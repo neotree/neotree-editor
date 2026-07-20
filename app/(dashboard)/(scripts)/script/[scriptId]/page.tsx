@@ -2,6 +2,7 @@ import { getHospitals } from "@/app/actions/hospitals";
 import { getScript } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
+import { EntityHistoryButton } from "@/app/(dashboard)/components/entity-history";
 import { ScriptForm } from "../../components/script-form";
 import { PageContainer } from "../../components/page-container";
 
@@ -35,6 +36,7 @@ export default async function Scripts({ params: { scriptId }, searchParams: { se
             <PageContainer
                 title="Edit script"
                 backLink="/"
+                actions={<EntityHistoryButton entityType="script" entityId={scriptId} entityName={formData.title} />}
             >
                 <ScriptForm 
                     hospitals={hospitals.data}

@@ -527,6 +527,7 @@ export type ScriptSelect = {
     exportable: boolean;
     nuidSearchEnabled: boolean;
     nuidSearchFields: ScriptSelect;
+    eligibilityCriteria: ScriptSelect | null;
     reviewable: boolean;
     reviewConfigurations: ScriptSelect;
     preferences: ScriptSelect;
@@ -553,6 +554,7 @@ export type ScriptInsert = {
     exportable?: boolean | undefined;
     nuidSearchEnabled?: boolean | undefined;
     nuidSearchFields?: ScriptInsert | undefined;
+    eligibilityCriteria?: (ScriptInsert | null) | undefined;
     reviewable?: boolean | undefined;
     reviewConfigurations?: ScriptInsert | undefined;
     preferences?: ScriptInsert | undefined;

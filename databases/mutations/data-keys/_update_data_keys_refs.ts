@@ -3,6 +3,7 @@ import { and, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import socket from '@/lib/socket';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensDrafts } from '@/databases/pg/schema';
 import { _getScreens, _getDiagnoses, _getProblems } from '@/databases/queries/scripts';
 import { _saveScreens, _saveDiagnoses, _saveProblems } from '@/databases/mutations/scripts';
@@ -24,6 +25,10 @@ export type UpdateDataKeysRefsParams = {
     userId?: string;
     draftOrigin?: "data_key_sync" | "import";
     matchUniqueKeysByDataKey?: Record<string, string[]>;
+    // Delete-replace uses alias-only matching so existing replacement usages are not rewritten unnecessarily.
+    includePrimaryUniqueKeys?: boolean;
+    forceFullScan?: boolean;
+    client?: DbOrTransaction;
 };
 
 type MatchSource = 'uniqueKey';
@@ -159,8 +164,12 @@ export async function _updateDataKeysRefs({
     userId,
     draftOrigin = "data_key_sync",
     matchUniqueKeysByDataKey = {},
+    includePrimaryUniqueKeys = true,
+    forceFullScan = false,
+    client,
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
     try {
+        const executor = client || db;
         const stats: UpdateStats = {
             candidateScripts: 0,
             fetchedScreens: 0,
@@ -188,7 +197,10 @@ export async function _updateDataKeysRefs({
             dataKeys.flatMap((key) => {
                 const currentUniqueKey = `${key.uniqueKey || ''}`.trim();
                 const aliases = currentUniqueKey ? (matchUniqueKeysByDataKey[currentUniqueKey] || []) : [];
-                return [currentUniqueKey, ...aliases].filter(Boolean);
+                return [
+                    ...(includePrimaryUniqueKeys ? [currentUniqueKey] : []),
+                    ...aliases,
+                ].filter(Boolean);
             }),
         ));
 
@@ -198,8 +210,10 @@ export async function _updateDataKeysRefs({
             uniqueKey?: string | null;
         }): { dataKey?: DataKey; source?: MatchSource } => {
             if (uniqueKey) {
-                const keyById = byUniqueKey.get(uniqueKey);
-                if (keyById) return { dataKey: keyById, source: 'uniqueKey' };
+                if (includePrimaryUniqueKeys) {
+                    const keyById = byUniqueKey.get(uniqueKey);
+                    if (keyById) return { dataKey: keyById, source: 'uniqueKey' };
+                }
 
                 for (const [currentUniqueKey, aliases] of Object.entries(matchUniqueKeysByDataKey)) {
                     if (!aliases.includes(uniqueKey)) continue;
@@ -263,7 +277,7 @@ export async function _updateDataKeysRefs({
         const candidateScripts = new Set<string>();
 
         if (changedUniqueKeys.length || likePatterns.length) {
-            const screensPublishedCandidates = await db
+            const screensPublishedCandidates = await executor
                 .select({ scriptId: screens.scriptId })
                 .from(screens)
                 .where(and(
@@ -280,7 +294,7 @@ export async function _updateDataKeysRefs({
                 if (row.scriptId) candidateScripts.add(row.scriptId);
             });
 
-            const diagnosesPublishedCandidates = await db
+            const diagnosesPublishedCandidates = await executor
                 .select({ scriptId: diagnoses.scriptId })
                 .from(diagnoses)
                 .where(and(
@@ -295,7 +309,7 @@ export async function _updateDataKeysRefs({
                 if (row.scriptId) candidateScripts.add(row.scriptId);
             });
 
-            const problemsPublishedCandidates = await db
+            const problemsPublishedCandidates = await executor
                 .select({ scriptId: problems.scriptId })
                 .from(problems)
                 .where(and(
@@ -310,7 +324,7 @@ export async function _updateDataKeysRefs({
             });
 
             if (likePatterns.length) {
-                const screensDraftCandidates = await db
+                const screensDraftCandidates = await executor
                     .select({
                         scriptId: screensDrafts.scriptId,
                         scriptDraftId: screensDrafts.scriptDraftId,
@@ -323,7 +337,7 @@ export async function _updateDataKeysRefs({
                     if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
                 });
 
-                const diagnosesDraftCandidates = await db
+                const diagnosesDraftCandidates = await executor
                     .select({
                         scriptId: diagnosesDrafts.scriptId,
                         scriptDraftId: diagnosesDrafts.scriptDraftId,
@@ -336,7 +350,7 @@ export async function _updateDataKeysRefs({
                     if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
                 });
 
-                const problemsDraftCandidates = await db
+                const problemsDraftCandidates = await executor
                     .select({
                         scriptId: problemsDrafts.scriptId,
                         scriptDraftId: problemsDrafts.scriptDraftId,
@@ -353,7 +367,7 @@ export async function _updateDataKeysRefs({
 
         stats.candidateScripts = candidateScripts.size;
 
-        const useFullScan = false;
+        const useFullScan = forceFullScan;
 
         if (!candidateScripts.size && !useFullScan) {
             return {
@@ -371,14 +385,14 @@ export async function _updateDataKeysRefs({
 
         const scriptsIds = useFullScan ? undefined : Array.from(candidateScripts);
         const { data: screensArr, errors: screensGetErrors } = await _getScreens(
-            scriptsIds?.length ? { scriptsIds } : undefined
+            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
         );
         const { data: diagnosesArr, errors: diagnosesGetErrors } = await _getDiagnoses(
-            scriptsIds?.length ? { scriptsIds } : undefined
+            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
         );
 
         const { data: problemsArr, errors: problemsGetErrors } = await _getProblems(
-            scriptsIds?.length ? { scriptsIds } : undefined
+            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
         );
 
         const prefetchErrors = [
@@ -802,11 +816,11 @@ export async function _updateDataKeysRefs({
 
         const saveDiagnosesTask = async () => {
             for (const chunk of chunkArray(diagnosesUpdatedData, SAVE_CHUNK_SIZE)) {
-                const res = await _saveDiagnoses({ data: chunk, userId, draftOrigin });
+                const res = await _saveDiagnoses({ data: chunk, userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (diagnosis) => {
-                        const singleRes = await _saveDiagnoses({ data: [diagnosis], userId, draftOrigin });
+                        const singleRes = await _saveDiagnoses({ data: [diagnosis], userId, draftOrigin, client: executor });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[diagnosis:${diagnosis.diagnosisId}] ${e}`));
                         } else {
@@ -821,11 +835,11 @@ export async function _updateDataKeysRefs({
 
         const saveProblemsTask = async () => {
             for (const chunk of chunkArray(problemsUpdatedData, SAVE_CHUNK_SIZE)) {
-                const res = await _saveProblems({ data: chunk, userId, draftOrigin });
+                const res = await _saveProblems({ data: chunk, userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (problem) => {
-                        const singleRes = await _saveProblems({ data: [problem], userId, draftOrigin });
+                        const singleRes = await _saveProblems({ data: [problem], userId, draftOrigin, client: executor });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[problem:${problem.problemId}] ${e}`));
                         } else {
@@ -840,11 +854,11 @@ export async function _updateDataKeysRefs({
 
         const saveScreensTask = async () => {
             for (const chunk of chunkArray(screensUpdatedData, SAVE_CHUNK_SIZE)) {
-                const res = await _saveScreens({ data: chunk, userId, draftOrigin });
+                const res = await _saveScreens({ data: chunk, userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
                     await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (screen) => {
-                        const singleRes = await _saveScreens({ data: [screen], userId, draftOrigin });
+                        const singleRes = await _saveScreens({ data: [screen], userId, draftOrigin, client: executor });
                         if (singleRes.errors?.length) {
                             saveErrors.push(...singleRes.errors.map(e => `[screen:${screen.screenId}] ${e}`));
                         } else {

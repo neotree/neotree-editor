@@ -2,11 +2,13 @@
 
 import axios from "axios";
 
-type DeleteImpactItem = {
+export type DeleteImpactItem = {
     dataKeyId: string;
     uniqueKey: string;
     name: string;
     label: string;
+    dataType: string;
+    options: string[];
     scripts: Array<{
         scriptId: string;
         scriptTitle: string;

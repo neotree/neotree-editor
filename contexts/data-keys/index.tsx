@@ -1,11 +1,11 @@
 'use client';
 
-import { 
-    createContext, 
-    useCallback, 
-    useContext, 
-    useEffect, 
-    useRef, 
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
     useState,
     useMemo,
 } from "react";
@@ -22,19 +22,19 @@ import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
 import { useAppContext } from "@/contexts/app";
-import { normalizeSearchTerm } from "@/lib/search";
+import { matchesDataKeySearch } from "@/lib/data-keys-search";
 
 
 function paginateData<T>(
-    data: T[], 
-    page: number, 
+    data: T[],
+    page: number,
     limit: number
 ): { data: T[], pagination: Pagination } {
     const total = data.length;
     const totalPages = Math.ceil(total / limit);
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
-    
+
     return {
         data: data.slice(startIndex, endIndex),
         pagination: {
@@ -117,19 +117,26 @@ export type tDataKeysCtx = {
     pagination?: Pagination;
     currentPage: number;
     itemsPerPage: number;
+    unusedDataKeys: {
+        data: DataKey[];
+        show: boolean;
+        errors: string[];
+    };
+    setUnusedDataKeys: React.Dispatch<React.SetStateAction<tDataKeysCtx['unusedDataKeys']>>;
     setCurrentPage: (page: number) => void;
     setSearchValue: (value: string) => void;
     saveDataKeys: (
         data: DataKeyFormData[],
         cb?: ((error?: string) => void)
     ) => Promise<Awaited<ReturnType<typeof actions.saveDataKeys>>>;
-    deleteDataKeys: (data: string[]) => Promise<void>;
+    deleteDataKeys: (data: string[], replacements?: Record<string, string>) => Promise<boolean>;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
     setSort: (value: string) => void;
     onSort: (value: string) => void;
     setFilter: (value: string) => void;
     setCurrentDataKeyUuid: (uuid: string) => void;
-    loadDataKeys: () => Promise<void>;
+    loadDataKeys: (params?: GetDataKeysParams) => Promise<void>;
+    loadUnusedDataKeys: () => Promise<void>;
     setSelected: React.Dispatch<tDataKeysCtx['selected']>;
     extractDataKeys: (uuids: string[], opts?: {
         withNested?: boolean;
@@ -144,8 +151,8 @@ export const useDataKeysCtx = () => {
     return ctx;
 };
 
-export function DataKeysCtxProvider({ 
-    children,  
+export function DataKeysCtxProvider({
+    children,
     prefetchDataKeys = true,
 }: {
     children: React.ReactNode;
@@ -171,11 +178,17 @@ export function DataKeysCtxProvider({
     const [itemsPerPage] = useState(100);
 
     /*****************************************************
-     ************ LOAD 
+     ************ LOAD
     ******************************************************/
     const [loadingDataKeys, setLoadingDataKeys] = useState(false);
     const [allDataKeys, setAllDataKeys] = useState<DataKey[]>([]);
     const [errors, setErrors] = useState<string[] | undefined>();
+
+    const [unusedDataKeys, setUnusedDataKeys] = useState<tDataKeysCtx['unusedDataKeys']>({ 
+        data: [], 
+        show: false, 
+        errors: [], 
+    });
 
     // Fetch ALL data once without pagination
     const loadDataKeys = useCallback(async (params?: GetDataKeysParams) => {
@@ -212,41 +225,47 @@ export function DataKeysCtxProvider({
         }
     }, [sort]); // Include sort in dependencies
 
+    // Fetch ALL data once without pagination
+    const loadUnusedDataKeys = useCallback(async () => {
+        setLoadingDataKeys(true);
+
+        try {
+            const response = await axios.get<{ data: DataKey[], errors?: string[] }>(`/api/data-keys/unused`);
+
+            // Apply sorting on client side using current sort value
+            const sortedData = sortDataKeys(response.data.data, sort);
+
+            setUnusedDataKeys({ data: sortedData, show: true, errors: response.data.errors || [], });
+            setCurrentPage(1);
+        } catch (e: any) {
+            setUnusedDataKeys({ data: [], show: true, errors: [e.message], });
+        } finally {
+            setLoadingDataKeys(false);
+        }
+    }, [sort]); // Include sort in dependencies
+
     // Apply filters and search to get filtered data
     const filteredDataKeys = useMemo(() => {
-        let filtered = [...allDataKeys];
+        let filtered = unusedDataKeys.show ? [...unusedDataKeys.data] : [...allDataKeys];
 
-        
+
         if (filter) {
-            if (filter === 'published') { 
+            if (filter === 'published') {
                 filtered = filtered.filter(dataKey => !dataKey?.isDraft);
-            } else if (filter === 'draft') { 
+            } else if (filter === 'draft') {
                 filtered = filtered.filter(dataKey => !!dataKey?.isDraft);
             } else {
                 filtered = filtered.filter(dataKey => dataKey?.dataType === filter);
             }
         }
 
-        
+
         if (searchValue) {
-            const { normalizedValue, isExactMatch } = normalizeSearchTerm(searchValue);
-
-            if (normalizedValue) {
-                filtered = filtered.filter(dataKey => {
-                    const searchableFields = [
-                        dataKey.name || '',
-                        dataKey.label || '',
-                    ].map(field => field.toLowerCase());
-
-                    return searchableFields.some(field =>
-                        isExactMatch ? field === normalizedValue : field.includes(normalizedValue)
-                    );
-                });
-            }
+            filtered = filtered.filter(dataKey => matchesDataKeySearch(dataKey, searchValue));
         }
 
         return filtered;
-    }, [allDataKeys, filter, searchValue]);
+    }, [allDataKeys, unusedDataKeys, filter, searchValue]);
 
     const { dataKeys, pagination } = useMemo(() => {
         if (!filteredDataKeys.length) {
@@ -254,7 +273,7 @@ export function DataKeysCtxProvider({
         }
 
         const paginatedResult = paginateData(filteredDataKeys, currentPage, itemsPerPage);
-        
+
         return {
             dataKeys: paginatedResult.data,
             pagination: paginatedResult.pagination,
@@ -285,7 +304,7 @@ export function DataKeysCtxProvider({
     }, [sort]); // This effect handles sorting when sort state changes
 
     /*****************************************************
-     ************ SAVE 
+     ************ SAVE
     ******************************************************/
     const [saving, setSaving] = useState(false);
 
@@ -298,9 +317,9 @@ export function DataKeysCtxProvider({
                 version: typeof d.version === 'string' ? Number(d.version) : d.version,
             }));
 
-            const response = await axios.post('/api/data-keys/save', { 
-                data: dataWithNumberVersion, 
-                broadcastAction: true, 
+            const response = await axios.post('/api/data-keys/save', {
+                data: dataWithNumberVersion,
+                broadcastAction: true,
             } satisfies SaveDataKeysParams);
             const res = response.data as Awaited<ReturnType<typeof actions.saveDataKeys>>;
 
@@ -334,7 +353,7 @@ export function DataKeysCtxProvider({
     }, [alert, router.refresh, loadDataKeys]);
 
     /*****************************************************
-     ************ DELETE 
+     ************ DELETE
     ******************************************************/
     const [deleting, setDeleting] = useState(false);
 
@@ -364,16 +383,19 @@ export function DataKeysCtxProvider({
         }
     }, [authenticatedUser?.userId, authenticatedUser?.displayName]);
 
-    const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data) => {
+    const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data, replacements) => {
         const keysToDelete = allDataKeys.filter(key => key?.uuid && data.includes(key.uuid));
 
         try {
             setDeleting(true);
 
-            const response = await axios.delete<DeleteDataKeysResponse>('/api/data-keys?data='+JSON.stringify({ 
-                dataKeysIds: data, 
-                broadcastAction: true, 
-            } satisfies DeleteDataKeysParams));
+            const response = await axios.delete<DeleteDataKeysResponse>('/api/data-keys', {
+                data: {
+                    dataKeysIds: data,
+                    broadcastAction: true,
+                    replacements,
+                } satisfies DeleteDataKeysParams,
+            });
 
             const res = response.data;
 
@@ -389,22 +411,26 @@ export function DataKeysCtxProvider({
 
             alert({
                 title: 'Success',
-                message: 'Data keys deleted successfully!',
+                message: replacements && Object.keys(replacements).length
+                    ? 'Data key replacements saved and deletion queued successfully!'
+                    : 'Data keys deleted successfully!',
                 variant: 'success',
             });
+            return true;
         } catch(e: any) {
             alert({
                 title: 'Error',
                 message: e.message,
                 variant: 'error',
             });
+            return false;
         } finally {
             setDeleting(false);
         }
     }, [router.refresh, alert, loadDataKeys, allDataKeys, recordDeletionPendingChanges]);
 
     /*****************************************************
-     ************ EXPORT 
+     ************ EXPORT
     ******************************************************/
     const [exporting, setExporting] = useState(false);
 
@@ -416,7 +442,7 @@ export function DataKeysCtxProvider({
             const res = response.data;
 
             if (res.errors?.length) throw new Error(res.errors[0]);
-            
+
             await loadDataKeys();
 
             setSelected([]);
@@ -436,7 +462,7 @@ export function DataKeysCtxProvider({
             setExporting(false);
         }
     }, [loadDataKeys, alert]);
-   
+
 
     /*****************************************************/
 
@@ -481,7 +507,7 @@ export function DataKeysCtxProvider({
                     exporting,
                     deleting,
                     dataKeys,
-                    allDataKeys, 
+                    allDataKeys,
                     errors,
                     selected,
                     currentDataKeyUuid,
@@ -491,6 +517,8 @@ export function DataKeysCtxProvider({
                     pagination,
                     currentPage,
                     itemsPerPage,
+                    unusedDataKeys,
+                    setUnusedDataKeys,
                     setCurrentPage,
                     setSearchValue,
                     extractDataKeys,
@@ -499,6 +527,7 @@ export function DataKeysCtxProvider({
                     exportDataKeys,
                     setCurrentDataKeyUuid,
                     loadDataKeys,
+                    loadUnusedDataKeys,
                     setSelected,
                     setSort,
                     onSort,
@@ -512,7 +541,7 @@ export function DataKeysCtxProvider({
 }
 
 function sortDataKeys (
-    dataKeys: DataKey[], 
+    dataKeys: DataKey[],
     sortValue = dataKeysSortOpts[0].value,
 ) {
     let sorted = [...dataKeys];
@@ -626,7 +655,7 @@ function sortDataKeys (
                 key2: new Date(key2.updatedAt || '').getTime().toString(),
             }));
             break;
-            
+
         default:
             sorted = dataKeys.sort((key1, key2) => sortFn({
                 sortDirection: 'asc',

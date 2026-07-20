@@ -3,6 +3,10 @@ import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
 import { DEFAULT_INTEGRITY_POLICY, getIntegrityEntryFingerprint, type IntegrityPolicy } from "@/lib/integrity-policy";
 import {
+    getDataKeyIntegrityPublishRuleLabel,
+    isDataKeyIntegrityRuleBlocking,
+} from "@/lib/data-key-integrity-rules";
+import {
     shouldSyncFieldOwnedOptions,
     shouldSyncScreenOwnedOptions,
     syncDiagnosisReference,
@@ -188,14 +192,7 @@ export type DataKeyIntegrityContext = {
 export function isBlockingEntry(
     entry: Pick<DataKeyIntegrityEntry, "status" | "kind">,
 ) {
-    return (
-        entry.status === "missing" ||
-        entry.status === "legacy_match" ||
-        entry.status === "unmanaged" ||
-        entry.kind === "screen_option_collection" ||
-        entry.kind === "field_option_collection" ||
-        entry.kind === "duplicate_parent_data_key"
-    );
+    return isDataKeyIntegrityRuleBlocking(entry);
 }
 
 export function getBlockingIntegrityEntries(
@@ -862,14 +859,7 @@ function getPublishEntryDisplayName(entry: DataKeyIntegrityEntry) {
 }
 
 function getPublishEntryRuleLabel(entry: DataKeyIntegrityEntry) {
-    if (entry.kind === "duplicate_parent_data_key") return "duplicate parent data key";
-    if (entry.kind === "screen_option_collection" || entry.kind === "field_option_collection") {
-        return "invalid script option";
-    }
-    if (entry.status === "missing") return "missing data key";
-    if (entry.status === "legacy_match") return "unlinked match";
-    if (entry.status === "unmanaged") return "unmanaged reference";
-    return getDataKeyIntegrityStatusLabel(entry.status).toLowerCase();
+    return getDataKeyIntegrityPublishRuleLabel(entry);
 }
 
 export function buildDataKeyIntegrityPublishDetails(
@@ -878,12 +868,26 @@ export function buildDataKeyIntegrityPublishDetails(
     const blocking = getBlockingIntegrityEntries(report.entries);
     if (!blocking.length) return null;
 
-    const grouped = new Map<string, DataKeyIntegrityEntry[]>();
+    const grouped = new Map<string, {
+        scriptId: string;
+        scriptTitle: string;
+        entries: DataKeyIntegrityEntry[];
+    }>();
     for (const entry of blocking) {
-        const key = `${entry.scriptId}::${entry.scriptTitle || entry.scriptId}`;
-        const current = grouped.get(key) || [];
-        current.push(entry);
-        grouped.set(key, current);
+        const scriptId = `${entry.scriptId || ""}`.trim();
+        if (!scriptId) continue;
+        const current = grouped.get(scriptId) || {
+            scriptId,
+            scriptTitle: `${entry.scriptTitle || ""}`.trim(),
+            entries: [],
+        };
+        // At this point script titles should already be enriched from the
+        // owning script. Never fall back to showing raw internal ids here.
+        if (entry.scriptTitle) {
+            current.scriptTitle = `${entry.scriptTitle}`.trim();
+        }
+        current.entries.push(entry);
+        grouped.set(scriptId, current);
     }
 
     const countsByRule = blocking.reduce((acc, entry) => {
@@ -903,9 +907,7 @@ export function buildDataKeyIntegrityPublishDetails(
             `Publish blocked: ${blocking.length} data key validation issue${blocking.length === 1 ? "" : "s"} found across ${grouped.size} script${grouped.size === 1 ? "" : "s"}.`,
             `Blocking rules triggered: ${topLevelSummary}.`,
         ],
-        scripts: Array.from(grouped.entries()).map(([groupKey, entries]) => {
-            const [scriptId, scriptTitleRaw] = groupKey.split("::");
-            const scriptTitle = scriptTitleRaw || scriptId;
+        scripts: Array.from(grouped.values()).map(({ scriptId, scriptTitle, entries }) => {
             return {
                 scriptId,
                 scriptTitle,

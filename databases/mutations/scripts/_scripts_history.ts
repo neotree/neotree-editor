@@ -27,8 +27,14 @@ export async function _saveScriptsHistory({
       const scriptId = c?.data?.scriptId
       if (!scriptId) continue
 
-      const isCreate = (c?.data?.version || 1) === 1
-      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
+      const prev = previous.find((prevC) => prevC.scriptId === scriptId)
+      const isCreate = !prev
+      // c.data is the row as persisted by publish, so its version is the entity's new version
+      const persistedVersion = Number(c?.data?.version)
+      const nextVersion =
+        Number.isFinite(persistedVersion) && persistedVersion > 0
+          ? persistedVersion
+          : Number(prev?.version ?? 0) + 1
 
       const changeHistoryData: typeof scriptsHistory.$inferInsert = {
         version: nextVersion,
@@ -44,8 +50,6 @@ export async function _saveScriptsHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.scriptId === scriptId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -74,16 +78,13 @@ export async function _saveScriptsHistory({
       if (userId) {
         const {  ...rest } = c.data || {}
         const sanitizedSnapshot = removeHexCharacters(rest)
-        const previousSnapshot = isCreate
-          ? {}
-          : removeHexCharacters(previous.find((prevC) => prevC.scriptId === scriptId) || {})
+        const previousSnapshot = isCreate ? {} : removeHexCharacters(prev || {})
         const changeReason = isCreate ? undefined : getDataKeySyncChangeReason(previousSnapshot, sanitizedSnapshot)
 
         changeLogsData.push({
           entityId: scriptId,
           entityType: "script",
           action: isCreate ? "create" : "update",
-          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -99,7 +100,8 @@ export async function _saveScriptsHistory({
       await executor.insert(scriptsHistory).values(insertData)
     }
   } catch (e: any) {
-    logger.error(e.message)
+    logger.error("_saveScriptsHistory ERROR", e.message)
+    throw e
   }
 
   return changeLogsData

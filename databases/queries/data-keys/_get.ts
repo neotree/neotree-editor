@@ -6,7 +6,6 @@ import { dataKeys, dataKeysDrafts, pendingDeletion, } from "@/databases/pg/schem
 import logger from "@/lib/logger";
 import { Pagination } from "@/types";
 
-
 export type DataKey = typeof dataKeys.$inferSelect & {
     isDraft: boolean;
     isDeleted: boolean;

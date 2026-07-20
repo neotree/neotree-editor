@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { CircleHelp, CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
+import { CopyIcon, ExternalLinkIcon, MoreVertical, WrenchIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryState } from "nuqs";
@@ -34,7 +34,8 @@ import {
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { PageContainer } from "../../../components/page-container";
-import { getDataKeyIntegrityStatusLabel, isBlockingEntry, type DataKeyIntegrityReport } from "@/lib/data-key-integrity";
+import { getDataKeyIntegrityEntryFingerprint, getDataKeyIntegrityStatusLabel, isBlockingEntry, type DataKeyIntegrityReport } from "@/lib/data-key-integrity";
+import { getDataKeyIntegrityRulesHref } from "@/lib/data-key-integrity-rules";
 import type { IntegrityPolicy } from "@/lib/integrity-policy";
 import { useAppContext } from "@/contexts/app";
 import { pendingChangesAPI } from "@/lib/indexed-db";
@@ -75,45 +76,6 @@ const statusFilterOptions = [
     { value: "legacy_match", label: "Unlinked match" },
     { value: "conflict", label: "Conflict" },
     { value: "unmanaged", label: "Unmanaged reference" },
-] as const;
-
-const statusHelpItems = [
-    {
-        status: "resolved",
-        label: "Resolved",
-        description: "The reference is linked correctly and matches the current data key library state.",
-        example: "A field points to the correct data key unique key and its current script text still matches the linked data key.",
-    },
-    {
-        status: "out_of_sync",
-        label: "Out of sync",
-        description: "The reference is linked, but part of the script copy or option set no longer matches the linked data key library entry.",
-        example: "A linked option still exists, but its label in the script is stale compared with the current library label.",
-    },
-    {
-        status: "missing",
-        label: "Missing",
-        description: "The script points to a data key that no longer exists in the library.",
-        example: "A deleted parent data key is still referenced by a field in the script.",
-    },
-    {
-        status: "legacy_match",
-        label: "Unlinked match",
-        description: "A matching data key exists in the library, but the script reference is not linked by unique key yet.",
-        example: "The script still uses an old text/key reference, and the matching data key can be resolved safely.",
-    },
-    {
-        status: "conflict",
-        label: "Conflict",
-        description: "The reference is structurally invalid and needs manual attention before publish can proceed.",
-        example: "The same parent data key appears twice in the same script, which would create ambiguous exported data.",
-    },
-    {
-        status: "unmanaged",
-        label: "Unmanaged reference",
-        description: "The script contains a local or legacy-style reference that does not map cleanly to the managed data key library.",
-        example: "A field still uses a free-text or locally-defined data key reference that is not managed by the central library.",
-    },
 ] as const;
 
 function formatIssueLabel(status: DataKeyIntegrityReport["entries"][number]["status"]) {
@@ -263,9 +225,10 @@ function buildImpactSummaryInlineText(summary?: IntegrityImpactSummary | null) {
     return base.replaceAll("Â·", "|");
 }
 
-export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
+export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, initialFocus = "all" }: {
     data: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0];
-    integrity?: (DataKeyIntegrityReport & { policy?: IntegrityPolicy | null }) | null;
+    integrity?: (DataKeyIntegrityReport & { policy?: IntegrityPolicy | null; newlyIntroducedFingerprints?: string[] }) | null;
+    initialFocus?: "all" | "newly_introduced";
 }) {
     type BulkPreviewItem = Awaited<ReturnType<typeof previewDataKeyIntegrityEntriesBulk>>["previews"][number];
     const router = useRouter();
@@ -273,7 +236,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const { alert } = useAlertModal();
     const [isRepairing, startRepairTransition] = useTransition();
     const [resolvingKey, setResolvingKey] = useState<string | null>(null);
-    const [issueScopeFilter, setIssueScopeFilter] = useState<"all" | "blocking" | "non_blocking">("all");
+    const [issueScopeFilter, setIssueScopeFilter] = useState<"all" | "blocking" | "newly_introduced" | "non_blocking">(
+        initialFocus === "newly_introduced" ? "newly_introduced" : "all"
+    );
     const [statusFilter, setStatusFilter] = useState<"all" | DataKeyIntegrityReport["entries"][number]["status"]>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [tableSearchValue, setTableSearchValue] = useState("");
@@ -282,7 +247,6 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
     const [repairPreview, setRepairPreview] = useState<Awaited<ReturnType<typeof previewDataKeyIntegrityEntryRepair>>["preview"] | null>(null);
     const [loadingRepairPreview, setLoadingRepairPreview] = useState(false);
     const [savingResolution, setSavingResolution] = useState(false);
-    const [statusHelpOpen, setStatusHelpOpen] = useState(false);
     const [resolveOutcomeModal, setResolveOutcomeModal] = useState<ResolveOutcomeModalState | null>(null);
     const [selectedTargetUniqueKey, setSelectedTargetUniqueKey] = useState<string>("");
     const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
@@ -314,11 +278,15 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         return `${a.location || ""}`.trim().toLowerCase().localeCompare(`${b.location || ""}`.trim().toLowerCase());
     }), [integrity?.entries]);
     const summary = integrity?.summary;
+    const newlyIntroducedFingerprintSet = useMemo(() => new Set(integrity?.newlyIntroducedFingerprints || []), [integrity?.newlyIntroducedFingerprints]);
     const availableTypes = useMemo(() => dataKeyTypes.filter((type) =>
         entries.some((entry) => `${entry.expectedDataType || ""}`.trim() === type.value)
     ), [entries]);
     const availableStatusOptions = useMemo(() => statusFilterOptions.filter((option) => {
         if (option.value === "all") return true;
+        if (issueScopeFilter === "newly_introduced") {
+            return option.value !== "resolved";
+        }
         if (issueScopeFilter === "blocking") {
             return option.value !== "resolved";
         }
@@ -328,12 +296,13 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         return true;
     }), [issueScopeFilter]);
     const filteredEntries = useMemo(() => entries.filter((entry) => {
+        if (issueScopeFilter === "newly_introduced" && !newlyIntroducedFingerprintSet.has(getDataKeyIntegrityEntryFingerprint(entry))) return false;
         if (issueScopeFilter === "blocking" && !isBlockingEntry(entry)) return false;
         if (issueScopeFilter === "non_blocking" && isBlockingEntry(entry)) return false;
         if (statusFilter !== "all" && entry.status !== statusFilter) return false;
         if (typeFilter !== "all" && entry.expectedDataType !== typeFilter) return false;
         return true;
-    }), [entries, issueScopeFilter, statusFilter, typeFilter]);
+    }), [entries, issueScopeFilter, statusFilter, typeFilter, newlyIntroducedFingerprintSet]);
 
     const getEntryKey = (entry: DataKeyIntegrityReport["entries"][number]) => `${entry.kind}::${entry.location}::${entry.currentUniqueKey || entry.currentKey || ""}`;
     const bulkResolvableEntries = useMemo(() => ({
@@ -944,34 +913,6 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         <>
             {showIntegrityLoader && <Loader overlay />}
             <Modal
-                open={statusHelpOpen}
-                onOpenChange={setStatusHelpOpen}
-                title="Integrity status help"
-                description="These statuses explain what was detected, why it matters, and what action is usually needed."
-                actions={(
-                    <Button variant="ghost" onClick={() => setStatusHelpOpen(false)}>
-                        Close
-                    </Button>
-                )}
-            >
-                <div className="space-y-3 text-sm">
-                    {statusHelpItems.map((item) => (
-                        <div key={item.status} className="rounded-md border p-3 space-y-2">
-                            <div className="flex items-center gap-2">
-                                <span className={cn("inline-flex rounded px-2 py-1 text-xs font-medium", statusStyles[item.status])}>
-                                    {item.label}
-                                </span>
-                            </div>
-                            <div className="text-foreground">{item.description}</div>
-                            <div className="text-muted-foreground">
-                                <span className="font-medium text-foreground">Example:</span> {item.example}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </Modal>
-
-            <Modal
                 open={!!resolveOutcomeModal}
                 onOpenChange={(open) => {
                     if (!open) setResolveOutcomeModal(null);
@@ -1550,11 +1491,11 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setStatusHelpOpen(true)}
-                                    className="gap-2"
+                                    asChild
                                 >
-                                    <CircleHelp className="h-4 w-4" />
-                                    Status help
+                                    <Link href={getDataKeyIntegrityRulesHref(scriptId)}>
+                                        Validation rules
+                                    </Link>
                                 </Button>
                             </div>
                         </div>
@@ -1571,6 +1512,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                     <SelectContent>
                                         <SelectItem value="all">All issues</SelectItem>
                                         <SelectItem value="blocking">Blocking issues</SelectItem>
+                                        <SelectItem value="newly_introduced">Newly introduced issues</SelectItem>
                                         <SelectItem value="non_blocking">Non-blocking issues</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -1636,8 +1578,10 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
                                 : integrity?.policy?.enforcementMode === "off"
                                     ? "Integrity enforcement is currently turned off in settings. The issue counts below still reflect the configured rule set."
                                     : integrity?.policy?.enforcementMode === "block_new_issues_only"
-                                        ? "Blocking issues match the configured rule set. In block new issues only mode, existing baseline issues may still be allowed at publish."
-                                    : "Blocking issues are the entries that currently prevent publish. Status options update based on the selected issue scope."}
+                                        ? issueScopeFilter === "newly_introduced"
+                                            ? "This view is focused on newly introduced blocking issues only. Switch the filter back to view all issues on this script."
+                                            : "Blocking issues match the configured rule set. In block new issues only mode, existing baseline issues may still be allowed at publish."
+                                        : "Blocking issues are the entries that currently prevent publish. Status options update based on the selected issue scope."}
                         </div>
 
                         {!viewOnly && hasBulkResolveActions && (
@@ -1777,4 +1721,3 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity }: {
         </>
     );
 }
-

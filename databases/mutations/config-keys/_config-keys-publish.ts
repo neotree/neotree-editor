@@ -7,6 +7,9 @@ import type { DbOrTransaction } from "@/databases/pg/db-client"
 import { configKeys, configKeysDrafts, configKeysHistory, pendingDeletion } from "@/databases/pg/schema"
 import { _saveConfigKeysHistory } from "./_config-keys-history"
 import { v4 } from "uuid"
+import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
+import { removeHexCharacters } from "@/databases/utils"
+import { buildDeleteChangeSnapshots } from "@/lib/changelog-publish"
 
 export async function _publishConfigKeys(opts?: {
   broadcastAction?: boolean
@@ -14,17 +17,23 @@ export async function _publishConfigKeys(opts?: {
   publisherUserId?: string | null
   dataVersion?: number
   client?: DbOrTransaction
-}) {
+}): Promise<{ success: boolean; errors?: string[] }> {
   const results: { success: boolean; errors?: string[] } = { success: false }
-  const errors: string[] = []
   const changeLogs: SaveChangeLogData[] = []
 
+  if (!opts?.client || !Number.isFinite(opts?.dataVersion)) {
+    return {
+      success: false,
+      errors: ["Config key publish must run inside a release transaction with a valid dataVersion"],
+    }
+  }
+
   try {
-    const executor = opts?.client || db
+    const client = opts.client
     let updates: (typeof configKeysDrafts.$inferSelect)[] = []
     let inserts: (typeof configKeysDrafts.$inferSelect)[] = []
 
-    const res = await executor.query.configKeysDrafts.findMany({
+    const res = await client.query.configKeysDrafts.findMany({
       where: !opts?.userId ? undefined : eq(configKeysDrafts.createdByUserId, opts?.userId),
     })
 
@@ -34,8 +43,9 @@ export async function _publishConfigKeys(opts?: {
     if (updates.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof configKeys.$inferSelect)[] = []
+      const persistedUpdates: typeof configKeysDrafts.$inferSelect[] = []
       if (updates.filter((c) => c.configKeyId).length) {
-        dataBefore = await executor.query.configKeys.findMany({
+        dataBefore = await client.query.configKeys.findMany({
           where: inArray(
             configKeys.configKeyId,
             updates.filter((c) => c.configKeyId).map((c) => c.configKeyId!),
@@ -45,22 +55,29 @@ export async function _publishConfigKeys(opts?: {
 
       for (const { configKeyId: _configKeyId, data: c } of updates) {
         const configKeyId = _configKeyId!
+        const sourceDraft = updates.find((draft) => draft.configKeyId === configKeyId)
 
         const { configKeyId: __configKeyId, id, oldConfigKeyId, createdAt, updatedAt, deletedAt, ...payload } = c
 
-        const updates = {
+        const nextData = {
           ...payload,
           publishDate: new Date(),
+          version: sql`${configKeys.version} + 1`,
         }
 
-        await executor.update(configKeys).set(updates).where(eq(configKeys.configKeyId, configKeyId)).returning()
+        const [persisted] = await client
+          .update(configKeys)
+          .set(nextData)
+          .where(eq(configKeys.configKeyId, configKeyId))
+          .returning()
+        if (persisted && sourceDraft) persistedUpdates.push({ ...sourceDraft, data: persisted })
       }
 
       const updateChangeLogs = await _saveConfigKeysHistory({
-        drafts: updates,
+        drafts: persistedUpdates,
         previous: dataBefore,
         userId: opts?.publisherUserId,
-        client: executor,
+        client,
       })
       changeLogs.push(...updateChangeLogs.map(log => ({
         ...log,
@@ -71,8 +88,9 @@ export async function _publishConfigKeys(opts?: {
     if (inserts.length) {
       // we'll use data before to compare changes
       let dataBefore: (typeof configKeys.$inferSelect)[] = []
+      const persistedInserts: typeof configKeysDrafts.$inferSelect[] = []
       if (inserts.filter((c) => c.configKeyId).length) {
-        dataBefore = await executor.query.configKeys.findMany({
+        dataBefore = await client.query.configKeys.findMany({
           where: inArray(
             configKeys.configKeyId,
             inserts.filter((c) => c.configKeyId).map((c) => c.configKeyId!),
@@ -82,21 +100,27 @@ export async function _publishConfigKeys(opts?: {
 
       for (const { id, data } of inserts) {
         const configKeyId = data.configKeyId || v4()
-        const payload = { ...data, configKeyId }
+        const payload = {
+          ...data,
+          configKeyId,
+          version: getPublishedEntityVersion({ currentVersion: data.version, isCreate: true }),
+        }
 
         inserts = inserts.map((d) => {
           if (d.id === id) d.data.configKeyId = configKeyId
           return d
         })
 
-        await executor.insert(configKeys).values(payload)
+        const [persisted] = await client.insert(configKeys).values(payload).returning()
+        const sourceDraft = inserts.find((draft) => draft.id === id)
+        if (persisted && sourceDraft) persistedInserts.push({ ...sourceDraft, data: persisted })
       }
 
       const insertChangeLogs = await _saveConfigKeysHistory({
-        drafts: inserts,
+        drafts: persistedInserts,
         previous: dataBefore,
         userId: opts?.publisherUserId,
-        client: executor,
+        client,
       })
       changeLogs.push(...insertChangeLogs.map(log => ({
         ...log,
@@ -104,11 +128,11 @@ export async function _publishConfigKeys(opts?: {
       })))
     }
 
-    await executor
+    await client
       .delete(configKeysDrafts)
       .where(!opts?.userId ? undefined : eq(configKeysDrafts.createdByUserId, opts.userId))
 
-    let deleted = await executor.query.pendingDeletion.findMany({
+    let deleted = await client.query.pendingDeletion.findMany({
       where: and(
         isNotNull(pendingDeletion.configKeyId),
         !opts?.userId ? undefined : eq(pendingDeletion.createdByUserId, opts.userId),
@@ -124,18 +148,22 @@ export async function _publishConfigKeys(opts?: {
     if (deleted.length) {
       const deletedAt = new Date()
 
-      await executor
+      const deletedRows = await client
         .update(configKeys)
-        .set({ deletedAt })
+        .set({ deletedAt, version: sql`${configKeys.version} + 1` })
         .where(
           inArray(
             configKeys.configKeyId,
             deleted.map((c) => c.configKeyId!),
           ),
         )
+        .returning()
+      const deletedById = new Map(deletedRows.map((row) => [row.configKeyId, row]))
 
       const historyPayload = deleted.map((c) => ({
-        version: (c.configKey!.version ?? 0) + 1,
+        version:
+          deletedById.get(c.configKeyId!)?.version ??
+          getPublishedEntityVersion({ currentVersion: c.configKey!.version, isCreate: false }),
         configKeyId: c.configKeyId!,
         changes: {
           action: "delete_config_key",
@@ -145,7 +173,7 @@ export async function _publishConfigKeys(opts?: {
         },
       }))
 
-      await executor.insert(configKeysHistory).values(historyPayload)
+      await client.insert(configKeysHistory).values(historyPayload)
 
       if (opts?.publisherUserId) {
         for (let index = 0; index < deleted.length; index++) {
@@ -153,31 +181,32 @@ export async function _publishConfigKeys(opts?: {
           const history = historyPayload[index]
           if (!entry?.configKeyId) continue
 
-          const snapshot = {
-            ...(entry.configKey ?? {}),
-            deletedAt,
-          }
+          const { previousSnapshot, fullSnapshot } = buildDeleteChangeSnapshots({
+            previousEntity: entry.configKey ?? {},
+            deletedFields: { deletedAt },
+            sanitize: removeHexCharacters,
+          })
 
           changeLogs.push({
             entityId: entry.configKeyId,
             entityType: "config_key",
             action: "delete",
-            version: history.version || ((entry.configKey?.version ?? 0) + 1),
+            version: history.version,
             dataVersion: opts.dataVersion,
             changes: history.changes,
-            fullSnapshot: JSON.parse(JSON.stringify(snapshot)),
-            previousSnapshot: JSON.parse(JSON.stringify(snapshot)),
-            baselineSnapshot: JSON.parse(JSON.stringify(snapshot)),
+            fullSnapshot,
+            previousSnapshot,
+            baselineSnapshot: previousSnapshot,
             description: history.changes.description,
             userId: opts.publisherUserId,
             configKeyId: entry.configKeyId,
-            isActive: false,
+            isActive: true,
           })
         }
       }
     }
 
-    await executor
+    await client
       .delete(pendingDeletion)
       .where(
         and(
@@ -186,25 +215,9 @@ export async function _publishConfigKeys(opts?: {
         ),
       )
 
-    const published = [
-      // ...inserts.map(c => c.configKeyId! || c.configKeyDraftId),
-      ...updates.map((c) => c.configKeyId!),
-      ...deleted.map((c) => c.configKeyId!),
-    ]
-
-    if (published.length) {
-      await executor
-        .update(configKeys)
-        .set({ version: sql`${configKeys.version} + 1` })
-        .where(inArray(configKeys.configKeyId, published))
-    }
-
     if (changeLogs.length) {
-      const saveResult = await _saveChangeLogs({ data: changeLogs, allowPartial: !opts?.client, client: executor })
-      if (saveResult.errors?.length) {
-        logger.error("_publishConfigKeys changelog error", saveResult.errors.join(", "))
-        throw new Error(saveResult.errors.join(", "))
-      }
+      const saveResult = await _saveChangeLogs({ data: changeLogs, client })
+      if (!saveResult.success) throw new Error(saveResult.errors?.join(", ") || "Failed to save config key changelogs")
     }
 
     results.success = true
@@ -212,7 +225,7 @@ export async function _publishConfigKeys(opts?: {
     results.success = false
     results.errors = [e.message]
     logger.error("_publishConfigKeys ERROR", e)
-  } finally {
-    return results
   }
+
+  return results
 }
