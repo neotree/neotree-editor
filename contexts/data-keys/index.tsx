@@ -117,6 +117,12 @@ export type tDataKeysCtx = {
     pagination?: Pagination;
     currentPage: number;
     itemsPerPage: number;
+    unusedDataKeys: {
+        data: DataKey[];
+        show: boolean;
+        errors: string[];
+    };
+    setUnusedDataKeys: React.Dispatch<React.SetStateAction<tDataKeysCtx['unusedDataKeys']>>;
     setCurrentPage: (page: number) => void;
     setSearchValue: (value: string) => void;
     saveDataKeys: (
@@ -129,7 +135,8 @@ export type tDataKeysCtx = {
     onSort: (value: string) => void;
     setFilter: (value: string) => void;
     setCurrentDataKeyUuid: (uuid: string) => void;
-    loadDataKeys: () => Promise<void>;
+    loadDataKeys: (params?: GetDataKeysParams) => Promise<void>;
+    loadUnusedDataKeys: () => Promise<void>;
     setSelected: React.Dispatch<tDataKeysCtx['selected']>;
     extractDataKeys: (uuids: string[], opts?: {
         withNested?: boolean;
@@ -177,6 +184,12 @@ export function DataKeysCtxProvider({
     const [allDataKeys, setAllDataKeys] = useState<DataKey[]>([]);
     const [errors, setErrors] = useState<string[] | undefined>();
 
+    const [unusedDataKeys, setUnusedDataKeys] = useState<tDataKeysCtx['unusedDataKeys']>({ 
+        data: [], 
+        show: false, 
+        errors: [], 
+    });
+
     // Fetch ALL data once without pagination
     const loadDataKeys = useCallback(async (params?: GetDataKeysParams) => {
         setLoadingDataKeys(true);
@@ -212,9 +225,28 @@ export function DataKeysCtxProvider({
         }
     }, [sort]); // Include sort in dependencies
 
+    // Fetch ALL data once without pagination
+    const loadUnusedDataKeys = useCallback(async () => {
+        setLoadingDataKeys(true);
+
+        try {
+            const response = await axios.get<{ data: DataKey[], errors?: string[] }>(`/api/data-keys/unused`);
+
+            // Apply sorting on client side using current sort value
+            const sortedData = sortDataKeys(response.data.data, sort);
+
+            setUnusedDataKeys({ data: sortedData, show: true, errors: response.data.errors || [], });
+            setCurrentPage(1);
+        } catch (e: any) {
+            setUnusedDataKeys({ data: [], show: true, errors: [e.message], });
+        } finally {
+            setLoadingDataKeys(false);
+        }
+    }, [sort]); // Include sort in dependencies
+
     // Apply filters and search to get filtered data
     const filteredDataKeys = useMemo(() => {
-        let filtered = [...allDataKeys];
+        let filtered = unusedDataKeys.show ? [...unusedDataKeys.data] : [...allDataKeys];
 
 
         if (filter) {
@@ -233,7 +265,7 @@ export function DataKeysCtxProvider({
         }
 
         return filtered;
-    }, [allDataKeys, filter, searchValue]);
+    }, [allDataKeys, unusedDataKeys, filter, searchValue]);
 
     const { dataKeys, pagination } = useMemo(() => {
         if (!filteredDataKeys.length) {
@@ -485,6 +517,8 @@ export function DataKeysCtxProvider({
                     pagination,
                     currentPage,
                     itemsPerPage,
+                    unusedDataKeys,
+                    setUnusedDataKeys,
                     setCurrentPage,
                     setSearchValue,
                     extractDataKeys,
@@ -493,6 +527,7 @@ export function DataKeysCtxProvider({
                     exportDataKeys,
                     setCurrentDataKeyUuid,
                     loadDataKeys,
+                    loadUnusedDataKeys,
                     setSelected,
                     setSort,
                     onSort,
