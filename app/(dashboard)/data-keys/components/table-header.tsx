@@ -25,8 +25,12 @@ export function DataKeysTableHeader() {
     const { 
         sort,
         filter,
+        unusedDataKeys,
+        setUnusedDataKeys,
         onSort,
         setFilter,
+        loadUnusedDataKeys,
+        loadDataKeys,
     } = useDataKeysCtx();
     const canManageDataKeys = isSuperUser && !viewOnly;
 
@@ -34,8 +38,8 @@ export function DataKeysTableHeader() {
         <>
             <div className="p-4 flex flex-col gap-y-4">
                 <div className="flex flex-wrap items-center">
-                    <div className="text-2xl">Data keys</div>
-                    <div className="flex-1 flex flex-wrap items-center justify-end gap-x-4">
+                    <div className="text-2xl mb-auto">Data keys</div>
+                    <div className="flex-1 flex flex-wrap items-center justify-end gap-4">
                         <div>
                             <Select
                                 value={sort}
@@ -126,6 +130,21 @@ export function DataKeysTableHeader() {
                                 </Link>
                             </Button>
                         )}
+
+                        <Button
+                            variant={unusedDataKeys.show ? 'primary-outline' : 'outline'}
+                            className="w-auto h-auto"
+                            onClick={() => {
+                                if (unusedDataKeys.show) {
+                                    setUnusedDataKeys(prev => ({ ...prev, show: false, }));
+                                    loadDataKeys();
+                                } else {
+                                    loadUnusedDataKeys();
+                                }
+                            }}
+                        >
+                            {unusedDataKeys.show ? 'Show all keys' : 'Show unused keys'}
+                        </Button>
 
                         <ExportMetadataButton />
                     </div>
