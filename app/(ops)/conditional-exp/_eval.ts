@@ -219,7 +219,7 @@ export function parseCondition(
         return `(${sanitizeCondition(parsedCondition)})`;
     }).join(' && ');
 
-    return _condition;
+    return _condition.toLowerCase();
 }
 
 export const screenTypes = [

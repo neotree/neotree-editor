@@ -111,6 +111,7 @@ export default function ConditionalExp() {
                             disabled={!canTest}
                             onChange={e => setCondition(e.target.value)}
                         />
+                        <pre>{!canTest ? '' : parseCondition(condition, entries)}</pre>
                     </div>
 
                     <div className="flex flex-row gap-x-4 justify-end">
