@@ -27,8 +27,14 @@ export async function _saveScreensHistory({
       const screenId = c?.data?.screenId
       if (!screenId) continue
 
-      const isCreate = (c?.data?.version || 1) === 1
-      const nextVersion = isCreate ? 1 : (c?.data?.version || 1) + 1
+      const prev = previous.find((prevC) => prevC.screenId === screenId)
+      const isCreate = !prev
+      // c.data is the row as persisted by publish, so its version is the entity's new version
+      const persistedVersion = Number(c?.data?.version)
+      const nextVersion =
+        Number.isFinite(persistedVersion) && persistedVersion > 0
+          ? persistedVersion
+          : Number(prev?.version ?? 0) + 1
 
       const changeHistoryData: typeof screensHistory.$inferInsert = {
         version: nextVersion,
@@ -45,8 +51,6 @@ export async function _saveScreensHistory({
           newValues: [],
         }
       } else {
-        const prev = previous.find((prevC) => prevC.screenId === screenId)
-
         const oldValues: any[] = []
         const newValues: any[] = []
 
@@ -75,9 +79,7 @@ export async function _saveScreensHistory({
       if (userId) {
         const {  ...rest } = c.data || {}
         const sanitizedSnapshot = removeHexCharacters(rest)
-        const previousSnapshot = isCreate
-          ? {}
-          : removeHexCharacters(previous.find((prevC) => prevC.screenId === screenId) || {})
+        const previousSnapshot = isCreate ? {} : removeHexCharacters(prev || {})
         const changeReason = isCreate
           ? undefined
           : c.draftOrigin === "other"
@@ -88,7 +90,6 @@ export async function _saveScreensHistory({
           entityId: screenId,
           entityType: "screen",
           action: isCreate ? "create" : "update",
-          version: nextVersion,
           changes: changeHistoryData.changes,
           fullSnapshot: sanitizedSnapshot,
           previousSnapshot,
@@ -105,7 +106,8 @@ export async function _saveScreensHistory({
       await executor.insert(screensHistory).values(insertData)
     }
   } catch (e: any) {
-    logger.error(e.message)
+    logger.error("_saveScreensHistory ERROR", e.message)
+    throw e
   }
 
   return changeLogsData

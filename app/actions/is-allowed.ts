@@ -3,6 +3,7 @@
 import { DataAction, PagePermission } from "@/types";
 import { isAuthenticated } from "./is-authenticated";
 import logger from "@/lib/logger";
+import { isUnauthenticatedError } from "@/lib/auth-errors";
 
 type PermissionParam = PagePermission | PagePermission[] | DataAction | DataAction[];
 
@@ -11,7 +12,9 @@ export async function canAccessPage(perm?: PermissionParam) {
     try {
         response = await isAllowed(perm);
     } catch(e: any) {
-        logger.error('canAccessPage ERROR', e.message);
+        if (!isUnauthenticatedError(e)) {
+            logger.error('canAccessPage ERROR', e.message);
+        }
     } finally {
         return response;
     }

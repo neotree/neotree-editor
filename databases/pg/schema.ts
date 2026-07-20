@@ -26,6 +26,7 @@ import type {
   ScriptImage,
   ScriptItem,
   FluidField,
+  EligibilityCriteria,
 } from "@/types"
 import type { IntegrityBaseline, IntegrityPolicy } from "@/lib/integrity-policy"
 import { defaultPreferences } from "@/constants"
@@ -573,6 +574,7 @@ export const scripts = pgTable(
     exportable: boolean("exportable").notNull().default(true),
     nuidSearchEnabled: boolean("nuid_search_enabled").notNull().default(false),
     nuidSearchFields: jsonb("nuid_search_fields").default("[]").notNull(),
+    eligibilityCriteria: jsonb("eligibility_criteria").$type<EligibilityCriteria | null>(),
     reviewable: boolean("reviewable").notNull().default(false),
     reviewConfigurations: jsonb("review_configurations").default("[]").notNull(),
     preferences: jsonb("preferences").default(JSON.stringify(defaultPreferences)).notNull(),
@@ -637,7 +639,7 @@ export const scriptsDrafts = pgTable("nt_scripts_drafts", {
   hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "set null" }),
   data: jsonb("data")
     .$type<
-      typeof scripts.$inferInsert & { nuidSearchFields: ScriptField[] } & { reviewConfigurations: ScreenReviewField[] }
+      typeof scripts.$inferInsert & { nuidSearchFields: ScriptField[] } & { reviewConfigurations: ScreenReviewField[] } & { eligibilityCriteria?: EligibilityCriteria | null }
     >()
     .notNull(),
   draftOrigin: draftOriginEnum("draft_origin").notNull().default("editor"),
@@ -1407,9 +1409,10 @@ export const changeLogs = pgTable(
     supersededBy: integer("superseded_by"),
     supersededAt: timestamp("superseded_at"),
 
-    // User tracking
+    // User tracking. RESTRICT, not SET NULL: the column is NOT NULL, so a SET NULL
+    // cascade would fail anyway — this makes "audited users cannot be hard-deleted" explicit.
     userId: uuid("user_id")
-      .references(() => users.userId, { onDelete: "set null" })
+      .references(() => users.userId, { onDelete: "restrict" })
       .notNull(),
 
     // Timestamps

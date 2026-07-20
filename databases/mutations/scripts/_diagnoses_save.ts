@@ -17,6 +17,31 @@ export type SaveDiagnosesResponse = {
     errors?: string[]; 
 };
 
+async function resolveScriptReference(
+    executor: DbOrTransaction,
+    scriptId: string,
+) {
+    /**
+     * Resolve against the merged entity state, not only the incoming payload.
+     * Partial saves can omit scriptId in the request while the final merged
+     * diagnosis still legitimately belongs to a script.
+     */
+    const scriptDraft = await executor.query.scriptsDrafts.findFirst({
+        where: eq(scriptsDrafts.scriptDraftId, scriptId),
+        columns: { scriptDraftId: true, },
+    });
+
+    const publishedScript = await executor.query.scripts.findFirst({
+        where: eq(scripts.scriptId, scriptId),
+        columns: { scriptId: true, },
+    });
+
+    return {
+        scriptDraftId: scriptDraft?.scriptDraftId,
+        scriptId: publishedScript?.scriptId,
+    };
+}
+
 export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveDiagnosesData[],
     broadcastAction?: boolean;
@@ -32,59 +57,6 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
     const executor = client || db;
 
     try {
-        const existingDiagnosisIds = Array.from(new Set(
-            data.map((item) => item.diagnosisId).filter((id): id is string => !!id)
-        ));
-        const referencedScriptIds = Array.from(new Set(
-            data.map((item) => item.scriptId).filter((id): id is string => !!id)
-        ));
-
-        const [
-            drafts,
-            publishedDiagnoses,
-            publishedScripts,
-            scriptDraftsRows,
-            maxPublishedDiagnosis,
-            maxDraftDiagnosis,
-        ] = await Promise.all([
-            existingDiagnosisIds.length
-                ? executor.query.diagnosesDrafts.findMany({
-                    where: inArray(diagnosesDrafts.diagnosisDraftId, existingDiagnosisIds),
-                })
-                : Promise.resolve([]),
-            existingDiagnosisIds.length
-                ? executor.query.diagnoses.findMany({
-                    where: inArray(diagnoses.diagnosisId, existingDiagnosisIds),
-                })
-                : Promise.resolve([]),
-            referencedScriptIds.length
-                ? executor.query.scripts.findMany({
-                    where: inArray(scripts.scriptId, referencedScriptIds),
-                    columns: { scriptId: true, },
-                })
-                : Promise.resolve([]),
-            referencedScriptIds.length
-                ? executor.query.scriptsDrafts.findMany({
-                    where: inArray(scriptsDrafts.scriptDraftId, referencedScriptIds),
-                    columns: { scriptDraftId: true, },
-                })
-                : Promise.resolve([]),
-            executor.query.diagnoses.findFirst({
-                columns: { position: true, },
-                orderBy: desc(diagnoses.position),
-            }),
-            executor.query.diagnosesDrafts.findFirst({
-                columns: { position: true, },
-                orderBy: desc(diagnosesDrafts.position),
-            }),
-        ]);
-
-        const draftsById = new Map(drafts.map((draft) => [draft.diagnosisDraftId, draft]));
-        const publishedDiagnosesById = new Map(publishedDiagnoses.map((diagnosis) => [diagnosis.diagnosisId, diagnosis]));
-        const publishedScriptIds = new Set(publishedScripts.map((script) => script.scriptId));
-        const scriptDraftIds = new Set(scriptDraftsRows.map((draft) => draft.scriptDraftId).filter(Boolean));
-        let nextPosition = Math.max(0, maxPublishedDiagnosis?.position || 0, maxDraftDiagnosis?.position || 0) + 1;
-
         let index = 0;
         for (const { diagnosisId: itemDiagnosisId, ...item } of data) {
             try {
@@ -93,8 +65,13 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                 const diagnosisId = itemDiagnosisId || uuid.v4();
 
                 if (!errors.length) {
-                    const draft = !itemDiagnosisId ? null : draftsById.get(diagnosisId) || null;
-                    const published = (draft || !itemDiagnosisId) ? null : publishedDiagnosesById.get(diagnosisId) || null;
+                    const draft = !itemDiagnosisId ? null : await executor.query.diagnosesDrafts.findFirst({
+                        where: eq(diagnosesDrafts.diagnosisDraftId, diagnosisId),
+                    });
+
+                    const published = (draft || !itemDiagnosisId) ? null : await executor.query.diagnoses.findFirst({
+                        where: eq(diagnoses.diagnosisId, diagnosisId),
+                    });
 
                     if (draft) {
                         const data = {
@@ -117,8 +94,17 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            position = nextPosition;
-                            nextPosition++;
+                            const diagnosis = await executor.query.diagnoses.findFirst({
+                                columns: { position: true, },
+                                orderBy: desc(diagnoses.position),
+                            });
+
+                            const diagnosisDraft = await executor.query.diagnosesDrafts.findFirst({
+                                columns: { position: true, },
+                                orderBy: desc(diagnosesDrafts.position),
+                            });
+
+                            position = Math.max(0, diagnosis?.position || 0, diagnosisDraft?.position || 0) + 1;
                         }
 
                         const data = {
@@ -130,13 +116,12 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                         } as typeof diagnosesDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraftId = scriptDraftIds.has(data.scriptId) ? data.scriptId : undefined;
-                            const publishedScriptId = publishedScriptIds.has(data.scriptId) ? data.scriptId : undefined;
+                            const { scriptDraftId, scriptId } = await resolveScriptReference(executor, data.scriptId);
 
-                            if (scriptDraftId || publishedScriptId) {
+                            if (scriptDraftId || scriptId) {
                                 const q = executor.insert(diagnosesDrafts).values({
                                     data,
-                                    scriptId: publishedScriptId,
+                                    scriptId,
                                     scriptDraftId,
                                     diagnosisDraftId: diagnosisId,
                                     position: data.position,
@@ -148,15 +133,6 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                                 sqlInfo[`${diagnosisId} - createDiagnosisDraft`] = q.toSQL();
 
                                 await q.execute();
-                                draftsById.set(diagnosisId, {
-                                    diagnosisDraftId: diagnosisId,
-                                    diagnosisId: published?.diagnosisId,
-                                    scriptId: publishedScriptId || null,
-                                    scriptDraftId: scriptDraftId || null,
-                                    createdByUserId: userId || null,
-                                    data,
-                                    position: data.position || null,
-                                } as typeof diagnosesDrafts.$inferSelect);
                             } else {
                                 errors.push(`Could not save diagnosis ${index}: ${data.name}, because script was not found`);
                             }

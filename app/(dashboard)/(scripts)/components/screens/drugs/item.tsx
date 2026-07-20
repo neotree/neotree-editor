@@ -12,8 +12,6 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { GetDrugsLibraryItemsResults } from "@/databases/queries/drugs-library"
 import { SelectDrug } from "../../../../components/drugs-library/select"
-import { pendingChangesAPI } from "@/lib/indexed-db"
-import { useAppContext } from "@/contexts/app"
 
 type Props = {
   children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode)
@@ -42,10 +40,6 @@ export function Item<P = {}>({
   subTypes = [],
   ...extraProps
 }: Props & P) {
-  const scriptId = form.getValues("scriptId")
-  const screenId = form.getValues("screenId")
-  const { authenticatedUser } = useAppContext()
-
   const [selected, setSelected] = useState<null | DrugField>(null)
   const [open, setOpen] = useState(false)
 
@@ -54,27 +48,6 @@ export function Item<P = {}>({
   const onSave = useCallback(async () => {
     if (selected) {
       const isNew = itemProp?.index === undefined
-      const fieldPath = isNew ? `${formKey}[new]` : `${formKey}[${itemProp.index}]`
-      const screenTitle =
-        form.getValues("title") ||
-        form.getValues("sectionTitle") ||
-        form.getValues("label") ||
-        form.getValues("previewTitle") ||
-        "Screen"
-
-      await pendingChangesAPI.addChange({
-        entityType: "screen",
-        entityId: screenId,
-        entityTitle: screenTitle,
-        action: isNew ? "create" : "update",
-        fieldPath,
-        fieldName: `${formKey}: ${selected.key}`,
-        oldValue: itemProp?.data || null,
-        newValue: selected,
-        userId: authenticatedUser?.userId,
-        userName: authenticatedUser?.displayName,
-      })
-
 
       if (isNew) {
         form.setValue(formKey, [...form.getValues(formKey), selected], { shouldDirty: true })
@@ -89,11 +62,12 @@ export function Item<P = {}>({
                   ...selected,
                 }),
           })),
+          { shouldDirty: true },
         )
       }
     }
     setOpen(false)
-  }, [selected, itemProp, formKey, screenId, form])
+  }, [selected, itemProp, formKey, form])
 
   return (
     <>
@@ -132,9 +106,10 @@ export function Item<P = {}>({
                 .map((item) => item.key)
                 .filter((s) => s !== selected?.key!)}
               onChange={([key]) => {
-                let position = form.getValues(formKey).length
-                  ? 1
-                  : Math.max(...form.getValues(formKey).map((s) => s.position)) + 1
+                const currentItems = form.getValues(formKey)
+                let position = currentItems.length
+                  ? Math.max(...currentItems.map((s) => s.position ?? 0)) + 1
+                  : 1
 
                 if (itemProp?.data) position = itemProp.data.position
 

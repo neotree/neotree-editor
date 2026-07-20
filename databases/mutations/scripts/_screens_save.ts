@@ -104,6 +104,31 @@ function getConfidentialDataKeyIds(screen: SaveScreensData) {
     return Array.from(ids).filter(Boolean);
 }
 
+async function resolveScriptReference(
+    executor: DbOrTransaction,
+    scriptId: string,
+) {
+    /**
+     * Resolve against the merged entity state, not the raw payload.
+     * Partial saves can omit scriptId in the request, while the final merged
+     * screen still has a valid scriptId from the existing draft/published row.
+     */
+    const scriptDraft = await executor.query.scriptsDrafts.findFirst({
+        where: eq(scriptsDrafts.scriptDraftId, scriptId),
+        columns: { scriptDraftId: true, },
+    });
+
+    const publishedScript = await executor.query.scripts.findFirst({
+        where: eq(scripts.scriptId, scriptId),
+        columns: { scriptId: true, },
+    });
+
+    return {
+        scriptDraftId: scriptDraft?.scriptDraftId,
+        scriptId: publishedScript?.scriptId,
+    };
+}
+
 async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: string) {
     const ids = Array.from(new Set(uniqueKeys.filter(Boolean)));
     if (!ids.length) return;
@@ -154,59 +179,6 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
     const executor = client || db;
     
     try {
-        const existingScreenIds = Array.from(new Set(
-            data.map((item) => item.screenId).filter((id): id is string => !!id)
-        ));
-        const referencedScriptIds = Array.from(new Set(
-            data.map((item) => item.scriptId).filter((id): id is string => !!id)
-        ));
-
-        const [
-            drafts,
-            publishedScreens,
-            publishedScripts,
-            scriptDraftsRows,
-            maxPublishedScreen,
-            maxDraftScreen,
-        ] = await Promise.all([
-            existingScreenIds.length
-                ? executor.query.screensDrafts.findMany({
-                    where: inArray(screensDrafts.screenDraftId, existingScreenIds),
-                })
-                : Promise.resolve([]),
-            existingScreenIds.length
-                ? executor.query.screens.findMany({
-                    where: inArray(screens.screenId, existingScreenIds),
-                })
-                : Promise.resolve([]),
-            referencedScriptIds.length
-                ? executor.query.scripts.findMany({
-                    where: inArray(scripts.scriptId, referencedScriptIds),
-                    columns: { scriptId: true, },
-                })
-                : Promise.resolve([]),
-            referencedScriptIds.length
-                ? executor.query.scriptsDrafts.findMany({
-                    where: inArray(scriptsDrafts.scriptDraftId, referencedScriptIds),
-                    columns: { scriptDraftId: true, },
-                })
-                : Promise.resolve([]),
-            executor.query.screens.findFirst({
-                columns: { position: true, },
-                orderBy: desc(screens.position),
-            }),
-            executor.query.screensDrafts.findFirst({
-                columns: { position: true, },
-                orderBy: desc(screensDrafts.position),
-            }),
-        ]);
-
-        const draftsById = new Map(drafts.map((draft) => [draft.screenDraftId, draft]));
-        const publishedScreensById = new Map(publishedScreens.map((screen) => [screen.screenId, screen]));
-        const publishedScriptIds = new Set(publishedScripts.map((script) => script.scriptId));
-        const scriptDraftIds = new Set(scriptDraftsRows.map((draft) => draft.scriptDraftId).filter(Boolean));
-        let nextPosition = Math.max(0, maxPublishedScreen?.position || 0, maxDraftScreen?.position || 0) + 1;
-
         let index = 0;
         for (const { screenId: itemScreenId, ...item } of data) {
             try {
@@ -237,22 +209,23 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                 getConfidentialDataKeyIds(normalizedItem).forEach((id) => confidentialDataKeyIds.add(id));
 
                 if (!errors.length) {
-                    const draft = !itemScreenId ? null : draftsById.get(screenId) || null;
+                    const draft = !itemScreenId ? null : await executor.query.screensDrafts.findFirst({
+                        where: eq(screensDrafts.screenDraftId, screenId),
+                    });
 
-                    const published = (draft || !itemScreenId) ? null : publishedScreensById.get(screenId) || null;
+                    const published = (draft || !itemScreenId) ? null : await executor.query.screens.findFirst({
+                        where: eq(screens.screenId, screenId),
+                    });
 
-                    if (draft) {
-                        const mergedNormalization = normalizeScreenSelectionRuleItemIds({
-                            ...draft.data,
-                            ...normalizedItem,
-                        } as typeof draft.data);
-                        const data = mergedNormalization.value as typeof draft.data;
-                        if (mergedNormalization.warnings.length) {
-                            warnings.push(...mergedNormalization.warnings.map((warning) => `Screen "${screenLabel}" merged draft: ${warning}`));
-                        }
-                        
+                    if (draft) {                        
                         const persistedDraftOrigin = requestedDraftOrigin;
-                        const q = executor
+
+                        const data = {
+                            ...draft.data,
+                            ...item,
+                        } as typeof draft.data;
+                        
+                        const q = db
                             .update(screensDrafts)
                             .set({
                                 data,
@@ -266,52 +239,46 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            position = nextPosition;
-                            nextPosition++;
+                            const screen = await executor.query.screens.findFirst({
+                                columns: { position: true, },
+                                orderBy: desc(screens.position),
+                            });
+
+                            const screenDraft = await executor.query.screensDrafts.findFirst({
+                                columns: { position: true, },
+                                orderBy: desc(screensDrafts.position),
+                            });
+
+                            position = Math.max(0, screen?.position || 0, screenDraft?.position || 0) + 1;
                         }
 
-                        const mergedNormalization = normalizeScreenSelectionRuleItemIds({
+                        const data = {
                             ...published,
-                            ...normalizedItem,
+                            ...item,
                             screenId,
                             version: published?.version ? (published.version + 1) : 1,
                             position,
-                        } as typeof screensDrafts.$inferInsert['data']);
-                        const data = mergedNormalization.value as typeof screensDrafts.$inferInsert['data'];
-                        if (mergedNormalization.warnings.length) {
-                            warnings.push(...mergedNormalization.warnings.map((warning) => `Screen "${screenLabel}" merged publish source: ${warning}`));
-                        }
+                        } as typeof screensDrafts.$inferInsert['data'];
 
                         if (data.scriptId) {
-                            const scriptDraftId = scriptDraftIds.has(data.scriptId) ? data.scriptId : undefined;
-                            const publishedScriptId = publishedScriptIds.has(data.scriptId) ? data.scriptId : undefined;
+                            const { scriptDraftId, scriptId } = await resolveScriptReference(executor, data.scriptId);
 
-                            if (scriptDraftId || publishedScriptId) {
+                            if (scriptDraftId || scriptId) {
                                 const q = executor.insert(screensDrafts).values({
                                     data,
                                     type: data.type,
-                                    scriptId: publishedScriptId,
+                                    scriptId,
                                     scriptDraftId,
-                                screenDraftId: screenId,
-                                position: data.position,
-                                screenId: published?.screenId,
-                                createdByUserId: userId,
-                                draftOrigin: requestedDraftOrigin,
-                            });
+                                    screenDraftId: screenId,
+                                    position: data.position,
+                                    screenId: published?.screenId,
+                                    createdByUserId: userId,
+                                    draftOrigin: requestedDraftOrigin,
+                                });
 
                                 info.query = q.toSQL();
 
                                 await q.execute();
-                                draftsById.set(screenId, {
-                                    screenDraftId: screenId,
-                                    screenId: published?.screenId,
-                                    scriptId: publishedScriptId || null,
-                                    scriptDraftId: scriptDraftId || null,
-                                    createdByUserId: userId || null,
-                                    data,
-                                    type: data.type || null,
-                                    position: data.position || null,
-                                } as typeof screensDrafts.$inferSelect);
                             } else {
                                 errors.push(`Could not save screen ${index}: ${data.title}, because script was not found`);
                             }

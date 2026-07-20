@@ -12,10 +12,11 @@ import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
-import { buildDataKeyIntegrityContext, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
+import { buildDataKeyIntegrityContext, getDataKeyIntegrityEntryFingerprint, isBlockingEntry, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 import { _getEditorInfo } from '@/databases/queries/editor-info';
-import { getIntegrityPolicyState } from '@/lib/integrity-policy';
+import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from '@/lib/integrity-policy';
 import socket from '@/lib/socket';
+import { buildDataKeysDeleteImpact } from '@/lib/data-key-delete-impact';
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
@@ -73,6 +74,10 @@ function buildRegistryIntegrityReport({
         rawReport,
         integrityContext,
     };
+}
+
+function getBlockingEntriesForRegistry(entries: DataKeyIntegrityEntry[]) {
+    return entries.filter((entry) => isBlockingEntry(entry));
 }
 
 function buildImpactSummary({
@@ -317,12 +322,24 @@ export const getDataKeysIntegrity = async (params?: {
             onlyIssues: params?.onlyIssues !== false,
         });
 
+        // Expose the currently enforced "newly introduced" issue set so the
+        // script registry can open directly into the same blocking slice a
+        // user saw from the publish modal.
+        const blockingEntries = getBlockingEntriesForRegistry(rawReport.entries);
+        const policyEvaluation = evaluateIntegrityPolicyBlockingEntries({
+            policy: integrityPolicyState.policy,
+            baseline: integrityPolicyState.baseline,
+            blockingEntries,
+            getFingerprint: getDataKeyIntegrityEntryFingerprint,
+        });
+
         return {
             success: true,
             data: {
                 ...rawReport,
                 policy: integrityPolicyState.policy,
                 summary: rawReport.summary,
+                newlyIntroducedFingerprints: policyEvaluation.enforcedBlockingEntries.map((entry) => getDataKeyIntegrityEntryFingerprint(entry)),
             },
         };
     } catch (e: any) {
@@ -345,6 +362,8 @@ export const getDataKeysDeleteImpact = async (params?: {
         uniqueKey: string;
         name: string;
         label: string;
+        dataType: string;
+        options: string[];
         scripts: Array<{
             scriptId: string;
             scriptTitle: string;
@@ -375,224 +394,16 @@ export const getDataKeysDeleteImpact = async (params?: {
 
         if (errors.length) return { success: false, data: [], errors };
 
-        const requestedIds = new Set((params?.dataKeysIds || []).filter(Boolean));
-        const requestedUniqueKeys = new Set((params?.uniqueKeys || []).filter(Boolean));
-        const targets = dataKeysRes.data.filter((dataKey) => (
-            (dataKey.uuid && requestedIds.has(dataKey.uuid)) ||
-            (dataKey.uniqueKey && requestedUniqueKeys.has(dataKey.uniqueKey))
-        ));
-
-        if (!targets.length) {
-            return {
-                success: true,
-                data: [],
-            };
-        }
-
-        const uniqueTargetNames = new Map<string, string>();
-        const dataKeyNameCounts = new Map<string, number>();
-        dataKeysRes.data.forEach((dataKey) => {
-            const name = `${dataKey.name || ''}`.trim();
-            if (!name) return;
-            dataKeyNameCounts.set(name, (dataKeyNameCounts.get(name) || 0) + 1);
-        });
-        targets.forEach((dataKey) => {
-            const name = `${dataKey.name || ''}`.trim();
-            if (!name) return;
-            if (dataKeyNameCounts.get(name) === 1) {
-                uniqueTargetNames.set(name, dataKey.uniqueKey);
-            }
-        });
-
-        const scriptsByTarget = new Map<string, Map<string, { scriptId: string; scriptTitle: string; usages: Array<{ label: string; href: string }> }>>();
-        targets.forEach((target) => {
-            scriptsByTarget.set(target.uniqueKey, new Map());
-        });
-
-        const addScriptUsage = ({
-            scriptId,
-            scriptTitle,
-            keyId,
-            keyName,
-            label,
-            href,
-        }: {
-            scriptId?: string | null;
-            scriptTitle?: string | null;
-            keyId?: string | null;
-            keyName?: string | null;
-            label: string;
-            href: string;
-        }) => {
-            const normalizedScriptId = `${scriptId || ''}`.trim();
-            const normalizedScriptTitle = `${scriptTitle || ''}`.trim();
-            if (!normalizedScriptId || !normalizedScriptTitle) return;
-
-            const matchedUniqueKey = (() => {
-                const normalizedKeyId = `${keyId || ''}`.trim();
-                if (normalizedKeyId && scriptsByTarget.has(normalizedKeyId)) return normalizedKeyId;
-
-                const normalizedKeyName = `${keyName || ''}`.trim();
-                if (!normalizedKeyName) return '';
-                return uniqueTargetNames.get(normalizedKeyName) || '';
-            })();
-
-            if (!matchedUniqueKey) return;
-
-            const scripts = scriptsByTarget.get(matchedUniqueKey);
-            if (!scripts) return;
-            const existing = scripts.get(normalizedScriptId);
-            const usage = {
-                label,
-                href,
-            };
-            if (existing) {
-                const usageKey = `${usage.label}::${usage.href}`;
-                if (!existing.usages.some((item) => `${item.label}::${item.href}` === usageKey)) {
-                    existing.usages.push(usage);
-                }
-                return;
-            }
-            scripts.set(normalizedScriptId, {
-                scriptId: normalizedScriptId,
-                scriptTitle: normalizedScriptTitle,
-                usages: [usage],
-            });
-        };
-
-        screensRes.data.forEach((screen) => {
-            const screenHref = `/script/${screen.scriptId}/screen/${screen.screenId}`;
-            const screenLabel = screen.title || screen.label || screen.refId || 'screen';
-            addScriptUsage({
-                scriptId: screen.scriptId,
-                scriptTitle: screen.scriptTitle,
-                keyId: screen.keyId,
-                keyName: screen.key,
-                label: screenLabel,
-                href: screenHref,
-            });
-
-            (screen.items || []).forEach((item, itemIndex) => {
-                addScriptUsage({
-                    scriptId: screen.scriptId,
-                    scriptTitle: screen.scriptTitle,
-                    keyId: item.keyId,
-                    keyName: item.key || item.id,
-                    label: `${screenLabel} > ${item.label || item.key || item.id || `item ${itemIndex + 1}`}`,
-                    href: `${screenHref}?item=${item.itemId || itemIndex}`,
-                });
-            });
-
-            (screen.fields || []).forEach((field, fieldIndex) => {
-                const fieldHref = `${screenHref}?field=${field.fieldId || fieldIndex}`;
-                const fieldLabel = `${screenLabel} > ${field.label || field.key || `field ${fieldIndex + 1}`}`;
-                addScriptUsage({
-                    scriptId: screen.scriptId,
-                    scriptTitle: screen.scriptTitle,
-                    keyId: field.keyId,
-                    keyName: field.key,
-                    label: fieldLabel,
-                    href: fieldHref,
-                });
-                addScriptUsage({
-                    scriptId: screen.scriptId,
-                    scriptTitle: screen.scriptTitle,
-                    keyId: field.refKeyId,
-                    keyName: field.refKey,
-                    label: `${fieldLabel} > ref key`,
-                    href: fieldHref,
-                });
-                addScriptUsage({
-                    scriptId: screen.scriptId,
-                    scriptTitle: screen.scriptTitle,
-                    keyId: field.minDateKeyId,
-                    keyName: field.minDateKey,
-                    label: `${fieldLabel} > min date`,
-                    href: fieldHref,
-                });
-                addScriptUsage({
-                    scriptId: screen.scriptId,
-                    scriptTitle: screen.scriptTitle,
-                    keyId: field.maxDateKeyId,
-                    keyName: field.maxDateKey,
-                    label: `${fieldLabel} > max date`,
-                    href: fieldHref,
-                });
-                addScriptUsage({
-                    scriptId: screen.scriptId,
-                    scriptTitle: screen.scriptTitle,
-                    keyId: field.minTimeKeyId,
-                    keyName: field.minTimeKey,
-                    label: `${fieldLabel} > min time`,
-                    href: fieldHref,
-                });
-                addScriptUsage({
-                    scriptId: screen.scriptId,
-                    scriptTitle: screen.scriptTitle,
-                    keyId: field.maxTimeKeyId,
-                    keyName: field.maxTimeKey,
-                    label: `${fieldLabel} > max time`,
-                    href: fieldHref,
-                });
-
-                (field.items || []).forEach((item, fieldItemIndex) => {
-                    addScriptUsage({
-                        scriptId: screen.scriptId,
-                        scriptTitle: screen.scriptTitle,
-                        keyId: item.keyId,
-                        keyName: `${item.value || ''}` || `${item.label || ''}`,
-                        label: `${fieldLabel} > ${item.label || item.value || `option ${fieldItemIndex + 1}`}`,
-                        href: `${fieldHref}&fieldItem=${item.itemId || fieldItemIndex}`,
-                    });
-                });
-            });
-        });
-
-        diagnosesRes.data.forEach((diagnosis) => {
-            const diagnosisHref = `/script/${diagnosis.scriptId}/diagnosis/${diagnosis.diagnosisId}`;
-            const diagnosisLabel = diagnosis.name || diagnosis.key || 'diagnosis';
-            addScriptUsage({
-                scriptId: diagnosis.scriptId,
-                scriptTitle: diagnosis.scriptTitle,
-                keyId: diagnosis.keyId,
-                keyName: diagnosis.key || diagnosis.name,
-                label: diagnosisLabel,
-                href: diagnosisHref,
-            });
-
-            (diagnosis.symptoms || []).forEach((symptom, symptomIndex) => {
-                addScriptUsage({
-                    scriptId: diagnosis.scriptId,
-                    scriptTitle: diagnosis.scriptTitle,
-                    keyId: symptom.keyId,
-                    keyName: symptom.key || symptom.name,
-                    label: `${diagnosisLabel} > ${symptom.name || symptom.key || `symptom ${symptomIndex + 1}`}`,
-                    href: `${diagnosisHref}?symptom=${symptom.symptomId || symptomIndex}`,
-                });
-            });
-        });
-
-        problemsRes.data.forEach((problem) => {
-            addScriptUsage({
-                scriptId: problem.scriptId,
-                scriptTitle: problem.scriptTitle,
-                keyId: problem.keyId,
-                keyName: problem.key || problem.name,
-                label: problem.name || problem.key || 'problem',
-                href: `/script/${problem.scriptId}/problem/${problem.problemId}`,
-            });
-        });
-
         return {
             success: true,
-            data: targets.map((target) => ({
-                dataKeyId: target.uuid,
-                uniqueKey: target.uniqueKey,
-                name: target.name || '',
-                label: target.label || '',
-                scripts: Array.from(scriptsByTarget.get(target.uniqueKey)?.values() || [])
-                    .sort((a, b) => a.scriptTitle.localeCompare(b.scriptTitle)),
-            })),
+            data: buildDataKeysDeleteImpact({
+                dataKeys: dataKeysRes.data,
+                screens: screensRes.data,
+                diagnoses: diagnosesRes.data,
+                problems: problemsRes.data,
+                dataKeysIds: params?.dataKeysIds,
+                uniqueKeys: params?.uniqueKeys,
+            }),
         };
     } catch (e: any) {
         logger.error('getDataKeysDeleteImpact ERROR', e.message);
@@ -1531,7 +1342,7 @@ export const exportDataKeys = async ({
         await assertCanManageDataKeys(session.user);
 
         const axiosClient = await getSiteAxiosClient(siteId);
-        
+
         const dataKeys = await _getDataKeys({
             dataKeysIds: uuids,
             returnDraftsIfExist: true,

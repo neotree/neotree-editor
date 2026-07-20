@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from "react";
 import Link from "next/link";
-import { MoreVertical, Trash, Edit, Eye, CopyIcon, ExternalLink } from "lucide-react";
+import { MoreVertical, Trash, Edit, Eye, CopyIcon, ExternalLink, History } from "lucide-react";
 
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { EntityHistorySheet } from "@/app/(dashboard)/components/entity-history";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -31,6 +33,7 @@ export function DrugsLibraryTableActions({
     editLink,
 }: Props) {
     const { confirm } = useConfirmModal();
+    const [historyOpen, setHistoryOpen] = useState(false);
 
     const lockStatusParams: LockStatusProps = {
         isDraft: !!item.isDraft,
@@ -94,6 +97,13 @@ export function DrugsLibraryTableActions({
                         </Link>
                     </DropdownMenuItem>
 
+                    {!!item.itemId && (
+                        <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
+                            <History className="mr-2 h-4 w-4" />
+                            View history
+                        </DropdownMenuItem>
+                    )}
+
                     {!disabled && (
                         <DropdownMenuItem
                             onClick={() => setTimeout(() => {
@@ -113,6 +123,16 @@ export function DrugsLibraryTableActions({
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
+
+            {!!item.itemId && (
+                <EntityHistorySheet
+                    entityType="drugs_library"
+                    entityId={item.itemId}
+                    entityName={item.drug || item.key || undefined}
+                    open={historyOpen}
+                    onOpenChange={setHistoryOpen}
+                />
+            )}
         </div>
     );
 }

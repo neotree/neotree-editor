@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { hospitals, hospitalsDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { and } from 'drizzle-orm';
 
 export type DeleteHospitalsData = {
     hospitalsIds: string[];
@@ -37,7 +38,10 @@ export async function _deleteHospitals(
 
         if (hospitalsIds.length) {
             // delete drafts
-            await db.delete(hospitalsDrafts).where(inArray(hospitalsDrafts.hospitalDraftId, hospitalsIds));
+            await db.delete(hospitalsDrafts).where(and(
+                inArray(hospitalsDrafts.hospitalDraftId, hospitalsIds),
+                !userId ? undefined : eq(hospitalsDrafts.createdByUserId, userId),
+            ));
 
             // insert hospitals into pendingDeletion, we'll delete them when data is published
             const hospitalsArr = await db

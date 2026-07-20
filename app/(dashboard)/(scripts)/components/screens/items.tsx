@@ -29,17 +29,23 @@ export function Items({
     form,
     disabled,
 }: Props) {
+    const {
+        getValues,
+        setValue,
+        watch,
+    } = form;
+
     const btnRef = useRef<HTMLButtonElement>(null);
-    const screenType = form.getValues('type');
+    const screenType = getValues('type');
     const isDiagnosisScreen = screenType === 'diagnosis';
-    const isChecklistScreen = screenType === 'checklist';
-    const isProgressScreen = screenType === 'progress';
+    const isProblemsScreen = screenType === 'problems';
 
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
 
-    const items = form.watch('items');
-    const rankItems = form.watch('rankItems');
+    const items = watch('items');
+    const rankItems = watch('rankItems');
+    const preferences = watch('preferences');
     
     const canRankItems = screenType === 'multi_select';
 
@@ -144,6 +150,19 @@ export function Items({
                 onSort={onSort}
                 selectedIndexes={selectedIndexes}
                 onSelect={setSelectedIndexes}
+                preTableNode={!isProblemsScreen ? undefined : (
+                    <div className="flex items-center space-x-2">
+                        <Checkbox
+                            id="enableSeverityRanking"
+                            checked={!!preferences.enableSeverityRanking}
+                            disabled={disabled}
+                            onCheckedChange={checked => {
+                                setValue('preferences.enableSeverityRanking', !!checked, { shouldDirty: true, });
+                            }}
+                        />
+                        <Label htmlFor="enableSeverityRanking">Enable severity ranking</Label>
+                    </div>
+                )}
                 search={{
                     inputPlaceholder: 'Search items',
                 }}
