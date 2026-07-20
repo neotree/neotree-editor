@@ -1,6 +1,7 @@
 import { getDiagnosis, getScript } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
+import { EntityHistoryButton } from "@/app/(dashboard)/components/entity-history";
 import { DiagnosisForm } from "../../../../components/diagnoses/form";
 import { PageContainer } from "../../../../components/page-container";
 
@@ -44,6 +45,7 @@ export default async function Diagnoses({ params: { diagnosisId, scriptId } }: P
             <PageContainer
                 title="Edit diagnosis"
                 backLink={`/script/${scriptId}`}
+                actions={<EntityHistoryButton entityType="diagnosis" entityId={diagnosisId} entityName={diagnosis.data.name} />}
             >
                 <DiagnosisForm 
                     scriptId={scriptId}

@@ -48,6 +48,8 @@ export type DataTableSearchOptions = {
     inputPlaceholder?: string;
     value?: string;
     setValue?: (value: string) => void;
+    /** Set to false when the parent already supplies filtered rows. */
+    filterRows?: boolean;
 };
 
 export type DataTableHeaderProps = {

@@ -45,9 +45,12 @@ export class ChangeLogDB extends Dexie {
 
 export const changeLogDB = new ChangeLogDB()
 
-// Helper functions for managing pending changes
 export const pendingChangesAPI = {
-  // Add a new pending change (entityTitle is required)
+  filterByUser<T extends { userId?: string }>(items: T[], userId?: string) {
+    if (!userId) return items
+    return items.filter((item) => item.userId === userId)
+  },
+
   async addChange(change: Omit<PendingChange, "id" | "timestamp">) {
     const timestamp = Date.now()
     const entityTitle =
@@ -66,8 +69,7 @@ export const pendingChangesAPI = {
     const nextUpdates = { ...updates }
 
     if (updates.entityTitle && typeof updates.entityTitle === "string") {
-      nextUpdates.entityTitle =
-        updates.entityTitle.trim().length > 0 ? updates.entityTitle.trim() : undefined
+      nextUpdates.entityTitle = updates.entityTitle.trim().length > 0 ? updates.entityTitle.trim() : undefined
     }
 
     return await changeLogDB.pendingChanges.update(id, nextUpdates)
@@ -77,20 +79,19 @@ export const pendingChangesAPI = {
     return await changeLogDB.pendingChanges.delete(id)
   },
 
-  // Get all pending changes for an entity
-  async getEntityChanges(entityId: string, entityType?: string) {
+  async getEntityChanges(entityId: string, entityType?: string, userId?: string) {
     const query = changeLogDB.pendingChanges.where("entityId").equals(entityId)
+    const matchesUser = (change: PendingChange) => !userId || change.userId === userId
 
     if (entityType) {
-      return await query.and((change) => change.entityType === entityType).toArray()
+      return await query.and((change) => change.entityType === entityType && matchesUser(change)).toArray()
     }
 
-    return await query.toArray()
+    return await query.and(matchesUser).toArray()
   },
 
-  // Get all pending changes grouped by entity (includes title)
-  async getAllChangesByEntity() {
-    const allChanges = await changeLogDB.pendingChanges.toArray()
+  async getAllChangesByEntity(userId?: string) {
+    const allChanges = this.filterByUser(await changeLogDB.pendingChanges.toArray(), userId)
     const grouped: Record<string, { title: string; changes: PendingChange[] }> = {}
 
     allChanges.forEach((change) => {
@@ -98,9 +99,9 @@ export const pendingChangesAPI = {
       if (!grouped[key]) {
         grouped[key] = {
           title:
-            (typeof change.entityTitle === "string" && change.entityTitle.trim().length
+            typeof change.entityTitle === "string" && change.entityTitle.trim().length
               ? change.entityTitle.trim()
-              : `${change.entityType} ${change.entityId}`),
+              : `${change.entityType} ${change.entityId}`,
           changes: [],
         }
       }
@@ -110,15 +111,15 @@ export const pendingChangesAPI = {
     return grouped
   },
 
-  // Get count of pending changes
-  async getChangeCount(entityId?: string) {
+  async getChangeCount(entityId?: string, userId?: string) {
     if (entityId) {
-      return await changeLogDB.pendingChanges.where("entityId").equals(entityId).count()
+      const entityChanges = await changeLogDB.pendingChanges.where("entityId").equals(entityId).toArray()
+      return this.filterByUser(entityChanges, userId).length
     }
-    return await changeLogDB.pendingChanges.count()
+    if (!userId) return await changeLogDB.pendingChanges.count()
+    return (await changeLogDB.pendingChanges.where("userId").equals(userId).toArray()).length
   },
 
-  // Clear changes for an entity (called after save/publish)
   async clearEntityChanges(entityId: string, entityType?: string) {
     if (entityType) {
       return await changeLogDB.pendingChanges
@@ -130,22 +131,19 @@ export const pendingChangesAPI = {
     return await changeLogDB.pendingChanges.where("entityId").equals(entityId).delete()
   },
 
-  // Clear all pending changes
   async clearAllChanges() {
     return await changeLogDB.pendingChanges.clear()
   },
 
-  // Get changes by user
   async getChangesByUser(userId: string) {
     return await changeLogDB.pendingChanges.where("userId").equals(userId).toArray()
   },
 
-  // Get recent changes (last N changes)
-  async getRecentChanges(limit = 50) {
-    return await changeLogDB.pendingChanges.orderBy("timestamp").reverse().limit(limit).toArray()
+  async getRecentChanges(limit = 50, userId?: string) {
+    const recent = await changeLogDB.pendingChanges.orderBy("timestamp").reverse().toArray()
+    return this.filterByUser(recent, userId).slice(0, limit)
   },
 
-  // Session management
   async startSession(entityId: string, entityType: string, entityTitle?: string, userId?: string) {
     const sessionId = `${entityType}-${entityId}-${Date.now()}`
     const session: Omit<ChangeSession, "id"> = {

@@ -10,8 +10,6 @@ import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useScriptsContext, type IScriptsContext } from "@/contexts/scripts"
 import { useAppContext } from "@/contexts/app"
 import type { ScriptsSearchResultsItem, ScriptsSearchResultsFilter } from "@/lib/scripts-search"
-import { pendingChangesAPI } from "@/lib/indexed-db"
-import { recordPendingDeletionChange } from "@/lib/change-tracker"
 
 export type UseScriptsTableParams = {
   scripts: Awaited<ReturnType<IScriptsContext["getScripts"]>>
@@ -39,7 +37,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
   }, [scriptsParam])
 
   const router = useRouter()
-  const { viewOnly, authenticatedUser } = useAppContext()
+  const { viewOnly } = useAppContext()
   const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 
@@ -73,20 +71,6 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
               onClose: () => setScripts(_scripts),
             })
           } else {
-            await Promise.all(
-              scriptsToDelete.map(async (script) => {
-                if (!script?.scriptId) return
-                await recordPendingDeletionChange({
-                  entityId: script.scriptId,
-                  entityType: "script",
-                  entityTitle: script.title || script.printTitle || "Untitled Script",
-                  snapshot: script,
-                  userId: authenticatedUser?.userId,
-                  userName: authenticatedUser?.displayName,
-                  description: `Marked "${script.title || script.printTitle || "Untitled Script"}" for deletion`,
-                })
-              }),
-            )
             setSelected([])
             router.refresh()
             alert({
@@ -106,7 +90,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
         },
       )
     },
-    [deleteScripts, confirm, alert, router, scripts, authenticatedUser?.userId, authenticatedUser?.displayName],
+    [deleteScripts, confirm, alert, router, scripts],
   )
 
   const onSort = useCallback(
@@ -131,51 +115,6 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
       setScripts((prev) => ({ ...prev, data: sorted }))
 
       try {
-        await Promise.all(
-          sorted.map(async (item) => {
-            const previousPosition = previousPositions.get(item.scriptId)
-            if (previousPosition === undefined) return
-
-            const existingChanges = await pendingChangesAPI.getEntityChanges(item.scriptId, "script")
-            const existingPositionChange = existingChanges.find((change) => change.fieldPath === "position")
-            const baseline = existingPositionChange?.oldValue ?? previousPosition
-
-            if (baseline === undefined) return
-
-            if (item.position === baseline) {
-              if (existingPositionChange?.id) {
-                await pendingChangesAPI.deleteChange(existingPositionChange.id)
-              }
-              return
-            }
-
-            const description = `Position changed from ${baseline} to ${item.position}`
-
-            if (existingPositionChange?.id) {
-              await pendingChangesAPI.updateChange(existingPositionChange.id, {
-                newValue: item.position,
-                description,
-                fullSnapshot: { ...item },
-              })
-            } else {
-              await pendingChangesAPI.addChange({
-                entityId: item.scriptId,
-                entityType: "script",
-                entityTitle: item.title || item.printTitle || "Untitled Script",
-                action: "update",
-                fieldPath: "position",
-                fieldName: "position",
-                oldValue: baseline,
-                newValue: item.position,
-                description,
-                userId: authenticatedUser?.userId,
-                userName: authenticatedUser?.displayName,
-                fullSnapshot: { ...item },
-              })
-            }
-          }),
-        )
-
         if (payload.length) {
           // TODO: Replace this with server action
           await axios.post("/api/scripts/save", { data: payload, broadcastAction: true })
@@ -183,30 +122,10 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
 
         router.refresh()
       } catch (e) {
-        // Roll back UI and pending changes on failure
         setScripts(previousState)
-
-        await Promise.all(
-          sorted.map(async (item) => {
-            const existingChanges = await pendingChangesAPI.getEntityChanges(item.scriptId, "script")
-            const existingPositionChange = existingChanges.find((change) => change.fieldPath === "position")
-            const baseline = existingPositionChange?.oldValue ?? previousPositions.get(item.scriptId)
-
-            if (existingPositionChange?.id) {
-              if (baseline === undefined || baseline === item.position) {
-                await pendingChangesAPI.deleteChange(existingPositionChange.id)
-              } else {
-                await pendingChangesAPI.updateChange(existingPositionChange.id, {
-                  newValue: baseline,
-                  description: `Position rolled back to ${baseline}`,
-                })
-              }
-            }
-          }),
-        )
       }
     },
-    [saveScripts, scripts, router, authenticatedUser?.userId, authenticatedUser?.displayName],
+    [saveScripts, scripts, router],
   )
 
   const onDuplicate = useCallback(
