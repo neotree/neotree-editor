@@ -78,15 +78,14 @@ export function parseScriptsSearchResults({
     diagnoses,
     problems,
 }: ParseScriptsSearchResultsParams): ScriptsSearchResultsItem[] {
-    const { normalizedValue, isExactMatch } = normalizeSearchTerm(searchValue);
+    const { normalizedValue, isQuotedSearch } = normalizeSearchTerm(searchValue, { doubleQuotesOnly: true });
 
     if (!normalizedValue) {
         return [];
     }
 
     const escapedSearchValue = escapeRegex(normalizedValue);
-    const pattern = isExactMatch ? `^${escapedSearchValue}$` : escapedSearchValue;
-    const searchRegex = new RegExp(pattern, isExactMatch ? "" : "i");
+    const searchRegex = new RegExp(escapedSearchValue, isQuotedSearch ? "" : "i");
     const manualEntrySearchTerms = [
         'manual entry',
         'enter value manually',
@@ -865,4 +864,3 @@ export function filterScriptsSearchResults({ searchValue, filter, results, }: {
 
     return filtered;
 }
-
