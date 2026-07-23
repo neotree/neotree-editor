@@ -72,8 +72,8 @@ export function ConditionalExpressionModal() {
                             <h6>Multi selection</h6>
                             
                             <code>
-                                <p><b>$Diagnoses</b> = &apos;LBW&apos; <i>{'-false'}</i></p>
-                                <div>For multiple values, we check if &apos;LBW&apos; (right side of the expression) is <b>included</b> in the selection</div>
+                                {/* <p><b>$Diagnoses</b> = &apos;LBW&apos; <i>{'-false'}</i></p>
+                                <div>For multiple values, we check if &apos;LBW&apos; (right side of the expression) is <b>included</b> in the selection</div> */}
 
                                 {/* <p><b>$Diagnoses</b> != &apos;LBW&apos; <i>{'-true'}</i></p>
                                 <div>For multiple values, we check if &apos;LBW&apos; (right side of the expression) is <b>NOT included</b> in the selection</div> */}
@@ -81,12 +81,14 @@ export function ConditionalExpressionModal() {
                                 <br />
 
                                 <p>[<b>$Diagnoses</b> includes (&apos;LBW&apos;)] <i>{'-false'}</i></p>
-                                <p>[<b>$Diagnoses</b> includes (&apos;LBW&apos;,&apos;Sepsis&apos;)] <i>{'-true'}</i></p>
+                                <p>[<b>$Diagnoses</b> includes (&apos;LBW&apos;,&apos;Sepsis&apos;)] <i>{'-false'}</i></p>
+                                <p>[<b>$Diagnoses</b> or_includes (&apos;LBW&apos;,&apos;Sepsis&apos;)] <i>{'-true'}</i></p>
 
                                 <br />
 
                                 <p>[<b>$Diagnoses</b> excludes (&apos;LBW&apos;)] <i>{'-true'}</i></p>
                                 <p>[<b>$Diagnoses</b> excludes (&apos;LBW&apos;,&apos;Sepsis&apos;)] <i>{'-false'}</i></p>
+                                <p>[<b>$Diagnoses</b> or_excludes (&apos;LBW&apos;,&apos;Sepsis&apos;)] <i>{'-true'}</i></p>
                             </code>
 
                             <h6>Stacked expressions</h6>
