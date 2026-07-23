@@ -177,7 +177,6 @@ const isSelectedEntryFn = (type: string) => [
     'drug',
     'fluid',
     'checklist',
-    'yesno',
 ].includes(type);
 
 const hasMultipleEntriesFn = (type: string) => [
@@ -380,30 +379,75 @@ function Modal({
                                         ) : (
                                             <div className="flex-1">
                                                 <Label>Value</Label>
-                                                <Input 
-                                                    value={v.value}
-                                                    onChange={e => setEntryValue(prev => {
-                                                        const value = e.target.value;
-                                                        const key = v.key || prev.key;
-                                                        let calculateValue: any = undefined;
+                                                {(() => {
+                                                    if (entryValue.type === 'yesno') {
+                                                        return (
+                                                            <>
+                                                                <Select
+                                                                    value={v.value}
+                                                                    onValueChange={value => setEntryValue(prev => ({
+                                                                        ...prev,
+                                                                        value: prev.value?.map?.((v: any, j: number) => {
+                                                                            return i !== j ? v : {
+                                                                                ...v,
+                                                                                value,
+                                                                                calculateValue: value === 'true',
+                                                                                parentKey: prev.key,
+                                                                            };
+                                                                        }),
+                                                                    }))}
+                                                                >
+                                                                    <SelectTrigger>
+                                                                        <SelectValue />
+                                                                    </SelectTrigger>
 
-                                                        if (isNumberFn(entryValue.type!)) {
-                                                            calculateValue = isNaN(Number(`${value || ''}`)) ? undefined : Number(value); 
-                                                        }
-                                                        
-                                                        return {
-                                                            ...prev,
-                                                            value: prev.value?.map?.((v: any, j: number) => {
-                                                                return i !== j ? v : {
-                                                                    ...v,
-                                                                    value,
-                                                                    key,
-                                                                    parentKey: prev.key,
+                                                                    <SelectContent>
+                                                                        {[
+                                                                            { label: 'Yes', value: 'true', },
+                                                                            { label: 'No', value: 'false', },
+                                                                        ].map((t, i) => {
+                                                                            return (
+                                                                                <SelectItem
+                                                                                    key={t.value}
+                                                                                    value={t.value}
+                                                                                >
+                                                                                    {t.label}
+                                                                                </SelectItem>
+                                                                            );
+                                                                        })}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <Input 
+                                                            value={v.value}
+                                                            onChange={e => setEntryValue(prev => {
+                                                                const value = e.target.value;
+                                                                const key = v.key || prev.key;
+                                                                let calculateValue: any = undefined;
+
+                                                                if (isNumberFn(entryValue.type!)) {
+                                                                    calculateValue = isNaN(Number(`${value || ''}`)) ? undefined : Number(value); 
+                                                                }
+                                                                
+                                                                return {
+                                                                    ...prev,
+                                                                    value: prev.value?.map?.((v: any, j: number) => {
+                                                                        return i !== j ? v : {
+                                                                            ...v,
+                                                                            value,
+                                                                            key,
+                                                                            parentKey: prev.key,
+                                                                        };
+                                                                    }),
                                                                 };
-                                                            }),
-                                                        };
-                                                    })}
-                                                />
+                                                            })}
+                                                        />
+                                                    );
+                                                })()}
                                             </div>
                                         )}
                                     </div>
