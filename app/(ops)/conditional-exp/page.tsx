@@ -144,7 +144,7 @@ export default function ConditionalExp() {
                                 whitespace-pre-wrap
                             "
                         >
-                            <p>{`> ${testResults.parsedCondition}`}</p>
+                            {/* <p>{`> ${testResults.parsedCondition}`}</p> */}
                             <p>{`> ${testResults.isValid}`}</p>
                         </pre>
                     )}
