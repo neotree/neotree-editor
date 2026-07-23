@@ -35,6 +35,8 @@ import { useIsLocked } from "@/hooks/use-is-locked";
 import { useAppContext } from "@/contexts/app";
 import { ErrorCard } from "@/components/error-card";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { ConditionEditor } from "@/components/conditional-expression";
+import type { ConditionKey } from "@/lib/conditional-expression";
 
 type ItemType = DrugsLibraryState['drugs'][0];
 
@@ -142,6 +144,13 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
 
     const { keys, loading } = useDrugsLibrary();
     useAppContext();
+
+    const [conditionHasErrors, setConditionHasErrors] = useState(false);
+    const [calculatorConditionHasErrors, setCalculatorConditionHasErrors] = useState(false);
+    const conditionKeys = useMemo<ConditionKey[]>(
+        () => (keys || []).map((k) => ({ name: `${k || ''}`.trim() })).filter((k) => !!k.name),
+        [keys],
+    );
 
     const { confirm } = useConfirmModal();
 
@@ -263,8 +272,10 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     const isSaveButtonDisabled = useCallback(() => {
         return !isFormComplete ||
             loading ||
-            disabled;
-    }, [isFormComplete, loading, disabled]);
+            disabled ||
+            conditionHasErrors ||
+            calculatorConditionHasErrors;
+    }, [isFormComplete, loading, disabled, conditionHasErrors, calculatorConditionHasErrors]);
 
     const formComponent = (
         <div className="flex flex-col gap-y-4">
@@ -348,13 +359,16 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                         <p>Will be used in the Standalone DFF Calculator only</p>
                     </ErrorCard>
                 </div>
-                <Textarea
+                <ConditionEditor
+                    id="calculator_condition"
                     rows={3}
-                    name="calculator_condition"
-                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                     value={form.calculator_condition}
                     disabled={disabled}
-                    onChange={e => setForm(prev => ({ ...prev, calculator_condition: e.target.value, }))}
+                    keys={conditionKeys}
+                    keysLoading={loading}
+                    initialValue={`${item?.calculator_condition || ''}`}
+                    onChange={val => setForm(prev => ({ ...prev, calculator_condition: val, }))}
+                    onValidityChange={setCalculatorConditionHasErrors}
                 />
                 <span className="font-bold opacity-50 text-xs">e.g {CONDITIONAL_EXP_EXAMPLE}</span>
             </div>
@@ -366,13 +380,16 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                         <p>Will be used in the Admission DFF Calculator only</p>
                     </ErrorCard>
                 </div>
-                <Textarea
+                <ConditionEditor
+                    id="condition"
                     rows={3}
-                    name="condition"
-                    className="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:ring-offset-0"
                     value={form.condition}
                     disabled={disabled}
-                    onChange={e => setForm(prev => ({ ...prev, condition: e.target.value, }))}
+                    keys={conditionKeys}
+                    keysLoading={loading}
+                    initialValue={`${item?.condition || ''}`}
+                    onChange={val => setForm(prev => ({ ...prev, condition: val, }))}
+                    onValidityChange={setConditionHasErrors}
                 />
                 <span className="font-bold opacity-50 text-xs">e.g {CONDITIONAL_EXP_EXAMPLE}</span>
             </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import queryString from "query-string";
 import axios from "axios";
@@ -105,31 +105,43 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
         }
     }, [scriptId, open, alert]);
 
+    const keysRequestRef = useRef<Promise<void> | null>(null);
+
     const loadKeys = useCallback(async () => {
-        try {
-            setKeysLoading(true);
+        // Collapse concurrent calls (multiple condition editors mounting at once)
+        // into a single in-flight request.
+        if (keysRequestRef.current) return keysRequestRef.current;
 
-            const { data: res, } = await axios.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/keys?data='+JSON.stringify({ 
-                returnDraftsIfExist: true,
-                scriptsIds: [scriptId], 
-            }));
+        const run = (async () => {
+            try {
+                setKeysLoading(true);
 
-            if (res?.errors?.length) throw new Error(res.errors.join(', '));
+                const { data: res, } = await axios.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/keys?data='+JSON.stringify({
+                    returnDraftsIfExist: true,
+                    scriptsIds: [scriptId],
+                }));
 
-            const scripts = res.data;
+                if (res?.errors?.length) throw new Error(res.errors.join(', '));
 
-            const _keys = scripts.reduce((acc, s) => [...acc, ...s.dataKeys], [] as typeof keys);
+                const scripts = res.data;
 
-            setKeys(_keys);
-        } catch(e: any) {
-            alert({
-                title: '',
-                message: 'Error: ' + e.message,
-                variant: 'error',
-            });
-        } finally {
-            setKeysLoading(false);
-        }
+                const _keys = scripts.reduce((acc, s) => [...acc, ...s.dataKeys], [] as typeof keys);
+
+                setKeys(_keys);
+            } catch(e: any) {
+                alert({
+                    title: '',
+                    message: 'Error: ' + e.message,
+                    variant: 'error',
+                });
+            } finally {
+                setKeysLoading(false);
+                keysRequestRef.current = null;
+            }
+        })();
+
+        keysRequestRef.current = run;
+        return run;
     }, [scriptId, open, alert]);
 
     return {

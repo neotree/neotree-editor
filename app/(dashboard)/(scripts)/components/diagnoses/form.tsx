@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, Fragment } from "react";
+import { useCallback, Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Controller } from "react-hook-form";
 
@@ -18,6 +18,7 @@ import { ImageField } from "../image-field";
 import { Symptoms } from "./symptoms";
 import { LockStatus } from "@/components/lock-status";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
 
 type Props = UseDiagnosisFormParams;
 
@@ -39,6 +40,9 @@ export function DiagnosisForm(props: Props) {
         setValue,
         save,
     } = form;
+
+    const { conditionKeys, keysLoading } = useConditionKeys();
+    const [expressionHasErrors, setExpressionHasErrors] = useState(false);
 
     const name = watch('name');
     const key = watch('key');
@@ -132,10 +136,22 @@ export function DiagnosisForm(props: Props) {
 
                 <div>
                     <Label htmlFor="expression">Diagnosis expression (e.g. $Temp &gt; 37 or $Gestation &lt; 20) <ConditionalExpressionModal /></Label>
-                    <Input 
-                        {...register('expression', { disabled, })}
+                    <Controller
+                        control={control}
                         name="expression"
-                        noRing={false}
+                        render={({ field: { value, onChange } }) => (
+                            <ConditionEditor
+                                id="expression"
+                                rows={3}
+                                value={`${value || ''}`}
+                                onChange={onChange}
+                                keys={conditionKeys}
+                                keysLoading={keysLoading}
+                                disabled={disabled}
+                                initialValue={`${props.formData?.expression || ''}`}
+                                onValidityChange={setExpressionHasErrors}
+                            />
+                        )}
                     />
                 </div>
 
@@ -207,8 +223,8 @@ export function DiagnosisForm(props: Props) {
                     onClick={() => goToScriptPage()}
                 >Cancel</Button>
 
-                <Button 
-                    disabled={disabled}
+                <Button
+                    disabled={disabled || expressionHasErrors}
                     onClick={() => save()}
                 >
                     Save Draft

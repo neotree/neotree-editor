@@ -24,7 +24,9 @@
         "test:integrity-baseline": "tsx tests/integrity-baseline.test.ts",
         "test:integrity-imports": "tsx tests/integrity-imports.test.ts",
         "test:script-draft-publish": "tsx tests/script-draft-publish.test.ts",
-        "test": "tsx tests/changelog-version-authority.test.ts && tsx tests/changelog-rollback-draft-guard.test.ts && tsx tests/integrity-policy.test.ts && tsx tests/data-key-integrity.test.ts && tsx tests/integrity-draft-origin.test.ts && tsx tests/integrity-scan-scope.test.ts && tsx tests/integrity-baseline.test.ts && tsx tests/integrity-imports.test.ts && tsx tests/script-draft-publish.test.ts"
+        "test:conditional-expression": "tsx tests/conditional-expression.test.ts",
+        "scan:conditions": "tsx scripts/scan-conditional-expressions.ts",
+        "test": "tsx tests/changelog-version-authority.test.ts && tsx tests/changelog-rollback-draft-guard.test.ts && tsx tests/integrity-policy.test.ts && tsx tests/data-key-integrity.test.ts && tsx tests/integrity-draft-origin.test.ts && tsx tests/integrity-scan-scope.test.ts && tsx tests/integrity-baseline.test.ts && tsx tests/integrity-imports.test.ts && tsx tests/script-draft-publish.test.ts && tsx tests/conditional-expression.test.ts"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.4.1",

@@ -58,6 +58,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
 
 type Props = {
     scriptId: string;
@@ -99,6 +100,9 @@ export function ScreenForm(props: Props) {
         save,
     } = form;
     const [alias, setAlias] = useState('');
+    const { conditionKeys, keysLoading } = useConditionKeys();
+    const [conditionHasErrors, setConditionHasErrors] = useState(false);
+    const [skipToConditionHasErrors, setSkipToConditionHasErrors] = useState(false);
     const type = watch('type');
     const skippable = watch('skippable');
     const printable = watch('printable');
@@ -230,7 +234,7 @@ export function ScreenForm(props: Props) {
                         >Cancel</Button>
 
                         <Button
-                            disabled={!type && !formIsDirty || disabled}
+                            disabled={(!type && !formIsDirty) || disabled || conditionHasErrors || skipToConditionHasErrors}
                             onClick={() => {
                                 setValue('dataType', getScreenDataType(type));
                                 if (type === 'management') {
@@ -424,11 +428,22 @@ export function ScreenForm(props: Props) {
 
                 <div>
                     <Label secondary htmlFor="condition">Conditional expression <ConditionalExpressionModal /></Label>
-                    <Textarea
-                        {...register('condition', { disabled, })}
+                    <Controller
+                        control={control}
                         name="condition"
-                        noRing={false}
-                        rows={5}
+                        render={({ field: { value, onChange } }) => (
+                            <ConditionEditor
+                                id="condition"
+                                rows={5}
+                                value={value || ''}
+                                onChange={onChange}
+                                keys={conditionKeys}
+                                keysLoading={keysLoading}
+                                disabled={disabled}
+                                initialValue={formData?.condition || ''}
+                                onValidityChange={setConditionHasErrors}
+                            />
+                        )}
                     />
                     <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                 </div>
@@ -436,10 +451,22 @@ export function ScreenForm(props: Props) {
                 <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:items-baseline">
                     <div className="flex-1">
                         <Label secondary htmlFor="skipToCondition">Skip to screen conditional expression</Label>
-                        <Input
-                            {...register('skipToCondition', { disabled, })}
+                        <Controller
+                            control={control}
                             name="skipToCondition"
-                            noRing={false}
+                            render={({ field: { value, onChange } }) => (
+                                <ConditionEditor
+                                    id="skipToCondition"
+                                    rows={3}
+                                    value={value || ''}
+                                    onChange={onChange}
+                                    keys={conditionKeys}
+                                    keysLoading={keysLoading}
+                                    disabled={disabled}
+                                    initialValue={formData?.skipToCondition || ''}
+                                    onValidityChange={setSkipToConditionHasErrors}
+                                />
+                            )}
                         />
                         <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                     </div>
