@@ -33,6 +33,7 @@ import { useScriptForm } from "../hooks/use-script-form";
 import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 import { FieldItems } from "./screens/field-items";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
 
 type Props = {
     disabled?: boolean;
@@ -301,6 +302,9 @@ export function Field({
         defaultValues: getDefaultValues(),
     });
 
+    const { conditionKeys, keysLoading } = useConditionKeys();
+    const [conditionHasErrors, setConditionHasErrors] = useState(false);
+
     const type = watch('type');
     const values = watch('values');
 
@@ -332,7 +336,7 @@ export function Field({
 
                         <Button
                             onClick={() => onSave()}
-                            disabled={!!valuesErrors.length}
+                            disabled={!!valuesErrors.length || conditionHasErrors}
                         >
                             Save
                         </Button>
@@ -356,11 +360,21 @@ export function Field({
 
                     <div>
                         <Label htmlFor="condition">Condition <ConditionalExpressionModal /></Label>
-                        <Textarea
-                            {...register('condition', { required: false, })}
+                        <Controller
+                            control={control}
                             name="condition"
-                            noRing={false}
-                            rows={5}
+                            render={({ field: { value, onChange } }) => (
+                                <ConditionEditor
+                                    id="condition"
+                                    rows={5}
+                                    value={`${value || ''}`}
+                                    onChange={onChange}
+                                    keys={conditionKeys}
+                                    keysLoading={keysLoading}
+                                    initialValue={`${field?.condition || ''}`}
+                                    onValidityChange={setConditionHasErrors}
+                                />
+                            )}
                         />
                     </div>
 
