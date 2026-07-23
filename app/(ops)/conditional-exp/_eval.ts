@@ -93,8 +93,17 @@ export function parseCondition(
 
         if (
             _condition.match(/ excludes /gi) ||
-            _condition.match(/ includes /gi)
+            _condition.match(/ includes /gi) ||
+            _condition.match(/ or_excludes /gi) ||
+            _condition.match(/ or_includes /gi)
         ) {
+            let joinWith = 'and';
+            if (_condition.match(/ or_excludes /gi) || _condition.match(/ or_includes /gi)) {
+                joinWith = 'or';
+                _condition = _condition.replaceAll(' or_excludes ', ' excludes ');
+                _condition = _condition.replaceAll(' or_includes ', ' includes ');
+            }
+
             const [key, vals] = _condition.match(/ excludes /gi) ?
                 _condition.split(/ excludes /gi).map(s => s.trim())
                 :
@@ -127,7 +136,7 @@ export function parseCondition(
                     }
                     return includes;
                 })
-                .join(' or ');
+                .join(` ${joinWith} `);
 
             return _condition;
         }
