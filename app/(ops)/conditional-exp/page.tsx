@@ -189,6 +189,11 @@ const hasMultipleEntriesFn = (type: string) => [
     'checklist',
 ].includes(type);
 
+const isNumberFn = (type: string) => [
+    'timer',
+    'number',
+].includes(type);
+
 function Modal({
     entry,
     entryIndex,
@@ -380,6 +385,12 @@ function Modal({
                                                     onChange={e => setEntryValue(prev => {
                                                         const value = e.target.value;
                                                         const key = v.key || prev.key;
+                                                        let calculateValue: any = undefined;
+
+                                                        if (isNumberFn(entryValue.type!)) {
+                                                            calculateValue = isNaN(Number(`${value || ''}`)) ? undefined : Number(value); 
+                                                        }
+                                                        
                                                         return {
                                                             ...prev,
                                                             value: prev.value?.map?.((v: any, j: number) => {
