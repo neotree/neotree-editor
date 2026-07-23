@@ -256,10 +256,19 @@ export const entryTypes = [
     },
     {
         type: 'text',
+    },     
+    {
+        type: 'single_select',
+    },    
+    {
+        type: 'yesno',
+    },
+    {
+        type: 'timer',
     },
     {
         type: 'time',
-    },
+    },  
     {
         type: 'diagnosis',
     },
@@ -274,17 +283,5 @@ export const entryTypes = [
     },
     {
         type: 'checklist',
-    },
-    {
-        type: 'multi_select',
-    },
-    {
-        type: 'single_select',
-    },
-    {
-        type: 'timer',
-    },
-    {
-        type: 'yesno',
     },
 ];
