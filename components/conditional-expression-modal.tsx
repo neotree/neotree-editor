@@ -1,4 +1,4 @@
-import { InfoIcon } from "lucide-react";
+import { ExternalLink, InfoIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import Link from "next/link";
 
 export function ConditionalExpressionModal() {
     return (
@@ -25,7 +26,11 @@ export function ConditionalExpressionModal() {
                 <DialogContent className="flex flex-col max-h-[90%] gap-y-4 p-0 m-0 sm:max-w-xl">
                     <DialogHeader className="border-b border-b-border px-4 py-4">
                         <DialogTitle>Conditional expression</DialogTitle>
-                        <DialogDescription>{''}</DialogDescription>
+                        <DialogDescription>
+                            <Link href="/conditional-exp" target="_blank" className="ml-auto flex items-center gap-2">
+                                Playground <ExternalLink className="w-4 h-4 text-primary" />
+                            </Link>
+                        </DialogDescription>
                     </DialogHeader>
 
                     <div className="flex-1 flex flex-col overflow-y-auto px-4 py-2">
