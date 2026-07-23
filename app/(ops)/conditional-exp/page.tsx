@@ -1,14 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import CodeEditor, { TextareaCodeEditorProps } from '@uiw/react-textarea-code-editor';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import CodeEditor from '@uiw/react-textarea-code-editor';
+import { ChevronDown, EditIcon, TrashIcon } from 'lucide-react';
 
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger, } from '@/components/ui/collapsible';
 import { 
     Dialog, 
@@ -24,30 +25,27 @@ import {
     type ScreenEntry,
     type ScreenEntryValue,
     entryTypes,
-    screenTypes,
+    // screenTypes,
     evaluateCondition,
     parseCondition,
+    parseConditionString,
 } from './_eval';
-import { ChevronDown, EditIcon, TrashIcon } from 'lucide-react';
+
+const defaultTestResults = {
+    parsedCondition: '',
+    isValid: false,
+};
 
 export default function ConditionalExp() {
     const [condition, setCondition] = useState('');
     const [entries, setEntries] = useState<ScreenEntry[]>([]);
-
-    const setEntry = useCallback((
-        entry: ScreenEntry, 
-        entryIndex: number,
-    ) => {
-        alert(entryIndex)
-        setEntries(prev => {
-            if (!prev.length) return [entry];
-            return prev.map((e, i) => ({
-                ...(i === entryIndex ? { ...e, ...entry, } : e),
-            }));            
-        });
-    }, []);
+    const [testResults, setTestResults] = useState(defaultTestResults);
 
     const canTest = entries.length;
+
+    useEffect(() => {
+        setTestResults(defaultTestResults);
+    }, [condition, entries]);
 
     return (
         <>
@@ -108,10 +106,8 @@ export default function ConditionalExp() {
                             value={condition}
                             placeholder="Condition"
                             rows={4}
-                            disabled={!canTest}
                             onChange={e => setCondition(e.target.value)}
                         />
-                        <pre>{!canTest ? '' : parseCondition(condition, entries)}</pre>
                     </div>
 
                     <div className="flex flex-row gap-x-4 justify-end">
@@ -124,15 +120,74 @@ export default function ConditionalExp() {
                             disabled={!canTest}
                             onClick={() => {
                                 const res = evaluateCondition(parseCondition(condition, entries));
-                                alert(res);
+                                setTestResults({
+                                    parsedCondition: parseCondition(condition, entries),
+                                    isValid: res,
+                                });
                             }}
                         >Test</Button>
                     </div>
+
+                    {!!condition && !!testResults.parsedCondition && (
+                        <pre 
+                            className="
+                                block
+                                px-4
+                                py-2
+                                rounded-md
+                                border-border
+                                border-[1px]
+                                bg-black 
+                                text-white 
+                                dark:text-black 
+                                dark:bg-white
+                            "
+                        >
+                            <p>{`> ${testResults.parsedCondition}`}</p>
+                            <p>{`> ${testResults.isValid}`}</p>
+                        </pre>
+                    )}
                 </div>
             </div>
         </>
     );
 }
+
+const defaultScreenEntry: ScreenEntry = {
+    values: [],
+    screen: {
+        type: '',
+    },
+};
+
+const defaultEntryValue: ScreenEntryValue = {
+    type: '',
+    key: '',
+    value: [
+        { value: '', },
+    ],
+};
+
+const isSelectedEntryFn = (type: string) => [
+    'dropdown',
+    'multi_select',
+    'single_select',
+    'diagnosis',
+    'problem',
+    'drug',
+    'fluid',
+    'checklist',
+    'yesno',
+].includes(type);
+
+const hasMultipleEntriesFn = (type: string) => [
+    'multi_select',
+    'diagnosis',
+    'problem',
+    'drug',
+    'fluid',
+    'checklist',
+].includes(type);
 
 function Modal({
     entry,
@@ -145,34 +200,25 @@ function Modal({
     trigger?: React.ReactNode;
     onSave: (entry: ScreenEntry, entryIndex: number) => void;
 }) {
-    const [entryValue, setEntryValue] = useState<ScreenEntryValue>({
-        type: '',
-        key: '',
-        value: '',
-    });
+    const [entryValue, setEntryValue] = useState<ScreenEntryValue>(defaultEntryValue);
     const [entryValueIndex, setEntryValueIndex] = useState(0);
-    const [form, setForm] = useState<ScreenEntry>(entry || {
-        values: [],
-        screen: {
-            type: '',
-        },
-    });
+    const [form, setForm] = useState<ScreenEntry>(entry || defaultScreenEntry);
 
     const save = useCallback(() => {
         onSave(form, entryIndex);
     }, [form, entryIndex, onSave]);
 
-    const canSave = !!form.screen.type && !!(
+    const canSave = !!(
         form.value?.length ||
         form.values?.length
-    );
+    ); // && !!form.screen.type;
 
     useEffect(() => {
         if (
             entryValue.key &&
             entryValue.value &&
-            entryValue.type &&
-            form.screen.type
+            entryValue.type
+            // && form.screen.type
         ) {
             setForm(prev => ({
                 ...prev,
@@ -196,7 +242,12 @@ function Modal({
 
     return (
         <>
-            <Dialog>
+            <Dialog
+                onOpenChange={() => {
+                    setForm(defaultScreenEntry);
+                    setEntryValue(defaultEntryValue);
+                }}
+            >
                 {trigger || (
                     <DialogTrigger asChild>
                         <Button
@@ -205,14 +256,14 @@ function Modal({
                     </DialogTrigger>
                 )}
                 
-                <DialogContent>
+                <DialogContent className="flex min-h-0 max-h-[90dvh] flex-col overflow-hidden gap-y-4 p-0 m-0 sm:max-w-xl">
                     <DialogHeader>
                         <DialogTitle>{''}</DialogTitle>
                         <DialogDescription>{''}</DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex flex-col gap-y-4">
-                        <div>
+                    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 py-2 gap-y-4">
+                        {/* <div>
                             <Label>Screen type</Label>
                             <Select
                                 value={form.screen.type}
@@ -242,16 +293,16 @@ function Modal({
                                     })}
                                 </SelectContent>
                             </Select>
-                        </div>
+                        </div> */}
 
                         <div>
                             <Label>Entry type</Label>
                             <Select
                                 value={entryValue.type}
-                                onValueChange={type => setEntryValue(prev => ({
-                                    ...prev,
+                                onValueChange={type => setEntryValue({
+                                    ...defaultEntryValue,
                                     type,
-                                }))}
+                                })}
                             >
                                 <SelectTrigger>
                                     <SelectValue />
@@ -277,26 +328,122 @@ function Modal({
                             <Label>Key</Label>
                             <Input 
                                 value={entryValue.key}
-                                onChange={e => setEntryValue(prev => ({
-                                    ...prev,
-                                    key: e.target.value,
-                                }))}
+                                onChange={e => {
+                                    const key = e.target.value;
+                                    setEntryValue(prev => ({
+                                        ...prev,
+                                        key,
+                                        value: (prev.value || []).map((v: any, i: number) => ({
+                                            ...v,
+                                            parentKey: key,
+                                        })),
+                                    }));
+                                }}
                             />
                         </div>
 
-                        <div>
-                            <Label>Value</Label>
-                            <Input 
-                                value={entryValue.value}
-                                onChange={e => setEntryValue(prev => ({
-                                    ...prev,
-                                    value: e.target.value,
-                                }))}
-                            />
+                        <div className="flex flex-col gap-y-2">
+                            {entryValue.value?.map?.((
+                                v: any, 
+                                i: number
+                            ) => {
+                                const isSelectedEntry = isSelectedEntryFn(entryValue.type!);
+                                const hasMultipleEntries = hasMultipleEntriesFn(entryValue.type!);
+
+                                const component = (
+                                    <div className="flex gap-x-2">
+                                        {isSelectedEntry ? (
+                                            <div className="flex-1">
+                                                <Label>Entry key</Label>
+                                                <Input 
+                                                    value={v.key}
+                                                    onChange={e => setEntryValue(prev => {
+                                                        const key = e.target.value;
+                                                        return {
+                                                            ...prev,
+                                                            value: prev.value?.map?.((v: any, j: number) => {
+                                                                return i !== j ? v : {
+                                                                    ...v,
+                                                                    key,
+                                                                    parentKey: v.key,
+                                                                };
+                                                            }),
+                                                        };
+                                                    })}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="flex-1">
+                                                <Label>Value</Label>
+                                                <Input 
+                                                    value={v.value}
+                                                    onChange={e => setEntryValue(prev => {
+                                                        const value = e.target.value;
+                                                        const key = v.key || prev.key;
+                                                        return {
+                                                            ...prev,
+                                                            value: prev.value?.map?.((v: any, j: number) => {
+                                                                return i !== j ? v : {
+                                                                    ...v,
+                                                                    value,
+                                                                    key,
+                                                                    parentKey: prev.key,
+                                                                };
+                                                            }),
+                                                        };
+                                                    })}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+
+                                return (
+                                    <Fragment key={i}>
+                                        {!hasMultipleEntries ? component : (
+                                            <Card>
+                                                <CardContent className='pt-4'>
+                                                    {component}
+                                                    {entryValue.value?.length > 1 && (
+                                                        <div className="flex justify-end">
+                                                            <Button
+                                                                variant="link"
+                                                                onClick={() => setEntryValue(prev => ({
+                                                                    ...prev,
+                                                                    value: prev.value.filter((_: any, j: number) => j !== i),
+                                                                }))}
+                                                            >
+                                                                Remove
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </CardContent>
+                                            </Card>
+                                        )}
+                                    </Fragment>
+                                );
+                            })}
+
+                            {hasMultipleEntriesFn(entryValue.type!) && (
+                                <div className="flex justify-end">
+                                    <Button
+                                        variant="link"
+                                        onClick={() => setEntryValue(prev => ({
+                                            ...prev,
+                                            value: [...prev.value, {
+                                                value: '',
+                                                key: '',
+                                            }]
+                                        }))}
+                                    >
+                                        Add another entry
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </div>
                     
-                    <DialogFooter>
+                    <DialogFooter className="shrink-0 border-t border-t-border px-4 py-2 items-center w-full">
                         <DialogClose asChild>
                             <Button
                                 variant="ghost"
