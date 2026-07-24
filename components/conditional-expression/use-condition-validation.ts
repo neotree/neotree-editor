@@ -16,8 +16,13 @@ export interface UseConditionValidationOptions {
   allowSelf?: boolean;
   selfDataType?: string;
   selfOptions?: string[];
-  /** Suppresses key-dependent checks (e.g. while script keys are loading). */
-  keysLoading?: boolean;
+  /**
+   * Whether the authoritative key catalogue is loaded and available. Key
+   * existence/type checks only run when this is true — so a failed/absent/still
+   * loading catalogue never produces false UNKNOWN_KEY errors, regardless of how
+   * many keys (e.g. unsaved local ones) happen to be in the list.
+   */
+  keysReady?: boolean;
   debounceMs?: number;
 }
 
@@ -29,7 +34,7 @@ export function useConditionValidation({
   allowSelf,
   selfDataType,
   selfOptions,
-  keysLoading,
+  keysReady,
   debounceMs = 200,
 }: UseConditionValidationOptions): ValidationResult {
   const [debounced, setDebounced] = useState(value);
@@ -45,10 +50,10 @@ export function useConditionValidation({
       allowSelf,
       selfDataType,
       selfOptions,
-      skipKeyResolution: !!keysLoading || !keys.length,
+      skipKeyResolution: !keysReady,
     };
     return mode === "reference"
       ? validateReferenceExpression(debounced, ctx)
       : validateCondition(debounced, ctx);
-  }, [debounced, keys, mode, allowSelf, selfDataType, selfOptions, keysLoading]);
+  }, [debounced, keys, mode, allowSelf, selfDataType, selfOptions, keysReady]);
 }

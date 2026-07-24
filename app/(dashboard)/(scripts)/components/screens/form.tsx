@@ -59,6 +59,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
+import type { ConditionKey } from "@/lib/conditional-expression";
 
 type Props = {
     scriptId: string;
@@ -120,6 +121,27 @@ export function ScreenForm(props: Props) {
     const key = watch('key');
     const listStyle = form.watch('listStyle');
     const printDisplayColumns = form.watch('printDisplayColumns');
+    const screenFields = watch('fields');
+    const screenLabel = watch('label');
+    // Keys defined on this (possibly unsaved) screen, so conditions can
+    // reference sibling fields before the first save. Use the screen `type`
+    // (e.g. multi_select) rather than its stored dataType (e.g. set<id>) so
+    // membership checks recognise it.
+    const localConditionKeys = useMemo<ConditionKey[]>(() => {
+        const fromFields: ConditionKey[] = (screenFields || []).map(f => ({
+            name: `${f?.key || ''}`.trim(),
+            label: `${f?.key || ''}${f?.label ? ` - ${f.label}` : ''}`,
+            dataType: f?.type,
+        }));
+        if (key) {
+            fromFields.push({
+                name: `${key}`.trim(),
+                label: `${key}${screenLabel ? ` - ${screenLabel}` : ''}`,
+                dataType: type,
+            });
+        }
+        return fromFields.filter(k => !!k.name);
+    }, [screenFields, key, screenLabel, type]);
     const selectedDataKey = useMemo(() => {
         const [dataKey] = !keyId ? [null] : extractDataKeys([keyId]);
         return dataKey;
@@ -438,6 +460,7 @@ export function ScreenForm(props: Props) {
                                 value={value || ''}
                                 onChange={onChange}
                                 keys={conditionKeys}
+                                extraKeys={localConditionKeys}
                                 keysLoading={keysLoading}
                                 disabled={disabled}
                                 initialValue={formData?.condition || ''}
@@ -461,6 +484,7 @@ export function ScreenForm(props: Props) {
                                     value={value || ''}
                                     onChange={onChange}
                                     keys={conditionKeys}
+                                    extraKeys={localConditionKeys}
                                     keysLoading={keysLoading}
                                     disabled={disabled}
                                     initialValue={formData?.skipToCondition || ''}
@@ -1185,7 +1209,7 @@ export function ScreenForm(props: Props) {
                 >Cancel</Button>
 
                 <Button
-                    disabled={disabled}
+                    disabled={disabled || conditionHasErrors || skipToConditionHasErrors}
                     onClick={() => save()}
                 >
                     Save Draft

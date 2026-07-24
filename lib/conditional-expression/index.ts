@@ -11,6 +11,7 @@ export type {
   ValidationResult,
 } from "./ast";
 export { validateReferenceExpression } from "./reference-expr";
+export { mergeConditionKeys } from "./merge-keys";
 
 /**
  * Validate a boolean conditional expression against the script's key context.
