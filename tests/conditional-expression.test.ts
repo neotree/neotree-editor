@@ -1,6 +1,7 @@
 import assert from "assert";
 
 import {
+  mergeConditionKeys,
   validateCondition,
   validateReferenceExpression,
   type ConditionKey,
@@ -96,6 +97,35 @@ const loadingCtx: ValidationContext = { keys: [], allowSelf: true, skipKeyResolu
 assert.equal(errors("$AnyKey = 'x'", loadingCtx).length, 0, "no unknown-key errors while keys load");
 assert.ok(codes("$AnyKey = 'x' or", loadingCtx).includes("DANGLING_OPERATOR"), "syntax still checked while loading");
 
+// Guard for the "catalogue unavailable + local key" false-positive: a non-empty
+// (local-only) list must NOT make a valid persisted key resolve as unknown when
+// the catalogue isn't authoritative.
+assert.equal(
+  errors("$Persisted = 'x'", { keys: [{ name: "Local" }], allowSelf: true, skipKeyResolution: true }).length,
+  0,
+  "unavailable catalogue + local key does not false-flag a persisted key",
+);
+// Control: with resolution on, an out-of-list key IS flagged — proving skip is the lever.
+assert.ok(
+  codes("$Persisted = 'x'", { keys: [{ name: "Local" }], allowSelf: true }).includes("UNKNOWN_KEY"),
+  "with resolution on, an unknown key is still flagged",
+);
+
+// ---- Multi-value normalization (set<id> etc.) -------------------------------
+
+const setCtx: ValidationContext = { keys: [{ name: "Sel", dataType: "set<id>" }] };
+const multiCtx: ValidationContext = { keys: [{ name: "Sel", dataType: "multi_select" }] };
+assert.equal(
+  warnings("$Sel includes ('A')", setCtx).filter((d) => d.code === "MEMBERSHIP_TYPE").length,
+  0,
+  "set<id> is treated as a multi-value type",
+);
+assert.equal(
+  warnings("$Sel includes ('A')", multiCtx).filter((d) => d.code === "MEMBERSHIP_TYPE").length,
+  0,
+  "multi_select membership has no warning",
+);
+
 // ---- Reference expression sublanguage ---------------------------------------
 
 const refDiags = (input: string) => validateReferenceExpression(input, ctx).diagnostics;
@@ -113,5 +143,53 @@ assert.ok(refWarnings("SUM(5, $Height)").some((d) => d.code === "FUNCTION_ARG"),
 // Unknown key and unbalanced parens remain hard errors.
 assert.ok(refErrors("SUM($Nope)").some((d) => d.code === "UNKNOWN_KEY"), "unknown key in ref");
 assert.ok(refErrors("SUM($Weight").some((d) => d.code === "UNBALANCED_PAREN"), "unbalanced ref paren");
+
+// ---- mergeConditionKeys -----------------------------------------------------
+
+// Duplicate extras collapse to one (later wins), case-insensitively.
+const dupExtras = mergeConditionKeys([], [
+  { name: "Field1", dataType: "text" },
+  { name: "field1", dataType: "number" },
+]);
+assert.equal(dupExtras.length, 1, "duplicate extras collapse to one");
+assert.equal(dupExtras[0].dataType, "number", "later duplicate extra wins");
+
+// Case-insensitive collision between base and extra -> one entry, local wins.
+const collision = mergeConditionKeys(
+  [{ name: "Sex", dataType: "dropdown", label: "Sex - persisted" }],
+  [{ name: "sex", dataType: "text" }],
+);
+assert.equal(collision.length, 1, "base/extra case-insensitive collision merges");
+assert.equal(collision[0].dataType, "text", "local dataType wins over persisted");
+
+// Local precedence, but fall back to persisted metadata the local entry omits.
+const fallback = mergeConditionKeys(
+  [{ name: "A", label: "A - persisted", dataType: "number" }],
+  [{ name: "A" }],
+);
+assert.equal(fallback.length, 1, "fallback merges to one");
+assert.equal(fallback[0].label, "A - persisted", "keeps persisted label when local omits it");
+assert.equal(fallback[0].dataType, "number", "keeps persisted dataType when local omits it");
+
+// Blank names are dropped.
+assert.equal(mergeConditionKeys([{ name: "" }], [{ name: "  " }]).length, 0, "blank names dropped");
+
+// Whitespace collision: the stored canonical name is trimmed and still resolves.
+const wsCollision = mergeConditionKeys([{ name: "Sex", dataType: "dropdown" }], [{ name: " sex " }]);
+assert.equal(wsCollision.length, 1, "whitespace collision merges to one");
+assert.equal(wsCollision[0].name, "sex", "collision stores the trimmed name");
+assert.equal(
+  validateCondition("$sex = 'M'", { keys: wsCollision }).diagnostics.filter((d) => d.severity === "error").length,
+  0,
+  "trimmed merged key resolves",
+);
+
+// An unsaved (name-only) screen field is a valid key once merged in.
+const withUnsaved = mergeConditionKeys(keys, [{ name: "NewField" }]);
+assert.equal(
+  validateCondition("$NewField = 'x'", { keys: withUnsaved }).diagnostics.filter((d) => d.severity === "error").length,
+  0,
+  "unsaved sibling field resolves once merged",
+);
 
 console.log("conditional-expression: all assertions passed");

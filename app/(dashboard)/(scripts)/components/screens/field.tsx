@@ -40,6 +40,7 @@ import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
+import type { ConditionKey } from "@/lib/conditional-expression"
 
 type Props = {
   open: boolean
@@ -118,6 +119,20 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const printDisplayColumns = watch('printDisplayColumns');
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
+
+  // Keys on the parent screen (incl. this field), so conditions can reference
+  // sibling fields that haven't been saved yet. Deduplication + precedence is
+  // handled by mergeConditionKeys inside ConditionEditor.
+  const localConditionKeys = useMemo<ConditionKey[]>(() => {
+    const siblings: FieldType[] = form.getValues("fields") || []
+    const arr: ConditionKey[] = siblings.map((f) => ({
+      name: `${f?.key || ""}`.trim(),
+      label: `${f?.key || ""}${f?.label ? ` - ${f.label}` : ""}`,
+      dataType: f?.type,
+    }))
+    if (key) arr.push({ name: `${key}`.trim(), label: `${key}${label ? ` - ${label}` : ""}`, dataType: type })
+    return arr.filter((k) => !!k.name)
+  }, [form, key, label, type])
 
   const isDateField = useMemo(() => type === "date" || type === "datetime", [type])
   const isTimeField = useMemo(() => type === "time", [type])
@@ -345,6 +360,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       value={value || ""}
                       onChange={onChange}
                       keys={conditionKeys}
+                      extraKeys={localConditionKeys}
                       keysLoading={keysLoading}
                       disabled={disabled}
                       allowSelf
@@ -575,6 +591,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                           value={value || ""}
                           onChange={onChange}
                           keys={conditionKeys}
+                          extraKeys={localConditionKeys}
                           keysLoading={keysLoading}
                           disabled={disabled}
                           initialValue={(field as { calculation?: string } | undefined)?.calculation || ""}

@@ -27,6 +27,17 @@ const NON_ORDERED_TYPES = new Set(["text", "string", "boolean", "yesno"]);
 
 const ORDERING_OPS = new Set([">", "<", ">=", "<="]);
 
+/**
+ * A multi-value ("collection") data type that supports includes/excludes.
+ * Accepts the various spellings that reach us, including the `set<...>`
+ * shape used for multi-select screens.
+ */
+function isMultiValueType(dataType: string): boolean {
+  if (!dataType) return false;
+  if (MULTI_VALUE_TYPES.has(dataType)) return true;
+  return dataType.startsWith("set<") || dataType === "set";
+}
+
 interface KeyDesc {
   dataType?: string;
   options?: string[];
@@ -133,7 +144,7 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
     const desc = describeVar(node.target);
     if (!desc) return;
     const dataType = (desc.dataType || "").toLowerCase();
-    if (dataType && !MULTI_VALUE_TYPES.has(dataType)) {
+    if (dataType && !isMultiValueType(dataType)) {
       diagnostics.push({
         severity: "warning",
         code: "MEMBERSHIP_TYPE",

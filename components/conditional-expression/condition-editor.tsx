@@ -5,7 +5,7 @@ import { AlertCircleIcon, AlertTriangleIcon, Wand2Icon } from "lucide-react";
 
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { ConditionKey } from "@/lib/conditional-expression";
+import { mergeConditionKeys, type ConditionKey } from "@/lib/conditional-expression";
 import { getTokenAtCursor, insertKeyAtCursor, sortKeyMatches } from "./autocomplete";
 import { useConditionValidation } from "./use-condition-validation";
 
@@ -13,6 +13,12 @@ export interface ConditionEditorProps {
   value: string;
   onChange: (value: string) => void;
   keys: ConditionKey[];
+  /**
+   * Keys defined in the current, not-yet-saved form (e.g. sibling fields being
+   * added on this screen). Merged into `keys` so a reference to a field you
+   * just added isn't wrongly flagged as unknown before the first save.
+   */
+  extraKeys?: ConditionKey[];
   mode?: "boolean" | "reference";
   allowSelf?: boolean;
   selfDataType?: string;
@@ -42,6 +48,7 @@ export function ConditionEditor({
   value,
   onChange,
   keys,
+  extraKeys,
   mode = "boolean",
   allowSelf,
   selfDataType,
@@ -56,14 +63,24 @@ export function ConditionEditor({
 }: ConditionEditorProps) {
   const [cursor, setCursor] = useState(value.length);
 
+  const mergedKeys = useMemo(
+    () => (extraKeys?.length ? mergeConditionKeys(keys, extraKeys) : keys),
+    [keys, extraKeys],
+  );
+
+  // Authoritativeness is decided by the *persisted* catalogue, never by the
+  // merged length — so an unsaved local key can't turn an unavailable catalogue
+  // into false UNKNOWN_KEY errors on otherwise-valid persisted keys.
+  const keysReady = !keysLoading && keys.length > 0;
+
   const { diagnostics, hasErrors } = useConditionValidation({
     value,
-    keys,
+    keys: mergedKeys,
     mode,
     allowSelf,
     selfDataType,
     selfOptions,
-    keysLoading,
+    keysReady,
   });
 
   // Only block saving once the expression actually changes from the persisted
@@ -77,16 +94,17 @@ export function ConditionEditor({
     onValidityChange?.(blocking);
   }, [blocking, onValidityChange]);
 
-  const activeToken = useMemo(() => (mode === "reference" ? null : getTokenAtCursor(value, cursor)), [mode, value, cursor]);
+  // Autocomplete works in both modes — reference expressions reference $keys too.
+  const activeToken = useMemo(() => getTokenAtCursor(value, cursor), [value, cursor]);
 
   const matches = useMemo(() => {
-    if (!activeToken || !keys.length) return [];
+    if (!activeToken || !mergedKeys.length) return [];
     const token = activeToken.token;
     if (token.toLowerCase() === "self") return [];
     // Hide once the token already exactly matches a known key.
-    if (token.length > 2 && keys.some((k) => k.name.toLowerCase() === token.toLowerCase())) return [];
-    return sortKeyMatches(keys, token).slice(0, 8);
-  }, [activeToken, keys]);
+    if (token.length > 2 && mergedKeys.some((k) => k.name.toLowerCase() === token.toLowerCase())) return [];
+    return sortKeyMatches(mergedKeys, token).slice(0, 8);
+  }, [activeToken, mergedKeys]);
 
   return (
     <div className="space-y-2">
