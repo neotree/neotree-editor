@@ -141,9 +141,10 @@ export default function ConditionalExp() {
                                 text-white 
                                 dark:text-black 
                                 dark:bg-white
+                                whitespace-pre-wrap
                             "
                         >
-                            <p>{`> ${testResults.parsedCondition}`}</p>
+                            {/* <p>{`> ${testResults.parsedCondition}`}</p> */}
                             <p>{`> ${testResults.isValid}`}</p>
                         </pre>
                     )}
@@ -368,8 +369,9 @@ function Modal({
                                                             value: prev.value?.map?.((v: any, j: number) => {
                                                                 return i !== j ? v : {
                                                                     ...v,
+                                                                    value: key,
                                                                     key,
-                                                                    parentKey: v.key,
+                                                                    parentKey: prev.key,
                                                                 };
                                                             }),
                                                         };
@@ -466,6 +468,7 @@ function Modal({
                                                                 onClick={() => setEntryValue(prev => ({
                                                                     ...prev,
                                                                     value: prev.value.filter((_: any, j: number) => j !== i),
+                                                                    parentKey: prev.key,
                                                                 }))}
                                                             >
                                                                 Remove
