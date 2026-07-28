@@ -1,15 +1,3 @@
-/**
- * Read-only corpus scan: runs the conditional-expression validator against
- * every expression already stored in the database and reports the ones that
- * would produce a blocking ERROR under the new editor validation.
- *
- * Run BEFORE enabling hard save-blocking, to surface false positives (valid
- * expressions our validator wrongly rejects) and genuinely broken expressions.
- *
- *   yarn tsx scripts/scan-conditional-expressions.ts
- *
- * Exits with code 1 if any errors are found (so it can gate CI), 0 otherwise.
- */
 import "@/server/env";
 
 import { getScriptsWithItems } from "@/app/actions/scripts";
@@ -45,7 +33,11 @@ function toConditionKeys(dataKeys: any[] = []): ConditionKey[] {
 const onlyErrors = (diagnostics: Diagnostic[]) => diagnostics.filter((d) => d.severity === "error");
 
 async function main() {
-  const res = await getScriptsWithItems({ returnDraftsIfExist: true } as any);
+  const scriptIdArg = process.argv[2];
+  const params = scriptIdArg
+    ? { scriptsIds: [scriptIdArg], returnDraftsIfExist: true }
+    : { returnDraftsIfExist: true };
+  const res = await getScriptsWithItems(params as any);
 
   if (res.errors?.length) {
     console.error("Failed to load scripts:", res.errors.join(", "));

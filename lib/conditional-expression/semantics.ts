@@ -27,11 +27,7 @@ const NON_ORDERED_TYPES = new Set(["text", "string", "boolean", "yesno"]);
 
 const ORDERING_OPS = new Set([">", "<", ">=", "<="]);
 
-/**
- * A multi-value ("collection") data type that supports includes/excludes.
- * Accepts the various spellings that reach us, including the `set<...>`
- * shape used for multi-select screens.
- */
+
 function isMultiValueType(dataType: string): boolean {
   if (!dataType) return false;
   if (MULTI_VALUE_TYPES.has(dataType)) return true;
@@ -62,9 +58,9 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
     if (name === "self") {
       if (!ctx.allowSelf) {
         diagnostics.push({
-          severity: "error",
+          severity: "warning",
           code: "SELF_NOT_ALLOWED",
-          message: '"$self" is not available here. Reference a script key instead.',
+          message: '"$self" may not be available here — it refers to the current field\'s own value.',
           start: node.start,
           end: node.end,
         });

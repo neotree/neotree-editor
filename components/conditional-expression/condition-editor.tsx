@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircleIcon, AlertTriangleIcon, Wand2Icon } from "lucide-react";
 
 import { Textarea } from "@/components/ui/textarea";
@@ -68,9 +68,6 @@ export function ConditionEditor({
     [keys, extraKeys],
   );
 
-  // Authoritativeness is decided by the *persisted* catalogue, never by the
-  // merged length — so an unsaved local key can't turn an unavailable catalogue
-  // into false UNKNOWN_KEY errors on otherwise-valid persisted keys.
   const keysReady = !keysLoading && keys.length > 0;
 
   const { diagnostics, hasErrors } = useConditionValidation({
@@ -83,8 +80,6 @@ export function ConditionEditor({
     keysReady,
   });
 
-  // Only block saving once the expression actually changes from the persisted
-  // value; legacy expressions with errors stay saveable (but still show them).
   const blocking = useMemo(() => {
     if (initialValue === undefined) return hasErrors;
     return hasErrors && value.trim() !== initialValue.trim();
@@ -93,6 +88,13 @@ export function ConditionEditor({
   useEffect(() => {
     onValidityChange?.(blocking);
   }, [blocking, onValidityChange]);
+
+
+  const onValidityChangeRef = useRef(onValidityChange);
+  onValidityChangeRef.current = onValidityChange;
+  useEffect(() => {
+    return () => onValidityChangeRef.current?.(false);
+  }, []);
 
   // Autocomplete works in both modes — reference expressions reference $keys too.
   const activeToken = useMemo(() => getTokenAtCursor(value, cursor), [value, cursor]);

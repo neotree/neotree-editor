@@ -363,8 +363,6 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       extraKeys={localConditionKeys}
                       keysLoading={keysLoading}
                       disabled={disabled}
-                      allowSelf
-                      selfDataType={type}
                       initialValue={field?.condition || ""}
                       onValidityChange={setConditionHasErrors}
                     />
