@@ -40,6 +40,8 @@ import type { ConditionKey } from "@/lib/conditional-expression";
 
 type ItemType = DrugsLibraryState['drugs'][0];
 
+const EMPTY_CONDITION_KEYS: ConditionKey[] = [];
+
 const resolveItemTitle = (item?: Partial<ItemType> | null) => {
     if (!item) return undefined;
     const data = item as any;
@@ -142,15 +144,18 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(getDefaultForm(item, newItemType));
 
-    const { keys, loading } = useDrugsLibrary();
+    const { loading } = useDrugsLibrary();
     useAppContext();
 
     const [conditionHasErrors, setConditionHasErrors] = useState(false);
     const [calculatorConditionHasErrors, setCalculatorConditionHasErrors] = useState(false);
-    const conditionKeys = useMemo<ConditionKey[]>(
-        () => (keys || []).map((k) => ({ name: `${k || ''}`.trim() })).filter((k) => !!k.name),
-        [keys],
-    );
+
+    const suggestedConditionKeys = useMemo<ConditionKey[]>(() => {
+        const names = [form.gestationKey, form.weightKey, form.ageKey, form.diagnosisKey]
+            .map((n) => `${n || ''}`.trim())
+            .filter(Boolean);
+        return Array.from(new Set(names)).map((name) => ({ name }));
+    }, [form.gestationKey, form.weightKey, form.ageKey, form.diagnosisKey]);
 
     const { confirm } = useConfirmModal();
 
@@ -364,8 +369,8 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     rows={3}
                     value={form.calculator_condition}
                     disabled={disabled}
-                    keys={conditionKeys}
-                    keysLoading={loading}
+                    keys={EMPTY_CONDITION_KEYS}
+                    extraKeys={suggestedConditionKeys}
                     initialValue={`${item?.calculator_condition || ''}`}
                     onChange={val => setForm(prev => ({ ...prev, calculator_condition: val, }))}
                     onValidityChange={setCalculatorConditionHasErrors}
@@ -385,8 +390,8 @@ export function DrugsLibraryForm({ disabled, item, floating, onChange }: {
                     rows={3}
                     value={form.condition}
                     disabled={disabled}
-                    keys={conditionKeys}
-                    keysLoading={loading}
+                    keys={EMPTY_CONDITION_KEYS}
+                    extraKeys={suggestedConditionKeys}
                     initialValue={`${item?.condition || ''}`}
                     onChange={val => setForm(prev => ({ ...prev, condition: val, }))}
                     onValidityChange={setConditionHasErrors}

@@ -4,13 +4,7 @@ import { type Token, tokenize } from "./tokenizer";
 
 const FUNCTIONS = new Set(["sum", "divide", "multiply", "subtract"]);
 
-/**
- * Validates the arithmetic "reference expression" sublanguage used by
- * calculation / calculator_condition fields, e.g.
- *   $key
- *   SUM($key1, $key2)
- *   DIVIDE($weight, $height)
- */
+
 export function validateReferenceExpression(input: string, ctx: ValidationContext): ValidationResult {
   const src = input || "";
   if (!src.trim()) return { diagnostics: [], hasErrors: false, ast: null };
@@ -27,7 +21,7 @@ export function validateReferenceExpression(input: string, ctx: ValidationContex
     if (!name) return;
     if (name === "self") {
       if (!ctx.allowSelf) {
-        diagnostics.push({ severity: "error", code: "SELF_NOT_ALLOWED", message: '"$self" is not available here.', start: tok.start, end: tok.end });
+        diagnostics.push({ severity: "warning", code: "SELF_NOT_ALLOWED", message: '"$self" may not be available here.', start: tok.start, end: tok.end });
       }
       return;
     }
