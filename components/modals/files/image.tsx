@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import clsx from 'clsx';
+import axios from 'axios';
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { Image as ImageComponent, ImageProps } from "@/components/image";
@@ -15,14 +16,37 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { useFiles, FilesStore } from '@/hooks/use-files';
+import { Trash2Icon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useConfirmModal } from '@/hooks/use-confirm-modal';
+import type { GetFileReferencesResponse } from '@/databases/queries/files';
+import { useAlertModal } from '@/hooks/use-alert-modal';
+
+type tFile = FilesStore['files'][0];
 
 export function Image({ file, ...props }: ImageProps & {
-    file: FilesStore['files'][0];
+    file: tFile
 }) {
     const [loaded, setLoaded] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const { selectMultiple, onSelectFiles, closeModal } = useFiles();
+    const { 
+        selectMultiple, 
+        replaceFile, 
+        setReplaceFile, 
+        onSelectFiles, 
+        closeModal, 
+    } = useFiles();
+
+    const onSelect = useCallback(() => {
+        if (replaceFile) {
+            setReplaceFile(replaceFile.fileId, file.fileId);
+        } else {
+            if (!onSelectFiles) return;
+            onSelectFiles([file]);
+            if (!selectMultiple) closeModal();
+        }
+    }, [onSelectFiles, setReplaceFile, replaceFile, file]);
 
     const img = (
         <ImageComponent 
@@ -39,12 +63,54 @@ export function Image({ file, ...props }: ImageProps & {
                 open={isModalOpen}
                 onOpenChange={setIsModalOpen}
             >
-                {/* <DialogTrigger>
+                <div
+                    className={cn(
+                        'relative', 
+                        '[&_div:last-child]:transition-opacity',
+                        !replaceFile && '[&_div:last-child]:opacity-0', 
+                        '[&:hover_div:last-child]:opacity-100',
+                    )}
+                >
                     {img}
-                </DialogTrigger> */}
+                    <div 
+                        className="
+                            absolute 
+                            top-0 
+                            left-0 
+                            w-full 
+                            h-full 
+                            bg-white/80
+                            dark:bg-black/80
+                            flex
+                            items-center
+                            justify-center
+                        "
+                    >
+                        <div className="flex flex-wrap gap-2">
+                            {!!onSelectFiles && (
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => onSelect()}
+                                >
+                                    Select
+                                </Button>
+                            )}
 
-                <div className="relative">
-                    {img}
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                >
+                                    View
+                                </Button>
+                            </DialogTrigger>
+
+                            {!replaceFile && (
+                                <DeleteFile file={file} />
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 <DialogContent 
@@ -72,10 +138,7 @@ export function Image({ file, ...props }: ImageProps & {
                         {!!onSelectFiles && (
                             <DialogClose asChild>
                                 <Button
-                                    onClick={() => {
-                                        onSelectFiles([file]);
-                                        if (!selectMultiple) closeModal();
-                                    }}
+                                    onClick={() => onSelect()}
                                 >
                                     Select
                                 </Button>
@@ -84,6 +147,81 @@ export function Image({ file, ...props }: ImageProps & {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+        </>
+    );
+}
+
+function DeleteFile({ file }: {
+    file: tFile;
+}) {
+    const [loading, setLoading] = useState(false);
+    const { setReplaceFile, } = useFiles();
+    const { confirm } = useConfirmModal();
+    const { alert } = useAlertModal();
+
+    const onDeleteClick = useCallback(async () => {
+        try {
+            const res = await axios.get<GetFileReferencesResponse>(`/api/files/${file.fileId}/references`);
+            const { data, errors } = res.data;
+
+            if (errors?.length) {
+                alert({
+                    variant: 'error',
+                    title: 'Error',
+                    message: errors.join(' \n'),
+                });
+                return;
+            }
+
+            if (data.length) {
+                alert({
+                    variant: 'error',
+                    title: 'Alert',
+                    message: 'File is referenced in other places, please select a replacement file.',
+                });
+                setReplaceFile(file.fileId);
+            } else {
+                confirm(
+                    async () => {
+                        try {
+                            
+                        } catch(e: any) {
+                            alert({
+                                variant: 'error',
+                                title: 'Error',
+                                message: e.message,
+                            });
+                        } finally {
+                            setLoading(false);
+                        }
+                    },
+                    {
+                        title: 'Delete file',
+                        message: 'Are you sure you want to delete this file?',
+                        positiveLabel: 'Yes, delete',
+                    }
+                );
+            }
+        } catch(e: any) {
+            alert({
+                variant: 'error',
+                title: 'Error',
+                message: e.message,
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [file, setReplaceFile, confirm, alert]);
+
+    return (
+        <>
+            <Button
+                variant="destructive"
+                size="sm"
+                onClick={onDeleteClick}
+            >
+                <Trash2Icon className="w-4 h-4" />
+            </Button>
         </>
     );
 }
