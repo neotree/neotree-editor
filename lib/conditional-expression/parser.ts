@@ -52,10 +52,6 @@ class Parser {
     this.diagnostics.push({ severity: "error", code, message, start, end });
   }
 
-  private warn(code: DiagnosticCode, message: string, start: number, end: number): void {
-    this.diagnostics.push({ severity: "warning", code, message, start, end });
-  }
-
   private atExprEnd(): boolean {
     const k = this.peek().kind;
     return k === "newline" || k === "eof" || k === "rparen" || k === "rbracket";
@@ -189,6 +185,15 @@ class Parser {
     // Comparison: operand OP operand
     if (tok.kind === "op") {
       const opTok = this.next();
+      // The left side of a comparison must be a $key.
+      if (left.type !== "Var" && left.type !== "Error") {
+        this.error(
+          "MISSING_KEY",
+          "The left side of a comparison must be a key, e.g. $Key. Did you forget the $?",
+          left.start,
+          opTok.start,
+        );
+      }
       if (this.atOperandEnd()) {
         this.error("MISSING_OPERAND", `Expected a value after "${opTok.value}".`, opTok.start, opTok.end);
         return { type: "Comparison", op: opTok.value as ComparisonOp, left, right: { type: "Error", start: opTok.end, end: opTok.end }, start: startTok.start, end: opTok.end };
@@ -200,12 +205,19 @@ class Parser {
     // Operand with no following operator.
     if (left.type !== "Error") {
       if (this.atPrimaryEnd()) {
-        // A standalone operand, e.g. "$key" used as a truthiness check. The
-        // mobile runtime tolerates this, so warn instead of blocking.
         if (left.type === "Var") {
-          this.warn(
+          // A key on its own (no comparison after it) is not accepted.
+          this.error(
             "STANDALONE_EXPRESSION",
-            `"$${(left as { name: string }).name}" is used on its own — it is treated as "has any value". Add a comparison (e.g. = 'Yes') to be explicit.`,
+            `"$${(left as { name: string }).name}" needs a comparison, e.g. = 'Yes' or > 5.`,
+            left.start,
+            left.end,
+          );
+        } else {
+          // Free text / a lone literal is not a valid condition.
+          this.error(
+            "STANDALONE_EXPRESSION",
+            "Not a valid condition. Use $Key = value (e.g. $Sex = 'M').",
             left.start,
             left.end,
           );

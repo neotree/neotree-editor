@@ -12,6 +12,7 @@ import { ProblemsTableRowActions } from "./table-row-actions";
 import { useProblemsTable, UseProblemsTableParams } from '../../hooks/use-problems-table';
 import { CopyProblemsModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
+import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
 
 type Props = UseProblemsTableParams;
 
@@ -34,6 +35,8 @@ export function ProblemsTable(props: Props) {
     } = useProblemsTable(props);
 
     const { sys, viewOnly } = useAppContext();
+    const { conditionKeys } = useConditionKeys();
+    const keysReady = conditionKeys.length > 0;
 
     return (
         <>
@@ -91,6 +94,21 @@ export function ProblemsTable(props: Props) {
                         },
                         {
                             name: 'Name',
+                            cellRenderer(cell) {
+                                const s = problemsArr[cell.rowIndex];
+                                return (
+                                    <span className="inline-flex items-center gap-x-2">
+                                        <span>{s?.name}</span>
+                                        {!!s && (
+                                            <ConditionErrorBadge
+                                                keys={conditionKeys}
+                                                keysReady={keysReady}
+                                                expressions={[{ value: s.expression, label: 'Expression' }]}
+                                            />
+                                        )}
+                                    </span>
+                                );
+                            },
                         },
                         {
                             name: 'Description',

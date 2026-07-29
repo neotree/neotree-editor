@@ -6,8 +6,18 @@ import { AlertCircleIcon, AlertTriangleIcon, Wand2Icon } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { mergeConditionKeys, type ConditionKey } from "@/lib/conditional-expression";
-import { getTokenAtCursor, insertKeyAtCursor, sortKeyMatches } from "./autocomplete";
+import {
+  getTokenAtCursor,
+  getValueContextAtCursor,
+  insertKeyAtCursor,
+  insertValueAtContext,
+  sortKeyMatches,
+} from "./autocomplete";
 import { useConditionValidation } from "./use-condition-validation";
+
+// Render cap: every match is reachable by typing to narrow, but we bound the
+// number of DOM nodes per keystroke so very large key sets stay responsive.
+const MAX_SUGGESTIONS = 50;
 
 export interface ConditionEditorProps {
   value: string;
@@ -53,7 +63,6 @@ export function ConditionEditor({
   allowSelf,
   selfDataType,
   selfOptions,
-  keysLoading,
   disabled,
   rows = 4,
   placeholder,
@@ -68,7 +77,10 @@ export function ConditionEditor({
     [keys, extraKeys],
   );
 
-  const keysReady = !keysLoading && keys.length > 0;
+  // Readiness is based on *having* keys, not the transient loading flag —
+  // otherwise a background refetch (keysLoading -> true) would momentarily
+  // blank out key-dependent diagnostics. Keys persist once loaded.
+  const keysReady = keys.length > 0;
 
   const { diagnostics, hasErrors } = useConditionValidation({
     value,
@@ -105,8 +117,26 @@ export function ConditionEditor({
     if (token.toLowerCase() === "self") return [];
     // Hide once the token already exactly matches a known key.
     if (token.length > 2 && mergedKeys.some((k) => k.name.toLowerCase() === token.toLowerCase())) return [];
-    return sortKeyMatches(mergedKeys, token).slice(0, 8);
+    return sortKeyMatches(mergedKeys, token);
   }, [activeToken, mergedKeys]);
+
+  // Value autocomplete: when typing a value, suggest the governing key's
+  // options (its child keys). Only when not already completing a $key.
+  const valueContext = useMemo(
+    () => (mode === "reference" || activeToken ? null : getValueContextAtCursor(value, cursor)),
+    [mode, activeToken, value, cursor],
+  );
+
+  const valueMatches = useMemo(() => {
+    if (!valueContext) return [];
+    const key = mergedKeys.find((k) => k.name.toLowerCase() === valueContext.keyName.toLowerCase());
+    if (!key?.options?.length) return [];
+    const partial = valueContext.partial.toLowerCase();
+    if (partial && key.options.some((o) => o.toLowerCase() === partial)) return []; // already an exact option
+    return key.options
+      .filter((o) => !partial || o.toLowerCase().includes(partial))
+      .map((o) => ({ value: o, label: key.optionLabels?.[o] }));
+  }, [valueContext, mergedKeys]);
 
   return (
     <div className="space-y-2">
@@ -126,8 +156,8 @@ export function ConditionEditor({
       />
 
       {!!matches.length && (
-        <div className="rounded-md border border-border">
-          {matches.map((option) => (
+        <div className="max-h-56 overflow-y-auto rounded-md border border-border">
+          {matches.slice(0, MAX_SUGGESTIONS).map((option) => (
             <button
               type="button"
               key={option.name}
@@ -139,10 +169,41 @@ export function ConditionEditor({
                 setCursor(next.cursor);
               }}
             >
-              <Wand2Icon className="mr-2 h-3.5 w-3.5 opacity-60" />
+              <Wand2Icon className="mr-2 h-3.5 w-3.5 shrink-0 opacity-60" />
               {option.label || option.name}
             </button>
           ))}
+          {matches.length > MAX_SUGGESTIONS && (
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              +{matches.length - MAX_SUGGESTIONS} more — keep typing to narrow…
+            </p>
+          )}
+        </div>
+      )}
+
+      {!matches.length && !!valueMatches.length && !!valueContext && (
+        <div className="max-h-56 overflow-y-auto rounded-md border border-border">
+          {valueMatches.slice(0, MAX_SUGGESTIONS).map((option) => (
+            <button
+              type="button"
+              key={option.value}
+              className="flex w-full items-center px-3 py-2 text-left text-sm hover:bg-accent"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                const next = insertValueAtContext(value, option.value, valueContext);
+                onChange(next.condition);
+                setCursor(next.cursor);
+              }}
+            >
+              <Wand2Icon className="mr-2 h-3.5 w-3.5 shrink-0 opacity-60" />
+              {option.label ? `${option.value} - ${option.label}` : option.value}
+            </button>
+          ))}
+          {valueMatches.length > MAX_SUGGESTIONS && (
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              +{valueMatches.length - MAX_SUGGESTIONS} more — keep typing to narrow…
+            </p>
+          )}
         </div>
       )}
 
