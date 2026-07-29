@@ -44,6 +44,8 @@ export function FilesModal() {
         totalPages,
         totalRows,
         limit,
+        replaceFile,
+        setReplaceFile,
         closeModal, 
         getFiles 
     } = useFiles();
@@ -72,7 +74,10 @@ export function FilesModal() {
 
             <Dialog
                 open={isModalOpen}
-                onOpenChange={closeModal}
+                onOpenChange={() => {
+                    closeModal();
+                    setReplaceFile(undefined);
+                }}
             >
                 <DialogContent 
                     hideCloseButton
@@ -109,6 +114,8 @@ export function FilesModal() {
                                 <div className="p-4 flex-1 overflow-y-auto columns-1 sm:columns-2 md:columns-3 gap-4">
                                     {files.map(file => {
                                         const meta = { ...file.metadata, };
+
+                                        if (replaceFile?.fileId === file.fileId) return null;
 
                                         return (
                                             <Card key={file.fileId} className="mb-4">
