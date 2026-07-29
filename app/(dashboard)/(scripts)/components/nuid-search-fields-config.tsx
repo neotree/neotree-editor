@@ -33,7 +33,7 @@ import { useScriptForm } from "../hooks/use-script-form";
 import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 import { FieldItems } from "./screens/field-items";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
-import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
+import { ConditionEditor, ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
 
 type Props = {
     disabled?: boolean;
@@ -62,6 +62,8 @@ export function NuidSearchFieldsConfig({
     }, [_nuidSearchEnabled, nuidSearchEnabled]);
 
     const { confirm } = useConfirmModal();
+    const { conditionKeys } = useConditionKeys();
+    const keysReady = conditionKeys.length > 0;
 
     const onDelete = useCallback((index: number) => {
         confirm(() => setValue('nuidSearchFields', fields.filter((_, i) => i !== index), { shouldDirty: true, }), {
@@ -194,7 +196,22 @@ export function NuidSearchFieldsConfig({
                                     name: 'Label'
                                 },
                                 {
-                                    name: 'Condition'
+                                    name: 'Condition',
+                                    cellRenderer({ rowIndex }) {
+                                        const f = fields[rowIndex];
+                                        return (
+                                            <span className="inline-flex items-center gap-x-2">
+                                                <span>{f?.condition}</span>
+                                                {!!f && (
+                                                    <ConditionErrorBadge
+                                                        keys={conditionKeys}
+                                                        keysReady={keysReady}
+                                                        expressions={[{ value: f.condition, label: 'Condition' }]}
+                                                    />
+                                                )}
+                                            </span>
+                                        );
+                                    },
                                 },
                                 {
                                     name: 'Action',

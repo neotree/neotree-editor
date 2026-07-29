@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import queryString from "query-string";
 import axios from "axios";
@@ -8,7 +8,6 @@ import axios from "axios";
 import * as serverActions from '@/app/actions/scripts';
 import * as filesActions from "@/app/actions/files";
 import { getHospitals } from "@/app/actions/hospitals";
-import { getDataKeys } from "@/app/actions/data-keys";
 import { useSearchParams } from "@/hooks/use-search-params";
 import { listScreens, getScriptsWithItems } from "@/app/actions/scripts";
 
@@ -70,6 +69,18 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
     const [keysLoading, setKeysLoading] = useState(false);
     const [keys, setKeys] = useState<Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['dataKeys']>([]);
 
+    const keysRequestRef = useRef<Promise<void> | null>(null);
+
+    // Scope the key catalogue to the current script: clear it (and any in-flight
+    // request) when the scriptId changes so expressions are never validated
+    // against a previous script's keys.
+    const keysScriptIdRef = useRef(scriptId);
+    useEffect(() => {
+        keysScriptIdRef.current = scriptId;
+        keysRequestRef.current = null;
+        setKeys([]);
+    }, [scriptId]);
+
     const onCancelScriptForm = useCallback(() => {
         router.push('/');
     }, [router]);
@@ -105,12 +116,12 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
         }
     }, [scriptId, open, alert]);
 
-    const keysRequestRef = useRef<Promise<void> | null>(null);
-
     const loadKeys = useCallback(async () => {
         // Collapse concurrent calls (multiple condition editors mounting at once)
         // into a single in-flight request.
         if (keysRequestRef.current) return keysRequestRef.current;
+
+        const requestedScriptId = scriptId;
 
         const run = (async () => {
             try {
@@ -122,6 +133,9 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
                 }));
 
                 if (res?.errors?.length) throw new Error(res.errors.join(', '));
+
+                // Ignore a stale response if we've since navigated to another script.
+                if (requestedScriptId !== keysScriptIdRef.current) return;
 
                 const scripts = res.data;
 

@@ -12,6 +12,7 @@ import { ScreensTableRowActions } from "./table-row-actions";
 import { useScreensTable, UseScreensTableParams } from '../../hooks/use-screens-table';
 import { CopyScreensModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
+import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
 
 type Props = UseScreensTableParams;
 
@@ -34,6 +35,8 @@ export function ScreensTable(props: Props) {
     } = useScreensTable(props);
 
     const { sys, viewOnly } = useAppContext();
+    const { conditionKeys } = useConditionKeys();
+    const keysReady = conditionKeys.length > 0;
 
     return (
         <>
@@ -103,6 +106,24 @@ export function ScreensTable(props: Props) {
                         },
                         {
                             name: 'Title',
+                            cellRenderer(cell) {
+                                const s = screensArr[cell.rowIndex];
+                                return (
+                                    <span className="inline-flex items-center gap-x-2">
+                                        <span>{s?.title}</span>
+                                        {!!s && (
+                                            <ConditionErrorBadge
+                                                keys={conditionKeys}
+                                                keysReady={keysReady}
+                                                expressions={[
+                                                    { value: s.condition, label: 'Condition' },
+                                                    { value: s.skipToCondition, label: 'Skip to screen' },
+                                                ]}
+                                            />
+                                        )}
+                                    </span>
+                                );
+                            },
                         },
                         {
                             name: 'Version',

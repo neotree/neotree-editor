@@ -17,6 +17,7 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { isNumericQueryValue } from "@/lib/query-state";
 import { FieldsBottomActions } from "./fields-bottom-actions";
 import { Field } from "./field";
+import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
 
 type Props = {
     disabled?: boolean;
@@ -34,8 +35,17 @@ export function Fields({
     const [manualOnly, setManualOnly] = useState(false);
     const [missingManualLabelOnly, setMissingManualLabelOnly] = useState(false);
     const { confirm } = useConfirmModal();
+    const { conditionKeys } = useConditionKeys();
+    const keysReady = conditionKeys.length > 0;
 
     const fields = form.watch('fields');
+    // Unsaved sibling field keys, matching what the field editor validates against.
+    const siblingConditionKeys = useMemo(
+        () => (fields || [])
+            .map((f) => ({ name: `${f?.key || ''}`.trim(), label: `${f?.key || ''}${f?.label ? ` - ${f.label}` : ''}`, dataType: f?.type }))
+            .filter((k) => !!k.name),
+        [fields],
+    );
     const fieldMeta = useMemo(() => {
         return fields.map((field) => {
             const items = field.items || [];
@@ -246,6 +256,25 @@ export function Fields({
                     },
                     {
                         name: 'Label',
+                        cellRenderer(cell) {
+                            const field = fields[cell.rowIndex];
+                            return (
+                                <span className="inline-flex items-center gap-x-2">
+                                    <span>{field?.label}</span>
+                                    {!!field && (
+                                        <ConditionErrorBadge
+                                            keys={conditionKeys}
+                                            extraKeys={siblingConditionKeys}
+                                            keysReady={keysReady}
+                                            expressions={[
+                                                { value: field.condition, label: 'Condition', allowSelf: true },
+                                                { value: (field as { calculation?: string }).calculation, label: 'Reference expression', mode: 'reference' },
+                                            ]}
+                                        />
+                                    )}
+                                </span>
+                            );
+                        },
                     },
                     {
                         name: 'Manual Entry',

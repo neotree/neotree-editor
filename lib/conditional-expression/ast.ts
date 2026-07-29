@@ -15,14 +15,22 @@ export type DiagnosticCode =
   | "DANGLING_OPERATOR"
   | "EMPTY_GROUP"
   | "MEMBERSHIP_SYNTAX"
+  | "MEMBERSHIP_BRACKETS"
+  | "MEMBERSHIP_EMPTY"
   | "STANDALONE_EXPRESSION"
+  | "MISSING_KEY"
   // Semantic (needs the script key context)
   | "UNKNOWN_KEY"
+  | "KEY_CASE"
   | "SELF_NOT_ALLOWED"
   | "TYPE_MISMATCH"
+  | "VALUE_TYPE"
   | "MEMBERSHIP_TYPE"
   | "UNKNOWN_OPTION"
   | "UNQUOTED_VALUE"
+  | "DUPLICATE_VALUE"
+  | "EMPTY_VALUE"
+  | "NULL_VALUE"
   // Reference-expression sublanguage
   | "UNKNOWN_FUNCTION"
   | "FUNCTION_ARG";
@@ -122,6 +130,8 @@ export interface ConditionKey {
   dataType?: string;
   /** Known option values (for dropdown/select keys). */
   options?: string[];
+  /** Optional display labels for options, keyed by option value. */
+  optionLabels?: Record<string, string>;
 }
 
 export interface ValidationContext {
