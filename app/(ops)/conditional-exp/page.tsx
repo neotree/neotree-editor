@@ -130,7 +130,7 @@ export default function ConditionalExp() {
 
                     {!!condition && !!testResults.parsedCondition && (
                         [
-                            testResults.isValid,
+                            `${testResults.isValid}`,
                             testResults.parsedCondition,
                         ]
                         .map((s, i) => (
@@ -150,7 +150,10 @@ export default function ConditionalExp() {
                                         whitespace-pre-wrap
                                     "
                                 >
-                                    <p>{`> ${s}`}</p>
+                                    <p className="flex">
+                                        <span>&gt;&nbsp;</span>
+                                        <span className="flex-1">{s}</span>
+                                    </p>
                                 </pre>
                             </div>
                         ))
