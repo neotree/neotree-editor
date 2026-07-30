@@ -27,11 +27,11 @@ import { DataTable } from "@/components/data-table";
 import { useField } from "../hooks/use-field";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
 import { validateDropdownValues } from "@/lib/validate-dropdown-values";
-import { FieldItems } from "./screens/field-items";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 
 type Props = {
@@ -196,6 +196,9 @@ export function NuidSearchFieldsConfig({
                                     name: 'Condition'
                                 },
                                 {
+                                    name: 'Required'
+                                },
+                                {
                                     name: 'Action',
                                     align: 'right',
                                     cellRenderer({ rowIndex }) {
@@ -242,6 +245,7 @@ export function NuidSearchFieldsConfig({
                                 f.key,
                                 f.label,
                                 f.condition,
+                                f.optional ? 'No' : 'Yes',
                                 '',
                             ])}
                         />
@@ -296,6 +300,7 @@ export function Field({
         control,
         watch,
         register,
+        setValue,
         handleSubmit,
     } = useForm({
         defaultValues: getDefaultValues(),
@@ -303,6 +308,7 @@ export function Field({
 
     const type = watch('type');
     const values = watch('values');
+    const optional = watch('optional');
 
     const onSave = handleSubmit(onChange);
 
@@ -362,6 +368,20 @@ export function Field({
                             noRing={false}
                             rows={5}
                         />
+                    </div>
+
+                    <div>
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id="optional"
+                                checked={optional}
+                                onCheckedChange={checked => setValue('optional', checked, { shouldDirty: true, })}
+                            />
+                            <Label htmlFor="optional">Optional</Label>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                            When off, the session cannot be started until this question is answered.
+                        </span>
                     </div>
 
                     {(
