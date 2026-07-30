@@ -129,24 +129,31 @@ export default function ConditionalExp() {
                     </div>
 
                     {!!condition && !!testResults.parsedCondition && (
-                        <pre 
-                            className="
-                                block
-                                px-4
-                                py-2
-                                rounded-md
-                                border-border
-                                border-[1px]
-                                bg-black 
-                                text-white 
-                                dark:text-black 
-                                dark:bg-white
-                                whitespace-pre-wrap
-                            "
-                        >
-                            {/* <p>{`> ${testResults.parsedCondition}`}</p> */}
-                            <p>{`> ${testResults.isValid}`}</p>
-                        </pre>
+                        [
+                            testResults.isValid,
+                            testResults.parsedCondition,
+                        ]
+                        .map((s, i) => (
+                            <div key={i}>
+                                <pre 
+                                    className="
+                                        block
+                                        px-4
+                                        py-2
+                                        rounded-md
+                                        border-border
+                                        border-[1px]
+                                        bg-black 
+                                        text-white 
+                                        dark:text-black 
+                                        dark:bg-white
+                                        whitespace-pre-wrap
+                                    "
+                                >
+                                    <p>{`> ${s}`}</p>
+                                </pre>
+                            </div>
+                        ))
                     )}
                 </div>
             </div>
