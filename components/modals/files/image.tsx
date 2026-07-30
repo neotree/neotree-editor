@@ -33,21 +33,21 @@ export function Image({ file, ...props }: ImageProps & {
 
     const { 
         selectMultiple, 
-        selectedFile, 
-        setSelectedFile, 
+        deleteState, 
+        setDeleteState, 
         onSelectFiles, 
         closeModal, 
     } = useFiles();
 
     const onSelect = useCallback(() => {
-        if (selectedFile) {
-            setSelectedFile(selectedFile.deleteFileId, file.fileId);
+        if (deleteState) {
+            setDeleteState(deleteState.fileId, file.fileId);
         } else {
             if (!onSelectFiles) return;
             onSelectFiles([file]);
             if (!selectMultiple) closeModal();
         }
-    }, [onSelectFiles, setSelectedFile, selectedFile, file]);
+    }, [onSelectFiles, setDeleteState, deleteState, file]);
 
     const img = (
         <ImageComponent 
@@ -68,7 +68,7 @@ export function Image({ file, ...props }: ImageProps & {
                     className={cn(
                         'relative', 
                         '[&_div:last-child]:transition-opacity',
-                        !selectedFile && '[&_div:last-child]:opacity-0', 
+                        !deleteState && '[&_div:last-child]:opacity-0', 
                         '[&:hover_div:last-child]:opacity-100',
                     )}
                 >
@@ -94,7 +94,7 @@ export function Image({ file, ...props }: ImageProps & {
                                     size="sm"
                                     onClick={() => onSelect()}
                                 >
-                                    Select {!!selectedFile && 'replacement'}
+                                    Select {!!deleteState && 'replacement'}
                                 </Button>
                             )}
 
@@ -139,7 +139,7 @@ export function Image({ file, ...props }: ImageProps & {
                                 <Button
                                     onClick={() => onSelect()}
                                 >
-                                    Select {!!selectedFile && 'replacement'}
+                                    Select {!!deleteState && 'replacement'}
                                 </Button>
                             </DialogClose>
                         )}
@@ -154,7 +154,7 @@ function DeleteBtn({ file, }: {
     file: tFile;
 }) {
     const [loading, setLoading] = useState(false);
-    const { selectedFile, setSelectedFile, } = useFiles();
+    const { deleteState, setDeleteState, } = useFiles();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
 
@@ -177,28 +177,28 @@ function DeleteBtn({ file, }: {
                 danger: true,
                 title: 'Delete file',
                 positiveLabel: 'Yes, delete',
-                onDeny: () => setSelectedFile(undefined),
+                onDeny: () => setDeleteState(undefined),
                 message: `
                     <p class="text-xl">Are you sure?</p>
                     <div class="flex gap-4 [&>div]:flex-1 [&>div]:w-1/2">
-                        ${!selectedFile?.deleteFileId ? '' : `
+                        ${!deleteState?.fileId ? '' : `
                             <div>
                                 <p class="text-center text-lg">Delete</p>
                                 <img 
                                     class="w-full h-auto"
                                     alt=""
-                                    src="${window.location.origin}/files/${selectedFile.deleteFileId}"
+                                    src="${window.location.origin}/files/${deleteState.fileId}"
                                 />
                             </div>
                         `}
 
-                        ${!selectedFile?.replaceWithFileId ? '' : `
+                        ${!deleteState?.replaceWithFileId ? '' : `
                             <div>
                                 <p class="text-center text-lg">Replace with</p>
                                 <img 
                                     class="w-full h-auto"
                                     alt=""
-                                    src="${window.location.origin}/files/${selectedFile.replaceWithFileId}"
+                                    src="${window.location.origin}/files/${deleteState.replaceWithFileId}"
                                 />
                             </div>
                         `}
@@ -206,7 +206,7 @@ function DeleteBtn({ file, }: {
                 `,
             }
         );
-    }, [file, selectedFile, setSelectedFile, confirm, alert]);
+    }, [file, deleteState, setDeleteState, confirm, alert]);
 
     const onDeleteClick = useCallback(async () => {
         try {
@@ -228,7 +228,7 @@ function DeleteBtn({ file, }: {
                     title: 'Alert',
                     message: 'File is referenced in other places, please select a replacement file.',
                 });
-                setSelectedFile(file.fileId);
+                setDeleteState(file.fileId);
             } else {
                 deleteFile();
             }
@@ -241,17 +241,17 @@ function DeleteBtn({ file, }: {
         } finally {
             setLoading(false);
         }
-    }, [file, setSelectedFile, confirm, alert, deleteFile]);
+    }, [file, setDeleteState, confirm, alert, deleteFile]);
 
     useEffect(() => {
-        if (selectedFile?.replaceWithFileId) {
+        if (deleteState?.replaceWithFileId) {
             deleteFile();
         }
-    }, [selectedFile?.replaceWithFileId, deleteFile]);
+    }, [deleteState?.replaceWithFileId, deleteFile]);
 
     return (
         <>
-            {!selectedFile?.deleteFileId ? (
+            {!deleteState?.fileId ? (
                 <Button
                     variant="destructive"
                     size="sm"
@@ -263,7 +263,7 @@ function DeleteBtn({ file, }: {
                 <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setSelectedFile(undefined)}
+                    onClick={() => setDeleteState(undefined)}
                 >
                     <XIcon className="w-4 h-4" />
                 </Button>

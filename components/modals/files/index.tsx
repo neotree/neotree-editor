@@ -44,8 +44,8 @@ export function FilesModal() {
         totalPages,
         totalRows,
         limit,
-        selectedFile,
-        setSelectedFile,
+        deleteState,
+        setDeleteState,
         closeModal, 
         getFiles 
     } = useFiles();
@@ -76,7 +76,7 @@ export function FilesModal() {
                 open={isModalOpen}
                 onOpenChange={() => {
                     closeModal();
-                    setSelectedFile(undefined);
+                    setDeleteState(undefined);
                 }}
             >
                 <DialogContent 
@@ -115,7 +115,7 @@ export function FilesModal() {
                                     {files.map(file => {
                                         const meta = { ...file.metadata, };
 
-                                        if (selectedFile?.deleteFileId === file.fileId) return null;
+                                        if (deleteState?.fileId === file.fileId) return null;
 
                                         return (
                                             <Card key={file.fileId} className="mb-4">
