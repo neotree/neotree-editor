@@ -154,6 +154,23 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
     return false;
   };
 
+  // Leading/trailing spaces inside a quoted value are almost always a mistake
+  // (e.g. '$Sex = "M "' never matches "M" at runtime).
+  const flagValueWhitespace = (value: Node): void => {
+    if (value.type !== "Literal" || value.valueType !== "string" || value.bare) return;
+    const raw = String(value.value);
+    const trimmed = raw.trim();
+    if (trimmed !== "" && trimmed !== raw) {
+      diagnostics.push({
+        severity: "warning",
+        code: "VALUE_WHITESPACE",
+        message: `Value has leading or trailing spaces — did you mean '${trimmed}'?`,
+        start: value.start,
+        end: value.end,
+      });
+    }
+  };
+
   // Warn when a quoted value isn't among a key's known options (with a "did you
   // mean" suggestion). Shared by equality comparisons and list members.
   const checkOptionValue = (value: Node, desc: KeyDesc, keyName: string): void => {
@@ -177,8 +194,8 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
 
   const checkComparison = (node: ComparisonNode): void => {
     const right = node.right;
-    // Empty/null value rejection runs regardless of the key catalogue.
     const badValue = flagBadValue(right);
+    if (!badValue) flagValueWhitespace(right);
 
     if (ctx.skipKeyResolution) return;
     if (node.left.type !== "Var") return;
@@ -283,9 +300,10 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
       });
     }
 
-    // Reject empty/null list values, then require quoting.
+    // Reject empty/null list values, flag stray spaces, then require quoting.
     node.values.forEach((value) => {
       if (flagBadValue(value)) return;
+      flagValueWhitespace(value);
       if (value.type === "Literal" && value.bare) {
         diagnostics.push({
           severity: "warning",
