@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import axios from 'axios';
 
@@ -16,11 +16,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { useFiles, FilesStore } from '@/hooks/use-files';
-import { Trash2Icon } from 'lucide-react';
+import { Trash2Icon, XIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import type { GetFileReferencesResponse } from '@/databases/queries/files';
 import { useAlertModal } from '@/hooks/use-alert-modal';
+import { Loader } from '@/components/loader';
 
 type tFile = FilesStore['files'][0];
 
@@ -32,21 +33,21 @@ export function Image({ file, ...props }: ImageProps & {
 
     const { 
         selectMultiple, 
-        replaceFile, 
-        setReplaceFile, 
+        selectedFile, 
+        setSelectedFile, 
         onSelectFiles, 
         closeModal, 
     } = useFiles();
 
     const onSelect = useCallback(() => {
-        if (replaceFile) {
-            setReplaceFile(replaceFile.fileId, file.fileId);
+        if (selectedFile) {
+            setSelectedFile(selectedFile.deleteFileId, file.fileId);
         } else {
             if (!onSelectFiles) return;
             onSelectFiles([file]);
             if (!selectMultiple) closeModal();
         }
-    }, [onSelectFiles, setReplaceFile, replaceFile, file]);
+    }, [onSelectFiles, setSelectedFile, selectedFile, file]);
 
     const img = (
         <ImageComponent 
@@ -67,7 +68,7 @@ export function Image({ file, ...props }: ImageProps & {
                     className={cn(
                         'relative', 
                         '[&_div:last-child]:transition-opacity',
-                        !replaceFile && '[&_div:last-child]:opacity-0', 
+                        !selectedFile && '[&_div:last-child]:opacity-0', 
                         '[&:hover_div:last-child]:opacity-100',
                     )}
                 >
@@ -93,7 +94,7 @@ export function Image({ file, ...props }: ImageProps & {
                                     size="sm"
                                     onClick={() => onSelect()}
                                 >
-                                    Select
+                                    Select {!!selectedFile && 'replacement'}
                                 </Button>
                             )}
 
@@ -106,9 +107,7 @@ export function Image({ file, ...props }: ImageProps & {
                                 </Button>
                             </DialogTrigger>
 
-                            {!replaceFile && (
-                                <DeleteFile file={file} />
-                            )}
+                            <DeleteBtn file={file} />
                         </div>
                     </div>
                 </div>
@@ -140,7 +139,7 @@ export function Image({ file, ...props }: ImageProps & {
                                 <Button
                                     onClick={() => onSelect()}
                                 >
-                                    Select
+                                    Select {!!selectedFile && 'replacement'}
                                 </Button>
                             </DialogClose>
                         )}
@@ -151,13 +150,63 @@ export function Image({ file, ...props }: ImageProps & {
     );
 }
 
-function DeleteFile({ file }: {
+function DeleteBtn({ file, }: {
     file: tFile;
 }) {
     const [loading, setLoading] = useState(false);
-    const { setReplaceFile, } = useFiles();
+    const { selectedFile, setSelectedFile, } = useFiles();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
+
+    const deleteFile = useCallback(() => {
+        confirm(
+            async () => {
+                try {
+                    
+                } catch(e: any) {
+                    alert({
+                        variant: 'error',
+                        title: 'Error',
+                        message: e.message,
+                    });
+                } finally {
+                    setLoading(false);
+                }
+            },
+            {
+                danger: true,
+                title: 'Delete file',
+                positiveLabel: 'Yes, delete',
+                onDeny: () => setSelectedFile(undefined),
+                message: `
+                    <p class="text-xl">Are you sure?</p>
+                    <div class="flex gap-4 [&>div]:flex-1 [&>div]:w-1/2">
+                        ${!selectedFile?.deleteFileId ? '' : `
+                            <div>
+                                <p class="text-center text-lg">Delete</p>
+                                <img 
+                                    class="w-full h-auto"
+                                    alt=""
+                                    src="${window.location.origin}/files/${selectedFile.deleteFileId}"
+                                />
+                            </div>
+                        `}
+
+                        ${!selectedFile?.replaceWithFileId ? '' : `
+                            <div>
+                                <p class="text-center text-lg">Replace with</p>
+                                <img 
+                                    class="w-full h-auto"
+                                    alt=""
+                                    src="${window.location.origin}/files/${selectedFile.replaceWithFileId}"
+                                />
+                            </div>
+                        `}
+                    </div>
+                `,
+            }
+        );
+    }, [file, selectedFile, setSelectedFile, confirm, alert]);
 
     const onDeleteClick = useCallback(async () => {
         try {
@@ -179,28 +228,9 @@ function DeleteFile({ file }: {
                     title: 'Alert',
                     message: 'File is referenced in other places, please select a replacement file.',
                 });
-                setReplaceFile(file.fileId);
+                setSelectedFile(file.fileId);
             } else {
-                confirm(
-                    async () => {
-                        try {
-                            
-                        } catch(e: any) {
-                            alert({
-                                variant: 'error',
-                                title: 'Error',
-                                message: e.message,
-                            });
-                        } finally {
-                            setLoading(false);
-                        }
-                    },
-                    {
-                        title: 'Delete file',
-                        message: 'Are you sure you want to delete this file?',
-                        positiveLabel: 'Yes, delete',
-                    }
-                );
+                deleteFile();
             }
         } catch(e: any) {
             alert({
@@ -211,17 +241,35 @@ function DeleteFile({ file }: {
         } finally {
             setLoading(false);
         }
-    }, [file, setReplaceFile, confirm, alert]);
+    }, [file, setSelectedFile, confirm, alert, deleteFile]);
+
+    useEffect(() => {
+        if (selectedFile?.replaceWithFileId) {
+            deleteFile();
+        }
+    }, [selectedFile?.replaceWithFileId, deleteFile]);
 
     return (
         <>
-            <Button
-                variant="destructive"
-                size="sm"
-                onClick={onDeleteClick}
-            >
-                <Trash2Icon className="w-4 h-4" />
-            </Button>
+            {!selectedFile?.deleteFileId ? (
+                <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={onDeleteClick}
+                >
+                    <Trash2Icon className="w-4 h-4" />
+                </Button>
+            ) : (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedFile(undefined)}
+                >
+                    <XIcon className="w-4 h-4" />
+                </Button>
+            )}
+
+            {loading && <Loader overlay />}
         </>
     );
 }

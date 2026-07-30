@@ -19,8 +19,8 @@ type OpenModalOptions = Partial<SelectOptions> & {
 };
 
 export type FilesStore = SelectOptions & {
-    replaceFile?: { 
-        fileId: string;
+    selectedFile?: { 
+        deleteFileId: string;
         replaceWithFileId?: string;
     };
     isModalOpen: boolean;
@@ -33,7 +33,7 @@ export type FilesStore = SelectOptions & {
     limit: number;
     totalPages: number;
     totalRows: number;
-    setReplaceFile: (fileId?:  string, replaceWithFileId?:  string) => void;
+    setSelectedFile: (deleteFileId?:  string, replaceWithFileId?:  string) => void;
     getFiles: (options?: GetFilesOptions) => Promise<void>;
     openModal: (options?: OpenModalOptions) => void;
     closeModal: () => void;
@@ -94,8 +94,8 @@ export const useFiles = create<FilesStore>((set, getStore) => {
         totalRows: 0,
         onSelectFiles: null,
         selectMultiple: false,
-        setReplaceFile(fileId, replaceWithFileId?: string) {
-            set({ replaceFile: fileId === undefined ? undefined : { fileId, replaceWithFileId, }, });
+        setSelectedFile(deleteFileId, replaceWithFileId?: string) {
+            set({ selectedFile: deleteFileId === undefined ? undefined : { deleteFileId, replaceWithFileId, }, });
         },
         getFiles,
         openModal(options) {
