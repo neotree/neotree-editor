@@ -31,6 +31,8 @@ export type DiagnosticCode =
   | "DUPLICATE_VALUE"
   | "EMPTY_VALUE"
   | "NULL_VALUE"
+  | "VALUE_WHITESPACE"
+  | "TRAILING_WHITESPACE"
   // Reference-expression sublanguage
   | "UNKNOWN_FUNCTION"
   | "FUNCTION_ARG";

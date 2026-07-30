@@ -219,6 +219,25 @@ assert.ok(
 // Equality option check still works via the shared helper.
 assert.ok(errors("$Diagnoses = 'Nope'", listCtx).some((d) => d.code === "UNKNOWN_OPTION"), "equality option error");
 
+// ---- Stray whitespace ------------------------------------------------------
+
+// Leading/trailing spaces inside a value (silent runtime mismatch).
+assert.ok(warnings("$Name = 'John '").some((d) => d.code === "VALUE_WHITESPACE"), "trailing space in value warns");
+assert.ok(warnings("$Name = ' John'").some((d) => d.code === "VALUE_WHITESPACE"), "leading space in value warns");
+assert.equal(warnings("$Name = 'John Doe'").filter((d) => d.code === "VALUE_WHITESPACE").length, 0, "interior space is fine");
+assert.ok(warnings("[$Diagnoses includes ('LBW ')]").some((d) => d.code === "VALUE_WHITESPACE"), "trailing space in list value warns");
+// Whitespace check is structural — fires even before keys load.
+assert.ok(
+  warnings("$Any = 'x '", { keys: [], allowSelf: true, skipKeyResolution: true }).some((d) => d.code === "VALUE_WHITESPACE"),
+  "value whitespace flagged while keys load",
+);
+
+// Trailing spaces on a line.
+assert.ok(codes("$Sex = 'M' ").includes("TRAILING_WHITESPACE"), "trailing spaces on the expression flagged");
+assert.equal(codes("$Sex = 'M'").filter((c) => c === "TRAILING_WHITESPACE").length, 0, "no trailing whitespace when clean");
+// Whitespace flags never block saving.
+assert.equal(validateCondition("$Name = 'John '", ctx).hasErrors, false, "whitespace flags do not block");
+
 // ---- skipKeyResolution suppresses key-dependent checks ----------------------
 
 const loadingCtx: ValidationContext = { keys: [], allowSelf: true, skipKeyResolution: true };
