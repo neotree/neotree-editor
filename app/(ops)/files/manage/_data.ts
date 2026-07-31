@@ -12,7 +12,7 @@ export async function loadData() {
             files: GetFilesResults['data'];
         }[] = [];
 
-        for (const site of sites.data) {
+        for (const site of [sites.data[0]]) {
             const { link, apiKey, } = site;
 
             const axios = await getSiteAxiosClient({
@@ -23,10 +23,19 @@ export async function loadData() {
             const referencedFiles = (await axios.get(`/api/files/references`))?.data?.data as ReferencedFile[];
             const files = (await axios.get(`/api/files`))?.data?.data as GetFilesResults['data'];
 
+            const filesWithData = await Promise.all(files.map(async f => {
+                const res = (await axios.get(`/api/files/${f.fileId}/download`))?.data?.data;
+                const base64 = Buffer.from(res.data).toString('base64');
+                return {
+                    ...f,
+                    base64,
+                };
+            }));
+
             data.push({
                 site,
                 referencedFiles,
-                files,
+                files: filesWithData,
             });
         }
 

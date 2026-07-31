@@ -7,6 +7,7 @@ type Options = {
     positiveLabel: string;
     negativeLabel: string;
     danger?: boolean;
+    onDeny?: () => void;
 };
 
 type ConfirmModalState = Options & {
