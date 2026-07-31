@@ -109,6 +109,17 @@ export function parseCondition(
                 :
                 _condition.split(/ includes /gi).map(s => s.trim());
 
+            const valsParsed = (vals || '')
+                .replace(/\((.*?)\)/gi, '$1').trim().split(',')
+                .map(s => s.trim().replace(/\'(.*?)\'/gi, '$1'))
+                .map(s => s.trim().replace(/\"(.*?)\"/gi, '$1'))
+                .map(s => s.trim().replace(/\`(.*?)\`/gi, '$1'));
+
+            // const valsParsed = `${vals || ''}`
+            //     .replace(/\((.*?)\)/, '$1')
+            //     .split(',')
+            //     .map(v => v.trim().replaceAll('"', '').replaceAll("'", '').replaceAll('`', '').replaceAll('`', ''));
+
             const entryVals = _form.map(e => {
                     let found: string[] = [];
                     const entryVals = e.value || e.values || [];
@@ -125,16 +136,14 @@ export function parseCondition(
                     return found.filter(v => v);
                 }).reduce((acc, arr) => [...acc, ...arr], []);
 
-            _condition = `${vals || ''}`
-                .replace(/\((.*?)\)/, '$1')
-                .split(',')
-                .map(v => v.trim().replaceAll('"', '').replaceAll("'", '').replaceAll('`', '').replaceAll('`', ''))
+            _condition = valsParsed
                 .map(v => {
-                    let includes = entryVals.map(v => v.toLowerCase()).includes(v.toLowerCase());
-                    if (_condition.match(/ excludes /gi)) {
-                        includes = !includes;
-                    }
-                    return includes;
+                    // let includes = entryVals.map(v => v.toLowerCase()).includes(v.toLowerCase());
+                    // if (_condition.match(/ excludes /gi)) {
+                    //     includes = !includes;
+                    // }
+                    // return includes;
+                    return `${JSON.stringify(entryVals.map(v => v.toLowerCase()))}.includes(${JSON.stringify(v).toLowerCase()})`;
                 })
                 .join(` ${joinWith} `);
 
