@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Plus, Trash } from "lucide-react";
 import { useMeasure } from "react-use";
 import queryString from "query-string";
@@ -7,6 +8,7 @@ import { ScriptImage } from "@/types";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Image } from "@/components/image";
 import { useFiles } from "@/hooks/use-files";
+import { SocketEventsListener } from "@/components/socket-events-listener";
 
 export type ImageFieldProps = {
     image: null | ScriptImage;
@@ -15,7 +17,7 @@ export type ImageFieldProps = {
 };
 
 export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
-    const filesState = useFiles();
+    const { openModal: openFilesModal, } = useFiles();
 
     const [containerRef, { width: containerWidth, }] = useMeasure<HTMLDivElement>();
     const { confirm } = useConfirmModal();
@@ -23,8 +25,19 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
     const q = `${image?.data || ''}`.split('?').filter((_, i) => i).join('');
     const { width, height } = queryString.parse(q);
 
+    const [timeStamp, setTimeStamp] = useState('');
+
     return (
         <>
+            <SocketEventsListener 
+                events={[
+                    {
+                        name: 'files_deleted',
+                        onEvent: { callback: () => setTimeStamp(new Date().getTime().toString()), },
+                    },
+                ]}
+            />
+
             <div ref={containerRef} className="flex flex-col gap-y-2 min-w-60 max-w-60">
                 <div className="w-full flex flex-col items-center justify-center min-h-28">
                     <Image 
@@ -32,7 +45,7 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
                         width={Number(width || '0')}
                         height={Number(height || '0')}
                         containerWidth={containerWidth}
-                        src={image?.data || '/images/placeholder.png'}
+                        src={`${image?.data || '/images/placeholder.png'}?ts=${timeStamp}`}
                     />
                 </div>
 
@@ -41,7 +54,7 @@ export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
                         size="icon"
                         className="w-8 h-8 rounded-full"
                         disabled={disabled}
-                        onClick={() => filesState.openModal({
+                        onClick={() => openFilesModal({
                             onSelectFiles([file]) {
                                 onChange({
                                     data: file.url,
