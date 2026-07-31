@@ -1,4 +1,4 @@
-import { eq, ilike, isNotNull, or, sql } from 'drizzle-orm';
+import { and, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
 import db from '@/databases/pg/drizzle';
 import * as schema from '@/databases/pg/schema';
@@ -29,7 +29,7 @@ export async function _getFileReferences({ fileId, }: GetFileReferences): Promis
             draftId: schema.screensDrafts.screenDraftId, 
             scriptId: schema.screensDrafts.scriptId, 
             contentTextImage: sql<string>`${schema.screensDrafts.data}->>'contentTextImage'`,
-        }).from(schema.screensDrafts).where(
+        }).from(schema.screensDrafts).where(and(
             or(
                 sql`${schema.screensDrafts.data}::text ILIKE ${'%' + fileId + '%'}`,
                 sql`${schema.screensDrafts.data}#>>'{image1,data}' ILIKE ${'%' + fileId + '%'}`,
@@ -43,13 +43,13 @@ export async function _getFileReferences({ fileId, }: GetFileReferences): Promis
                     sql`${schema.screensDrafts.data}#>>'{contentTextImage,data}' ILIKE ${'%' + alias + '%'}`,
                 ]),
             ),
-        );
+        ));
 
         const problemsDrafts = await db.select({ 
             id: schema.problemsDrafts.problemId, 
             draftId: schema.problemsDrafts.problemDraftId, 
             scriptId: schema.problemsDrafts.scriptId, 
-        }).from(schema.problemsDrafts).where(
+        }).from(schema.problemsDrafts).where(and(
             or(
                 sql`${schema.problemsDrafts.data}::text ILIKE ${'%' + fileId + '%'}`,
                 sql`${schema.problemsDrafts.data}#>>'{image1}' ILIKE ${'%' + fileId + '%'}`,
@@ -61,13 +61,13 @@ export async function _getFileReferences({ fileId, }: GetFileReferences): Promis
                     sql`${schema.problemsDrafts.data}#>>'{image3}' ILIKE ${'%' + alias + '%'}`,
                 ]),
             ),
-        );
+        ));
 
         const diagnosesDrafts = await db.select({ 
             id: schema.diagnosesDrafts.diagnosisId, 
             draftId: schema.diagnosesDrafts.diagnosisDraftId, 
             scriptId: schema.diagnosesDrafts.scriptId, 
-        }).from(schema.diagnosesDrafts).where(
+        }).from(schema.diagnosesDrafts).where(and(
             or(
                 sql`${schema.diagnosesDrafts.data}::text ILIKE ${'%' + fileId + '%'}`,
                 sql`${schema.diagnosesDrafts.data}#>>'{image1}' ILIKE ${'%' + fileId + '%'}`,
@@ -79,12 +79,13 @@ export async function _getFileReferences({ fileId, }: GetFileReferences): Promis
                     sql`${schema.diagnosesDrafts.data}#>>'{image3}' ILIKE ${'%' + alias + '%'}`,
                 ]),
             ),
-        );
+        ));
 
         const screens = await db.select({ 
             id: schema.screens.screenId,
             scriptId: schema.screens.scriptId, 
-        }).from(schema.screens).where(
+        }).from(schema.screens).where(and(
+            isNull(schema.screens.deletedAt),
             or(
                 sql`${schema.screens.image1}::text ILIKE ${'%' + fileId + '%'}`,
                 sql`${schema.screens.image2}::text ILIKE ${'%' + fileId + '%'}`,
@@ -97,12 +98,13 @@ export async function _getFileReferences({ fileId, }: GetFileReferences): Promis
                     sql`${schema.screens.contentTextImage}::text ILIKE ${'%' + alias + '%'}`,
                 ]),
             ),
-        );
+        ));
 
         const problems = await db.select({ 
             id: schema.problems.problemId, 
             scriptId: schema.problems.scriptId, 
-        }).from(schema.problems).where(
+        }).from(schema.problems).where(and(
+            isNull(schema.problems.deletedAt),
             or(
                 sql`${schema.problems.image1}::text ILIKE ${'%' + fileId + '%'}`,
                 sql`${schema.problems.image2}::text ILIKE ${'%' + fileId + '%'}`,
@@ -113,12 +115,13 @@ export async function _getFileReferences({ fileId, }: GetFileReferences): Promis
                     sql`${schema.problems.image3}::text ILIKE ${'%' + alias + '%'}`,
                 ]),
             ),
-        );
+        ));
 
         const diagnoses = await db.select({ 
             id: schema.diagnoses.diagnosisId, 
             scriptId: schema.diagnoses.scriptId, 
-        }).from(schema.diagnoses).where(
+        }).from(schema.diagnoses).where(and(
+            isNull(schema.diagnoses.deletedAt),
             or(
                 sql`${schema.diagnoses.image1}::text ILIKE ${'%' + fileId + '%'}`,
                 sql`${schema.diagnoses.image2}::text ILIKE ${'%' + fileId + '%'}`,
@@ -129,7 +132,7 @@ export async function _getFileReferences({ fileId, }: GetFileReferences): Promis
                     sql`${schema.diagnoses.image3}::text ILIKE ${'%' + alias + '%'}`,
                 ]),
             ),
-        );
+        ));
 
         const data: GetFileReferencesResponse['data'] = [
             ...screensDrafts.map(item => ({

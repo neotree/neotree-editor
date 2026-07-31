@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 
 import socket  from '@/lib/socket';
 import db from '@/databases/pg/drizzle';
@@ -18,6 +18,7 @@ export type DeleteAndReplaceFilesResponse = {
 };
 
 export async function _deleteAndReplaceFiles({
+    broadcastAction,
     items,
 }: DeleteAndReplaceFiles): Promise<DeleteAndReplaceFilesResponse> {
     try {
@@ -29,16 +30,21 @@ export async function _deleteAndReplaceFiles({
             }
 
             if (replaceWithId) {
+                await db.update(schema.filesAliases)
+                    .set({ fileId: replaceWithId, })
+                    .where(or(
+                        eq(schema.filesAliases.fileId, deleteId),
+                        eq(schema.filesAliases.alias, deleteId)
+                    ));
+
                 const alias = await db.query.filesAliases.findFirst({
-                    where: eq(schema.filesAliases.fileId, deleteId),
+                    where: eq(schema.filesAliases.alias, deleteId),
                 });
 
-                if (alias) {
-                    await db.update(schema.filesAliases).set({ alias: replaceWithId, }).where(eq(schema.filesAliases.id, alias.id)); 
-                } else {
+                if (!alias) {
                     await db.insert(schema.filesAliases).values({
-                        fileId: deleteId,
-                        alias: replaceWithId,
+                        fileId: replaceWithId,
+                        alias: deleteId,
                     });
                 }
             }
@@ -46,7 +52,7 @@ export async function _deleteAndReplaceFiles({
             processedItems.push({ deleteId, replaceWithId, });
         }
 
-        if (processedItems.length) socket.emit('files_deleted');
+        if (broadcastAction) socket.emit('files_deleted', '');
 
         return {
             success: true,
