@@ -22,6 +22,7 @@ import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import type { GetFileReferencesResponse } from '@/databases/queries/files';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { Loader } from '@/components/loader';
+import { DeleteAndReplaceFiles, DeleteAndReplaceFilesResponse } from '@/databases/mutations/files';
 
 type tFile = FilesStore['files'][0];
 
@@ -154,15 +155,53 @@ function DeleteBtn({ file, }: {
     file: tFile;
 }) {
     const [loading, setLoading] = useState(false);
-    const { deleteState, setDeleteState, } = useFiles();
+    const { deleteState, setDeleteState, getFiles, } = useFiles();
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
 
-    const deleteFile = useCallback(() => {
+    const deleteFile = useCallback((params?: typeof deleteState) => {
+        const state = params || deleteState;
+
+        if (!state) return;
+
         confirm(
-            async () => {
+            () => (async () => {
+                setLoading(true);
                 try {
-                    
+                    const payload: DeleteAndReplaceFiles = {
+                        broadcastAction: true,
+                        items: [
+                            {
+                                deleteId: state.fileId,
+                                replaceWithId: state.replaceWithFileId,
+                            },
+                        ],
+                    };
+
+                    const res = await axios.post<DeleteAndReplaceFilesResponse>(`/api/files/delete-and-replace`, payload);
+                    const { errors } = res.data;
+
+                    if (errors?.length) {
+                        alert({
+                            variant: 'error',
+                            title: 'Error',
+                            message: errors.join(' \n'),
+                        });
+                        return;
+                    }
+
+                    useFiles.setState(prev => ({
+                        ...prev,
+                        files: prev.files.filter(f => f.fileId !== state.fileId),
+                    }));
+
+                    setDeleteState(undefined);
+
+                    alert({
+                        variant: 'success',
+                        title: 'Success',
+                        message: 'File was delete successfully!',
+                    });
                 } catch(e: any) {
                     alert({
                         variant: 'error',
@@ -172,7 +211,7 @@ function DeleteBtn({ file, }: {
                 } finally {
                     setLoading(false);
                 }
-            },
+            })(),
             {
                 danger: true,
                 title: 'Delete file',
@@ -181,24 +220,24 @@ function DeleteBtn({ file, }: {
                 message: `
                     <p class="text-xl">Are you sure?</p>
                     <div class="flex gap-4 [&>div]:flex-1 [&>div]:w-1/2">
-                        ${!deleteState?.fileId ? '' : `
+                        ${!state?.fileId ? '' : `
                             <div>
                                 <p class="text-center text-lg">Delete</p>
                                 <img 
                                     class="w-full h-auto"
                                     alt=""
-                                    src="${window.location.origin}/files/${deleteState.fileId}"
+                                    src="${window.location.origin}/files/${state.fileId}"
                                 />
                             </div>
                         `}
 
-                        ${!deleteState?.replaceWithFileId ? '' : `
+                        ${!state?.replaceWithFileId ? '' : `
                             <div>
                                 <p class="text-center text-lg">Replace with</p>
                                 <img 
                                     class="w-full h-auto"
                                     alt=""
-                                    src="${window.location.origin}/files/${deleteState.replaceWithFileId}"
+                                    src="${window.location.origin}/files/${state.replaceWithFileId}"
                                 />
                             </div>
                         `}
@@ -210,6 +249,8 @@ function DeleteBtn({ file, }: {
 
     const onDeleteClick = useCallback(async () => {
         try {
+            setLoading(true);
+            
             const res = await axios.get<GetFileReferencesResponse>(`/api/files/${file.fileId}/references`);
             const { data, errors } = res.data;
 
@@ -223,14 +264,15 @@ function DeleteBtn({ file, }: {
             }
 
             if (data.length) {
-                alert({
-                    variant: 'error',
-                    title: 'Alert',
+                confirm(() => {}, {
+                    danger: true,
+                    title: 'Delete file',
                     message: 'File is referenced in other places, please select a replacement file.',
+                    onDeny: () => setDeleteState(undefined),
                 });
                 setDeleteState(file.fileId);
             } else {
-                deleteFile();
+                deleteFile({ fileId: file.fileId, });
             }
         } catch(e: any) {
             alert({
