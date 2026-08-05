@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Settings, Trash, MoreVertical, Edit2, Plus } from "lucide-react";
+import { arrayMoveImmutable } from "array-move";
+import { Settings, Trash, MoreVertical, Edit2, Plus, ArrowUp, ArrowDown } from "lucide-react";
 
 import {
     Sheet,
@@ -72,8 +73,15 @@ export function NuidSearchFieldsConfig({
         });
     }, [fields, confirm, setValue]);
 
+    const onReorder = useCallback((oldIndex: number, newIndex: number) => {
+        if (disabled) return;
+        if (oldIndex === newIndex) return;
+        if ((newIndex < 0) || (newIndex > (fields.length - 1))) return;
+        setValue('nuidSearchFields', arrayMoveImmutable(fields, oldIndex, newIndex), { shouldDirty: true, });
+    }, [fields, disabled, setValue]);
+
     const onSave = useCallback(() => {
-        
+
     }, []);
 
     return (
@@ -149,9 +157,10 @@ export function NuidSearchFieldsConfig({
                     </SheetHeader>
 
                     <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
-                        <DataTable 
+                        <DataTable
                             title="Fields"
-                            sortable
+                            sortable={!disabled}
+                            onSort={(oldIndex, newIndex) => onReorder(oldIndex, newIndex)}
                             headerActions={(
                                 <>
                                     <DropdownMenu>
@@ -223,6 +232,24 @@ export function NuidSearchFieldsConfig({
                                                         >
                                                             <Edit2 className="mr-2 h-4 w-4" />
                                                             Edit
+                                                        </DropdownMenuItem>
+
+                                                        <DropdownMenuItem
+                                                            className="focus:text-primary focus:bg-primary/20"
+                                                            disabled={disabled || (rowIndex === 0)}
+                                                            onClick={() => onReorder(rowIndex, rowIndex - 1)}
+                                                        >
+                                                            <ArrowUp className="mr-2 h-4 w-4" />
+                                                            Move up
+                                                        </DropdownMenuItem>
+
+                                                        <DropdownMenuItem
+                                                            className="focus:text-primary focus:bg-primary/20"
+                                                            disabled={disabled || (rowIndex === (fields.length - 1))}
+                                                            onClick={() => onReorder(rowIndex, rowIndex + 1)}
+                                                        >
+                                                            <ArrowDown className="mr-2 h-4 w-4" />
+                                                            Move down
                                                         </DropdownMenuItem>
 
                                                         <DropdownMenuItem
