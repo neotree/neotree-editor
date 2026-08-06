@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Settings, Trash, MoreVertical, Edit2, Plus } from "lucide-react";
+import { arrayMoveImmutable } from "array-move";
+import { Settings, Trash, MoreVertical, Edit2, Plus, ArrowUp, ArrowDown } from "lucide-react";
 
 import {
     Sheet,
@@ -27,11 +28,11 @@ import { DataTable } from "@/components/data-table";
 import { useField } from "../hooks/use-field";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
 import { validateDropdownValues } from "@/lib/validate-dropdown-values";
-import { FieldItems } from "./screens/field-items";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
 
@@ -75,8 +76,15 @@ export function NuidSearchFieldsConfig({
         });
     }, [fields, confirm, setValue]);
 
+    const onReorder = useCallback((oldIndex: number, newIndex: number) => {
+        if (disabled) return;
+        if (oldIndex === newIndex) return;
+        if ((newIndex < 0) || (newIndex > (fields.length - 1))) return;
+        setValue('nuidSearchFields', arrayMoveImmutable(fields, oldIndex, newIndex), { shouldDirty: true, });
+    }, [fields, disabled, setValue]);
+
     const onSave = useCallback(() => {
-        
+
     }, []);
 
     return (
@@ -152,9 +160,10 @@ export function NuidSearchFieldsConfig({
                     </SheetHeader>
 
                     <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
-                        <DataTable 
+                        <DataTable
                             title="Fields"
-                            sortable
+                            sortable={!disabled}
+                            onSort={(oldIndex, newIndex) => onReorder(oldIndex, newIndex)}
                             headerActions={(
                                 <>
                                     <DropdownMenu>
@@ -214,6 +223,9 @@ export function NuidSearchFieldsConfig({
                                     },
                                 },
                                 {
+                                    name: 'Required'
+                                },
+                                {
                                     name: 'Action',
                                     align: 'right',
                                     cellRenderer({ rowIndex }) {
@@ -241,6 +253,24 @@ export function NuidSearchFieldsConfig({
                                                         </DropdownMenuItem>
 
                                                         <DropdownMenuItem
+                                                            className="focus:text-primary focus:bg-primary/20"
+                                                            disabled={disabled || (rowIndex === 0)}
+                                                            onClick={() => onReorder(rowIndex, rowIndex - 1)}
+                                                        >
+                                                            <ArrowUp className="mr-2 h-4 w-4" />
+                                                            Move up
+                                                        </DropdownMenuItem>
+
+                                                        <DropdownMenuItem
+                                                            className="focus:text-primary focus:bg-primary/20"
+                                                            disabled={disabled || (rowIndex === (fields.length - 1))}
+                                                            onClick={() => onReorder(rowIndex, rowIndex + 1)}
+                                                        >
+                                                            <ArrowDown className="mr-2 h-4 w-4" />
+                                                            Move down
+                                                        </DropdownMenuItem>
+
+                                                        <DropdownMenuItem
                                                             disabled={disabled}
                                                             onClick={() => onDelete(rowIndex)}
                                                             className="text-danger focus:bg-danger focus:text-danger-foreground"
@@ -260,6 +290,7 @@ export function NuidSearchFieldsConfig({
                                 f.key,
                                 f.label,
                                 f.condition,
+                                f.optional ? 'No' : 'Yes',
                                 '',
                             ])}
                         />
@@ -314,6 +345,7 @@ export function Field({
         control,
         watch,
         register,
+        setValue,
         handleSubmit,
     } = useForm({
         defaultValues: getDefaultValues(),
@@ -324,6 +356,7 @@ export function Field({
 
     const type = watch('type');
     const values = watch('values');
+    const optional = watch('optional');
 
     const onSave = handleSubmit(onChange);
 
@@ -393,6 +426,20 @@ export function Field({
                                 />
                             )}
                         />
+                    </div>
+
+                    <div>
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id="optional"
+                                checked={optional}
+                                onCheckedChange={checked => setValue('optional', checked, { shouldDirty: true, })}
+                            />
+                            <Label htmlFor="optional">Optional</Label>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                            When off, the session cannot be started until this question is answered.
+                        </span>
                     </div>
 
                     {(
