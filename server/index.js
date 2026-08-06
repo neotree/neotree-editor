@@ -30,6 +30,7 @@ app.prepare().then(() => {
         socket.on('mode_changed', (...args) => onEvent('mode_changed', ...args));
         socket.on('update_system', (...args) => onEvent('update_system', ...args));
         socket.on('file_uploaded', (...args) => onEvent('file_uploaded', ...args));
+        socket.on('files_deleted', (...args) => onEvent('files_deleted', ...args));
     });
 
     httpServer
