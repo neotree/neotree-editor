@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { arrayMoveImmutable } from "array-move";
+import Link from "next/link";
 import { Settings, Trash, MoreVertical, Edit2, Plus, ArrowUp, ArrowDown } from "lucide-react";
 
 import {
@@ -34,6 +35,8 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
 import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { SelectDataKey } from "@/components/select-data-key";
+import { useDataKeysCtx } from "@/contexts/data-keys";
 
 type Props = {
     disabled?: boolean;
@@ -87,8 +90,9 @@ export function NuidSearchFieldsConfig({
     return (
         <>
             {!!selectedField && (
-                <Field 
+                <Field
                     open
+                    disabled={disabled}
                     field={selectedField?.field}
                     fieldType={selectedField?.field?.type!}
                     onClose={() => setSelectedField(undefined)}
@@ -107,8 +111,9 @@ export function NuidSearchFieldsConfig({
             )}
 
             {!!selectedNewFieldType && (
-                <Field 
+                <Field
                     open
+                    disabled={disabled}
                     fieldType={selectedNewFieldType}
                     onClose={() => setSelectedNewFieldType(undefined)}
                     onChange={field => {
@@ -305,22 +310,26 @@ export function NuidSearchFieldsConfig({
     );
 }
 
-export function Field({ 
+export function Field({
     open,
     field,
     fieldType,
+    disabled,
     onChange,
     onClose,
 }: {
     open: boolean;
     field?: ScriptField;
     fieldType: ScriptField['type'];
+    disabled?: boolean;
     onClose: () => void;
     onChange: (field: ScriptField) => void;
 }) {
-    const { getDefaultValues } = useField({ 
-        ...field, 
-        type: fieldType, 
+    const { extractDataKeys } = useDataKeysCtx();
+
+    const { getDefaultValues } = useField({
+        ...field,
+        type: fieldType,
     } as ScriptField);
 
     const {
@@ -329,17 +338,42 @@ export function Field({
         register,
         setValue,
         handleSubmit,
+        formState: { errors, },
     } = useForm({
         defaultValues: getDefaultValues(),
     });
 
     const type = watch('type');
+    const key = watch('key');
+    const keyId = watch('keyId');
+    const label = watch('label');
     const values = watch('values');
     const optional = watch('optional');
+    const confidential = watch('confidential');
+
+    const hasOptions = useMemo(() => ['dropdown', 'multi_select'].includes(type), [type]);
+
+    const dataKey = useMemo(() => {
+        const [k] = !keyId ? [null] : extractDataKeys([keyId]);
+        return k;
+    }, [keyId, extractDataKeys]);
+
+    // Confidentiality lives on the data key - fields inherit it, same as screen fields
+    const inheritedConfidential = useMemo(() => !!dataKey?.confidential, [dataKey?.confidential]);
+
+    useEffect(() => {
+        if (confidential !== inheritedConfidential) {
+            setValue('confidential', inheritedConfidential, { shouldDirty: true, });
+        }
+    }, [confidential, inheritedConfidential, setValue]);
+
+    // Legacy fields were keyed by hand and have no keyId, so leave the picker open for
+    // them. Once a field is linked to a data key the key is locked, as on screen fields.
+    const isKeyDisabled = !!disabled || (!!field && !!field.keyId);
 
     const onSave = handleSubmit(onChange);
 
-    const valuesErrors = useMemo(() => ['dropdown', 'multi_select'].includes(type) ? validateDropdownValues(values) : [], [values, type]);
+    const valuesErrors = useMemo(() => hasOptions ? validateDropdownValues(values) : [], [values, hasOptions]);
 
     return (
         <>
@@ -365,7 +399,7 @@ export function Field({
 
                         <Button
                             onClick={() => onSave()}
-                            disabled={!!valuesErrors.length}
+                            disabled={disabled || !!valuesErrors.length}
                         >
                             Save
                         </Button>
@@ -374,23 +408,69 @@ export function Field({
             >
                 <div className="flex flex-col gap-y-5">
                     <div>
-                        <Label htmlFor="label">Label *</Label>
-                        <Input 
-                            {...register('label', { required: true, })}
+                        <Label error={!disabled && !key} htmlFor="key">Key *</Label>
+                        <Controller
+                            control={control}
+                            name="key"
+                            rules={{ required: 'Select a data key.', }}
+                            render={({ field: { value, onChange, }, }) => (
+                                <SelectDataKey
+                                    modal
+                                    value={`${value || ''}`}
+                                    disabled={isKeyDisabled}
+                                    error={!!errors.key}
+                                    onChange={([item]) => {
+                                        if (!item) return;
+                                        onChange(item.name);
+                                        setValue('keyId', item.uniqueKey, { shouldDirty: true, });
+                                        setValue('label', item.label || item.name, { shouldDirty: true, });
+                                        setValue('confidential', !!item.confidential, { shouldDirty: true, });
+
+                                        // Dropdown data keys carry their options as child keys - pull them
+                                        // in so the app's Yes/No prompt matches the library.
+                                        const options = (item.children || [])
+                                            .map(c => `${c.name},${c.label || c.name}`)
+                                            .join('\n');
+                                        if (hasOptions && options) setValue('values', options, { shouldDirty: true, });
+                                    }}
+                                />
+                            )}
                         />
+                        {!!errors.key && <span className="text-xs text-danger">{`${errors.key.message || ''}`}</span>}
+                        <span className="text-xs text-muted-foreground">
+                            Keys come from the <b>Data Key library</b>.
+                            {!!keyId && (
+                                <>
+                                    {' '}
+                                    <Link
+                                        href={`/data-keys/edit/${keyId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="underline"
+                                    >
+                                        Open data key
+                                    </Link>
+                                </>
+                            )}
+                            {!keyId && !!key && ' This field is not linked to a data key yet - pick one above to link it.'}
+                        </span>
                     </div>
 
                     <div>
-                        <Label htmlFor="key">Key *</Label>
-                        <Input 
-                            {...register('key', { required: true, })}
+                        <Label error={!disabled && !label} htmlFor="label">Label *</Label>
+                        <Input
+                            {...register('label', { required: true, disabled, })}
+                            error={!disabled && !label}
                         />
+                        <span className="text-xs text-muted-foreground">
+                            Prefilled from the data key. Edit it to change the wording shown on the app.
+                        </span>
                     </div>
 
                     <div>
                         <Label htmlFor="condition">Condition <ConditionalExpressionModal /></Label>
                         <Textarea
-                            {...register('condition', { required: false, })}
+                            {...register('condition', { required: false, disabled, })}
                             name="condition"
                             noRing={false}
                             rows={5}
@@ -401,6 +481,7 @@ export function Field({
                         <div className="flex items-center space-x-2">
                             <Switch
                                 id="optional"
+                                disabled={disabled}
                                 checked={optional}
                                 onCheckedChange={checked => setValue('optional', checked, { shouldDirty: true, })}
                             />
@@ -411,17 +492,35 @@ export function Field({
                         </span>
                     </div>
 
+                    <div>
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id="confidential"
+                                disabled
+                                checked={inheritedConfidential}
+                            />
+                            <Label htmlFor="confidential">Confidential</Label>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                            Inherited from the data key. Change it in the Data Key library.
+                        </span>
+                    </div>
+
                     {(
                         (type === 'dropdown') ||
                         (type === 'multi_select')
                     ) && (
                         <div>
                             <Label htmlFor="values">Options *</Label>
-                            <Textarea 
-                                {...register('values', { required: true, })}
+                            <Textarea
+                                {...register('values', { required: true, disabled, })}
                                 rows={5}
                             />
                             {!!valuesErrors.length && <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>}
+                            <span className="text-xs text-muted-foreground">
+                                Filled from the data key&apos;s options when you pick a key that has them.
+                                One <b>value,label</b> pair per line.
+                            </span>
                         </div>
                         // <Controller 
                         //     control={control}
