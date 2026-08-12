@@ -33,7 +33,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
-import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { SelectDataKey } from "@/components/select-data-key";
 import { useDataKeysCtx } from "@/contexts/data-keys";
@@ -358,6 +357,40 @@ export function Field({
         return k;
     }, [keyId, extractDataKeys]);
 
+    // Options are the data key's child keys - they aren't edited here
+    const dataKeyOptions = useMemo(() => {
+        const children = !dataKey?.options?.length ? [] : extractDataKeys(dataKey.options);
+        return children.map(c => ({ value: c.name, label: c.label || c.name, }));
+    }, [dataKey, extractDataKeys]);
+
+    const derivedValues = useMemo(
+        () => dataKeyOptions.map(o => `${o.value},${o.label}`).join('\n'),
+        [dataKeyOptions]
+    );
+
+    // `values` is what the app reads, so keep it in step with the data key. Unlinked
+    // legacy fields keep what they were saved with - there's no key to derive from -
+    // and a missing dataKey means the library hasn't loaded yet, so don't wipe it.
+    useEffect(() => {
+        if (!hasOptions || !keyId || !dataKey) return;
+        if (derivedValues === values) return;
+        setValue('values', derivedValues, { shouldDirty: true, });
+    }, [hasOptions, keyId, dataKey, derivedValues, values, setValue]);
+
+    // Options saved against unlinked legacy fields, shown read-only until a key is picked
+    const storedOptions = useMemo(() => {
+        return `${values || ''}`
+            .split('\n')
+            .map(v => v.trim())
+            .filter(v => v)
+            .map(v => {
+                const [value, ...rest] = v.split(',');
+                return { value, label: rest.join(',') || value, };
+            });
+    }, [values]);
+
+    const options = dataKeyOptions.length ? dataKeyOptions : storedOptions;
+
     // Confidentiality lives on the data key - fields inherit it, same as screen fields
     const inheritedConfidential = useMemo(() => !!dataKey?.confidential, [dataKey?.confidential]);
 
@@ -373,7 +406,8 @@ export function Field({
 
     const onSave = handleSubmit(onChange);
 
-    const valuesErrors = useMemo(() => hasOptions ? validateDropdownValues(values) : [], [values, hasOptions]);
+    // A dropdown with no options renders an unanswerable question on the app
+    const missingOptions = useMemo(() => hasOptions && !options.length, [hasOptions, options]);
 
     return (
         <>
@@ -399,7 +433,7 @@ export function Field({
 
                         <Button
                             onClick={() => onSave()}
-                            disabled={disabled || !!valuesErrors.length}
+                            disabled={disabled || missingOptions}
                         >
                             Save
                         </Button>
@@ -425,13 +459,6 @@ export function Field({
                                         setValue('keyId', item.uniqueKey, { shouldDirty: true, });
                                         setValue('label', item.label || item.name, { shouldDirty: true, });
                                         setValue('confidential', !!item.confidential, { shouldDirty: true, });
-
-                                        // Dropdown data keys carry their options as child keys - pull them
-                                        // in so the app's Yes/No prompt matches the library.
-                                        const options = (item.children || [])
-                                            .map(c => `${c.name},${c.label || c.name}`)
-                                            .join('\n');
-                                        if (hasOptions && options) setValue('values', options, { shouldDirty: true, });
                                     }}
                                 />
                             )}
@@ -506,36 +533,45 @@ export function Field({
                         </span>
                     </div>
 
-                    {(
-                        (type === 'dropdown') ||
-                        (type === 'multi_select')
-                    ) && (
+                    {hasOptions && (
                         <div>
-                            <Label htmlFor="values">Options *</Label>
-                            <Textarea
-                                {...register('values', { required: true, disabled, })}
-                                rows={5}
-                            />
-                            {!!valuesErrors.length && <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>}
+                            <Label htmlFor="values">Options</Label>
+
+                            {!options.length ? (
+                                <span className="block text-xs text-danger">
+                                    {!keyId ?
+                                        'Pick a data key above to bring in its options.'
+                                        :
+                                        'This data key has no options. Add them to the data key, then reopen this field.'}
+                                </span>
+                            ) : (
+                                <div className="flex flex-col gap-y-1 rounded-md border border-border p-2">
+                                    {options.map(o => (
+                                        <div key={o.value} className="flex items-center gap-x-2 text-sm">
+                                            <span className="text-muted-foreground text-xs">{o.value}</span>
+                                            <span>{o.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             <span className="text-xs text-muted-foreground">
-                                Filled from the data key&apos;s options when you pick a key that has them.
-                                One <b>value,label</b> pair per line.
+                                Options come from the data key&apos;s child keys.
+                                {!!keyId && (
+                                    <>
+                                        {' '}
+                                        <Link
+                                            href={`/data-keys/edit/${keyId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="underline"
+                                        >
+                                            Edit them in the Data Key library
+                                        </Link>
+                                    </>
+                                )}
                             </span>
                         </div>
-                        // <Controller 
-                        //     control={control}
-                        //     name="items"
-                        //     render={({ field: { value, onChange, }, }) => {
-                        //         return (
-                        //             <FieldItems 
-                        //                 disabled={false}
-                        //                 items={value}
-                        //                 fieldType={type}
-                        //                 onChange={onChange}
-                        //             />
-                        //         );
-                        //     }}
-                        // />
                     )}
                 </div>
             </Modal>
