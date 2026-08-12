@@ -4,10 +4,11 @@ import logger from '@/lib/logger';
 import socket from '@/lib/socket';
 import db from '@/databases/pg/drizzle';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
-import { diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensDrafts } from '@/databases/pg/schema';
+import { diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensDrafts, scripts as scriptsTable, scriptsDrafts as scriptsDraftsTable } from '@/databases/pg/schema';
 import { _getScreens, _getDiagnoses, _getProblems } from '@/databases/queries/scripts';
-import { _saveScreens, _saveDiagnoses, _saveProblems } from '@/databases/mutations/scripts';
+import { _saveScreens, _saveDiagnoses, _saveProblems, _saveScripts } from '@/databases/mutations/scripts';
 import { DataKey } from "@/databases/queries/data-keys";
+import type { ScriptField } from "@/types";
 import {
     shouldSyncFieldOwnedOptions,
     shouldSyncScreenOwnedOptions,
@@ -38,12 +39,15 @@ type UpdateStats = {
     fetchedScreens: number;
     fetchedDiagnoses: number;
     fetchedProblems: number;
+    fetchedScriptRecords: number;
     updatedScreens: number;
     updatedDiagnoses: number;
     updatedProblems: number;
+    updatedScriptRecords: number;
     savedScreens: number;
     savedDiagnoses: number;
     savedProblems: number;
+    savedScriptRecords: number;
     chunkRetries: number;
     matchedByUniqueKey: number;
     matchedByLegacyName: number;
@@ -61,7 +65,7 @@ type AffectedEntity = {
 
 type AffectedUsage = {
     id: string;
-    kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom' | 'problem';
+    kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom' | 'problem' | 'script_nuid_search_field';
     title: string;
     location: string;
     scriptId: string;
@@ -83,6 +87,7 @@ export type UpdateDataKeysRefsResponse = {
         screens: Awaited<ReturnType<typeof _getScreens>>["data"];
         diagnoses: Awaited<ReturnType<typeof _getDiagnoses>>["data"];
         problems: Awaited<ReturnType<typeof _getProblems>>["data"];
+        scriptRecords: NuidSearchScriptSource[];
     };
     affected?: {
         scripts: { scriptId: string; scriptTitle?: string; }[];
@@ -91,6 +96,14 @@ export type UpdateDataKeysRefsResponse = {
         problems: AffectedEntity[];
         usages: AffectedUsage[];
     };
+};
+
+// NUID search fields hang off the script record, so they are synced from the scripts
+// tables directly rather than through the screen/diagnosis/problem readers.
+type NuidSearchScriptSource = {
+    scriptId: string;
+    scriptTitle?: string;
+    nuidSearchFields: ScriptField[];
 };
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
@@ -175,12 +188,15 @@ export async function _updateDataKeysRefs({
             fetchedScreens: 0,
             fetchedDiagnoses: 0,
             fetchedProblems: 0,
+            fetchedScriptRecords: 0,
             updatedScreens: 0,
             updatedDiagnoses: 0,
             updatedProblems: 0,
+            updatedScriptRecords: 0,
             savedScreens: 0,
             savedDiagnoses: 0,
             savedProblems: 0,
+            savedScriptRecords: 0,
             chunkRetries: 0,
             matchedByUniqueKey: 0,
             matchedByLegacyName: 0,
@@ -324,6 +340,31 @@ export async function _updateDataKeysRefs({
             });
 
             if (likePatterns.length) {
+                const scriptsPublishedCandidates = await executor
+                    .select({ scriptId: scriptsTable.scriptId })
+                    .from(scriptsTable)
+                    .where(and(
+                        isNull(scriptsTable.deletedAt),
+                        buildLikeClauses(sql`${scriptsTable.nuidSearchFields}`, likePatterns),
+                    ));
+
+                scriptsPublishedCandidates.forEach(row => {
+                    if (row.scriptId) candidateScripts.add(row.scriptId);
+                });
+
+                const scriptsDraftCandidates = await executor
+                    .select({
+                        scriptDraftId: scriptsDraftsTable.scriptDraftId,
+                        scriptId: scriptsDraftsTable.scriptId,
+                    })
+                    .from(scriptsDraftsTable)
+                    .where(buildLikeClauses(sql`${scriptsDraftsTable.data}`, likePatterns));
+
+                scriptsDraftCandidates.forEach(row => {
+                    if (row.scriptId) candidateScripts.add(row.scriptId);
+                    if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
+                });
+
                 const screensDraftCandidates = await executor
                     .select({
                         scriptId: screensDrafts.scriptId,
@@ -404,9 +445,42 @@ export async function _updateDataKeysRefs({
             return { success: false, errors: prefetchErrors, info: stats };
         }
 
+        const scriptDraftRows = await executor.query.scriptsDrafts.findMany({
+            where: scriptsIds?.length
+                ? or(
+                    inArray(scriptsDraftsTable.scriptDraftId, scriptsIds),
+                    inArray(scriptsDraftsTable.scriptId, scriptsIds),
+                )
+                : undefined,
+        });
+        const scriptDraftIds = new Set(scriptDraftRows.map(row => row.scriptDraftId).filter(Boolean));
+
+        const publishedScriptRows = await executor.query.scripts.findMany({
+            where: and(
+                isNull(scriptsTable.deletedAt),
+                scriptsIds?.length ? inArray(scriptsTable.scriptId, scriptsIds) : undefined,
+            ),
+        });
+
+        const scriptRecords: NuidSearchScriptSource[] = [
+            ...scriptDraftRows.map(row => ({
+                scriptId: row.scriptDraftId,
+                scriptTitle: row.data?.title || undefined,
+                nuidSearchFields: (row.data?.nuidSearchFields || []) as ScriptField[],
+            })),
+            ...publishedScriptRows
+                .filter(row => !scriptDraftIds.has(row.scriptId))
+                .map(row => ({
+                    scriptId: row.scriptId,
+                    scriptTitle: row.title || undefined,
+                    nuidSearchFields: (row.nuidSearchFields || []) as ScriptField[],
+                })),
+        ].filter(record => record.scriptId && record.nuidSearchFields.length);
+
         stats.fetchedScreens = screensArr.length;
         stats.fetchedDiagnoses = diagnosesArr.length;
         stats.fetchedProblems = problemsArr.length;
+        stats.fetchedScriptRecords = scriptRecords.length;
 
         let screensUpdatedData: typeof screensArr = screensArr.map(s => {
             const { dataKey: refIdDataKey, source: refMatchSource } = getUpdatedDataKey({
@@ -749,9 +823,43 @@ export async function _updateDataKeysRefs({
             };
         }).filter(d => !!d.updated).map(({ updated, ...d }) => d);
 
+        const scriptRecordsUpdatedData: NuidSearchScriptSource[] = scriptRecords.map(script => {
+            let updated = false;
+
+            const nuidSearchFields = script.nuidSearchFields.map((field, fieldIndex) => {
+                const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
+                    uniqueKey: field.keyId,
+                });
+                trackMatchSource(fieldMatchSource);
+
+                if (fieldDataKey) {
+                    addUsage({
+                        id: field.fieldId || `${script.scriptId}:nuidSearchField:${fieldIndex}`,
+                        kind: 'script_nuid_search_field',
+                        title: field.label || field.key || `${fieldIndex + 1}`,
+                        location: 'NUID search',
+                        scriptId: script.scriptId,
+                        scriptTitle: script.scriptTitle,
+                        fieldIndex,
+                    });
+                }
+
+                const syncedField = syncFieldReference(field, fieldDataKey);
+                if (syncedField.changed) updated = true;
+                return syncedField.value;
+            });
+
+            return {
+                ...script,
+                nuidSearchFields,
+                updated,
+            };
+        }).filter(s => !!s.updated).map(({ updated, ...s }) => s);
+
         stats.updatedScreens = screensUpdatedData.length;
         stats.updatedDiagnoses = diagnosesUpdatedData.length;
         stats.updatedProblems = problemsUpdatedData.length;
+        stats.updatedScriptRecords = scriptRecordsUpdatedData.length;
 
         const affectedScreensMap = new Map<string, AffectedEntity>();
         screensUpdatedData.forEach((s) => {
@@ -791,6 +899,15 @@ export async function _updateDataKeysRefs({
                 };
             }
         });
+        scriptRecordsUpdatedData.forEach(script => {
+            if (!script.scriptId) return;
+            if (!affectedScriptsMap[script.scriptId]) {
+                affectedScriptsMap[script.scriptId] = {
+                    scriptId: script.scriptId,
+                    scriptTitle: script.scriptTitle,
+                };
+            }
+        });
         const affected = {
             scripts: Object.values(affectedScriptsMap),
             screens: affectedScreens,
@@ -807,6 +924,7 @@ export async function _updateDataKeysRefs({
                     screens: screensUpdatedData,
                     diagnoses: diagnosesUpdatedData,
                     problems: problemsUpdatedData,
+                    scriptRecords: scriptRecordsUpdatedData,
                 },
                 affected,
             };
@@ -871,7 +989,30 @@ export async function _updateDataKeysRefs({
             }
         };
 
-        await Promise.all([saveDiagnosesTask(), saveProblemsTask(), saveScreensTask()]);
+        const saveScriptRecordsTask = async () => {
+            for (const chunk of chunkArray(scriptRecordsUpdatedData, SAVE_CHUNK_SIZE)) {
+                const toPayload = (script: NuidSearchScriptSource) => ({
+                    scriptId: script.scriptId,
+                    nuidSearchFields: script.nuidSearchFields,
+                });
+                const res = await _saveScripts({ data: chunk.map(toPayload), userId, draftOrigin, client: executor });
+                if (res.errors?.length) {
+                    stats.chunkRetries++;
+                    await mapWithConcurrency(chunk, SAVE_RETRY_CONCURRENCY, async (script) => {
+                        const singleRes = await _saveScripts({ data: [toPayload(script)], userId, draftOrigin, client: executor });
+                        if (singleRes.errors?.length) {
+                            saveErrors.push(...singleRes.errors.map(e => `[script:${script.scriptId}] ${e}`));
+                        } else {
+                            stats.savedScriptRecords++;
+                        }
+                    });
+                } else {
+                    stats.savedScriptRecords += chunk.length;
+                }
+            }
+        };
+
+        await Promise.all([saveDiagnosesTask(), saveProblemsTask(), saveScreensTask(), saveScriptRecordsTask()]);
 
         if (saveErrors.length) {
             return {
@@ -882,7 +1023,7 @@ export async function _updateDataKeysRefs({
             };
         }
 
-        const saved = stats.savedDiagnoses + stats.savedProblems + stats.savedScreens;
+        const saved = stats.savedDiagnoses + stats.savedProblems + stats.savedScreens + stats.savedScriptRecords;
         if (broadcastAction && saved) socket.emit('data_changed', 'save_scripts');
 
         return { success: true, info: stats, affected };
