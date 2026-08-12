@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { arrayMoveImmutable } from "array-move";
+import { useQueryState } from "nuqs";
 import Link from "next/link";
 import { Settings, Trash, MoreVertical, Edit2, Plus, ArrowUp, ArrowDown } from "lucide-react";
 
@@ -35,7 +36,9 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { SelectDataKey } from "@/components/select-data-key";
-import { useDataKeysCtx } from "@/contexts/data-keys";
+import { useDataKeysCtx, type DataKey } from "@/contexts/data-keys";
+import { isNumericQueryValue } from "@/lib/query-state";
+import { normalizeDataKeyCompatibilityType } from "@/lib/data-key-types";
 
 type Props = {
     disabled?: boolean;
@@ -58,10 +61,32 @@ export function NuidSearchFieldsConfig({
     const [selectedNewFieldType, setSelectedNewFieldType] = useState<typeof fields[0]['type']>();
     const [open, setOpen] = useState(false);
 
+    // The data key registry links here with ?nuidSearchField=<fieldId|index> when a NUID
+    // reference needs attention, so open the sheet on that field.
+    const [deepLinkedField, setDeepLinkedField] = useQueryState('nuidSearchField', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+
     useEffect(() => {
         if (nuidSearchEnabled && !_nuidSearchEnabled) setOpen(true);
         _setNuidSearchEnabled(nuidSearchEnabled);
     }, [_nuidSearchEnabled, nuidSearchEnabled]);
+
+    useEffect(() => {
+        if (!deepLinkedField) return;
+
+        setOpen(true);
+
+        const indexById = fields.findIndex(f => f.fieldId && (f.fieldId === deepLinkedField));
+        const index = indexById >= 0
+            ? indexById
+            : (isNumericQueryValue(deepLinkedField) ? Number(deepLinkedField) : -1);
+        const field = fields[index];
+
+        if (field) setSelectedField({ index, field, });
+        setDeepLinkedField('');
+    }, [deepLinkedField, fields, setDeepLinkedField]);
 
     const { confirm } = useConfirmModal();
 
@@ -324,7 +349,7 @@ export function Field({
     onClose: () => void;
     onChange: (field: ScriptField) => void;
 }) {
-    const { extractDataKeys } = useDataKeysCtx();
+    const { extractDataKeys, allDataKeys } = useDataKeysCtx();
 
     const { getDefaultValues } = useField({
         ...field,
@@ -352,10 +377,32 @@ export function Field({
 
     const hasOptions = useMemo(() => ['dropdown', 'multi_select'].includes(type), [type]);
 
+    // A Yes/No field may only use a dropdown data key, a NUID search field only a text
+    // one. Compared through the library's own type normalisation, so the picker offers
+    // exactly what the integrity checker accepts - anything else scans as a conflict.
+    const expectedType = useMemo(() => normalizeDataKeyCompatibilityType(type), [type]);
+    const isCompatibleDataKey = useCallback(
+        (candidate: DataKey) => normalizeDataKeyCompatibilityType(candidate.dataType) === expectedType,
+        [expectedType]
+    );
+    const compatibleDataKeys = useMemo(
+        () => allDataKeys.filter(isCompatibleDataKey),
+        [allDataKeys, isCompatibleDataKey]
+    );
+    const expectedTypeLabel = useMemo(() => hasOptions ? 'dropdown' : (type || 'text'), [hasOptions, type]);
+    const fieldTypeLabel = useMemo(() => hasOptions ? 'Yes/No' : 'NUID search', [hasOptions]);
+
     const dataKey = useMemo(() => {
         const [k] = !keyId ? [null] : extractDataKeys([keyId]);
         return k;
     }, [keyId, extractDataKeys]);
+
+    // Legacy fields can point at a key of the wrong type - say so rather than silently
+    // dropping it from the picker.
+    const dataKeyTypeMismatch = useMemo(
+        () => !!dataKey && !isCompatibleDataKey(dataKey),
+        [dataKey, isCompatibleDataKey]
+    );
 
     // Options are the data key's child keys - they aren't edited here
     const dataKeyOptions = useMemo(() => {
@@ -400,9 +447,9 @@ export function Field({
         }
     }, [confidential, inheritedConfidential, setValue]);
 
-    // Legacy fields were keyed by hand and have no keyId, so leave the picker open for
-    // them. Once a field is linked to a data key the key is locked, as on screen fields.
-    const isKeyDisabled = !!disabled || (!!field && !!field.keyId);
+    // The key stays changeable for the life of the field - relinking is how an unmanaged
+    // legacy field, or one pointed at the wrong data key, gets corrected.
+    const isKeyDisabled = !!disabled;
 
     const onSave = handleSubmit(onChange);
 
@@ -433,7 +480,7 @@ export function Field({
 
                         <Button
                             onClick={() => onSave()}
-                            disabled={disabled || missingOptions}
+                            disabled={disabled || missingOptions || dataKeyTypeMismatch}
                         >
                             Save
                         </Button>
@@ -452,7 +499,8 @@ export function Field({
                                     modal
                                     value={`${value || ''}`}
                                     disabled={isKeyDisabled}
-                                    error={!!errors.key}
+                                    error={!!errors.key || dataKeyTypeMismatch}
+                                    filterDataKeys={isCompatibleDataKey}
                                     onChange={([item]) => {
                                         if (!item) return;
                                         onChange(item.name);
@@ -463,9 +511,25 @@ export function Field({
                                 />
                             )}
                         />
-                        {!!errors.key && <span className="text-xs text-danger">{`${errors.key.message || ''}`}</span>}
+                        {!!errors.key && <span className="block text-xs text-danger">{`${errors.key.message || ''}`}</span>}
+
+                        {dataKeyTypeMismatch && (
+                            <span className="block text-xs text-danger">
+                                This field is linked to a <b>{dataKey?.dataType || 'untyped'}</b> data key,
+                                but a {fieldTypeLabel} field needs a <b>{expectedTypeLabel}</b> one. Pick a
+                                replacement above.
+                            </span>
+                        )}
+
+                        {!compatibleDataKeys.length && (
+                            <span className="block text-xs text-danger">
+                                There are no {expectedTypeLabel} data keys in the library yet. Create one
+                                before adding this field.
+                            </span>
+                        )}
+
                         <span className="text-xs text-muted-foreground">
-                            Keys come from the <b>Data Key library</b>.
+                            Only <b>{expectedTypeLabel}</b> keys from the <b>Data Key library</b> can be used here.
                             {!!keyId && (
                                 <>
                                     {' '}
