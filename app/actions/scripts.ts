@@ -1047,6 +1047,11 @@ export async function copyScripts(params?: {
                     screens: importedScripts.flatMap((script) => script.screens || []),
                     diagnoses: importedScripts.flatMap((script) => script.diagnoses || []),
                     problems: importedScripts.flatMap((script) => script.problems || []),
+                    scripts: importedScripts.map((script) => ({
+                        scriptId: script.scriptId,
+                        title: script.title,
+                        nuidSearchFields: script.nuidSearchFields || [],
+                    })),
                 });
 
                 response.integrityImportReview = {

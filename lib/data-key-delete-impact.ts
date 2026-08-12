@@ -21,12 +21,18 @@ export type DataKeyDeleteImpactItem = {
 type ScreenData = Awaited<ReturnType<typeof _getScreens>>["data"][number];
 type DiagnosisData = Awaited<ReturnType<typeof _getDiagnoses>>["data"][number];
 type ProblemData = Awaited<ReturnType<typeof _getProblems>>["data"][number];
+type NuidSearchScriptData = {
+    scriptId: string;
+    title?: string | null;
+    nuidSearchFields?: Array<{ keyId?: string | null; key?: string | null; label?: string | null }> | null;
+};
 
 export function buildDataKeysDeleteImpact({
     dataKeys,
     screens,
     diagnoses,
     problems,
+    scripts = [],
     dataKeysIds = [],
     uniqueKeys = [],
 }: {
@@ -34,6 +40,7 @@ export function buildDataKeysDeleteImpact({
     screens: ScreenData[];
     diagnoses: DiagnosisData[];
     problems: ProblemData[];
+    scripts?: NuidSearchScriptData[];
     dataKeysIds?: string[];
     uniqueKeys?: string[];
 }): DataKeyDeleteImpactItem[] {
@@ -207,6 +214,18 @@ export function buildDataKeysDeleteImpact({
             keyId: problem.keyId,
             label: problem.name || problem.key || 'problem',
             href: `/script/${problem.scriptId}/problem/${problem.problemId}`,
+        });
+    });
+
+    scripts.forEach((script) => {
+        (script.nuidSearchFields || []).forEach((field, fieldIndex) => {
+            addScriptUsage({
+                scriptId: script.scriptId,
+                scriptTitle: script.title,
+                keyId: field.keyId,
+                label: `NUID search > ${field.label || field.key || `field ${fieldIndex + 1}`}`,
+                href: `/script/${script.scriptId}`,
+            });
         });
     });
 

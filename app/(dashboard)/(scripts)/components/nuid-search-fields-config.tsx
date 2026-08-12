@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { arrayMoveImmutable } from "array-move";
+import { useQueryState } from "nuqs";
+import Link from "next/link";
 import { Settings, Trash, MoreVertical, Edit2, Plus, ArrowUp, ArrowDown } from "lucide-react";
 
 import {
@@ -32,9 +34,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
-import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
+import { SelectDataKey } from "@/components/select-data-key";
+import { useDataKeysCtx, type DataKey } from "@/contexts/data-keys";
+import { isNumericQueryValue } from "@/lib/query-state";
+import { normalizeDataKeyCompatibilityType } from "@/lib/data-key-types";
 
 type Props = {
     disabled?: boolean;
@@ -57,10 +62,32 @@ export function NuidSearchFieldsConfig({
     const [selectedNewFieldType, setSelectedNewFieldType] = useState<typeof fields[0]['type']>();
     const [open, setOpen] = useState(false);
 
+    // The data key registry links here with ?nuidSearchField=<fieldId|index> when a NUID
+    // reference needs attention, so open the sheet on that field.
+    const [deepLinkedField, setDeepLinkedField] = useQueryState('nuidSearchField', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+
     useEffect(() => {
         if (nuidSearchEnabled && !_nuidSearchEnabled) setOpen(true);
         _setNuidSearchEnabled(nuidSearchEnabled);
     }, [_nuidSearchEnabled, nuidSearchEnabled]);
+
+    useEffect(() => {
+        if (!deepLinkedField) return;
+
+        setOpen(true);
+
+        const indexById = fields.findIndex(f => f.fieldId && (f.fieldId === deepLinkedField));
+        const index = indexById >= 0
+            ? indexById
+            : (isNumericQueryValue(deepLinkedField) ? Number(deepLinkedField) : -1);
+        const field = fields[index];
+
+        if (field) setSelectedField({ index, field, });
+        setDeepLinkedField('');
+    }, [deepLinkedField, fields, setDeepLinkedField]);
 
     const { confirm } = useConfirmModal();
     const { conditionKeys } = useConditionKeys();
@@ -90,8 +117,9 @@ export function NuidSearchFieldsConfig({
     return (
         <>
             {!!selectedField && (
-                <Field 
+                <Field
                     open
+                    disabled={disabled}
                     field={selectedField?.field}
                     fieldType={selectedField?.field?.type!}
                     onClose={() => setSelectedField(undefined)}
@@ -110,8 +138,9 @@ export function NuidSearchFieldsConfig({
             )}
 
             {!!selectedNewFieldType && (
-                <Field 
+                <Field
                     open
+                    disabled={disabled}
                     fieldType={selectedNewFieldType}
                     onClose={() => setSelectedNewFieldType(undefined)}
                     onChange={field => {
@@ -323,22 +352,26 @@ export function NuidSearchFieldsConfig({
     );
 }
 
-export function Field({ 
+export function Field({
     open,
     field,
     fieldType,
+    disabled,
     onChange,
     onClose,
 }: {
     open: boolean;
     field?: ScriptField;
     fieldType: ScriptField['type'];
+    disabled?: boolean;
     onClose: () => void;
     onChange: (field: ScriptField) => void;
 }) {
-    const { getDefaultValues } = useField({ 
-        ...field, 
-        type: fieldType, 
+    const { extractDataKeys, allDataKeys } = useDataKeysCtx();
+
+    const { getDefaultValues } = useField({
+        ...field,
+        type: fieldType,
     } as ScriptField);
 
     const {
@@ -347,6 +380,7 @@ export function Field({
         register,
         setValue,
         handleSubmit,
+        formState: { errors, },
     } = useForm({
         defaultValues: getDefaultValues(),
     });
@@ -355,12 +389,93 @@ export function Field({
     const [conditionHasErrors, setConditionHasErrors] = useState(false);
 
     const type = watch('type');
+    const key = watch('key');
+    const keyId = watch('keyId');
+    const label = watch('label');
     const values = watch('values');
     const optional = watch('optional');
+    const confidential = watch('confidential');
+
+    const hasOptions = useMemo(() => ['dropdown', 'multi_select'].includes(type), [type]);
+
+    // A Yes/No field may only use a dropdown data key, a NUID search field only a text
+    // one. Compared through the library's own type normalisation, so the picker offers
+    // exactly what the integrity checker accepts - anything else scans as a conflict.
+    const expectedType = useMemo(() => normalizeDataKeyCompatibilityType(type), [type]);
+    const isCompatibleDataKey = useCallback(
+        (candidate: DataKey) => normalizeDataKeyCompatibilityType(candidate.dataType) === expectedType,
+        [expectedType]
+    );
+    const compatibleDataKeys = useMemo(
+        () => allDataKeys.filter(isCompatibleDataKey),
+        [allDataKeys, isCompatibleDataKey]
+    );
+    const expectedTypeLabel = useMemo(() => hasOptions ? 'dropdown' : (type || 'text'), [hasOptions, type]);
+    const fieldTypeLabel = useMemo(() => hasOptions ? 'Yes/No' : 'NUID search', [hasOptions]);
+
+    const dataKey = useMemo(() => {
+        const [k] = !keyId ? [null] : extractDataKeys([keyId]);
+        return k;
+    }, [keyId, extractDataKeys]);
+
+    // Legacy fields can point at a key of the wrong type - say so rather than silently
+    // dropping it from the picker.
+    const dataKeyTypeMismatch = useMemo(
+        () => !!dataKey && !isCompatibleDataKey(dataKey),
+        [dataKey, isCompatibleDataKey]
+    );
+
+    // Options are the data key's child keys - they aren't edited here
+    const dataKeyOptions = useMemo(() => {
+        const children = !dataKey?.options?.length ? [] : extractDataKeys(dataKey.options);
+        return children.map(c => ({ value: c.name, label: c.label || c.name, }));
+    }, [dataKey, extractDataKeys]);
+
+    const derivedValues = useMemo(
+        () => dataKeyOptions.map(o => `${o.value},${o.label}`).join('\n'),
+        [dataKeyOptions]
+    );
+
+    // `values` is what the app reads, so keep it in step with the data key. Unlinked
+    // legacy fields keep what they were saved with - there's no key to derive from -
+    // and a missing dataKey means the library hasn't loaded yet, so don't wipe it.
+    useEffect(() => {
+        if (!hasOptions || !keyId || !dataKey) return;
+        if (derivedValues === values) return;
+        setValue('values', derivedValues, { shouldDirty: true, });
+    }, [hasOptions, keyId, dataKey, derivedValues, values, setValue]);
+
+    // Options saved against unlinked legacy fields, shown read-only until a key is picked
+    const storedOptions = useMemo(() => {
+        return `${values || ''}`
+            .split('\n')
+            .map(v => v.trim())
+            .filter(v => v)
+            .map(v => {
+                const [value, ...rest] = v.split(',');
+                return { value, label: rest.join(',') || value, };
+            });
+    }, [values]);
+
+    const options = dataKeyOptions.length ? dataKeyOptions : storedOptions;
+
+    // Confidentiality lives on the data key - fields inherit it, same as screen fields
+    const inheritedConfidential = useMemo(() => !!dataKey?.confidential, [dataKey?.confidential]);
+
+    useEffect(() => {
+        if (confidential !== inheritedConfidential) {
+            setValue('confidential', inheritedConfidential, { shouldDirty: true, });
+        }
+    }, [confidential, inheritedConfidential, setValue]);
+
+    // The key stays changeable for the life of the field - relinking is how an unmanaged
+    // legacy field, or one pointed at the wrong data key, gets corrected.
+    const isKeyDisabled = !!disabled;
 
     const onSave = handleSubmit(onChange);
 
-    const valuesErrors = useMemo(() => ['dropdown', 'multi_select'].includes(type) ? validateDropdownValues(values) : [], [values, type]);
+    // A dropdown with no options renders an unanswerable question on the app
+    const missingOptions = useMemo(() => hasOptions && !options.length, [hasOptions, options]);
 
     return (
         <>
@@ -386,7 +501,7 @@ export function Field({
 
                         <Button
                             onClick={() => onSave()}
-                            disabled={!!valuesErrors.length || conditionHasErrors}
+                            disabled={disabled || conditionHasErrors || missingOptions || dataKeyTypeMismatch}
                         >
                             Save
                         </Button>
@@ -395,17 +510,73 @@ export function Field({
             >
                 <div className="flex flex-col gap-y-5">
                     <div>
-                        <Label htmlFor="label">Label *</Label>
-                        <Input 
-                            {...register('label', { required: true, })}
+                        <Label error={!disabled && !key} htmlFor="key">Key *</Label>
+                        <Controller
+                            control={control}
+                            name="key"
+                            rules={{ required: 'Select a data key.', }}
+                            render={({ field: { value, onChange, }, }) => (
+                                <SelectDataKey
+                                    modal
+                                    value={`${value || ''}`}
+                                    disabled={isKeyDisabled}
+                                    error={!!errors.key || dataKeyTypeMismatch}
+                                    filterDataKeys={isCompatibleDataKey}
+                                    onChange={([item]) => {
+                                        if (!item) return;
+                                        onChange(item.name);
+                                        setValue('keyId', item.uniqueKey, { shouldDirty: true, });
+                                        setValue('label', item.label || item.name, { shouldDirty: true, });
+                                        setValue('confidential', !!item.confidential, { shouldDirty: true, });
+                                    }}
+                                />
+                            )}
                         />
+                        {!!errors.key && <span className="block text-xs text-danger">{`${errors.key.message || ''}`}</span>}
+
+                        {dataKeyTypeMismatch && (
+                            <span className="block text-xs text-danger">
+                                This field is linked to a <b>{dataKey?.dataType || 'untyped'}</b> data key,
+                                but a {fieldTypeLabel} field needs a <b>{expectedTypeLabel}</b> one. Pick a
+                                replacement above.
+                            </span>
+                        )}
+
+                        {!compatibleDataKeys.length && (
+                            <span className="block text-xs text-danger">
+                                There are no {expectedTypeLabel} data keys in the library yet. Create one
+                                before adding this field.
+                            </span>
+                        )}
+
+                        <span className="text-xs text-muted-foreground">
+                            Only <b>{expectedTypeLabel}</b> keys from the <b>Data Key library</b> can be used here.
+                            {!!keyId && (
+                                <>
+                                    {' '}
+                                    <Link
+                                        href={`/data-keys/edit/${keyId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="underline"
+                                    >
+                                        Open data key
+                                    </Link>
+                                </>
+                            )}
+                            {!keyId && !!key && ' This field is not linked to a data key yet - pick one above to link it.'}
+                        </span>
                     </div>
 
                     <div>
-                        <Label htmlFor="key">Key *</Label>
-                        <Input 
-                            {...register('key', { required: true, })}
+                        <Label error={!disabled && !label} htmlFor="label">Label *</Label>
+                        <Input
+                            {...register('label', { required: true, disabled, })}
+                            error={!disabled && !label}
                         />
+                        <span className="text-xs text-muted-foreground">
+                            Prefilled from the data key. Edit it to change the wording shown on the app.
+                        </span>
                     </div>
 
                     <div>
@@ -421,6 +592,7 @@ export function Field({
                                     onChange={onChange}
                                     keys={conditionKeys}
                                     keysLoading={keysLoading}
+                                    disabled={disabled}
                                     initialValue={`${field?.condition || ''}`}
                                     onValidityChange={setConditionHasErrors}
                                 />
@@ -432,6 +604,7 @@ export function Field({
                         <div className="flex items-center space-x-2">
                             <Switch
                                 id="optional"
+                                disabled={disabled}
                                 checked={optional}
                                 onCheckedChange={checked => setValue('optional', checked, { shouldDirty: true, })}
                             />
@@ -442,32 +615,59 @@ export function Field({
                         </span>
                     </div>
 
-                    {(
-                        (type === 'dropdown') ||
-                        (type === 'multi_select')
-                    ) && (
-                        <div>
-                            <Label htmlFor="values">Options *</Label>
-                            <Textarea 
-                                {...register('values', { required: true, })}
-                                rows={5}
+                    <div>
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id="confidential"
+                                disabled
+                                checked={inheritedConfidential}
                             />
-                            {!!valuesErrors.length && <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>}
+                            <Label htmlFor="confidential">Confidential</Label>
                         </div>
-                        // <Controller 
-                        //     control={control}
-                        //     name="items"
-                        //     render={({ field: { value, onChange, }, }) => {
-                        //         return (
-                        //             <FieldItems 
-                        //                 disabled={false}
-                        //                 items={value}
-                        //                 fieldType={type}
-                        //                 onChange={onChange}
-                        //             />
-                        //         );
-                        //     }}
-                        // />
+                        <span className="text-xs text-muted-foreground">
+                            Inherited from the data key. Change it in the Data Key library.
+                        </span>
+                    </div>
+
+                    {hasOptions && (
+                        <div>
+                            <Label htmlFor="values">Options</Label>
+
+                            {!options.length ? (
+                                <span className="block text-xs text-danger">
+                                    {!keyId ?
+                                        'Pick a data key above to bring in its options.'
+                                        :
+                                        'This data key has no options. Add them to the data key, then reopen this field.'}
+                                </span>
+                            ) : (
+                                <div className="flex flex-col gap-y-1 rounded-md border border-border p-2">
+                                    {options.map(o => (
+                                        <div key={o.value} className="flex items-center gap-x-2 text-sm">
+                                            <span className="text-muted-foreground text-xs">{o.value}</span>
+                                            <span>{o.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <span className="text-xs text-muted-foreground">
+                                Options come from the data key&apos;s child keys.
+                                {!!keyId && (
+                                    <>
+                                        {' '}
+                                        <Link
+                                            href={`/data-keys/edit/${keyId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="underline"
+                                        >
+                                            Edit them in the Data Key library
+                                        </Link>
+                                    </>
+                                )}
+                            </span>
+                        </div>
                     )}
                 </div>
             </Modal>
