@@ -35,7 +35,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
-import { ConditionEditor, ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
+import { ConditionEditor, ConditionErrorBadge, toConditionKeys, useConditionKeys } from "@/components/conditional-expression";
+import type { ConditionKey } from "@/lib/conditional-expression";
 import { SelectDataKey } from "@/components/select-data-key";
 import { useDataKeysCtx, type DataKey } from "@/contexts/data-keys";
 import { isNumericQueryValue } from "@/lib/query-state";
@@ -91,7 +92,14 @@ export function NuidSearchFieldsConfig({
 
     const { confirm } = useConfirmModal();
     const { conditionKeys } = useConditionKeys();
+    const { extractDataKeys } = useDataKeysCtx();
     const keysReady = conditionKeys.length > 0;
+    
+    const nuidFieldKeys = useMemo<ConditionKey[]>(() => {
+        const keyIds = (fields || []).map((f) => f.keyId).filter(Boolean) as string[];
+        if (!keyIds.length) return [];
+        return toConditionKeys(extractDataKeys(keyIds, { withNested: true }));
+    }, [fields, extractDataKeys]);
 
     const onDelete = useCallback((index: number) => {
         confirm(() => setValue('nuidSearchFields', fields.filter((_, i) => i !== index), { shouldDirty: true, }), {
@@ -122,6 +130,7 @@ export function NuidSearchFieldsConfig({
                     disabled={disabled}
                     field={selectedField?.field}
                     fieldType={selectedField?.field?.type!}
+                    extraKeys={nuidFieldKeys}
                     onClose={() => setSelectedField(undefined)}
                     onChange={field => {
                         setValue(
@@ -142,6 +151,7 @@ export function NuidSearchFieldsConfig({
                     open
                     disabled={disabled}
                     fieldType={selectedNewFieldType}
+                    extraKeys={nuidFieldKeys}
                     onClose={() => setSelectedNewFieldType(undefined)}
                     onChange={field => {
                         setValue(
@@ -243,6 +253,7 @@ export function NuidSearchFieldsConfig({
                                                 {!!f && (
                                                     <ConditionErrorBadge
                                                         keys={conditionKeys}
+                                                        extraKeys={nuidFieldKeys}
                                                         keysReady={keysReady}
                                                         expressions={[{ value: f.condition, label: 'Condition' }]}
                                                     />
@@ -357,6 +368,7 @@ export function Field({
     field,
     fieldType,
     disabled,
+    extraKeys,
     onChange,
     onClose,
 }: {
@@ -364,6 +376,7 @@ export function Field({
     field?: ScriptField;
     fieldType: ScriptField['type'];
     disabled?: boolean;
+    extraKeys?: ConditionKey[];
     onClose: () => void;
     onChange: (field: ScriptField) => void;
 }) {
@@ -591,6 +604,7 @@ export function Field({
                                     value={`${value || ''}`}
                                     onChange={onChange}
                                     keys={conditionKeys}
+                                    extraKeys={extraKeys}
                                     keysLoading={keysLoading}
                                     disabled={disabled}
                                     initialValue={`${field?.condition || ''}`}

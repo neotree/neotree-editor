@@ -5,4 +5,4 @@ export {
   type ConditionExpressionInput,
 } from "./condition-error-badge";
 export { useConditionValidation } from "./use-condition-validation";
-export { useConditionKeys } from "./use-condition-keys";
+export { useConditionKeys, toConditionKeys } from "./use-condition-keys";
