@@ -65,6 +65,7 @@ const kindLabels: Record<DataKeyIntegrityReport["entries"][number]["kind"], stri
     diagnosis: "Diagnosis key",
     diagnosis_symptom: "Diagnosis symptom",
     problem: "Problem key",
+    nuid_search_field: "NUID search field",
     duplicate_parent_data_key: "Duplicate parent key",
 };
 
@@ -468,6 +469,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                 screens: res.preview.screens,
                 diagnoses: res.preview.diagnoses,
                 problems: res.preview.problems,
+                scripts: res.preview.scripts,
                 changed: res.changed,
                 reviewed: item.reviewed === true,
             },
