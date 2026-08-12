@@ -1,6 +1,6 @@
 import logger from '@/lib/logger';
 import { _getDataKeysRefs } from '@/databases/queries/data-keys';
-import { _saveScreens, _saveDiagnoses, _saveProblems, } from '../scripts';
+import { _saveScreens, _saveDiagnoses, _saveProblems, _saveScripts, } from '../scripts';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 
 export async function _deleteReferencedDataKeyOptions({
@@ -103,6 +103,33 @@ export async function _deleteReferencedDataKeyOptions({
                 await _saveProblems({
                     userId: userId || undefined,
                     data: saveProblemsData,
+                    draftOrigin: 'data_key_sync',
+                    client,
+                });
+            }
+
+            const saveScriptsData = refs.data
+                .filter(d => {
+                    const nuidSearchFields = d.data.nuidSearchFields || [];
+                    return d.refType === 'script' && (
+                        !!uniqueKeys.find(k => JSON.stringify(nuidSearchFields).includes(k))
+                    );
+                })
+                .map(d => {
+                    const script: Parameters<typeof _saveScripts>[0]['data'][0] = d.data;
+
+                    const nuidSearchFields = script?.nuidSearchFields || [];
+
+                    return {
+                        scriptId: script.scriptId,
+                        nuidSearchFields: nuidSearchFields.filter(f => !uniqueKeys.includes(f.keyId!)),
+                    };
+                });
+
+            if (saveScriptsData.length) {
+                await _saveScripts({
+                    userId: userId || undefined,
+                    data: saveScriptsData,
                     draftOrigin: 'data_key_sync',
                     client,
                 });
