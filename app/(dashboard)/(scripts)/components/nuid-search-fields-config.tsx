@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { arrayMoveImmutable } from "array-move";
+import { useQueryState } from "nuqs";
 import Link from "next/link";
 import { Settings, Trash, MoreVertical, Edit2, Plus, ArrowUp, ArrowDown } from "lucide-react";
 
@@ -33,10 +34,11 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
-import { validateDropdownValues } from "@/lib/validate-dropdown-values";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { SelectDataKey } from "@/components/select-data-key";
-import { useDataKeysCtx } from "@/contexts/data-keys";
+import { useDataKeysCtx, type DataKey } from "@/contexts/data-keys";
+import { isNumericQueryValue } from "@/lib/query-state";
+import { normalizeDataKeyCompatibilityType } from "@/lib/data-key-types";
 
 type Props = {
     disabled?: boolean;
@@ -59,10 +61,32 @@ export function NuidSearchFieldsConfig({
     const [selectedNewFieldType, setSelectedNewFieldType] = useState<typeof fields[0]['type']>();
     const [open, setOpen] = useState(false);
 
+    // The data key registry links here with ?nuidSearchField=<fieldId|index> when a NUID
+    // reference needs attention, so open the sheet on that field.
+    const [deepLinkedField, setDeepLinkedField] = useQueryState('nuidSearchField', {
+        defaultValue: '',
+        clearOnDefault: true,
+    });
+
     useEffect(() => {
         if (nuidSearchEnabled && !_nuidSearchEnabled) setOpen(true);
         _setNuidSearchEnabled(nuidSearchEnabled);
     }, [_nuidSearchEnabled, nuidSearchEnabled]);
+
+    useEffect(() => {
+        if (!deepLinkedField) return;
+
+        setOpen(true);
+
+        const indexById = fields.findIndex(f => f.fieldId && (f.fieldId === deepLinkedField));
+        const index = indexById >= 0
+            ? indexById
+            : (isNumericQueryValue(deepLinkedField) ? Number(deepLinkedField) : -1);
+        const field = fields[index];
+
+        if (field) setSelectedField({ index, field, });
+        setDeepLinkedField('');
+    }, [deepLinkedField, fields, setDeepLinkedField]);
 
     const { confirm } = useConfirmModal();
 
@@ -325,7 +349,7 @@ export function Field({
     onClose: () => void;
     onChange: (field: ScriptField) => void;
 }) {
-    const { extractDataKeys } = useDataKeysCtx();
+    const { extractDataKeys, allDataKeys } = useDataKeysCtx();
 
     const { getDefaultValues } = useField({
         ...field,
@@ -353,10 +377,66 @@ export function Field({
 
     const hasOptions = useMemo(() => ['dropdown', 'multi_select'].includes(type), [type]);
 
+    // A Yes/No field may only use a dropdown data key, a NUID search field only a text
+    // one. Compared through the library's own type normalisation, so the picker offers
+    // exactly what the integrity checker accepts - anything else scans as a conflict.
+    const expectedType = useMemo(() => normalizeDataKeyCompatibilityType(type), [type]);
+    const isCompatibleDataKey = useCallback(
+        (candidate: DataKey) => normalizeDataKeyCompatibilityType(candidate.dataType) === expectedType,
+        [expectedType]
+    );
+    const compatibleDataKeys = useMemo(
+        () => allDataKeys.filter(isCompatibleDataKey),
+        [allDataKeys, isCompatibleDataKey]
+    );
+    const expectedTypeLabel = useMemo(() => hasOptions ? 'dropdown' : (type || 'text'), [hasOptions, type]);
+    const fieldTypeLabel = useMemo(() => hasOptions ? 'Yes/No' : 'NUID search', [hasOptions]);
+
     const dataKey = useMemo(() => {
         const [k] = !keyId ? [null] : extractDataKeys([keyId]);
         return k;
     }, [keyId, extractDataKeys]);
+
+    // Legacy fields can point at a key of the wrong type - say so rather than silently
+    // dropping it from the picker.
+    const dataKeyTypeMismatch = useMemo(
+        () => !!dataKey && !isCompatibleDataKey(dataKey),
+        [dataKey, isCompatibleDataKey]
+    );
+
+    // Options are the data key's child keys - they aren't edited here
+    const dataKeyOptions = useMemo(() => {
+        const children = !dataKey?.options?.length ? [] : extractDataKeys(dataKey.options);
+        return children.map(c => ({ value: c.name, label: c.label || c.name, }));
+    }, [dataKey, extractDataKeys]);
+
+    const derivedValues = useMemo(
+        () => dataKeyOptions.map(o => `${o.value},${o.label}`).join('\n'),
+        [dataKeyOptions]
+    );
+
+    // `values` is what the app reads, so keep it in step with the data key. Unlinked
+    // legacy fields keep what they were saved with - there's no key to derive from -
+    // and a missing dataKey means the library hasn't loaded yet, so don't wipe it.
+    useEffect(() => {
+        if (!hasOptions || !keyId || !dataKey) return;
+        if (derivedValues === values) return;
+        setValue('values', derivedValues, { shouldDirty: true, });
+    }, [hasOptions, keyId, dataKey, derivedValues, values, setValue]);
+
+    // Options saved against unlinked legacy fields, shown read-only until a key is picked
+    const storedOptions = useMemo(() => {
+        return `${values || ''}`
+            .split('\n')
+            .map(v => v.trim())
+            .filter(v => v)
+            .map(v => {
+                const [value, ...rest] = v.split(',');
+                return { value, label: rest.join(',') || value, };
+            });
+    }, [values]);
+
+    const options = dataKeyOptions.length ? dataKeyOptions : storedOptions;
 
     // Confidentiality lives on the data key - fields inherit it, same as screen fields
     const inheritedConfidential = useMemo(() => !!dataKey?.confidential, [dataKey?.confidential]);
@@ -367,13 +447,14 @@ export function Field({
         }
     }, [confidential, inheritedConfidential, setValue]);
 
-    // Legacy fields were keyed by hand and have no keyId, so leave the picker open for
-    // them. Once a field is linked to a data key the key is locked, as on screen fields.
-    const isKeyDisabled = !!disabled || (!!field && !!field.keyId);
+    // The key stays changeable for the life of the field - relinking is how an unmanaged
+    // legacy field, or one pointed at the wrong data key, gets corrected.
+    const isKeyDisabled = !!disabled;
 
     const onSave = handleSubmit(onChange);
 
-    const valuesErrors = useMemo(() => hasOptions ? validateDropdownValues(values) : [], [values, hasOptions]);
+    // A dropdown with no options renders an unanswerable question on the app
+    const missingOptions = useMemo(() => hasOptions && !options.length, [hasOptions, options]);
 
     return (
         <>
@@ -399,7 +480,7 @@ export function Field({
 
                         <Button
                             onClick={() => onSave()}
-                            disabled={disabled || !!valuesErrors.length}
+                            disabled={disabled || missingOptions || dataKeyTypeMismatch}
                         >
                             Save
                         </Button>
@@ -418,27 +499,37 @@ export function Field({
                                     modal
                                     value={`${value || ''}`}
                                     disabled={isKeyDisabled}
-                                    error={!!errors.key}
+                                    error={!!errors.key || dataKeyTypeMismatch}
+                                    filterDataKeys={isCompatibleDataKey}
                                     onChange={([item]) => {
                                         if (!item) return;
                                         onChange(item.name);
                                         setValue('keyId', item.uniqueKey, { shouldDirty: true, });
                                         setValue('label', item.label || item.name, { shouldDirty: true, });
                                         setValue('confidential', !!item.confidential, { shouldDirty: true, });
-
-                                        // Dropdown data keys carry their options as child keys - pull them
-                                        // in so the app's Yes/No prompt matches the library.
-                                        const options = (item.children || [])
-                                            .map(c => `${c.name},${c.label || c.name}`)
-                                            .join('\n');
-                                        if (hasOptions && options) setValue('values', options, { shouldDirty: true, });
                                     }}
                                 />
                             )}
                         />
-                        {!!errors.key && <span className="text-xs text-danger">{`${errors.key.message || ''}`}</span>}
+                        {!!errors.key && <span className="block text-xs text-danger">{`${errors.key.message || ''}`}</span>}
+
+                        {dataKeyTypeMismatch && (
+                            <span className="block text-xs text-danger">
+                                This field is linked to a <b>{dataKey?.dataType || 'untyped'}</b> data key,
+                                but a {fieldTypeLabel} field needs a <b>{expectedTypeLabel}</b> one. Pick a
+                                replacement above.
+                            </span>
+                        )}
+
+                        {!compatibleDataKeys.length && (
+                            <span className="block text-xs text-danger">
+                                There are no {expectedTypeLabel} data keys in the library yet. Create one
+                                before adding this field.
+                            </span>
+                        )}
+
                         <span className="text-xs text-muted-foreground">
-                            Keys come from the <b>Data Key library</b>.
+                            Only <b>{expectedTypeLabel}</b> keys from the <b>Data Key library</b> can be used here.
                             {!!keyId && (
                                 <>
                                     {' '}
@@ -506,36 +597,45 @@ export function Field({
                         </span>
                     </div>
 
-                    {(
-                        (type === 'dropdown') ||
-                        (type === 'multi_select')
-                    ) && (
+                    {hasOptions && (
                         <div>
-                            <Label htmlFor="values">Options *</Label>
-                            <Textarea
-                                {...register('values', { required: true, disabled, })}
-                                rows={5}
-                            />
-                            {!!valuesErrors.length && <span className="text-xs text-danger">{valuesErrors.join(', ')}</span>}
+                            <Label htmlFor="values">Options</Label>
+
+                            {!options.length ? (
+                                <span className="block text-xs text-danger">
+                                    {!keyId ?
+                                        'Pick a data key above to bring in its options.'
+                                        :
+                                        'This data key has no options. Add them to the data key, then reopen this field.'}
+                                </span>
+                            ) : (
+                                <div className="flex flex-col gap-y-1 rounded-md border border-border p-2">
+                                    {options.map(o => (
+                                        <div key={o.value} className="flex items-center gap-x-2 text-sm">
+                                            <span className="text-muted-foreground text-xs">{o.value}</span>
+                                            <span>{o.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             <span className="text-xs text-muted-foreground">
-                                Filled from the data key&apos;s options when you pick a key that has them.
-                                One <b>value,label</b> pair per line.
+                                Options come from the data key&apos;s child keys.
+                                {!!keyId && (
+                                    <>
+                                        {' '}
+                                        <Link
+                                            href={`/data-keys/edit/${keyId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="underline"
+                                        >
+                                            Edit them in the Data Key library
+                                        </Link>
+                                    </>
+                                )}
                             </span>
                         </div>
-                        // <Controller 
-                        //     control={control}
-                        //     name="items"
-                        //     render={({ field: { value, onChange, }, }) => {
-                        //         return (
-                        //             <FieldItems 
-                        //                 disabled={false}
-                        //                 items={value}
-                        //                 fieldType={type}
-                        //                 onChange={onChange}
-                        //             />
-                        //         );
-                        //     }}
-                        // />
                     )}
                 </div>
             </Modal>

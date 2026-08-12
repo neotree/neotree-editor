@@ -368,4 +368,96 @@ assert.deepEqual(
   "import-origin data-key impact should participate in affected-script scope under imports",
 )
 
+// NUID search fields live on the script record, so data key propagation now raises
+// script drafts - they must be filtered exactly like propagated screen drafts.
+const propagatedScriptDraft = {
+  scriptId: "script-10",
+  scriptDraftId: "script-10",
+  draftOrigin: "data_key_sync" as const,
+  data: { scriptId: "script-10", title: "Synced NUID search" },
+}
+
+const manualScriptDraft = {
+  scriptId: "script-11",
+  scriptDraftId: "script-11",
+  draftOrigin: "editor" as const,
+  data: { scriptId: "script-11", title: "Hand edited" },
+}
+
+const propagatedScriptIgnored = evaluateIntegrityScanScope({
+  policy: policyDataKeysOff,
+  userScriptDrafts: [propagatedScriptDraft],
+  userScreenDrafts: [],
+  userDiagnosisDrafts: [],
+  userProblemDrafts: [],
+  userPendingDeletion: [],
+  hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: false,
+  deletedDataKeyIdsSize: 0,
+  screenPreviewMap: emptyPreview,
+  diagnosisPreviewMap: emptyPreview,
+  problemPreviewMap: emptyPreview,
+  dataKeyImpactScriptIds: [],
+})
+
+assert.equal(
+  propagatedScriptIgnored.effectiveUserScriptDrafts.length,
+  0,
+  "propagated script drafts should be excluded when data key library edit scanning is off",
+)
+assert.equal(
+  propagatedScriptIgnored.shouldRunIntegrityChecks,
+  false,
+  "a NUID-only propagation should not trigger a script-edit scan when data key library edit scanning is off",
+)
+
+const manualScriptStillCounts = evaluateIntegrityScanScope({
+  policy: policyDataKeysOff,
+  userScriptDrafts: [propagatedScriptDraft, manualScriptDraft],
+  userScreenDrafts: [],
+  userDiagnosisDrafts: [],
+  userProblemDrafts: [],
+  userPendingDeletion: [],
+  hasExistingDataKeyLibraryChanges: false,
+  hasImportOriginDataKeyChanges: false,
+  deletedDataKeyIdsSize: 0,
+  screenPreviewMap: emptyPreview,
+  diagnosisPreviewMap: emptyPreview,
+  problemPreviewMap: emptyPreview,
+  dataKeyImpactScriptIds: [],
+})
+
+assert.equal(
+  manualScriptStillCounts.effectiveUserScriptDrafts.length,
+  1,
+  "hand-edited script drafts must survive the propagation filter",
+)
+assert.equal(
+  manualScriptStillCounts.shouldRunIntegrityChecks,
+  true,
+  "a manual script edit still triggers a scan",
+)
+
+const propagatedScriptIncluded = evaluateIntegrityScanScope({
+  policy: policyDataKeysOn,
+  userScriptDrafts: [propagatedScriptDraft],
+  userScreenDrafts: [],
+  userDiagnosisDrafts: [],
+  userProblemDrafts: [],
+  userPendingDeletion: [],
+  hasExistingDataKeyLibraryChanges: true,
+  hasImportOriginDataKeyChanges: false,
+  deletedDataKeyIdsSize: 0,
+  screenPreviewMap: emptyPreview,
+  diagnosisPreviewMap: emptyPreview,
+  problemPreviewMap: emptyPreview,
+  dataKeyImpactScriptIds: [],
+})
+
+assert.equal(
+  propagatedScriptIncluded.effectiveUserScriptDrafts.length,
+  1,
+  "propagated script drafts are kept when data key library edit scanning is on",
+)
+
 console.log("integrity scan scope tests passed")
