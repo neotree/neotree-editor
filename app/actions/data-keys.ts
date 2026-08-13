@@ -17,6 +17,7 @@ import { _getEditorInfo } from '@/databases/queries/editor-info';
 import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from '@/lib/integrity-policy';
 import socket from '@/lib/socket';
 import { buildDataKeysDeleteImpact } from '@/lib/data-key-delete-impact';
+import { recomputeScriptsConditionErrors } from '@/app/actions/scripts';
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
@@ -232,10 +233,16 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
     try {
         const session = await isAllowed();
         await assertCanManageDataKeys(session.user);
-        return await _saveDataKeys({
+        const res = await _saveDataKeys({
             ...params,
             userId: session.user?.userId,
         });
+       
+        const affected = (res as any)?.info?.refs?.affected?.scripts as { scriptId?: string }[] | undefined;
+        if (res?.success !== false && affected?.length) {
+            void recomputeScriptsConditionErrors(affected.map((s) => s?.scriptId));
+        }
+        return res;
     } catch (e: any) {
         logger.error('saveDataKeys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };

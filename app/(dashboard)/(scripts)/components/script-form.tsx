@@ -24,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { scriptTypes } from "@/constants";
 import { useAppContext } from "@/contexts/app";
 import { NuidSearchFieldsConfig } from "./nuid-search-fields-config";
+import { useNuidConfigIssues } from "../hooks/use-nuid-config-issues";
 import { Title } from "./title";
 import { ScriptItemsFab } from "./script-items-fab";
 import { useScriptForm } from "../hooks/use-script-form";
@@ -74,6 +75,8 @@ export function ScriptForm(props: Props) {
     const exportable = watch('exportable');
     const nuidSearchFields = watch('nuidSearchFields');
     const nuidSearchEnabled = watch('nuidSearchEnabled');
+
+    const { hasIssues: nuidHasIssues } = useNuidConfigIssues(nuidSearchFields, nuidSearchEnabled);
     const eligibilityCriteria = watch('eligibilityCriteria');
     const preferences = watch('preferences');
     const reviewable = watch('reviewable');
@@ -305,7 +308,8 @@ export function ScriptForm(props: Props) {
 
                     <Button
                         onClick={() => onSubmit()}
-                        disabled={disabled}
+                        disabled={disabled || nuidHasIssues}
+                        title={nuidHasIssues ? 'Resolve the NUID Search data key / condition issues before saving.' : undefined}
                     >
                         Save draft
                     </Button>

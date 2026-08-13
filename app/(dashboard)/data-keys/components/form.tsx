@@ -40,6 +40,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { useIsLocked } from '@/hooks/use-is-locked';
+import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { useAppContext } from "@/contexts/app";
 import { cn } from "@/lib/utils";
 import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
@@ -86,6 +87,8 @@ function Form({
     });
 
     const isReadOnly = !!disabled || isLocked || viewOnly;
+
+    const isNuidManaged = isNuidManagedDataKey(dataKey as any);
 
     const {
         control,
@@ -448,7 +451,7 @@ function Form({
                                             <Select
                                                 value={value}
                                                 name="name"
-                                                disabled={isFormDisabled}
+                                                disabled={isFormDisabled || isNuidManaged}
                                                 onValueChange={val => {
                                                     onChange(val);
 
@@ -481,13 +484,18 @@ function Form({
 
                         <div className="px-4">
                             <Label htmlFor="name">Key *</Label>
-                            <Input 
-                                disabled={isFormDisabled}
+                            <Input
+                                disabled={isFormDisabled || isNuidManaged}
                                 {...register('name', {
-                                    disabled: isFormDisabled,
+                                    disabled: isFormDisabled || isNuidManaged,
                                     required: true,
                                 })}
                             />
+                            {isNuidManaged && (
+                                <span className="text-xs text-muted-foreground">
+                                    Managed by NUID Search — the key and data type are locked. You can still edit the label.
+                                </span>
+                            )}
                         </div>
 
                         <div className="px-4">
