@@ -1,6 +1,7 @@
 import assert from "assert";
 
 import {
+  getScriptConditionErrorCount,
   mergeConditionKeys,
   validateCondition,
   validateReferenceExpression,
@@ -369,5 +370,86 @@ assert.equal(quoteValue("Mother's \"x\""), "`Mother's \"x\"`", "value with both 
 assert.equal(validateCondition("$Gestaton > 39", ctx).hasErrors, true, "legacy typo flagged without editing");
 assert.equal(validateCondition("$adm = 'x'", caseCtx).hasErrors, true, "legacy wrong-casing flagged without editing");
 assert.equal(validateCondition("$Sex = 'M'", ctx).hasErrors, false, "valid legacy expression is not flagged");
+
+// ---- getScriptConditionErrorCount (script-level badge collector) -----------
+
+const scriptKeys = [
+  { name: "Sex", dataType: "dropdown" },
+  { name: "Gestation", dataType: "number" },
+];
+
+// A fully valid script -> 0.
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: scriptKeys,
+    screens: [{ condition: "$Sex = 'M'", fields: [{ condition: "$Gestation > 20" }] }],
+    diagnoses: [{ expression: "$Gestation < 30" }],
+  }),
+  0,
+  "clean script has no CE errors",
+);
+
+// Distinct broken expressions counted once each (unknown key + missing operand).
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: scriptKeys,
+    screens: [{ condition: "$Gestaton > 20", fields: [{ condition: "$Gestation = " }] }],
+  }),
+  2,
+  "counts each broken expression once",
+);
+
+// NUID conditions resolve against the NUID fields' LINKED registry keys
+// (passed as nuidDataKeys), so a reference to a linked key is valid.
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: scriptKeys,
+    nuidSearchFields: [
+      { key: "NuidA", type: "text", keyId: "dk-a", condition: "$NuidB = 'x'" },
+      { key: "NuidB", type: "text", keyId: "dk-b" },
+    ],
+    nuidDataKeys: [
+      { name: "NuidA", dataType: "text", uniqueKey: "dk-a" },
+      { name: "NuidB", dataType: "text", uniqueKey: "dk-b" },
+    ],
+  }),
+  0,
+  "a NUID reference to a linked registry key resolves",
+);
+// A NUID field referencing a key that ISN'T in the registry is flagged, just
+// like every other CE surface — even when it names a sibling field.
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: scriptKeys,
+    nuidSearchFields: [
+      { key: "NuidA", type: "text", keyId: "dk-a", condition: "$NuidB = 'x'" },
+      { key: "NuidB", type: "dropdown" }, // unlinked -> not in the registry
+    ],
+    nuidDataKeys: [{ name: "NuidA", dataType: "text", uniqueKey: "dk-a" }],
+  }),
+  1,
+  "a NUID reference to a key not in the registry is flagged",
+);
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: scriptKeys,
+    nuidSearchFields: [{ key: "NuidA", type: "text", keyId: "dk-a", condition: "$Nope = 'x'" }],
+    nuidDataKeys: [{ name: "NuidA", dataType: "text", uniqueKey: "dk-a" }],
+  }),
+  1,
+  "unknown NUID reference is counted",
+);
+
+// No keys at all -> key checks are skipped (only syntax), so no false positives.
+assert.equal(
+  getScriptConditionErrorCount({ dataKeys: [], screens: [{ condition: "$Anything = 'x'" }] }),
+  0,
+  "empty key catalogue does not false-flag references",
+);
+assert.equal(
+  getScriptConditionErrorCount({ dataKeys: [], screens: [{ condition: "$Anything = 'x' or" }] }),
+  1,
+  "syntax errors still counted with empty key catalogue",
+);
 
 console.log("conditional-expression: all assertions passed");

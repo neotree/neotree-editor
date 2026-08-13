@@ -2,7 +2,10 @@
 
 import { v4 } from "uuid";
 import queryString from "query-string";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
+import db from "@/databases/pg/drizzle";
+import { screens, diagnoses, problems, screensDrafts, diagnosesDrafts, problemsDrafts, pendingDeletion, scripts as scriptsTable } from "@/databases/pg/schema";
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
 import { _saveDrugsLibraryItemsUpdateIfExists, _saveDrugsLibraryItemsIfKeysNotExist } from "@/databases/mutations/drugs-library";
@@ -15,10 +18,13 @@ import { isAllowed } from "./is-allowed";
 import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
+import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { dataKeyToJSON, parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
 import { getIntegrityPolicyState } from "@/lib/integrity-policy";
 import { createIntegrityImportSnapshot } from "./integrity-imports";
+import { collectScriptConditionFindings, type ScriptConditionEntityRef } from "@/lib/conditional-expression";
+import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
 
@@ -58,13 +64,55 @@ export const getScreen: typeof queries._getScreen = async (...args) => {
     return await queries._getScreen(...args);
 };
 
+/**
+ * Resolves the script IDs affected by an entity delete so their cached CE report
+ * can be refreshed afterwards. Reads scriptId from both the published and draft
+ * tables of whichever entity ids were supplied, unioned with any explicit
+ * scriptsIds. Must be called BEFORE the delete (entities still resolvable).
+ */
+async function resolveDeleteAffectedScriptIds(params: any): Promise<string[]> {
+    const ids = new Set<string>();
+    for (const id of ((params?.scriptsIds || []) as any[])) if (id) ids.add(`${id}`);
+
+    const screensIds = ((params?.screensIds || []) as any[]).filter(Boolean);
+    const diagnosesIds = ((params?.diagnosesIds || []) as any[]).filter(Boolean);
+    const problemsIds = ((params?.problemsIds || []) as any[]).filter(Boolean);
+
+    const lookups: Promise<{ scriptId: string | null }[]>[] = [];
+    if (screensIds.length) {
+        lookups.push(db.select({ scriptId: screens.scriptId }).from(screens).where(inArray(screens.screenId, screensIds)));
+        lookups.push(db.select({ scriptId: screensDrafts.scriptId }).from(screensDrafts).where(inArray(screensDrafts.screenId, screensIds)));
+    }
+    if (diagnosesIds.length) {
+        lookups.push(db.select({ scriptId: diagnoses.scriptId }).from(diagnoses).where(inArray(diagnoses.diagnosisId, diagnosesIds)));
+        lookups.push(db.select({ scriptId: diagnosesDrafts.scriptId }).from(diagnosesDrafts).where(inArray(diagnosesDrafts.diagnosisId, diagnosesIds)));
+    }
+    if (problemsIds.length) {
+        lookups.push(db.select({ scriptId: problems.scriptId }).from(problems).where(inArray(problems.problemId, problemsIds)));
+        lookups.push(db.select({ scriptId: problemsDrafts.scriptId }).from(problemsDrafts).where(inArray(problemsDrafts.problemId, problemsIds)));
+    }
+
+    try {
+        for (const rows of await Promise.all(lookups)) {
+            for (const r of rows) if (r?.scriptId) ids.add(`${r.scriptId}`);
+        }
+    } catch (e: any) {
+        logger.error('resolveDeleteAffectedScriptIds ERROR', e?.message);
+    }
+    return Array.from(ids);
+}
+
 export const deleteScreens: typeof mutations._deleteScreens = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._deleteScreens({
+
+        const affectedScriptIds = await resolveDeleteAffectedScriptIds(params);
+        const res = await mutations._deleteScreens({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        return res;
     } catch (e: any) {
         logger.error('deleteScreens ERROR', e.message);
         return { errors: [e.message], success: false, };
@@ -74,10 +122,12 @@ export const deleteScreens: typeof mutations._deleteScreens = async params => {
 export const saveScreens: typeof mutations._saveScreens = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._saveScreens({
+        const res = await mutations._saveScreens({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(((params as any)?.data || []).map((d: any) => d?.scriptId));
+        return res;
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -113,10 +163,13 @@ export const getDiagnosis: typeof queries._getDiagnosis = async (...args) => {
 export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._deleteDiagnoses({
+        const affectedScriptIds = await resolveDeleteAffectedScriptIds(params);
+        const res = await mutations._deleteDiagnoses({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        return res;
     } catch (e: any) {
         logger.error('deleteDiagnoses ERROR', e.message);
         return { errors: [e.message], success: false, };
@@ -152,10 +205,13 @@ export const getProblem: typeof queries._getProblem = async (...args) => {
 export const deleteProblems: typeof mutations._deleteProblems = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._deleteProblems({
+        const affectedScriptIds = await resolveDeleteAffectedScriptIds(params);
+        const res = await mutations._deleteProblems({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        return res;
     } catch (e: any) {
         logger.error('deleteProblems ERROR', e.message);
         return { errors: [e.message], success: false, };
@@ -165,10 +221,12 @@ export const deleteProblems: typeof mutations._deleteProblems = async params => 
 export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._saveDiagnoses({
+        const res = await mutations._saveDiagnoses({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(((params as any)?.data || []).map((d: any) => d?.scriptId));
+        return res;
     } catch (e: any) {
         logger.error('saveDiagnoses ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -178,10 +236,12 @@ export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => {
 export const saveProblems: typeof mutations._saveProblems = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._saveProblems({
+        const res = await mutations._saveProblems({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(((params as any)?.data || []).map((d: any) => d?.scriptId));
+        return res;
     } catch (e: any) {
         logger.error('saveProblems ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -230,10 +290,12 @@ export const deleteScripts: typeof mutations._deleteScripts = async params => {
 export const saveScripts: typeof mutations._saveScripts = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._saveScripts({
+        const res = await mutations._saveScripts({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(((params as any)?.data || []).map((d: any) => d?.scriptId));
+        return res;
     } catch (e: any) {
         logger.error('saveScripts ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -306,6 +368,431 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
     } catch (e: any) {
         logger.error('getScriptsWithItems ERROR', e.message);
         return { data: [], errors: [e.message], };
+    }
+}
+
+export type ScriptConditionErrorInput = {
+    scriptId: string;
+    nuidSearchFields?: any;
+    eligibilityCriteria?: any;
+};
+
+export type ScriptConditionReport = {
+    count: number;
+    findings: { location: string; href?: string; message?: string }[];
+};
+
+function hrefForConditionEntity(scriptId: string, entity?: ScriptConditionEntityRef): string {
+    if (!entity) return `/script/${scriptId}`;
+    switch (entity.kind) {
+        case 'screen':
+            return entity.screenId ? `/script/${scriptId}/screen/${entity.screenId}` : `/script/${scriptId}?section=screens`;
+        case 'diagnosis':
+            return entity.diagnosisId ? `/script/${scriptId}/diagnosis/${entity.diagnosisId}` : `/script/${scriptId}?section=diagnoses`;
+        case 'problem':
+            return entity.problemId ? `/script/${scriptId}/problem/${entity.problemId}` : `/script/${scriptId}?section=diagnoses`;
+        default:
+            return `/script/${scriptId}`;
+    }
+}
+
+function buildConditionReport(scriptId: string, script: any): ScriptConditionReport {
+    const findings = collectScriptConditionFindings(script);
+    return {
+        count: findings.length,
+        findings: findings.slice(0, 100).map((f) => ({
+            location: f.location,
+            href: hrefForConditionEntity(scriptId, f.entity),
+            message: f.errors[0]?.message,
+        })),
+    };
+}
+
+/**
+ * Lean, batched (no N+1) computation of CE reports for the given scripts —
+ * one query each for screens/diagnoses/problems + one for the data-key
+ * registry, grouped and scrapped in memory. Reflects PUBLISHED content (the
+ * persisted per-script report, kept fresh on write, is draft-inclusive).
+ */
+async function computeConditionReportsLean(
+    inputs: ScriptConditionErrorInput[],
+): Promise<Record<string, ScriptConditionReport>> {
+    const scriptIds = inputs.map((s) => `${s?.scriptId || ''}`).filter(Boolean);
+    if (!scriptIds.length) return {};
+
+    const [screenRows, diagnosisRows, problemRows, dataKeysRes] = await Promise.all([
+        db
+            .select({
+                scriptId: screens.scriptId,
+                screenId: screens.screenId,
+                key: screens.key,
+                label: screens.label,
+                title: screens.title,
+                type: screens.type,
+                condition: screens.condition,
+                skipToCondition: screens.skipToCondition,
+                fields: screens.fields,
+                items: screens.items,
+                drugs: screens.drugs,
+                fluids: screens.fluids,
+                feeds: screens.feeds,
+            })
+            .from(screens)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
+            .where(and(isNull(screens.deletedAt), isNull(pendingDeletion.id), inArray(screens.scriptId, scriptIds))),
+        db
+            .select({
+                scriptId: diagnoses.scriptId,
+                diagnosisId: diagnoses.diagnosisId,
+                key: diagnoses.key,
+                name: diagnoses.name,
+                expression: diagnoses.expression,
+                symptoms: diagnoses.symptoms,
+            })
+            .from(diagnoses)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
+            .where(and(isNull(diagnoses.deletedAt), isNull(pendingDeletion.id), inArray(diagnoses.scriptId, scriptIds))),
+        db
+            .select({
+                scriptId: problems.scriptId,
+                problemId: problems.problemId,
+                key: problems.key,
+                name: problems.name,
+                expression: problems.expression,
+                symptoms: problems.symptoms,
+            })
+            .from(problems)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.problemId, problems.problemId))
+            .where(and(isNull(problems.deletedAt), isNull(pendingDeletion.id), inArray(problems.scriptId, scriptIds))),
+        _getDataKeys(),
+    ]);
+
+    const globalDataKeys = dataKeysRes.data || [];
+    const dataKeyIndex = indexDataKeysById(globalDataKeys as any);
+
+    const groupByScript = <T extends { scriptId?: string | null }>(rows: T[] = []) => {
+        const map = new Map<string, T[]>();
+        for (const row of rows) {
+            const id = `${row?.scriptId || ''}`;
+            if (!id) continue;
+            const arr = map.get(id);
+            if (arr) arr.push(row);
+            else map.set(id, [row]);
+        }
+        return map;
+    };
+
+    const screensByScript = groupByScript(screenRows);
+    const diagnosesByScript = groupByScript(diagnosisRows);
+    const problemsByScript = groupByScript(problemRows);
+
+    const DRUG_SCREEN_TYPES = ['drugs', 'fluids', 'feeds'];
+    const drugKeysOf = (scriptScreens: any[]) => {
+        const keys = new Set<string>();
+        for (const scr of scriptScreens) {
+            if (!DRUG_SCREEN_TYPES.includes(`${scr?.type}`)) continue;
+            for (const item of [...(scr?.drugs || []), ...(scr?.fluids || []), ...(scr?.feeds || [])]) {
+                if (item?.key) keys.add(`${item.key}`);
+            }
+        }
+        return keys;
+    };
+    const allDrugKeys = drugKeysOf(screenRows as any[]);
+    const drugItemsRes = allDrugKeys.size
+        ? await _getDrugsLibraryItems({ keys: Array.from(allDrugKeys) })
+        : { data: [] as any[] };
+    const drugItemsByKey = new Map<string, any>();
+    for (const d of drugItemsRes.data || []) if (d?.key) drugItemsByKey.set(`${d.key}`, d);
+
+    const reports: Record<string, ScriptConditionReport> = {};
+
+    await Promise.all(inputs.map(async (s) => {
+        const scriptId = `${s?.scriptId || ''}`;
+        if (!scriptId) return;
+
+        const scriptScreens = screensByScript.get(scriptId) || [];
+        const scriptDiagnoses = diagnosesByScript.get(scriptId) || [];
+        const scriptProblems = problemsByScript.get(scriptId) || [];
+        const scriptDrugs = Array.from(drugKeysOf(scriptScreens as any[]))
+            .map((k) => drugItemsByKey.get(k))
+            .filter(Boolean);
+
+        const dataKeys = await scrapDataKeys({
+            dataKeys: globalDataKeys,
+            screens: scriptScreens as any,
+            diagnoses: scriptDiagnoses as any,
+            problems: scriptProblems as any,
+            drugsLibrary: scriptDrugs as any,
+        });
+
+        const nuidSearchFields = (s?.nuidSearchFields || []) as any[];
+        reports[scriptId] = buildConditionReport(scriptId, {
+            scriptId,
+            dataKeys,
+            screens: scriptScreens,
+            diagnoses: scriptDiagnoses,
+            problems: scriptProblems,
+            drugsLibrary: scriptDrugs,
+            nuidSearchFields,
+            nuidDataKeys: resolveNuidLibraryKeys(nuidSearchFields, dataKeyIndex),
+            eligibilityCriteria: s?.eligibilityCriteria,
+        });
+    }));
+
+    return reports;
+}
+
+/**
+ * Returns a map of scriptId -> CE error report for scripts that have any error.
+ * Called ONCE (not per row) by the scripts list, asynchronously, so it adds no
+ * render latency.
+ *
+ * Prefers the precomputed `conditionErrorReport` column (kept fresh on write,
+ * draft-inclusive) and only computes lean for scripts not yet persisted. Any
+ * freshly computed report is written back (persist-on-read), so the very first
+ * load after migration warms the column and every later load is a plain indexed
+ * select — no backfill needed. Resilient if the column doesn't exist yet
+ * (pre-migration): it just computes everything lean each time.
+ */
+export async function getScriptsConditionErrors(
+    scripts: ScriptConditionErrorInput[],
+): Promise<{ data: Record<string, ScriptConditionReport>; errors: string[] }> {
+    try {
+        const scriptIds = (scripts || []).map((s) => `${s?.scriptId || ''}`).filter(Boolean);
+        if (!scriptIds.length) return { data: {}, errors: [] };
+
+        const persisted = new Map<string, ScriptConditionReport | null>();
+        try {
+            const rows = await db
+                .select({ scriptId: scriptsTable.scriptId, report: scriptsTable.conditionErrorReport })
+                .from(scriptsTable)
+                .where(inArray(scriptsTable.scriptId, scriptIds));
+            for (const row of rows) persisted.set(`${row.scriptId}`, (row.report as ScriptConditionReport | null) || null);
+        } catch {
+            // Column not migrated yet — fall through to computing everything lean.
+        }
+
+        const result: Record<string, ScriptConditionReport> = {};
+        const missing: ScriptConditionErrorInput[] = [];
+        for (const s of scripts) {
+            const id = `${s?.scriptId || ''}`;
+            if (!id) continue;
+            const report = persisted.get(id);
+            if (report) result[id] = report;
+            else missing.push(s);
+        }
+
+        if (missing.length) {
+            const computed = await computeConditionReportsLean(missing);
+            Object.assign(result, computed);
+            void persistConditionReports(computed);
+        }
+
+        const pruned: Record<string, ScriptConditionReport> = {};
+        for (const [id, report] of Object.entries(result)) {
+            if (report && report.count > 0) pruned[id] = report;
+        }
+        return { data: pruned, errors: [] };
+    } catch (e: any) {
+        logger.error('getScriptsConditionErrors ERROR', e.message);
+        return { data: {}, errors: [e.message] };
+    }
+}
+
+/** Does the actual per-script CE report computation + persist. Never throws. */
+async function doRecomputeScriptConditionErrors(
+    id: string,
+    opts?: { dataKeyIndex?: Map<string, any> },
+): Promise<void> {
+    try {
+        const { data, errors } = await getScriptsWithItems({ scriptsIds: [id], returnDraftsIfExist: true } as any);
+        if (errors?.length) return;
+        const script = (data as any[])[0];
+        if (script) {
+            const nuidFields = (script.nuidSearchFields || []) as any[];
+            if (nuidFields.some((f: any) => f?.keyId)) {
+                const index = opts?.dataKeyIndex
+                    ?? indexDataKeysById(((await _getDataKeys({ returnDraftsIfExist: true })).data || []) as any);
+                script.nuidDataKeys = resolveNuidLibraryKeys(nuidFields, index);
+            }
+        }
+        const report = script ? buildConditionReport(id, script) : { count: 0, findings: [] };
+        await db.update(scriptsTable).set({ conditionErrorReport: report }).where(eq(scriptsTable.scriptId, id));
+    } catch (e: any) {
+        logger.error('recomputeScriptConditionErrors ERROR', e?.message);
+    }
+}
+
+
+const recomputeInFlight = new Map<string, { dirty: boolean }>();
+
+/**
+ * Recomputes a single script's CE report (draft-inclusive) and persists it.
+ * Coalesced per script + fire-and-forget from save paths; never throws.
+ *
+ * Pass a prebuilt `dataKeyIndex` when recomputing many scripts so the registry
+ * is loaded once for the batch instead of once per script.
+ */
+export async function recomputeScriptConditionErrors(
+    scriptId: string,
+    opts?: { dataKeyIndex?: Map<string, any> },
+): Promise<void> {
+    const id = `${scriptId || ''}`;
+    if (!id) return;
+
+    const active = recomputeInFlight.get(id);
+    if (active) {
+        active.dirty = true;
+        return;
+    }
+
+    const state = { dirty: false };
+    recomputeInFlight.set(id, state);
+    try {
+        do {
+            state.dirty = false;
+            await doRecomputeScriptConditionErrors(id, opts);
+        } while (state.dirty);
+    } finally {
+        recomputeInFlight.delete(id);
+    }
+}
+
+/** Runs tasks with a bounded concurrency so batches don't stampede the DB. */
+async function runWithConcurrency<T>(items: T[], limit: number, task: (item: T) => Promise<void>): Promise<void> {
+    const queue = [...items];
+    const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+        while (queue.length) {
+            const item = queue.shift();
+            if (item === undefined) return;
+            await task(item);
+        }
+    });
+    await Promise.all(workers);
+}
+
+/** Recomputes several scripts' CE reports. Fire-and-forget; never throws. */
+export async function recomputeScriptsConditionErrors(scriptIds: (string | null | undefined)[]): Promise<void> {
+    const ids = Array.from(new Set((scriptIds || []).map((s) => `${s || ''}`).filter(Boolean)));
+    if (!ids.length) return;
+    
+    let dataKeyIndex: Map<string, any> | undefined;
+    try {
+        const registry = await _getDataKeys({ returnDraftsIfExist: true });
+        dataKeyIndex = indexDataKeysById((registry.data || []) as any);
+    } catch {
+        dataKeyIndex = undefined;
+    }
+    
+    await runWithConcurrency(ids, 6, (id) => recomputeScriptConditionErrors(id, { dataKeyIndex }));
+}
+
+/**
+ * Writes already-computed reports back to the `conditionErrorReport` column so
+ * they don't have to be recomputed on the next read. This is what makes the
+ * cache self-populate: the first read that computes-lean warms the column, and
+ * every subsequent read is a plain indexed select. Fire-and-forget; a failure
+ * here (e.g. column not migrated) must never surface to the caller.
+ */
+async function persistConditionReports(reports: Record<string, ScriptConditionReport>): Promise<void> {
+    const entries = Object.entries(reports || {});
+    if (!entries.length) return;
+    try {
+        await Promise.all(
+            entries.map(([id, report]) =>
+                db
+                    .update(scriptsTable)
+                    .set({ conditionErrorReport: report })
+                    .where(eq(scriptsTable.scriptId, id))
+                    .catch((e: any) => logger.error('persistConditionReports row ERROR', e?.message)),
+            ),
+        );
+    } catch (e: any) {
+        logger.error('persistConditionReports ERROR', e?.message);
+    }
+}
+
+/**
+ * Summarizes scripts that carry conditional-expression errors, for the
+ * publish-time gate.
+ *
+ * Prefers the precomputed `conditionErrorReport` column (kept fresh on every
+ * save) and lazily computes-lean for any script whose report is still `null`
+ * (e.g. not saved since the feature shipped) — so the system self-heals with
+ * migration only, no backfill required. Never throws: a failure here must not
+ * block publishing.
+ *
+ * Pass `scriptIds` to restrict the check to the scripts actually being published
+ * (the publish scope) — an empty array means "no scripts in scope" and returns
+ * nothing; omit it to scan every script.
+ */
+export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[] }): Promise<{
+    scripts: { scriptId: string; title: string; count: number }[];
+    totalFindings: number;
+}> {
+    try {
+        const scopeIds = opts?.scriptIds;
+        if (scopeIds && !scopeIds.length) return { scripts: [], totalFindings: 0 };
+
+        const rows = await db
+            .select({
+                scriptId: scriptsTable.scriptId,
+                title: scriptsTable.title,
+                report: scriptsTable.conditionErrorReport,
+                nuidSearchFields: scriptsTable.nuidSearchFields,
+                eligibilityCriteria: scriptsTable.eligibilityCriteria,
+            })
+            .from(scriptsTable)
+            .where(
+                scopeIds && scopeIds.length
+                    ? and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scopeIds))
+                    : isNull(scriptsTable.deletedAt),
+            );
+
+        const titleById = new Map<string, string>();
+        const counts = new Map<string, number>();
+        const missing: ScriptConditionErrorInput[] = [];
+
+        for (const row of rows) {
+            const id = `${row.scriptId}`;
+            titleById.set(id, `${row.title || 'Untitled script'}`);
+            const report = (row.report as ScriptConditionReport | null) || null;
+            if (report) {
+                counts.set(id, report.count || 0);
+            } else {
+                missing.push({
+                    scriptId: id,
+                    nuidSearchFields: row.nuidSearchFields,
+                    eligibilityCriteria: row.eligibilityCriteria,
+                });
+            }
+        }
+
+        // Lazily fill in never-computed scripts (also self-heals the column
+        // for next time — computeConditionReportsLean is a bounded bulk query).
+        if (missing.length) {
+            const computed = await computeConditionReportsLean(missing);
+            for (const [id, report] of Object.entries(computed)) {
+                counts.set(id, report?.count || 0);
+            }
+            void persistConditionReports(computed);
+        }
+
+        const scripts: { scriptId: string; title: string; count: number }[] = [];
+        let totalFindings = 0;
+        counts.forEach((count, id) => {
+            if (count > 0) {
+                scripts.push({ scriptId: id, title: titleById.get(id) || 'Untitled script', count });
+                totalFindings += count;
+            }
+        });
+        // Worst offenders first.
+        scripts.sort((a, b) => b.count - a.count);
+        return { scripts, totalFindings };
+    } catch (e: any) {
+        // Column not migrated yet, or a transient DB error — degrade to "no warnings".
+        logger.error('getScriptsWithConditionErrors ERROR', e?.message);
+        return { scripts: [], totalFindings: 0 };
     }
 }
 
@@ -391,6 +878,7 @@ export async function saveScriptScreens({
 
         if (errors.length) return { errors, saved, success: false, };
 
+        void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptScreens ERROR', e.message);
@@ -479,6 +967,7 @@ export async function saveScriptDiagnoses({
 
         if (errors.length) return { errors, saved, success: false, };
 
+        void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptDiagnoses ERROR', e.message);
@@ -566,6 +1055,7 @@ export async function saveScriptProblems({
 
         if (errors.length) return { errors, saved, success: false, };
 
+        void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptProblems ERROR', e.message);
@@ -745,6 +1235,7 @@ export async function saveScriptsWithItems({ data, }: {
 
         if (errors.length) return { success: false, errors, info, savedScriptIds, };
 
+        void recomputeScriptsConditionErrors(savedScriptIds);
         return { success: true, info, savedScriptIds, };
     } catch (e: any) {
         logger.error('saveScriptsWithItems ERROR', e.message);

@@ -1,11 +1,14 @@
 'use client';
 
-import { Edit, ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Edit, ExternalLink, AlertCircleIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DataTable } from "@/components/data-table";
+import { getScriptsConditionErrors, type ScriptConditionReport } from "@/app/actions/scripts";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
@@ -39,6 +42,30 @@ export function ScriptsTable(props: Props) {
 
     const { sys, viewOnly } = useAppContext();
     const { hospitals, } = useScriptsContext();
+
+    const [conditionErrors, setConditionErrors] = useState<Record<string, ScriptConditionReport>>({});
+    const scriptsSignature = useMemo(
+        () => (props.scripts?.data || [])
+            .map((s: any) => `${s?.scriptId}:${s?.version}:${s?.isDraft ? 1 : 0}:${s?.hasChangedItems ? 1 : 0}`)
+            .join(','),
+        [props.scripts],
+    );
+    useEffect(() => {
+        let cancelled = false;
+        const input = (props.scripts?.data || []).map((s: any) => ({
+            scriptId: s?.scriptId,
+            nuidSearchFields: s?.nuidSearchFields,
+            eligibilityCriteria: s?.eligibilityCriteria,
+        }));
+        if (!input.length) {
+            setConditionErrors({});
+            return;
+        }
+        getScriptsConditionErrors(input)
+            .then((res) => { if (!cancelled) setConditionErrors(res?.data || {}); })
+            .catch(() => { /* badges are best-effort; ignore failures */ });
+        return () => { cancelled = true; };
+    }, [scriptsSignature]);
 
     const displayLoader = loading;
 
@@ -237,6 +264,52 @@ export function ScriptsTable(props: Props) {
                         },
                         {
                             name: 'Title',
+                            cellRenderer({ rowIndex }) {
+                                const s = scriptsArr[rowIndex];
+                                const report = s ? conditionErrors[s.scriptId] : undefined;
+                                const count = report?.count || 0;
+                                return (
+                                    <span className="inline-flex items-center gap-x-2">
+                                        <span>{s?.title || ''}</span>
+                                        {!!count && (
+                                            <TooltipProvider delayDuration={0}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span
+                                                            className="inline-flex shrink-0 items-center text-destructive"
+                                                            aria-label="Has conditional expression errors"
+                                                        >
+                                                            <AlertCircleIcon className="h-4 w-4" />
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-sm">
+                                                        <div className="flex flex-col gap-1 text-xs">
+                                                            <span className="font-medium">
+                                                                {count} conditional expression error{count === 1 ? '' : 's'}
+                                                            </span>
+                                                            {(report?.findings || []).slice(0, 8).map((f, i) => (
+                                                                f.href ? (
+                                                                    <Link
+                                                                        key={i}
+                                                                        href={f.href}
+                                                                        className="underline hover:text-primary"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        • {f.location}
+                                                                    </Link>
+                                                                ) : (
+                                                                    <span key={i}>• {f.location}</span>
+                                                                )
+                                                            ))}
+                                                            {count > 8 && <span className="opacity-70">…and {count - 8} more</span>}
+                                                        </div>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        )}
+                                    </span>
+                                );
+                            },
                         },
                         {
                             name: 'Description',
