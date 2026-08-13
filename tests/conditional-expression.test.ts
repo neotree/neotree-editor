@@ -272,21 +272,28 @@ assert.equal(
   "multi_select membership has no type warning",
 );
 
-// ---- Reference expression sublanguage ---------------------------------------
+// ---- Reference expressions are EXEMPT from validation -----------------------
+// Reference/calculation expressions use a free-form MATH/arithmetic grammar the
+// checker doesn't model, so they are intentionally never flagged (no errors or
+// warnings) regardless of content.
 
 const refDiags = (input: string) => validateReferenceExpression(input, ctx).diagnostics;
-const refErrors = (input: string) => refDiags(input).filter((d) => d.severity === "error");
-const refWarnings = (input: string) => refDiags(input).filter((d) => d.severity === "warning");
 
-assert.equal(refErrors("$Weight").length, 0, "single key ref is valid");
-assert.equal(refErrors("SUM($Weight, $Height)").length, 0, "SUM valid");
-assert.equal(refErrors("DIVIDE($Weight, $Height)").length, 0, "DIVIDE valid");
-assert.equal(refErrors("SUMM($Weight)").length, 0, "unknown function does not block");
-assert.ok(refWarnings("SUMM($Weight)").some((d) => d.code === "UNKNOWN_FUNCTION"), "unknown function warns");
-assert.equal(refErrors("SUM(5, $Height)").length, 0, "non-key arg does not block");
-assert.ok(refWarnings("SUM(5, $Height)").some((d) => d.code === "FUNCTION_ARG"), "non-key arg warns");
-assert.ok(refErrors("SUM($Nope)").some((d) => d.code === "UNKNOWN_KEY"), "unknown key in ref");
-assert.ok(refErrors("SUM($Weight").some((d) => d.code === "UNBALANCED_PAREN"), "unbalanced ref paren");
+assert.equal(refDiags("$Weight").length, 0, "reference expressions are exempt");
+assert.equal(refDiags("SUM($Weight, $Height)").length, 0, "SUM ref exempt");
+assert.equal(refDiags("SUM($Nope)").length, 0, "unknown key in a reference is not flagged (exempt)");
+assert.equal(refDiags("SUMM($Weight)").length, 0, "unknown function is not flagged (exempt)");
+assert.equal(refDiags("SUM($Weight").length, 0, "unbalanced paren is not flagged (exempt)");
+assert.equal(
+  refDiags("MATH(Math.floor($Gestation) + Math.round(($Age / 24) % 7) / 10)").length,
+  0,
+  "MATH/arithmetic reference expressions are not flagged (exempt)",
+);
+assert.equal(
+  validateReferenceExpression("MATH($A + $B * 2.5)", ctx).hasErrors,
+  false,
+  "reference expressions never report errors",
+);
 
 // ---- mergeConditionKeys -----------------------------------------------------
 
