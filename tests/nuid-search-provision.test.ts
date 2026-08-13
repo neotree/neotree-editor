@@ -151,24 +151,57 @@ const genId = () => `gen-${++counter}`;
   assert.equal(payload.length, 0, "an existing text key is not duplicated");
 }
 
-// Reuses an existing option key (matched by value OR label) instead of creating a duplicate.
+// Reuses an existing option key named after the LABEL (Yes) when its label is
+// exactly "Yes" — falling back from the preferred value name (Y).
 {
   counter = 0;
   const lib: NuidLibraryKey[] = [
-    { uniqueKey: "opt-yes", name: "Yes", dataType: "option" }, // matches the "Yes" label of value "Y"
+    { uniqueKey: "opt-yes", name: "Yes", label: "Yes", dataType: "option" }, // key "Yes", label "Yes"
   ];
   const dropdownOnly: NuidFieldSpec[] = [template[0]];
   const payload = buildNuidProvisionPayload(dropdownOnly, lib, genId);
 
-  const createdYes = payload.find((k) => k.name === "Y" || k.name === "Yes");
+  const createdYes = payload.find((k) => k.dataType === "option" && (k.name === "Y" || k.name === "Yes"));
   assert.equal(createdYes, undefined, "the existing Yes option is reused, not recreated");
 
   const createdNo = payload.find((k) => k.name === "N");
-  assert.ok(createdNo, "the missing No option is still created");
+  assert.ok(createdNo, "the missing No option is still created (key N, label No)");
+  assert.equal(createdNo!.label, "No");
 
   const dropdown = payload.find((k) => k.name === "BabyTransfered");
   assert.ok(dropdown!.options!.includes("opt-yes"), "dropdown references the reused option's uniqueKey");
   assert.ok(dropdown!.options!.includes(createdNo!.uniqueKey), "dropdown references the created No option");
+}
+
+// Prefers the value-named key (Y) over the label-named key (Yes) when both exist
+// with label "Yes".
+{
+  counter = 0;
+  const lib: NuidLibraryKey[] = [
+    { uniqueKey: "opt-y", name: "Y", label: "Yes", dataType: "option" },
+    { uniqueKey: "opt-yes", name: "Yes", label: "Yes", dataType: "option" },
+    { uniqueKey: "opt-n", name: "N", label: "No", dataType: "option" },
+  ];
+  const payload = buildNuidProvisionPayload([template[0]], lib, genId);
+  const dropdown = payload.find((k) => k.name === "BabyTransfered");
+  assert.ok(dropdown!.options!.includes("opt-y"), "prefers the Y-named key over the Yes-named key");
+  assert.ok(!dropdown!.options!.includes("opt-yes"), "does not use the Yes-named key when Y exists");
+  assert.ok(dropdown!.options!.includes("opt-n"), "reuses the N option");
+  assert.equal(payload.filter((k) => k.dataType === "option").length, 0, "no new option keys created");
+}
+
+// Does NOT reuse an option whose label isn't exactly Yes/No — a new one is made.
+{
+  counter = 0;
+  const lib: NuidLibraryKey[] = [
+    { uniqueKey: "opt-y-wrong", name: "Y", label: "Positive", dataType: "option" }, // wrong label
+  ];
+  const payload = buildNuidProvisionPayload([template[0]], lib, genId);
+  const createdYes = payload.find((k) => k.dataType === "option" && k.name === "Y");
+  assert.ok(createdYes, "a new Y/Yes option is created because the existing one's label isn't 'Yes'");
+  assert.equal(createdYes!.label, "Yes");
+  const dropdown = payload.find((k) => k.name === "BabyTransfered");
+  assert.ok(!dropdown!.options!.includes("opt-y-wrong"), "the wrong-label option is not reused");
 }
 
 // ---- managed lock --------------------------------------------------------

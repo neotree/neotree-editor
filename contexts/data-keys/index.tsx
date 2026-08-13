@@ -473,12 +473,12 @@ export function DataKeysCtxProvider({
     }, []);
 
     const extractDataKeys: tDataKeysCtx['extractDataKeys'] = useCallback((uuids, opts) => {
-        let keys = uuids
+        let keys = (uuids || [])
             .map(o => allDataKeys.find(k => (k.uniqueKey === o) || (k.uuid === o))!)
             .filter(k => k);
 
         if (opts?.withNested) {
-            keys.filter(k => k.options.length).forEach(k => {
+            keys.filter(k => Array.isArray(k.options) && k.options.length).forEach(k => {
                 const nested = extractDataKeys(k.options, opts);
                 keys = [...keys, ...nested];
             });

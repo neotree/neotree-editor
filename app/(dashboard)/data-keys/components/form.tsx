@@ -89,6 +89,9 @@ function Form({
     const isReadOnly = !!disabled || isLocked || viewOnly;
 
     const isNuidManaged = isNuidManagedDataKey(dataKey as any);
+    // Managed NUID keys are locked: key + type (below) and their option children
+    // (e.g. Y/N) can't be added, removed or reordered — only the label may change.
+    const optionsLocked = isReadOnly || isNuidManaged;
 
     const {
         control,
@@ -493,7 +496,7 @@ function Form({
                             />
                             {isNuidManaged && (
                                 <span className="text-xs text-muted-foreground">
-                                    Managed by NUID Search — the key and data type are locked. You can still edit the label.
+                                    Managed by NUID Search — the key, data type and options are locked, and it can&apos;t be deleted. You can still edit the label.
                                 </span>
                             )}
                         </div>
@@ -556,16 +559,16 @@ function Form({
 
                                 return (
                                     <div className="mt-4 pt-4 border-t border-t-border">
-                                        <DataTable 
-                                            sortable={!isReadOnly}
+                                        <DataTable
+                                            sortable={!optionsLocked}
                                             onSort={(oldIndex: number, newIndex: number) => {
-                                                if (isReadOnly) return;
+                                                if (optionsLocked) return;
                                                 const sorted = arrayMoveImmutable([...value], oldIndex, newIndex);
                                                 onChange(sorted);
                                             }}
                                             search={{}}
                                             title="Options"
-                                            headerActions={isReadOnly ? null : (
+                                            headerActions={optionsLocked ? null : (
                                                 <>
                                                     <SelectModal 
                                                         multiple
@@ -616,7 +619,7 @@ function Form({
                                                     cellRenderer({ rowIndex }) {
                                                         const child = value[rowIndex];
 
-                                                        if (!child || isReadOnly) return null;
+                                                        if (!child || optionsLocked) return null;
 
                                                         return (
                                                             <>
