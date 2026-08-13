@@ -17,17 +17,13 @@ import * as hospitalsQueries from "@/databases/queries/hospitals"
 import * as drugsLibraryMutations from "@/databases/mutations/drugs-library"
 import * as drugsLibraryQueries from "@/databases/queries/drugs-library"
 import * as dataKeysMutations from "@/databases/mutations/data-keys"
-import * as appUpdatesMutations from "@/databases/mutations/app-updates"
 import * as dataKeysQueries from "@/databases/queries/data-keys"
-import * as appUpdatesQueries from "@/databases/queries/app-updates"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
 import { buildReleasePublishChangeLog } from "@/databases/mutations/changelogs"
-import { requestMdmApkRolloutForPolicy } from "@/lib/app-updates/mdm-rollout"
+import { getScriptsWithConditionErrors, recomputeScriptsConditionErrors } from "./scripts"
 import db from "@/databases/pg/drizzle"
 import {
-  apkReleasesDrafts,
-  appUpdatePoliciesDrafts,
   configKeysDrafts,
   dataKeysDrafts,
   diagnosesDrafts,
@@ -1328,8 +1324,6 @@ export const countAllDrafts = async () => {
     const scripts = await scriptsQueries._countScripts()
     const diagnoses = await scriptsQueries._countDiagnoses()
     const problems = await scriptsQueries._countProblems()
-    const appUpdatePolicies = await appUpdatesQueries._countAppUpdatePolicies()
-    const apkReleases = await appUpdatesQueries._countApkReleases()
 
     return {
       configKeys: configKeys.data.allDrafts,
@@ -1340,8 +1334,6 @@ export const countAllDrafts = async () => {
       diagnoses: diagnoses.data.allDrafts,
       problems: problems.data.allDrafts,
       dataKeys: dataKeys.data.allDrafts,
-      appUpdatePolicies: appUpdatePolicies.data.allDrafts,
-      apkReleases: apkReleases.data.allDrafts,
     }
   } catch (e: any) {
     logger.error("countAllDrafts ERROR", e.message)
@@ -1352,10 +1344,6 @@ export const countAllDrafts = async () => {
       hospitals: 0,
       diagnoses: 0,
       problems: 0,
-      dataKeys: 0,
-      drugsLibrary: 0,
-      appUpdatePolicies: 0,
-      apkReleases: 0,
     }
   }
 }
@@ -1378,8 +1366,6 @@ export async function publishData({ scope }: { scope: number }) {
 
     const publisherUserId = session?.user?.userId || null
     if (!publisherUserId) {
-      // Without a publisher every entity changelog and the release row would be skipped,
-      // minting a data version that is invisible to the changelog UI and rollbacks.
       throw new Error("Publishing requires an authenticated user")
     }
 
@@ -1387,7 +1373,34 @@ export async function publishData({ scope }: { scope: number }) {
 
     if (scope === 1) userId = null
 
-    const { mdmRolloutPolicies } = await db.transaction(async (tx) => {
+    const draftScopeFilter = <TColumn>(column: TColumn) => (!userId ? undefined : eq(column as any, userId))
+    const publishScriptIds = new Set<string>()
+    try {
+      const draftRows = await Promise.all([
+        db.select({ scriptId: scriptsDrafts.scriptId }).from(scriptsDrafts).where(draftScopeFilter(scriptsDrafts.createdByUserId)),
+        db.select({ scriptId: screensDrafts.scriptId }).from(screensDrafts).where(draftScopeFilter(screensDrafts.createdByUserId)),
+        db.select({ scriptId: diagnosesDrafts.scriptId }).from(diagnosesDrafts).where(draftScopeFilter(diagnosesDrafts.createdByUserId)),
+        db.select({ scriptId: problemsDrafts.scriptId }).from(problemsDrafts).where(draftScopeFilter(problemsDrafts.createdByUserId)),
+      ])
+      for (const rows of draftRows) for (const r of rows) if (r?.scriptId) publishScriptIds.add(`${r.scriptId}`)
+    } catch (e: any) {
+      logger.error("publishData scope-scripts lookup ERROR", e.message)
+    }
+
+    const ceGate = await getScriptsWithConditionErrors({ scriptIds: Array.from(publishScriptIds) })
+    if (ceGate.scripts.length) {
+      const top = ceGate.scripts.slice(0, 10)
+      const lines = top.map((s) => `• ${s.title} (${s.count} issue${s.count === 1 ? "" : "s"})`)
+      const more = ceGate.scripts.length - top.length
+      if (more > 0) lines.push(`• …and ${more} more script${more === 1 ? "" : "s"}`)
+      results.warnings = [
+        `${ceGate.scripts.length} script${ceGate.scripts.length === 1 ? "" : "s"} being published contain ${ceGate.totalFindings} conditional-expression issue${ceGate.totalFindings === 1 ? "" : "s"}. These will reach the mobile app as-is:`,
+        ...lines,
+      ]
+      results.blockingDetails = { conditionErrors: ceGate }
+    }
+
+    await db.transaction(async (tx) => {
       const lockedEditor = await tx.execute<{ id: number; dataVersion: number }>(
         sql`select id, data_version as "dataVersion" from nt_editor_info limit 1 for update`,
       )
@@ -1462,21 +1475,6 @@ export async function publishData({ scope }: { scope: number }) {
       })
       if (!publishProblems.success) throw new Error(publishProblems.errors?.join(", ") || "Failed to publish problems")
 
-      const publishApkReleases = await appUpdatesMutations._publishApkReleases({
-        userId,
-        dataVersion: nextDataVersion,
-        client: tx,
-      })
-      if (publishApkReleases.errors?.length) throw new Error(publishApkReleases.errors.join(", "))
-
-      const publishAppUpdatePolicies = await appUpdatesMutations._publishAppUpdatePolicies({
-        userId,
-        dataVersion: nextDataVersion,
-        client: tx,
-      })
-      if (publishAppUpdatePolicies.errors?.length) throw new Error(publishAppUpdatePolicies.errors.join(", "))
-      const mdmRolloutPolicies = publishAppUpdatePolicies.mdmRolloutPolicies || []
-
       const processPendingDeletion = await _processPendingDeletion({
         userId,
         publisherUserId: publisherUserId || undefined,
@@ -1497,28 +1495,7 @@ export async function publishData({ scope }: { scope: number }) {
       if (!releaseLog.success) {
         throw new Error(releaseLog.errors?.join(", ") || "Failed to save release changelog")
       }
-
-      return { mdmRolloutPolicies }
     })
-
-    for (const policy of mdmRolloutPolicies) {
-      try {
-        const rolloutResult = await requestMdmApkRolloutForPolicy(policy)
-        if (rolloutResult.errors.length) {
-          logger.error("publishData MDM rollout warning", JSON.stringify({
-            policyId: policy.policyId,
-            policyVersion: policy.policyVersion,
-            errors: rolloutResult.errors,
-          }))
-        }
-      } catch (error: any) {
-        logger.error("publishData MDM rollout ERROR", JSON.stringify({
-          policyId: policy.policyId,
-          policyVersion: policy.policyVersion,
-          message: error?.message || "Unknown MDM rollout error",
-        }))
-      }
-    }
 
     socket.emit("data_changed", "publish_data")
   } catch (e: any) {
@@ -1545,9 +1522,22 @@ export async function discardDrafts({ scope }: { scope: number }) {
       userId = undefined
     }
 
-    await db.transaction(async (tx) => {
-      const byUser = <TColumn>(column: TColumn) => (!userId ? undefined : eq(column as any, userId))
+    const byUser = <TColumn>(column: TColumn) => (!userId ? undefined : eq(column as any, userId))
 
+    const affectedScriptIds = new Set<string>()
+    try {
+      const draftScriptRows = await Promise.all([
+        db.select({ scriptId: scriptsDrafts.scriptId }).from(scriptsDrafts).where(byUser(scriptsDrafts.createdByUserId)),
+        db.select({ scriptId: screensDrafts.scriptId }).from(screensDrafts).where(byUser(screensDrafts.createdByUserId)),
+        db.select({ scriptId: diagnosesDrafts.scriptId }).from(diagnosesDrafts).where(byUser(diagnosesDrafts.createdByUserId)),
+        db.select({ scriptId: problemsDrafts.scriptId }).from(problemsDrafts).where(byUser(problemsDrafts.createdByUserId)),
+      ])
+      for (const rows of draftScriptRows) for (const r of rows) if (r?.scriptId) affectedScriptIds.add(`${r.scriptId}`)
+    } catch (e: any) {
+      logger.error("discardDrafts affected-scripts lookup ERROR", e.message)
+    }
+
+    await db.transaction(async (tx) => {
       await tx.delete(configKeysDrafts).where(byUser(configKeysDrafts.createdByUserId))
       await tx.delete(hospitalsDrafts).where(byUser(hospitalsDrafts.createdByUserId))
       await tx.delete(drugsLibraryDrafts).where(byUser(drugsLibraryDrafts.createdByUserId))
@@ -1556,14 +1546,14 @@ export async function discardDrafts({ scope }: { scope: number }) {
       await tx.delete(screensDrafts).where(byUser(screensDrafts.createdByUserId))
       await tx.delete(diagnosesDrafts).where(byUser(diagnosesDrafts.createdByUserId))
       await tx.delete(problemsDrafts).where(byUser(problemsDrafts.createdByUserId))
-      await tx.delete(appUpdatePoliciesDrafts).where(byUser(appUpdatePoliciesDrafts.createdByUserId))
-      await tx.delete(apkReleasesDrafts).where(byUser(apkReleasesDrafts.createdByUserId))
 
       const clearPendingDeletion = await _clearPendingDeletion({ userId, client: tx })
       if (!clearPendingDeletion.success) {
         throw new Error(clearPendingDeletion.errors?.join(", ") || "Failed to clear queued deletions")
       }
     })
+
+    if (affectedScriptIds.size) void recomputeScriptsConditionErrors(Array.from(affectedScriptIds))
 
     socket.emit("data_changed", "discard_drafts")
   } catch (e: any) {

@@ -12,6 +12,14 @@ export type {
 } from "./ast";
 export { validateReferenceExpression } from "./reference-expr";
 export { mergeConditionKeys } from "./merge-keys";
+export { toConditionKeys } from "./keys";
+export {
+  collectScriptConditionFindings,
+  getScriptConditionErrorCount,
+  type ScriptWithItems,
+  type ScriptConditionFinding,
+  type ScriptConditionEntityRef,
+} from "./collect";
 
 /** Flags trailing whitespace on each non-empty line of the expression. */
 function findTrailingWhitespace(input: string): Diagnostic[] {

@@ -101,6 +101,23 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.screens.position),
         });
 
+        // scripts - NUID search fields live on the script record itself
+        const _scriptsDrafts = await executor.query.scriptsDrafts.findMany({
+            where: whereUniqueKey(schema.scriptsDrafts.data),
+            orderBy: asc(schema.scriptsDrafts.position),
+        });
+
+        const scriptsIds = _scriptsDrafts.map(d => d.scriptId!).filter(d => d);
+
+        const _scripts = await executor.query.scripts.findMany({
+            where: and(
+                whereUniqueKey(schema.scripts.nuidSearchFields),
+                isNull(schema.scripts.deletedAt),
+                !scriptsIds.length ? undefined : notInArray(schema.scripts.scriptId, scriptsIds),
+            ),
+            orderBy: asc(schema.scripts.position),
+        });
+
         const diagnoses = [
             ..._diagnosesDrafts.map(d => ({
                 ...d.data,
@@ -123,6 +140,14 @@ export async function _getDataKeysRefs({
                 screenId: d.data.screenId || d.screenDraftId,
             })),
             ..._screens,
+        ];
+
+        const scripts = [
+            ..._scriptsDrafts.map(d => ({
+                ...d.data,
+                scriptId: d.data.scriptId || d.scriptDraftId,
+            })),
+            ..._scripts,
         ];
 
         const extractDataKeys = (o: object, parentKey?: string) => {
@@ -184,12 +209,20 @@ export async function _getDataKeysRefs({
             dataKeys: extractDataKeys(s),
         }));
 
-        return { 
+        const scriptsDataKeys: typeof defaultResData = scripts.map(s => ({
+            data: s,
+            refId: s.scriptId,
+            refType: 'script',
+            dataKeys: extractDataKeys(s),
+        }));
+
+        return {
             data: [
                 ...diagnosesDataKeys,
                 ...problemsDataKeys,
                 ...screensDataKeys,
-            ], 
+                ...scriptsDataKeys,
+            ],
         };
     } catch(e: any) {
         return {

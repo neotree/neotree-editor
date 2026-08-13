@@ -1,6 +1,7 @@
 import { buildNormalizedDataKeyMatchKey, normalizeDataKeyCompatibilityType, normalizeDataKeyMatchValue } from "@/lib/data-key-types";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
+import type { ScriptField } from "@/types";
 import { DEFAULT_INTEGRITY_POLICY, getIntegrityEntryFingerprint, type IntegrityPolicy } from "@/lib/integrity-policy";
 import {
     getDataKeyIntegrityPublishRuleLabel,
@@ -40,7 +41,22 @@ export type DataKeyIntegrityKind =
     | "diagnosis"
     | "diagnosis_symptom"
     | "problem"
+    | "nuid_search_field"
     | "duplicate_parent_data_key";
+
+// NUID search fields hang off the script record itself rather than a screen, so the
+// scanner takes them as their own source instead of walking screens.
+export type NuidSearchSource = {
+    scriptId: string;
+    title?: string | null;
+    nuidSearchFields?: ScriptField[] | null;
+};
+
+const NUID_SEARCH_LOCATION = "NUID search";
+
+function buildNuidSearchFieldLocation(field: ScriptField, fieldIndex: number) {
+    return `${NUID_SEARCH_LOCATION} > ${field.label || field.key || `field ${fieldIndex + 1}`}`;
+}
 
 export type DataKeyIntegrityEntry = {
     status: DataKeyIntegrityStatus;
@@ -258,6 +274,14 @@ function buildIntegrityEntryUsageHref(entry: DataKeyIntegrityEntry) {
 
         const query = params.toString();
         return `/script/${entry.scriptId}/screen/${entry.screenId}${query ? `?${query}` : ""}`;
+    }
+
+    if (entry.kind === "nuid_search_field") {
+        // NUID search fields are configured from the script form, so deep link into the
+        // sheet and open the offending field directly.
+        const target = entry.fieldId || (Number.isInteger(entry.fieldIndex) ? `${entry.fieldIndex}` : "");
+        if (!target) return `/script/${entry.scriptId}`;
+        return `/script/${entry.scriptId}?nuidSearchField=${encodeURIComponent(target)}`;
     }
 
     return `/script/${entry.scriptId}`;
@@ -579,6 +603,7 @@ export function scanDataKeyIntegrity({
     screens = [],
     diagnoses = [],
     problems = [],
+    scripts = [],
     dataKeys = [],
     onlyIssues = false,
     context,
@@ -587,6 +612,7 @@ export function scanDataKeyIntegrity({
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
     problems?: ProblemType[];
+    scripts?: NuidSearchSource[];
     dataKeys?: DataKey[];
     onlyIssues?: boolean;
     context?: DataKeyIntegrityContext;
@@ -848,6 +874,37 @@ export function scanDataKeyIntegrity({
         }));
     }
 
+    for (const script of scripts) {
+        const scriptBase = {
+            scriptId: script.scriptId,
+            scriptTitle: script.title || undefined,
+            location: NUID_SEARCH_LOCATION,
+        };
+
+        (script.nuidSearchFields || []).forEach((field, fieldIndex) => {
+            if (!hasReferenceIdentity([field.keyId, field.key])) return;
+
+            pushEntry(evaluateReference({
+                currentUniqueKey: field.keyId || undefined,
+                currentKey: field.key || undefined,
+                currentLabel: field.label || undefined,
+                expectedDataType: field.type || "",
+                base: {
+                    ...scriptBase,
+                    kind: "nuid_search_field",
+                    expectedDataType: field.type || "",
+                    currentUniqueKey: field.keyId || undefined,
+                    currentKey: field.key || undefined,
+                    currentLabel: field.label || undefined,
+                    fieldId: field.fieldId || undefined,
+                    fieldIndex,
+                    location: buildNuidSearchFieldLocation(field, fieldIndex),
+                },
+                context: resolvedContext,
+            }));
+        });
+    }
+
     const duplicateParentEntries = collectDuplicateParentEntries(entries);
     duplicateParentEntries.forEach((entry) => pushEntry(entry));
 
@@ -959,16 +1016,18 @@ function resolveOwnedOptions(dataKey: DataKey | undefined, byUniqueKey: Map<stri
         .filter((item): item is DataKey => !!item);
 }
 
-export function repairDataKeyIntegrityReferences({
+export function repairDataKeyIntegrityReferences<TScript extends NuidSearchSource>({
     screens = [],
     diagnoses = [],
     problems = [],
+    scripts = [],
     dataKeys = [],
     context,
 }: {
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
     problems?: ProblemType[];
+    scripts?: TScript[];
     dataKeys?: DataKey[];
     context?: DataKeyIntegrityContext;
 }) {
@@ -1166,18 +1225,46 @@ export function repairDataKeyIntegrityReferences({
         };
     });
 
+    const repairedScripts = scripts.map((script) => {
+        let changed = false;
+
+        const nuidSearchFields = (script.nuidSearchFields || []).map((field) => {
+            const fieldDataKey = resolveDataKeyMatch({
+                currentUniqueKey: field.keyId || undefined,
+                currentKey: field.key || undefined,
+                currentLabel: field.label || undefined,
+                expectedDataType: field.type || "",
+                byUniqueKey,
+                legacyMaps,
+            });
+            const synced = syncFieldReference(field, fieldDataKey);
+            if (synced.changed) changed = true;
+            return synced.value;
+        });
+
+        return {
+            value: {
+                ...script,
+                nuidSearchFields,
+            },
+            changed,
+        };
+    });
+
     return {
         screens: repairedScreens.filter((item) => item.changed).map((item) => item.value),
         diagnoses: repairedDiagnoses.filter((item) => item.changed).map((item) => item.value),
         problems: repairedProblems.filter((item) => item.changed).map((item) => item.value),
+        scripts: repairedScripts.filter((item) => item.changed).map((item) => item.value),
     };
 }
 
-export function repairSingleDataKeyIntegrityReference({
+export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearchSource>({
     entry,
     screens = [],
     diagnoses = [],
     problems = [],
+    scripts = [],
     dataKeys = [],
     overrideTargetUniqueKey,
     context,
@@ -1186,6 +1273,7 @@ export function repairSingleDataKeyIntegrityReference({
     screens?: ScreenType[];
     diagnoses?: DiagnosisType[];
     problems?: ProblemType[];
+    scripts?: TScript[];
     dataKeys?: DataKey[];
     overrideTargetUniqueKey?: string;
     context?: DataKeyIntegrityContext;
@@ -1408,9 +1496,43 @@ export function repairSingleDataKeyIntegrityReference({
         };
     });
 
+    const repairedScripts = scripts.map((script) => {
+        let changed = false;
+
+        const nuidSearchFields = (script.nuidSearchFields || []).map((field, fieldIndex) => {
+            const location = buildNuidSearchFieldLocation(field, fieldIndex);
+            if (!matchesIntegrityEntry(entry, {
+                kind: "nuid_search_field",
+                scriptId: script.scriptId,
+                location,
+            })) return field;
+
+            const fieldDataKey = overrideTarget || resolveDataKeyMatch({
+                currentUniqueKey: field.keyId || undefined,
+                currentKey: field.key || undefined,
+                currentLabel: field.label || undefined,
+                expectedDataType: field.type || "",
+                byUniqueKey,
+                legacyMaps,
+            });
+            const synced = syncFieldReference(field, fieldDataKey);
+            if (synced.changed) changed = true;
+            return synced.value;
+        });
+
+        return {
+            value: {
+                ...script,
+                nuidSearchFields,
+            },
+            changed,
+        };
+    });
+
     return {
         screens: repairedScreens.filter((item) => item.changed).map((item) => item.value),
         diagnoses: repairedDiagnoses.filter((item) => item.changed).map((item) => item.value),
         problems: repairedProblems.filter((item) => item.changed).map((item) => item.value),
+        scripts: repairedScripts.filter((item) => item.changed).map((item) => item.value),
     };
 }

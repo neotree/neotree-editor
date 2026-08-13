@@ -2,21 +2,22 @@
 
 import { GetDataKeysParams, _getDataKeys } from '@/databases/queries/data-keys';
 import { _saveDataKeys, _saveDataKeysIfNotExist, _saveDataKeysUpdateIfExist, _previewDataKeysRefsImpact } from '@/databases/mutations/data-keys';
-import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
-import { _saveDiagnoses, _saveProblems, _saveScreens } from '@/databases/mutations/scripts';
+import { _getDiagnoses, _getProblems, _getScreens, _getScripts } from '@/databases/queries/scripts';
+import { _saveDiagnoses, _saveProblems, _saveScreens, _saveScripts } from '@/databases/mutations/scripts';
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import logger from "@/lib/logger";
 import { isAllowed } from './is-allowed';
 import { validateApiKey, validateHeadersItem } from './authenticate';
 import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
-import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts } from '@/databases/pg/schema';
+import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts, scripts as scriptsTable, scriptsDrafts as scriptsDraftsTable } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
 import { buildDataKeyIntegrityContext, getDataKeyIntegrityEntryFingerprint, isBlockingEntry, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
 import { _getEditorInfo } from '@/databases/queries/editor-info';
 import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from '@/lib/integrity-policy';
 import socket from '@/lib/socket';
 import { buildDataKeysDeleteImpact } from '@/lib/data-key-delete-impact';
+import { recomputeScriptsConditionErrors } from '@/app/actions/scripts';
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
@@ -43,6 +44,7 @@ type IntegrityImpactSummary = {
         screens: number;
         diagnoses: number;
         problems: number;
+        scripts: number;
     };
 };
 
@@ -51,12 +53,14 @@ function buildRegistryIntegrityReport({
     screens,
     diagnoses,
     problems,
+    scripts,
     onlyIssues,
 }: {
     dataKeys: Awaited<ReturnType<typeof _getDataKeys>>["data"];
     screens: Awaited<ReturnType<typeof _getScreens>>["data"];
     diagnoses: Awaited<ReturnType<typeof _getDiagnoses>>["data"];
     problems: Awaited<ReturnType<typeof _getProblems>>["data"];
+    scripts?: Awaited<ReturnType<typeof _getScripts>>["data"];
     onlyIssues: boolean;
 }) {
     const integrityContext = buildDataKeyIntegrityContext(dataKeys);
@@ -66,6 +70,7 @@ function buildRegistryIntegrityReport({
         screens,
         diagnoses,
         problems,
+        scripts,
         onlyIssues,
         context: integrityContext,
     });
@@ -107,11 +112,12 @@ function buildImpactSummary({
 }
 
 async function loadIntegrityScriptState(scriptId: string) {
-    const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+    const [dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes] = await Promise.all([
         _getDataKeys({ returnDraftsIfExist: true }),
         _getScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
         _getDiagnoses({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
         _getProblems({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
+        _getScripts({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
     ]);
 
     const errors = [
@@ -119,6 +125,7 @@ async function loadIntegrityScriptState(scriptId: string) {
         ...(screensRes.errors || []),
         ...(diagnosesRes.errors || []),
         ...(problemsRes.errors || []),
+        ...(scriptsRes.errors || []),
     ];
 
     return {
@@ -128,15 +135,17 @@ async function loadIntegrityScriptState(scriptId: string) {
         screens: screensRes.data,
         diagnoses: diagnosesRes.data,
         problems: problemsRes.data,
+        scripts: scriptsRes.data,
     };
 }
 
 async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, selectedTargetUniqueKey?: string) {
-    const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+    const [dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes] = await Promise.all([
         _getDataKeys({ returnDraftsIfExist: true }),
         _getScreens({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
         _getDiagnoses({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
         _getProblems({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
+        _getScripts({ scriptsIds: [entry.scriptId], returnDraftsIfExist: true }),
     ]);
 
     const errors = [
@@ -144,6 +153,7 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, 
         ...(screensRes.errors || []),
         ...(diagnosesRes.errors || []),
         ...(problemsRes.errors || []),
+        ...(scriptsRes.errors || []),
     ];
 
     if (errors.length) {
@@ -154,6 +164,7 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, 
             screens: [] as Awaited<ReturnType<typeof _getScreens>>["data"],
             diagnoses: [] as Awaited<ReturnType<typeof _getDiagnoses>>["data"],
             problems: [] as Awaited<ReturnType<typeof _getProblems>>["data"],
+            scripts: [] as Awaited<ReturnType<typeof _getScripts>>["data"],
             repairs: null,
         };
     }
@@ -165,6 +176,7 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, 
         screens: screensRes.data,
         diagnoses: diagnosesRes.data,
         problems: problemsRes.data,
+        scripts: scriptsRes.data,
         repairs: (() => {
             const integrityContext = buildDataKeyIntegrityContext(dataKeysRes.data);
             return repairSingleDataKeyIntegrityReference({
@@ -173,11 +185,21 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, 
                 screens: screensRes.data,
                 diagnoses: diagnosesRes.data,
                 problems: problemsRes.data,
+                scripts: scriptsRes.data,
                 overrideTargetUniqueKey: selectedTargetUniqueKey,
                 context: integrityContext,
             });
         })(),
     };
+}
+
+// Repairs only touch nuidSearchFields - send just that so the draft keeps every other
+// script value, and computed read-model fields never leak into the stored record.
+function toNuidSearchFieldsSavePayload(scripts: Awaited<ReturnType<typeof _getScripts>>["data"]) {
+    return scripts.map((script) => ({
+        scriptId: script.scriptId,
+        nuidSearchFields: script.nuidSearchFields,
+    }));
 }
 
 async function assertCanManageDataKeys(
@@ -211,10 +233,16 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
     try {
         const session = await isAllowed();
         await assertCanManageDataKeys(session.user);
-        return await _saveDataKeys({
+        const res = await _saveDataKeys({
             ...params,
             userId: session.user?.userId,
         });
+       
+        const affected = (res as any)?.info?.refs?.affected?.scripts as { scriptId?: string }[] | undefined;
+        if (res?.success !== false && affected?.length) {
+            void recomputeScriptsConditionErrors(affected.map((s) => s?.scriptId));
+        }
+        return res;
     } catch (e: any) {
         logger.error('saveDataKeys ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -272,11 +300,12 @@ export const getDataKeysIntegrity = async (params?: {
         const session = await isAllowed();
         const userId = session.user?.userId;
 
-        const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+        const [dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes] = await Promise.all([
             _getDataKeys({ returnDraftsIfExist: true }),
             _getScreens({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
             _getDiagnoses({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
             _getProblems({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
+            _getScripts({ scriptsIds: params?.scriptsIds, returnDraftsIfExist: true }),
         ]);
         const pendingDeletedDataKeys = userId
             ? await db.query.pendingDeletion.findMany({
@@ -295,6 +324,7 @@ export const getDataKeysIntegrity = async (params?: {
             ...(screensRes.errors || []),
             ...(diagnosesRes.errors || []),
             ...(problemsRes.errors || []),
+            ...(scriptsRes.errors || []),
             ...(editorInfoRes.errors || []),
         ];
 
@@ -319,6 +349,7 @@ export const getDataKeysIntegrity = async (params?: {
             screens: screensRes.data,
             diagnoses: diagnosesRes.data,
             problems: problemsRes.data,
+            scripts: scriptsRes.data,
             onlyIssues: params?.onlyIssues !== false,
         });
 
@@ -378,11 +409,12 @@ export const getDataKeysDeleteImpact = async (params?: {
     try {
         await isAllowed();
 
-        const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+        const [dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes] = await Promise.all([
             _getDataKeys({ returnDraftsIfExist: true }),
             _getScreens({ returnDraftsIfExist: true }),
             _getDiagnoses({ returnDraftsIfExist: true }),
             _getProblems({ returnDraftsIfExist: true }),
+            _getScripts({ returnDraftsIfExist: true }),
         ]);
 
         const errors = [
@@ -390,6 +422,7 @@ export const getDataKeysDeleteImpact = async (params?: {
             ...(screensRes.errors || []),
             ...(diagnosesRes.errors || []),
             ...(problemsRes.errors || []),
+            ...(scriptsRes.errors || []),
         ];
 
         if (errors.length) return { success: false, data: [], errors };
@@ -401,6 +434,7 @@ export const getDataKeysDeleteImpact = async (params?: {
                 screens: screensRes.data,
                 diagnoses: diagnosesRes.data,
                 problems: problemsRes.data,
+                scripts: scriptsRes.data,
                 dataKeysIds: params?.dataKeysIds,
                 uniqueKeys: params?.uniqueKeys,
             }),
@@ -444,10 +478,11 @@ export const resolveDataKeyIntegrityEntry = async (params: {
             screens: prepared.screens,
             diagnoses: prepared.diagnoses,
             problems: prepared.problems,
+            scripts: prepared.scripts,
             onlyIssues: false,
         }).rawReport;
 
-        if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length) {
+        if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length && !repairs.scripts.length) {
             return {
                 success: true,
                 changed: false,
@@ -501,6 +536,19 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                         throw new Error(repairedProblems.errors.join(', '));
                     }
                 }
+
+                if (repairs.scripts.length) {
+                    const repairedScripts = await _saveScripts({
+                        data: toNuidSearchFieldsSavePayload(repairs.scripts),
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedScripts.errors?.length) {
+                        throw new Error(repairedScripts.errors.join(', '));
+                    }
+                }
             });
         } catch (e: any) {
             logger.error('resolveDataKeyIntegrityEntry SAVE_TRANSACTION_ERROR', {
@@ -508,6 +556,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 screensCount: repairs.screens.length,
                 diagnosesCount: repairs.diagnoses.length,
                 problemsCount: repairs.problems.length,
+                scriptsCount: repairs.scripts.length,
                 error: e.message,
             });
             return {
@@ -545,6 +594,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
             screens: persistedState.screens,
             diagnoses: persistedState.diagnoses,
             problems: persistedState.problems,
+            scripts: persistedState.scripts,
             onlyIssues: false,
         }).rawReport;
 
@@ -561,6 +611,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                     screens: repairs.screens.length,
                     diagnoses: repairs.diagnoses.length,
                     problems: repairs.problems.length,
+                    scripts: repairs.scripts.length,
                 },
             }),
             errors: [],
@@ -620,11 +671,12 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
             };
         }
 
-        const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+        const [dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes] = await Promise.all([
             _getDataKeys({ returnDraftsIfExist: true }),
             _getScreens({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
             _getDiagnoses({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
             _getProblems({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+            _getScripts({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
         ]);
 
         const fetchErrors = [
@@ -632,6 +684,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
             ...(screensRes.errors || []),
             ...(diagnosesRes.errors || []),
             ...(problemsRes.errors || []),
+            ...(scriptsRes.errors || []),
         ];
         if (fetchErrors.length) {
             logger.error('resolveDataKeyIntegrityEntriesBulk FETCH_ERRORS', {
@@ -652,12 +705,15 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
         let currentScreens = screensRes.data;
         let currentDiagnoses = diagnosesRes.data;
         let currentProblems = problemsRes.data;
+        let currentScripts = scriptsRes.data;
         const currentScreensById = new Map(currentScreens.map((screen) => [screen.screenId, screen] as const));
         const currentDiagnosesById = new Map(currentDiagnoses.map((diagnosis) => [diagnosis.diagnosisId, diagnosis] as const));
         const currentProblemsById = new Map(currentProblems.map((problem) => [problem.problemId, problem] as const));
+        const currentScriptsById = new Map(currentScripts.map((script) => [script.scriptId, script] as const));
         const changedScreenIds = new Set<string>();
         const changedDiagnosisIds = new Set<string>();
         const changedProblemIds = new Set<string>();
+        const changedScriptIds = new Set<string>();
         let resolvedCount = 0;
         const warnings: string[] = [];
         const beforeReport = buildRegistryIntegrityReport({
@@ -665,6 +721,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
             screens: currentScreens,
             diagnoses: currentDiagnoses,
             problems: currentProblems,
+            scripts: currentScripts,
             onlyIssues: false,
         }).rawReport;
 
@@ -676,10 +733,11 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 screens: currentScreens,
                 diagnoses: currentDiagnoses,
                 problems: currentProblems,
+                scripts: currentScripts,
                 overrideTargetUniqueKey: item.selectedTargetUniqueKey,
             });
 
-            if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length) continue;
+            if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length && !repairs.scripts.length) continue;
 
             resolvedCount++;
             if (repairs.screens.length) {
@@ -703,6 +761,13 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 });
                 currentProblems = currentProblems.map((problem) => currentProblemsById.get(problem.problemId) || problem);
             }
+            if (repairs.scripts.length) {
+                repairs.scripts.forEach((script) => {
+                    currentScriptsById.set(script.scriptId, script);
+                    changedScriptIds.add(script.scriptId);
+                });
+                currentScripts = currentScripts.map((script) => currentScriptsById.get(script.scriptId) || script);
+            }
         }
 
         const changedScreens = Array.from(changedScreenIds)
@@ -714,8 +779,11 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
         const changedProblems = Array.from(changedProblemIds)
             .map((problemId) => currentProblemsById.get(problemId))
             .filter((problem): problem is typeof problemsRes.data[number] => !!problem);
+        const changedScripts = Array.from(changedScriptIds)
+            .map((scriptId) => currentScriptsById.get(scriptId))
+            .filter((script): script is typeof scriptsRes.data[number] => !!script);
 
-        if (!changedScreens.length && !changedDiagnoses.length && !changedProblems.length) {
+        if (!changedScreens.length && !changedDiagnoses.length && !changedProblems.length && !changedScripts.length) {
             return {
                 success: true,
                 changed: false,
@@ -768,6 +836,19 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                         throw new Error(repairedProblems.errors.join(', '));
                     }
                 }
+
+                if (changedScripts.length) {
+                    const repairedScripts = await _saveScripts({
+                        data: toNuidSearchFieldsSavePayload(changedScripts),
+                        userId: session.user?.userId,
+                        broadcastAction: false,
+                        client: tx,
+                        draftOrigin: "other",
+                    });
+                    if (repairedScripts.errors?.length) {
+                        throw new Error(repairedScripts.errors.join(', '));
+                    }
+                }
             });
         } catch (e: any) {
             logger.error('resolveDataKeyIntegrityEntriesBulk SAVE_TRANSACTION_ERROR', {
@@ -776,6 +857,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 screensCount: changedScreens.length,
                 diagnosesCount: changedDiagnoses.length,
                 problemsCount: changedProblems.length,
+                scriptsCount: changedScripts.length,
                 error: e.message,
             });
             return {
@@ -814,6 +896,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
             screens: persistedState.screens,
             diagnoses: persistedState.diagnoses,
             problems: persistedState.problems,
+            scripts: persistedState.scripts,
             onlyIssues: false,
         }).rawReport;
 
@@ -830,6 +913,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                     screens: changedScreens.length,
                     diagnoses: changedDiagnoses.length,
                     problems: changedProblems.length,
+                    scripts: changedScripts.length,
                 },
             }),
             errors: [],
@@ -881,11 +965,12 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
             };
         }
 
-        const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+        const [dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes] = await Promise.all([
             _getDataKeys({ returnDraftsIfExist: true }),
             _getScreens({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
             _getDiagnoses({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
             _getProblems({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
+            _getScripts({ scriptsIds: [scriptIds[0]], returnDraftsIfExist: true }),
         ]);
 
         const fetchErrors = [
@@ -893,6 +978,7 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
             ...(screensRes.errors || []),
             ...(diagnosesRes.errors || []),
             ...(problemsRes.errors || []),
+            ...(scriptsRes.errors || []),
         ];
         if (fetchErrors.length) {
             return {
@@ -912,6 +998,7 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
                 screens: screensRes.data,
                 diagnoses: diagnosesRes.data,
                 problems: problemsRes.data,
+                scripts: scriptsRes.data,
                 overrideTargetUniqueKey: item.selectedTargetUniqueKey,
                 context: integrityContext,
             });
@@ -951,7 +1038,11 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
                     title: problem.name || problem.key || problem.problemId,
                     scriptId: problem.scriptId,
                 })),
-                changed: !!repairs.screens.length || !!repairs.diagnoses.length || !!repairs.problems.length,
+                scripts: repairs.scripts.map((script) => ({
+                    scriptId: script.scriptId,
+                    title: script.title || script.scriptId,
+                })),
+                changed: !!repairs.screens.length || !!repairs.diagnoses.length || !!repairs.problems.length || !!repairs.scripts.length,
                 reviewed: item.reviewed === true,
             };
         });
@@ -1013,7 +1104,7 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
         const matchedDataKey = preferredUniqueKey ? dataKeysByUniqueKey.get(preferredUniqueKey) : undefined;
         return {
             success: true,
-            changed: !!repairs.screens.length || !!repairs.diagnoses.length || !!repairs.problems.length,
+            changed: !!repairs.screens.length || !!repairs.diagnoses.length || !!repairs.problems.length || !!repairs.scripts.length,
             preview: {
                 entry: params.entry,
                 targetDataKey: !matchedDataKey ? null : {
@@ -1041,6 +1132,10 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
                     problemId: problem.problemId,
                     title: problem.name || problem.key || problem.problemId,
                     scriptId: problem.scriptId,
+                })),
+                scripts: repairs.scripts.map((script) => ({
+                    scriptId: script.scriptId,
+                    title: script.title || script.scriptId,
                 })),
                 savesAsDraft: true,
                 publishRequired: true,
@@ -1113,6 +1208,8 @@ async function getUsageExportFingerprint() {
         [draftKeysMeta],
         [publishedScreensMeta],
         [draftScreensMeta],
+        [publishedScriptsMeta],
+        [draftScriptsMeta],
     ] = await Promise.all([
         db.select({
             updatedAt: max(dataKeys.updatedAt),
@@ -1130,6 +1227,14 @@ async function getUsageExportFingerprint() {
             updatedAt: max(screensDrafts.updatedAt),
             count: count(),
         }).from(screensDrafts),
+        db.select({
+            updatedAt: max(scriptsTable.updatedAt),
+            count: count(),
+        }).from(scriptsTable).where(isNull(scriptsTable.deletedAt)),
+        db.select({
+            updatedAt: max(scriptsDraftsTable.updatedAt),
+            count: count(),
+        }).from(scriptsDraftsTable),
     ]);
 
     return [
@@ -1141,6 +1246,10 @@ async function getUsageExportFingerprint() {
         `${publishedScreensMeta?.count || 0}`,
         draftScreensMeta?.updatedAt ? new Date(draftScreensMeta.updatedAt).toISOString() : '',
         `${draftScreensMeta?.count || 0}`,
+        publishedScriptsMeta?.updatedAt ? new Date(publishedScriptsMeta.updatedAt).toISOString() : '',
+        `${publishedScriptsMeta?.count || 0}`,
+        draftScriptsMeta?.updatedAt ? new Date(draftScriptsMeta.updatedAt).toISOString() : '',
+        `${draftScriptsMeta?.count || 0}`,
     ].join('|');
 }
 
@@ -1155,14 +1264,16 @@ export const getDataKeysUsageExportRows = async (params?: {
     try {
         await isAllowed();
 
-        const [dataKeysRes, screensRes] = await Promise.all([
+        const [dataKeysRes, screensRes, scriptsRes] = await Promise.all([
             _getDataKeys({ returnDraftsIfExist: true }),
             _getScreens({ returnDraftsIfExist: true }),
+            _getScripts({ returnDraftsIfExist: true }),
         ]);
 
         const errors = [
             ...(dataKeysRes.errors || []),
             ...(screensRes.errors || []),
+            ...(scriptsRes.errors || []),
         ];
 
         if (errors.length) return { success: false, data: [], errors };
@@ -1294,6 +1405,18 @@ export const getDataKeysUsageExportRows = async (params?: {
                     });
                 });
             }
+        });
+
+        scriptsRes.data.forEach(script => {
+            const scriptTitle = script.title || '';
+
+            (script.nuidSearchFields || []).forEach(field => {
+                addRow({
+                    keyId: field.keyId,
+                    keyName: field.key,
+                    scriptTitle,
+                });
+            });
         });
 
         const data = normalizeUsageExportRows(Array.from(rowsMap.values()))

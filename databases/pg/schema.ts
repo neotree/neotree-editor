@@ -1083,6 +1083,10 @@ export const scripts = pgTable(
     nuidSearchEnabled: boolean("nuid_search_enabled").notNull().default(false),
     nuidSearchFields: jsonb("nuid_search_fields").default("[]").notNull(),
     eligibilityCriteria: jsonb("eligibility_criteria").$type<EligibilityCriteria | null>(),
+    conditionErrorReport: jsonb("condition_error_report").$type<{
+      count: number
+      findings: { location: string; href?: string; message?: string }[]
+    } | null>(),
     reviewable: boolean("reviewable").notNull().default(false),
     reviewConfigurations: jsonb("review_configurations").default("[]").notNull(),
     preferences: jsonb("preferences").default(JSON.stringify(defaultPreferences)).notNull(),

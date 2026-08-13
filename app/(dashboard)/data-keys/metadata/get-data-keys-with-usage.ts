@@ -26,7 +26,7 @@ type DataKeyUsage = {
         problems: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' | 'problem', }[];
         usages: {
             id: string;
-            kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom' | 'problem';
+            kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom' | 'problem' | 'script_nuid_search_field';
             title: string;
             location: string;
             scriptId: string;

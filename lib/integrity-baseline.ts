@@ -12,6 +12,7 @@ import {
 } from "@/lib/integrity-policy";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
+import type { NuidSearchSource } from "@/lib/data-key-integrity";
 
 export function buildIntegrityBaselineFromSnapshotData({
   policy,
@@ -20,6 +21,7 @@ export function buildIntegrityBaselineFromSnapshotData({
   screens,
   diagnoses,
   problems,
+  scripts,
 }: {
   policy: IntegrityPolicy;
   userId?: string | null;
@@ -27,6 +29,7 @@ export function buildIntegrityBaselineFromSnapshotData({
   screens: ScreenType[];
   diagnoses: DiagnosisType[];
   problems: ProblemType[];
+  scripts?: NuidSearchSource[];
 }): IntegrityBaseline {
   const integrityContext = buildDataKeyIntegrityContext(dataKeys);
   const report = scanDataKeyIntegrity({
@@ -34,6 +37,7 @@ export function buildIntegrityBaselineFromSnapshotData({
     screens,
     diagnoses,
     problems,
+    scripts,
     onlyIssues: true,
     context: integrityContext,
     policy,
