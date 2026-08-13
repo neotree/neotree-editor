@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 
 import { Button } from "@/components/ui/button";
 import { GetScriptsMetadataResponse } from "@/databases/queries/scripts";
+import { buildScriptScreenMetadataRows } from "@/lib/scripts/metadata-export";
 
 export function ScriptMetaActions({ data }: {
     data: GetScriptsMetadataResponse['data'];
@@ -15,90 +16,7 @@ export function ScriptMetaActions({ data }: {
         const workbook = XLSX.utils.book_new();
 
         data.forEach(script => {
-            const worksheetData = [] as {
-                Script: string;
-                Hospital: string;
-                Screen: string;
-                'Screen Ref': string;
-                'Screen Type': string;
-                Key: string;
-                Label: string;
-                'Data Type': string;
-                'Value': string;
-                'Value Label': string;
-                Confidential: string;
-                Optional: string;
-                'Field Condition': string;
-                'Field Options': string;
-                'Screen Condition': string;
-                'Item Condition': string;
-                'Item Options': string;
-                'Skip To Screen Conditional Expression': string;
-                'Skip To Screen': string;
-                'Disable other options if selected': string;
-                'Forbid With': string;
-                'Management Metadata': string;
-            }[];
-
-            script.screens.forEach(screen => {
-                if ((screen.type === 'management') && !screen.fields.length) {
-                    worksheetData.push({
-                        Script: script.title,
-                        Hospital: script.hospitalName || '',
-                        Screen: screen.title,
-                        'Screen Ref': screen.ref || '',
-                        'Screen Type': screen.type || '',
-                        Key: '',
-                        Label: '',
-                        'Data Type': '',
-                        'Value': '',
-                        'Value Label': '',
-                        Confidential: '',
-                        Optional: '',
-                        'Field Condition': '',
-                        'Field Options': '',
-                        'Screen Condition': screen.condition || '',
-                        'Item Condition': '',
-                        'Item Options': '',
-                        'Skip To Screen Conditional Expression': screen.skipToCondition || '',
-                        'Skip To Screen': screen.skipToScreen ? JSON.stringify(screen.skipToScreen) : '',
-                        'Disable other options if selected': '',
-                        'Forbid With': '',
-                        'Management Metadata': screen.managementMetadata ? JSON.stringify(screen.managementMetadata) : '',
-                    });
-                }
-
-                screen.fields.forEach(f => {
-                    worksheetData.push({
-                        Script: script.title,
-                        Hospital: script.hospitalName || '',
-                        Screen: screen.title,
-                        'Screen Ref': screen.ref || '',
-                        'Screen Type': screen.type || '',
-                        Key: f.key,
-                        Label: f.label,
-                        'Data Type': f.dataType || '',
-                        'Value': `${f.value || ''}`,
-                        'Value Label': `${f.valueLabel || ''}`,
-                        Confidential: f.confidential ? 'Yes' : 'No',
-                        Optional: f.optional ? 'Yes' : 'No',
-                        'Field Condition': f.condition || '',
-                        'Field Options': f.options?.length ? JSON.stringify(f.options) : '',
-                        'Screen Condition': screen.condition || '',
-                        'Item Condition': '',
-                        'Item Options': '',
-                        'Skip To Screen Conditional Expression': screen.skipToCondition || '',
-                        'Skip To Screen': screen.skipToScreen ? JSON.stringify(screen.skipToScreen) : '',
-                        'Disable other options if selected': typeof f.disableOtherOptionsIfSelected === 'boolean'
-                            ? (f.disableOtherOptionsIfSelected ? 'Yes' : 'No')
-                            : '',
-                        'Forbid With': f.forbidWith?.join(', ') || '',
-                        'Management Metadata': screen.type === 'management' && screen.managementMetadata
-                            ? JSON.stringify(screen.managementMetadata)
-                            : '',
-                    });
-                });
-            });
+            const worksheetData = buildScriptScreenMetadataRows(script);
 
             const worksheet = XLSX.utils.json_to_sheet(worksheetData);
             XLSX.utils.book_append_sheet(workbook, worksheet, `Screens - ${script.title || ''}`.substring(0, 31));
@@ -179,9 +97,9 @@ export function ScriptMetaActions({ data }: {
 
     return (
         <>
-            <a 
-                href="#" 
-                target="_blank" 
+            <a
+                href="#"
+                target="_blank"
                 className="h-0 w-0 absolute overflow-hidden"
                 ref={downloadJSONRef}
             />

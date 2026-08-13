@@ -1,0 +1,1 @@
+ALTER TABLE "nt_scripts" ADD COLUMN "condition_error_report" jsonb;
