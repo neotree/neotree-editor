@@ -8,6 +8,7 @@ import { type DataKey, _getDataKeys } from '@/databases/queries/data-keys';
 import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
 import { buildDataKeysDeleteImpact, type DataKeyDeleteImpactItem } from '@/lib/data-key-delete-impact';
 import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-compatibility';
+import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 
@@ -153,6 +154,16 @@ export async function _deleteDataKeys(
             if (loadErrors.length) throw new Error(loadErrors[0]);
 
             const targets = dataKeysRes.data.filter((dataKey) => dataKeysIds.includes(dataKey.uuid));
+
+            const managedTargets = targets.filter((dataKey) => isNuidManagedDataKey(dataKey as any));
+            if (managedTargets.length) {
+                const names = managedTargets.map((dataKey) => dataKey.name || dataKey.uniqueKey).join(', ');
+                throw new Error(
+                    `Cannot delete NUID Search data key${managedTargets.length > 1 ? 's' : ''}: ${names}. ` +
+                    `These are managed by NUID Search and are permanent — they can't be deleted.`,
+                );
+            }
+
             const impact = buildDataKeysDeleteImpact({
                 dataKeys: dataKeysRes.data,
                 screens: screensRes.data,
