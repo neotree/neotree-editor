@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { arrayMoveImmutable } from "array-move";
 import { useQueryState } from "nuqs";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Settings, Trash, MoreVertical, Edit2, Plus, ArrowUp, ArrowDown } from "lucide-react";
 
@@ -34,11 +35,22 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useScriptForm } from "../hooks/use-script-form";
+import { useNuidConfigIssues } from "../hooks/use-nuid-config-issues";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { ConditionEditor, ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
+import { type ConditionKey } from "@/lib/conditional-expression";
 import { SelectDataKey } from "@/components/select-data-key";
 import { useDataKeysCtx, type DataKey } from "@/contexts/data-keys";
 import { isNumericQueryValue } from "@/lib/query-state";
 import { normalizeDataKeyCompatibilityType } from "@/lib/data-key-types";
+import {
+    resolveNuidTemplate,
+    buildNuidProvisionPayload,
+    parseTemplateOptionValues,
+    isNuidManagedDataKey,
+    type NuidFieldSpec,
+    type NuidConflict,
+} from "@/lib/nuid-search";
 
 type Props = {
     disabled?: boolean;
@@ -69,7 +81,9 @@ export function NuidSearchFieldsConfig({
     });
 
     useEffect(() => {
-        if (nuidSearchEnabled && !_nuidSearchEnabled) setOpen(true);
+        if (nuidSearchEnabled && !_nuidSearchEnabled) {
+            setOpen(true);
+        }
         _setNuidSearchEnabled(nuidSearchEnabled);
     }, [_nuidSearchEnabled, nuidSearchEnabled]);
 
@@ -89,6 +103,79 @@ export function NuidSearchFieldsConfig({
     }, [deepLinkedField, fields, setDeepLinkedField]);
 
     const { confirm } = useConfirmModal();
+    const router = useRouter();
+    const { extractDataKeys, allDataKeys, saveDataKeys, loadingDataKeys } = useDataKeysCtx();
+
+    const { conditionKeys, keysReady, nuidFieldKeys, hasIssues } = useNuidConfigIssues(fields, nuidSearchEnabled);
+
+    const [provision, setProvision] = useState<{ missing: NuidFieldSpec[]; conflicts: NuidConflict[] } | null>(null);
+    const [provisioning, setProvisioning] = useState(false);
+    const [resolvePending, setResolvePending] = useState<null | "prompt" | "link">(null);
+
+    const buildSpecFromFields = useCallback((flds: typeof fields): NuidFieldSpec[] => {
+        return (flds || [])
+            .map((f) => {
+                const type = `${f?.type || ""}`.trim();
+                return {
+                    key: `${f?.key || ""}`.trim(),
+                    type,
+                    label: `${f?.label || ""}`.trim(),
+                    condition: f?.condition ? `${f.condition}` : undefined,
+                    options: ["dropdown", "multi_select"].includes(type)
+                        ? parseTemplateOptionValues(f?.values)
+                        : undefined,
+                } satisfies NuidFieldSpec;
+            })
+            .filter((s) => !!s.key);
+    }, []);
+
+    // Resolve current fields against the library, auto-link matches by key, and
+    // (when prompting) surface anything missing/conflicting for provisioning.
+    const runResolve = useCallback((opts?: { prompt?: boolean }) => {
+        const current = watch("nuidSearchFields");
+        if (!current?.length) return;
+
+        const { linked, missing, conflicts } = resolveNuidTemplate(buildSpecFromFields(current), allDataKeys);
+        const linkedByKey = new Map(linked.map((l) => [l.key, l.keyId]));
+
+        const updated = current.map((f) => {
+            const keyId = linkedByKey.get(`${f?.key || ""}`.trim());
+            return keyId && keyId !== f.keyId ? { ...f, keyId } : f;
+        });
+        const changed = updated.some((f, i) => f !== current[i]);
+        if (changed) setValue("nuidSearchFields", updated, { shouldDirty: true });
+
+        if (opts?.prompt && (missing.length || conflicts.length)) {
+            setProvision({ missing, conflicts });
+        }
+    }, [watch, allDataKeys, buildSpecFromFields, setValue]);
+
+    useEffect(() => {
+        if (!resolvePending || loadingDataKeys) return;
+        runResolve({ prompt: resolvePending === "prompt" });
+        setResolvePending(null);
+    }, [resolvePending, loadingDataKeys, runResolve]);
+
+    useEffect(() => {
+        if (open && nuidSearchEnabled) setResolvePending("prompt");
+    }, [open, nuidSearchEnabled]);
+
+    const onProvision = useCallback(async () => {
+        if (!provision) return;
+        setProvisioning(true);
+        try {
+            const payload = buildNuidProvisionPayload(provision.missing, allDataKeys);
+            if (payload.length) {
+                const res = await saveDataKeys(payload as any);
+                if (res?.errors?.length) return; 
+                router.refresh();
+            }
+            setProvision(null);
+            setResolvePending("link");
+        } finally {
+            setProvisioning(false);
+        }
+    }, [provision, allDataKeys, saveDataKeys]);
 
     const onDelete = useCallback((index: number) => {
         confirm(() => setValue('nuidSearchFields', fields.filter((_, i) => i !== index), { shouldDirty: true, }), {
@@ -113,12 +200,79 @@ export function NuidSearchFieldsConfig({
 
     return (
         <>
+            {!!provision && (
+                <Modal
+                    title="Set up NUID Search data keys"
+                    open
+                    onOpenChange={isOpen => { if (!isOpen && !provisioning) setProvision(null); }}
+                    actions={(
+                        <>
+                            <div className="flex-1" />
+                            <DialogClose asChild>
+                                <Button variant="ghost" disabled={provisioning}>Cancel</Button>
+                            </DialogClose>
+                            {!!provision.missing.length && (
+                                <Button onClick={() => onProvision()} disabled={provisioning}>
+                                    {provisioning ? 'Creating…' : 'Create & link'}
+                                </Button>
+                            )}
+                        </>
+                    )}
+                >
+                    <div className="flex flex-col gap-y-4 text-sm">
+                        <p className="text-muted-foreground">
+                            NUID Search uses data keys from the Data Key library. These are matched by key —
+                            create the missing ones to finish setting up the search page.
+                        </p>
+
+                        {!!provision.missing.length && (
+                            <div className="flex flex-col gap-y-2">
+                                <div className="font-medium">Will be created &amp; linked</div>
+                                {provision.missing.map((m) => (
+                                    <div key={m.key} className="rounded-md border border-border px-3 py-2">
+                                        <div className="flex items-center gap-x-2">
+                                            <span className="font-medium">{m.key}</span>
+                                            <span className="text-xs text-muted-foreground">{m.type}</span>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">{m.label}</div>
+                                        {!!m.options?.length && (
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                Options: {m.options.map((o) => `${o.value} (${o.label})`).join(', ')}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {!!provision.conflicts.length && (
+                            <div className="flex flex-col gap-y-2">
+                                <div className="font-medium text-danger">Needs attention</div>
+                                <p className="text-xs text-muted-foreground">
+                                    A data key with this name already exists but is the wrong type. Rename or
+                                    relink it in the Data Key library before using it here.
+                                </p>
+                                {provision.conflicts.map((c) => (
+                                    <div key={c.key} className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2">
+                                        <span className="font-medium">{c.key}</span>
+                                        <span className="ml-2 text-xs text-danger">
+                                            expected <b>{c.expectedType}</b>, found <b>{c.foundType}</b>
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </Modal>
+            )}
+
             {!!selectedField && (
                 <Field
                     open
                     disabled={disabled}
                     field={selectedField?.field}
                     fieldType={selectedField?.field?.type!}
+                    extraKeys={nuidFieldKeys}
                     onClose={() => setSelectedField(undefined)}
                     onChange={field => {
                         setValue(
@@ -139,6 +293,7 @@ export function NuidSearchFieldsConfig({
                     open
                     disabled={disabled}
                     fieldType={selectedNewFieldType}
+                    extraKeys={nuidFieldKeys}
                     onClose={() => setSelectedNewFieldType(undefined)}
                     onChange={field => {
                         setValue(
@@ -231,7 +386,23 @@ export function NuidSearchFieldsConfig({
                                     name: 'Label'
                                 },
                                 {
-                                    name: 'Condition'
+                                    name: 'Condition',
+                                    cellRenderer({ rowIndex }) {
+                                        const f = fields[rowIndex];
+                                        return (
+                                            <span className="inline-flex items-center gap-x-2">
+                                                <span>{f?.condition}</span>
+                                                {!!f && (
+                                                    <ConditionErrorBadge
+                                                        keys={conditionKeys}
+                                                        extraKeys={nuidFieldKeys}
+                                                        keysReady={keysReady}
+                                                        expressions={[{ value: f.condition, label: 'Condition' }]}
+                                                    />
+                                                )}
+                                            </span>
+                                        );
+                                    },
                                 },
                                 {
                                     name: 'Required'
@@ -307,7 +478,12 @@ export function NuidSearchFieldsConfig({
                         />
                     </div>
 
-                    <div className="border-t border-t-border px-4 py-2 flex gap-x-2">
+                    <div className="border-t border-t-border px-4 py-2 flex items-center gap-x-2">
+                        {hasIssues && (
+                            <span className="text-xs text-danger">
+                                Resolve the data key / condition issues to save.
+                            </span>
+                        )}
                         <div className="ml-auto" />
 
                         <SheetClose asChild>
@@ -319,14 +495,18 @@ export function NuidSearchFieldsConfig({
                             </Button>
                         </SheetClose>
 
-                        <SheetClose asChild>
-                            <Button
-                                onClick={() => onSave()}
-                                disabled={disabled}
-                            >
-                                Save
-                            </Button>
-                        </SheetClose>
+                        {hasIssues ? (
+                            <Button disabled>Save</Button>
+                        ) : (
+                            <SheetClose asChild>
+                                <Button
+                                    onClick={() => onSave()}
+                                    disabled={disabled}
+                                >
+                                    Save
+                                </Button>
+                            </SheetClose>
+                        )}
                     </div>
                 </SheetContent>
             </Sheet>
@@ -339,6 +519,7 @@ export function Field({
     field,
     fieldType,
     disabled,
+    extraKeys,
     onChange,
     onClose,
 }: {
@@ -346,6 +527,7 @@ export function Field({
     field?: ScriptField;
     fieldType: ScriptField['type'];
     disabled?: boolean;
+    extraKeys?: ConditionKey[];
     onClose: () => void;
     onChange: (field: ScriptField) => void;
 }) {
@@ -367,6 +549,9 @@ export function Field({
         defaultValues: getDefaultValues(),
     });
 
+    const { conditionKeys, keysLoading } = useConditionKeys();
+    const [conditionHasErrors, setConditionHasErrors] = useState(false);
+
     const type = watch('type');
     const key = watch('key');
     const keyId = watch('keyId');
@@ -377,9 +562,6 @@ export function Field({
 
     const hasOptions = useMemo(() => ['dropdown', 'multi_select'].includes(type), [type]);
 
-    // A Yes/No field may only use a dropdown data key, a NUID search field only a text
-    // one. Compared through the library's own type normalisation, so the picker offers
-    // exactly what the integrity checker accepts - anything else scans as a conflict.
     const expectedType = useMemo(() => normalizeDataKeyCompatibilityType(type), [type]);
     const isCompatibleDataKey = useCallback(
         (candidate: DataKey) => normalizeDataKeyCompatibilityType(candidate.dataType) === expectedType,
@@ -415,16 +597,12 @@ export function Field({
         [dataKeyOptions]
     );
 
-    // `values` is what the app reads, so keep it in step with the data key. Unlinked
-    // legacy fields keep what they were saved with - there's no key to derive from -
-    // and a missing dataKey means the library hasn't loaded yet, so don't wipe it.
     useEffect(() => {
         if (!hasOptions || !keyId || !dataKey) return;
         if (derivedValues === values) return;
         setValue('values', derivedValues, { shouldDirty: true, });
     }, [hasOptions, keyId, dataKey, derivedValues, values, setValue]);
 
-    // Options saved against unlinked legacy fields, shown read-only until a key is picked
     const storedOptions = useMemo(() => {
         return `${values || ''}`
             .split('\n')
@@ -438,7 +616,6 @@ export function Field({
 
     const options = dataKeyOptions.length ? dataKeyOptions : storedOptions;
 
-    // Confidentiality lives on the data key - fields inherit it, same as screen fields
     const inheritedConfidential = useMemo(() => !!dataKey?.confidential, [dataKey?.confidential]);
 
     useEffect(() => {
@@ -447,9 +624,7 @@ export function Field({
         }
     }, [confidential, inheritedConfidential, setValue]);
 
-    // The key stays changeable for the life of the field - relinking is how an unmanaged
-    // legacy field, or one pointed at the wrong data key, gets corrected.
-    const isKeyDisabled = !!disabled;
+    const isKeyDisabled = !!disabled || isNuidManagedDataKey(dataKey as any);
 
     const onSave = handleSubmit(onChange);
 
@@ -480,7 +655,7 @@ export function Field({
 
                         <Button
                             onClick={() => onSave()}
-                            disabled={disabled || missingOptions || dataKeyTypeMismatch}
+                            disabled={disabled || conditionHasErrors || missingOptions || dataKeyTypeMismatch}
                         >
                             Save
                         </Button>
@@ -560,11 +735,23 @@ export function Field({
 
                     <div>
                         <Label htmlFor="condition">Condition <ConditionalExpressionModal /></Label>
-                        <Textarea
-                            {...register('condition', { required: false, disabled, })}
+                        <Controller
+                            control={control}
                             name="condition"
-                            noRing={false}
-                            rows={5}
+                            render={({ field: { value, onChange } }) => (
+                                <ConditionEditor
+                                    id="condition"
+                                    rows={5}
+                                    value={`${value || ''}`}
+                                    onChange={onChange}
+                                    keys={conditionKeys}
+                                    extraKeys={extraKeys}
+                                    keysLoading={keysLoading}
+                                    disabled={disabled}
+                                    initialValue={`${field?.condition || ''}`}
+                                    onValidityChange={setConditionHasErrors}
+                                />
+                            )}
                         />
                     </div>
 

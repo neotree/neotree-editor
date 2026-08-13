@@ -4,7 +4,6 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import CodeEditor from '@uiw/react-textarea-code-editor';
 import { ChevronDown, EditIcon, TrashIcon } from 'lucide-react';
 
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -30,6 +29,8 @@ import {
     parseCondition,
     parseConditionString,
 } from './_eval';
+import { ConditionEditor } from '@/components/conditional-expression';
+import type { ConditionKey } from '@/lib/conditional-expression';
 
 const defaultTestResults = {
     parsedCondition: '',
@@ -42,6 +43,20 @@ export default function ConditionalExp() {
     const [testResults, setTestResults] = useState(defaultTestResults);
 
     const canTest = entries.length;
+
+    // Keys derived from the mock entries, so the playground validates against
+    // the same engine the editor uses (syntax-only when no entries are added).
+    const playgroundKeys = useMemo<ConditionKey[]>(() => {
+        const map = new Map<string, ConditionKey>();
+        entries.forEach((entry) => {
+            const values = entry.value || entry.values || [];
+            values.forEach((v) => {
+                const name = `${v?.key || ''}`.trim();
+                if (name) map.set(name.toLowerCase(), { name, dataType: `${v?.dataType || v?.type || ''}`.trim() });
+            });
+        });
+        return Array.from(map.values());
+    }, [entries]);
 
     useEffect(() => {
         setTestResults(defaultTestResults);
@@ -102,11 +117,12 @@ export default function ConditionalExp() {
                     )}
 
                     <div>
-                        <Textarea 
+                        <ConditionEditor
                             value={condition}
-                            placeholder="Condition"
+                            onChange={setCondition}
+                            keys={playgroundKeys}
                             rows={4}
-                            onChange={e => setCondition(e.target.value)}
+                            placeholder="Condition"
                         />
                     </div>
 

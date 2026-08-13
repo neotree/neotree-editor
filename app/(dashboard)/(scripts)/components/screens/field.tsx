@@ -29,7 +29,6 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { DateTimePicker } from "@/components/datetime-picker"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { validateDropdownValues } from "@/lib/validate-dropdown-values"
 import { cn } from "@/lib/utils"
@@ -40,6 +39,8 @@ import { useField } from "../../hooks/use-field"
 import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
+import type { ConditionKey } from "@/lib/conditional-expression"
 
 type Props = {
   open: boolean
@@ -91,6 +92,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
     defaultValues: getDefaultValues(),
   })
   const [alias, setAlias] = useState("")
+  const { conditionKeys, keysLoading } = useConditionKeys()
+  const [conditionHasErrors, setConditionHasErrors] = useState(false)
+  const [calculationHasErrors, setCalculationHasErrors] = useState(false)
 
   const type = watch("type")
   const format = watch("format")
@@ -115,6 +119,20 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const printDisplayColumns = watch('printDisplayColumns');
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
+
+  // Keys on the parent screen (incl. this field), so conditions can reference
+  // sibling fields that haven't been saved yet. Deduplication + precedence is
+  // handled by mergeConditionKeys inside ConditionEditor.
+  const localConditionKeys = useMemo<ConditionKey[]>(() => {
+    const siblings: FieldType[] = form.getValues("fields") || []
+    const arr: ConditionKey[] = siblings.map((f) => ({
+      name: `${f?.key || ""}`.trim(),
+      label: `${f?.key || ""}${f?.label ? ` - ${f.label}` : ""}`,
+      dataType: f?.type,
+    }))
+    if (key) arr.push({ name: `${key}`.trim(), label: `${key}${label ? ` - ${label}` : ""}`, dataType: type })
+    return arr.filter((k) => !!k.name)
+  }, [form, key, label, type])
 
   const isDateField = useMemo(() => type === "date" || type === "datetime", [type])
   const isTimeField = useMemo(() => type === "time", [type])
@@ -259,7 +277,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
             </DialogClose>
 
             <Button
-              disabled={disabled || !type}
+              disabled={disabled || !type || (showForm && (conditionHasErrors || calculationHasErrors))}
               onClick={() => {
                 if (!showForm) {
                   setShowForm(true)
@@ -332,7 +350,24 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
               <Title>Flow control</Title>
               <div>
                 <Label htmlFor="condition">Conditional expression <ConditionalExpressionModal /></Label>
-                <Textarea {...register("condition", { disabled })} name="condition" noRing={false} rows={5} />
+                <Controller
+                  control={control}
+                  name="condition"
+                  render={({ field: { value, onChange } }) => (
+                    <ConditionEditor
+                      id="condition"
+                      rows={5}
+                      value={value || ""}
+                      onChange={onChange}
+                      keys={conditionKeys}
+                      extraKeys={localConditionKeys}
+                      keysLoading={keysLoading}
+                      disabled={disabled}
+                      initialValue={field?.condition || ""}
+                      onValidityChange={setConditionHasErrors}
+                    />
+                  )}
+                />
                 <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
               </div>
             </>
@@ -543,7 +578,25 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                 <>
                   <div>
                     <Label htmlFor="calculation">Reference expression <ConditionalExpressionModal /></Label>
-                    <Input {...register("calculation", { disabled })} name="calculation" noRing={false} />
+                    <Controller
+                      control={control}
+                      name="calculation"
+                      render={({ field: { value, onChange } }) => (
+                        <ConditionEditor
+                          id="calculation"
+                          mode="reference"
+                          rows={2}
+                          value={value || ""}
+                          onChange={onChange}
+                          keys={conditionKeys}
+                          extraKeys={localConditionKeys}
+                          keysLoading={keysLoading}
+                          disabled={disabled}
+                          initialValue={(field as { calculation?: string } | undefined)?.calculation || ""}
+                          onValidityChange={setCalculationHasErrors}
+                        />
+                      )}
+                    />
                     <span className="text-xs text-muted-foreground">
                       Example: $key or SUM($key1,$key2...) or DIVIDE($key1,$key2...) or MULTIPLY($key1,$key2...) or
                       SUBTRACT($key1,$key2...)

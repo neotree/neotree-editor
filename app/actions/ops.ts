@@ -21,6 +21,7 @@ import * as dataKeysQueries from "@/databases/queries/data-keys"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
 import { buildReleasePublishChangeLog } from "@/databases/mutations/changelogs"
+import { getScriptsWithConditionErrors, recomputeScriptsConditionErrors } from "./scripts"
 import db from "@/databases/pg/drizzle"
 import {
   configKeysDrafts,
@@ -1365,14 +1366,39 @@ export async function publishData({ scope }: { scope: number }) {
 
     const publisherUserId = session?.user?.userId || null
     if (!publisherUserId) {
-      // Without a publisher every entity changelog and the release row would be skipped,
-      // minting a data version that is invisible to the changelog UI and rollbacks.
       throw new Error("Publishing requires an authenticated user")
     }
 
     let userId: string | null = publisherUserId
 
     if (scope === 1) userId = null
+
+    const draftScopeFilter = <TColumn>(column: TColumn) => (!userId ? undefined : eq(column as any, userId))
+    const publishScriptIds = new Set<string>()
+    try {
+      const draftRows = await Promise.all([
+        db.select({ scriptId: scriptsDrafts.scriptId }).from(scriptsDrafts).where(draftScopeFilter(scriptsDrafts.createdByUserId)),
+        db.select({ scriptId: screensDrafts.scriptId }).from(screensDrafts).where(draftScopeFilter(screensDrafts.createdByUserId)),
+        db.select({ scriptId: diagnosesDrafts.scriptId }).from(diagnosesDrafts).where(draftScopeFilter(diagnosesDrafts.createdByUserId)),
+        db.select({ scriptId: problemsDrafts.scriptId }).from(problemsDrafts).where(draftScopeFilter(problemsDrafts.createdByUserId)),
+      ])
+      for (const rows of draftRows) for (const r of rows) if (r?.scriptId) publishScriptIds.add(`${r.scriptId}`)
+    } catch (e: any) {
+      logger.error("publishData scope-scripts lookup ERROR", e.message)
+    }
+
+    const ceGate = await getScriptsWithConditionErrors({ scriptIds: Array.from(publishScriptIds) })
+    if (ceGate.scripts.length) {
+      const top = ceGate.scripts.slice(0, 10)
+      const lines = top.map((s) => `• ${s.title} (${s.count} issue${s.count === 1 ? "" : "s"})`)
+      const more = ceGate.scripts.length - top.length
+      if (more > 0) lines.push(`• …and ${more} more script${more === 1 ? "" : "s"}`)
+      results.warnings = [
+        `${ceGate.scripts.length} script${ceGate.scripts.length === 1 ? "" : "s"} being published contain ${ceGate.totalFindings} conditional-expression issue${ceGate.totalFindings === 1 ? "" : "s"}. These will reach the mobile app as-is:`,
+        ...lines,
+      ]
+      results.blockingDetails = { conditionErrors: ceGate }
+    }
 
     await db.transaction(async (tx) => {
       const lockedEditor = await tx.execute<{ id: number; dataVersion: number }>(
@@ -1496,9 +1522,22 @@ export async function discardDrafts({ scope }: { scope: number }) {
       userId = undefined
     }
 
-    await db.transaction(async (tx) => {
-      const byUser = <TColumn>(column: TColumn) => (!userId ? undefined : eq(column as any, userId))
+    const byUser = <TColumn>(column: TColumn) => (!userId ? undefined : eq(column as any, userId))
 
+    const affectedScriptIds = new Set<string>()
+    try {
+      const draftScriptRows = await Promise.all([
+        db.select({ scriptId: scriptsDrafts.scriptId }).from(scriptsDrafts).where(byUser(scriptsDrafts.createdByUserId)),
+        db.select({ scriptId: screensDrafts.scriptId }).from(screensDrafts).where(byUser(screensDrafts.createdByUserId)),
+        db.select({ scriptId: diagnosesDrafts.scriptId }).from(diagnosesDrafts).where(byUser(diagnosesDrafts.createdByUserId)),
+        db.select({ scriptId: problemsDrafts.scriptId }).from(problemsDrafts).where(byUser(problemsDrafts.createdByUserId)),
+      ])
+      for (const rows of draftScriptRows) for (const r of rows) if (r?.scriptId) affectedScriptIds.add(`${r.scriptId}`)
+    } catch (e: any) {
+      logger.error("discardDrafts affected-scripts lookup ERROR", e.message)
+    }
+
+    await db.transaction(async (tx) => {
       await tx.delete(configKeysDrafts).where(byUser(configKeysDrafts.createdByUserId))
       await tx.delete(hospitalsDrafts).where(byUser(hospitalsDrafts.createdByUserId))
       await tx.delete(drugsLibraryDrafts).where(byUser(drugsLibraryDrafts.createdByUserId))
@@ -1513,6 +1552,8 @@ export async function discardDrafts({ scope }: { scope: number }) {
         throw new Error(clearPendingDeletion.errors?.join(", ") || "Failed to clear queued deletions")
       }
     })
+
+    if (affectedScriptIds.size) void recomputeScriptsConditionErrors(Array.from(affectedScriptIds))
 
     socket.emit("data_changed", "discard_drafts")
   } catch (e: any) {
