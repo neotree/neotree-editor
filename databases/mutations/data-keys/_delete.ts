@@ -1,8 +1,8 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
-import { dataKeys, dataKeysDrafts, pendingDeletion, scripts, scriptsDrafts, } from '@/databases/pg/schema';
+import { dataKeys, dataKeysDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { type DataKey, _getDataKeys } from '@/databases/queries/data-keys';
 import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
@@ -130,50 +130,6 @@ export async function _deleteAllDataKeysDrafts(opts?: {
     }
 }
 
-/**
- * The set of key identifiers (uniqueKey, uuid, and name) currently referenced by
- * NUID Search on any enabled script — published or draft — including the option
- * children of every referenced dropdown. A NUID-managed key is only locked while
- * it appears here; once no enabled script uses it, it can be released/deleted.
- */
-async function getReferencedNuidKeyIdentifiers(allDataKeys: DataKey[]): Promise<Set<string>> {
-    const referenced = new Set<string>();
-
-    const published = await db
-        .select({ fields: scripts.nuidSearchFields })
-        .from(scripts)
-        .where(and(isNull(scripts.deletedAt), eq(scripts.nuidSearchEnabled, true)));
-
-    const draftRows = await db.query.scriptsDrafts.findMany();
-
-    const fieldSets: any[][] = [
-        ...published.map((s) => (s.fields || []) as any[]),
-        ...draftRows
-            .filter((d) => (d.data as any)?.nuidSearchEnabled)
-            .map((d) => ((d.data as any)?.nuidSearchFields || []) as any[]),
-    ];
-
-    for (const fields of fieldSets) {
-        for (const f of fields) {
-            if (f?.keyId) referenced.add(`${f.keyId}`);
-            if (f?.key) referenced.add(`${f.key}`);
-        }
-    }
-
-    // Option children of any referenced dropdown are in use as well.
-    for (const dk of allDataKeys) {
-        const isReferenced =
-            referenced.has(`${dk.uniqueKey || ''}`) ||
-            referenced.has(`${dk.uuid || ''}`) ||
-            referenced.has(`${dk.name || ''}`);
-        if (isReferenced) {
-            for (const childId of (((dk as any).options || []) as string[])) referenced.add(`${childId}`);
-        }
-    }
-
-    return referenced;
-}
-
 export async function _deleteDataKeys(
     { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, replacements = {}, }: DeleteDataKeysParams,
 ) {
@@ -201,27 +157,11 @@ export async function _deleteDataKeys(
 
             const managedTargets = targets.filter((dataKey) => isNuidManagedDataKey(dataKey as any));
             if (managedTargets.length) {
-                let referenced: Set<string>;
-                try {
-                    referenced = await getReferencedNuidKeyIdentifiers(dataKeysRes.data);
-                } catch (e: any) {
-                    logger.error('getReferencedNuidKeyIdentifiers ERROR', e?.message);
-                    throw new Error('Could not verify NUID Search usage for the managed data key(s) — please try again.');
-                }
-
-                const stillUsed = managedTargets.filter((dataKey) =>
-                    referenced.has(`${dataKey.uniqueKey || ''}`) ||
-                    referenced.has(`${dataKey.uuid || ''}`) ||
-                    referenced.has(`${dataKey.name || ''}`)
+                const names = managedTargets.map((dataKey) => dataKey.name || dataKey.uniqueKey).join(', ');
+                throw new Error(
+                    `Cannot delete NUID Search data key${managedTargets.length > 1 ? 's' : ''}: ${names}. ` +
+                    `These are managed by NUID Search and are permanent — they can't be deleted.`,
                 );
-                if (stillUsed.length) {
-                    const names = stillUsed.map((dataKey) => dataKey.name || dataKey.uniqueKey).join(', ');
-                    throw new Error(
-                        `Cannot delete NUID Search data key${stillUsed.length > 1 ? 's' : ''}: ${names}. ` +
-                        `Still used by NUID Search on one or more scripts — disable NUID Search (or remove the field) on those scripts first.`,
-                    );
-                }
-                
             }
 
             const impact = buildDataKeysDeleteImpact({

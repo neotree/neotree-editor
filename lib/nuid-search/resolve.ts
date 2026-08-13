@@ -6,6 +6,7 @@ export type NuidLibraryKey = {
   uniqueKey?: string | null;
   uuid?: string | null;
   name?: string | null;
+  label?: string | null;
   dataType?: string | null;
   options?: string[] | null;
 };

@@ -47,6 +47,7 @@ import {
     resolveNuidTemplate,
     buildNuidProvisionPayload,
     parseTemplateOptionValues,
+    isNuidManagedDataKey,
     type NuidFieldSpec,
     type NuidConflict,
 } from "@/lib/nuid-search";
@@ -623,7 +624,7 @@ export function Field({
         }
     }, [confidential, inheritedConfidential, setValue]);
 
-    const isKeyDisabled = !!disabled;
+    const isKeyDisabled = !!disabled || isNuidManagedDataKey(dataKey as any);
 
     const onSave = handleSubmit(onChange);
 

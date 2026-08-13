@@ -8,6 +8,7 @@ import socket from '@/lib/socket';
 import { _getDataKeys } from '@/databases/queries/data-keys';
 import { normalizeIncomingDataKeyPatch } from '@/lib/data-key-save';
 import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
+import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import type { DataKeyDraftOrigin } from '@/databases/pg/_data-keys';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
@@ -124,6 +125,37 @@ export async function _saveDataKeys({
         });
 
         const uniqueKeys: string[] = [];
+
+        if (draftOrigin === 'editor') try {
+            const incomingNames = Array.from(
+                new Set(data.map((d) => `${d.name || ''}`.trim().toLowerCase()).filter(Boolean)),
+            );
+            if (incomingNames.length) {
+                const existing = await _getDataKeys({ names: incomingNames });
+                const managedExisting = (existing.data || []).filter((k) => isNuidManagedDataKey(k as any));
+                for (const item of data) {
+                    const name = `${item.name || ''}`.trim();
+                    if (!name) continue;
+                    const compat = normalizeDataKeyCompatibilityType(item.dataType);
+                    const dup = managedExisting.find((k) =>
+                        `${k.name || ''}`.trim().toLowerCase() === name.toLowerCase() &&
+                        normalizeDataKeyCompatibilityType(k.dataType) === compat &&
+                        `${k.uniqueKey || ''}` !== `${item.uniqueKey || ''}` &&
+                        `${k.uuid || ''}` !== `${item.uuid || ''}`,
+                    );
+                    if (dup) {
+                        errors.push(
+                            `A NUID Search data key "${dup.name}" (${dup.dataType}) already exists — duplicate managed keys aren't allowed.`,
+                        );
+                    }
+                }
+            }
+        } catch (e: any) {
+            logger.error('_saveDataKeys managed-duplicate check ERROR', e?.message);
+        }
+        if (errors.length) {
+            return { success: false, errors };
+        }
 
         // const { data: { drafts, published, }, } = await checkDataKeyName(
         //     data.filter(d => d.name).map(d => d.name!),

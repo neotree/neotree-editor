@@ -32,12 +32,16 @@ const indexKey = (name: string | null | undefined, dataType: string | null | und
  * - Each missing dropdown → the parent key plus its option children (Y/Yes, N/No).
  * - Each missing text field → a plain text key.
  *
- * **No duplicates by key + dataType.** A single index (seeded from the library
- * and grown as keys are created) guarantees a given (name, type) is created at
- * most once — reusing an existing library key or one already created earlier in
- * the same batch. So two dropdowns that both need `Y`/`N` share one `Y` and one
- * `N`, and a dropdown/text whose key already exists is never re-created. Options
- * additionally match by value OR label, so an existing `Y` or `Yes` is adopted.
+ * **No duplicates by key + dataType.** Parent/text keys are deduped by (name,
+ * type) via an index (seeded from the library and grown as keys are created), so
+ * a dropdown/text whose key already exists is never re-created.
+ *
+ * **Option (Y/N) matching** is stricter and label-aware. For a Yes option
+ * (`value: 'Y'`, `label: 'Yes'`) an existing `option` key is reused only when its
+ * label is exactly `Yes`, preferring one keyed `Y` and falling back to one keyed
+ * `Yes`. Same for No (`N`/`No`, label `No`). When none matches, a new option is
+ * created keyed by the value (`Y`/`N`) with the `Yes`/`No` label. So two dropdowns
+ * that both need `Y`/`N` still share one `Y` and one `N`.
  *
  * Every created key is stamped `metadata.managed = 'nuid'`. New keys get a
  * client-generated `uniqueKey` so parents can reference freshly created children
@@ -87,15 +91,37 @@ export function buildNuidProvisionPayload(
     return uniqueKey;
   };
 
-  /** Ensure an option child, matching an existing one by value OR label. */
-  const ensureOption = (opt: NuidOptionSpec): string => {
-    const byValue = index.get(indexKey(opt.value, "option"));
-    if (byValue) return byValue;
-    const byLabel = opt.label ? index.get(indexKey(opt.label, "option")) : undefined;
-    if (byLabel) return byLabel;
+  type OptionEntry = { name: string; label: string; uniqueKey: string };
+  const optionEntries: OptionEntry[] = (allDataKeys || [])
+    .filter((k) => normalizeDataKeyCompatibilityType(k.dataType) === "option")
+    .map((k) => ({ name: `${k.name || ""}`.trim(), label: `${k.label || ""}`.trim(), uniqueKey: keyIdOf(k) }))
+    .filter((o) => !!o.uniqueKey);
 
-    const uniqueKey = ensureKey(opt.value, opt.label || opt.value, "option", { confidential: false });
-    if (opt.label) remember(uniqueKey, opt.label, "option");
+  const findOption = (name: string, label: string): string | undefined =>
+    optionEntries.find((o) => o.name === name && o.label === label)?.uniqueKey;
+
+  /**
+   * Match/create a Yes-or-No option child. Requires the existing key's label to
+   * be exactly the spec label (`Yes`/`No`), preferring a key named after the
+   * value (`Y`/`N`) and falling back to one named after the label (`Yes`/`No`).
+   */
+  const ensureOption = (opt: NuidOptionSpec): string => {
+    const value = `${opt.value || ""}`.trim(); // 'Y' | 'N'
+    const label = `${opt.label || ""}`.trim(); // 'Yes' | 'No'
+
+    // Priority 1: key === value (Y/N) with the exact label.
+    const byValue = findOption(value, label);
+    if (byValue) return byValue;
+    // Priority 2: key === label (Yes/No) with the exact label.
+    if (label && label !== value) {
+      const byLabel = findOption(label, label);
+      if (byLabel) return byLabel;
+    }
+
+    // Create: key = value (Y/N), label = Yes/No.
+    const uniqueKey = genId();
+    payload.push({ uniqueKey, name: value, label, dataType: "option", metadata: managed(), confidential: false });
+    optionEntries.push({ name: value, label, uniqueKey });
     return uniqueKey;
   };
 
