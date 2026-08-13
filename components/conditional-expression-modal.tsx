@@ -70,7 +70,11 @@ export function ConditionalExpressionModal() {
                             </code>
 
                             <h6>Multi selection</h6>
-                            
+
+                            <div>
+                                Always wrap <b>includes</b> / <b>excludes</b> in <b>[ ]</b> — especially when combining with <b>and</b> / <b>or</b>, e.g. <i>[$Diagnoses includes (&apos;LBW&apos;)] and $Sex = &apos;M&apos;</i>. Without the brackets the list reference will not evaluate correctly.
+                            </div>
+
                             <code>
                                 {/* <p><b>$Diagnoses</b> = &apos;LBW&apos; <i>{'-false'}</i></p>
                                 <div>For multiple values, we check if &apos;LBW&apos; (right side of the expression) is <b>included</b> in the selection</div> */}

@@ -12,6 +12,7 @@ import { DiagnosesTableRowActions } from "./table-row-actions";
 import { useDiagnosesTable, UseDiagnosesTableParams } from '../../hooks/use-diagnoses-table';
 import { CopyDiagnosesModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
+import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
 
 type Props = UseDiagnosesTableParams;
 
@@ -34,6 +35,8 @@ export function DiagnosesTable(props: Props) {
     } = useDiagnosesTable(props);
 
     const { sys, viewOnly } = useAppContext();
+    const { conditionKeys } = useConditionKeys();
+    const keysReady = conditionKeys.length > 0;
 
     return (
         <>
@@ -91,6 +94,21 @@ export function DiagnosesTable(props: Props) {
                         },
                         {
                             name: 'Name',
+                            cellRenderer(cell) {
+                                const s = diagnosesArr[cell.rowIndex];
+                                return (
+                                    <span className="inline-flex items-center gap-x-2">
+                                        <span>{s?.name}</span>
+                                        {!!s && (
+                                            <ConditionErrorBadge
+                                                keys={conditionKeys}
+                                                keysReady={keysReady}
+                                                expressions={[{ value: s.expression, label: 'Expression' }]}
+                                            />
+                                        )}
+                                    </span>
+                                );
+                            },
                         },
                         {
                             name: 'Description',

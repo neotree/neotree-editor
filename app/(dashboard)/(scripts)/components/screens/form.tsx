@@ -58,6 +58,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
+import type { ConditionKey } from "@/lib/conditional-expression";
 
 type Props = {
     scriptId: string;
@@ -99,6 +101,9 @@ export function ScreenForm(props: Props) {
         save,
     } = form;
     const [alias, setAlias] = useState('');
+    const { conditionKeys, keysLoading } = useConditionKeys();
+    const [conditionHasErrors, setConditionHasErrors] = useState(false);
+    const [skipToConditionHasErrors, setSkipToConditionHasErrors] = useState(false);
     const type = watch('type');
     const skippable = watch('skippable');
     const printable = watch('printable');
@@ -116,6 +121,27 @@ export function ScreenForm(props: Props) {
     const key = watch('key');
     const listStyle = form.watch('listStyle');
     const printDisplayColumns = form.watch('printDisplayColumns');
+    const screenFields = watch('fields');
+    const screenLabel = watch('label');
+    // Keys defined on this (possibly unsaved) screen, so conditions can
+    // reference sibling fields before the first save. Use the screen `type`
+    // (e.g. multi_select) rather than its stored dataType (e.g. set<id>) so
+    // membership checks recognise it.
+    const localConditionKeys = useMemo<ConditionKey[]>(() => {
+        const fromFields: ConditionKey[] = (screenFields || []).map(f => ({
+            name: `${f?.key || ''}`.trim(),
+            label: `${f?.key || ''}${f?.label ? ` - ${f.label}` : ''}`,
+            dataType: f?.type,
+        }));
+        if (key) {
+            fromFields.push({
+                name: `${key}`.trim(),
+                label: `${key}${screenLabel ? ` - ${screenLabel}` : ''}`,
+                dataType: type,
+            });
+        }
+        return fromFields.filter(k => !!k.name);
+    }, [screenFields, key, screenLabel, type]);
     const selectedDataKey = useMemo(() => {
         const [dataKey] = !keyId ? [null] : extractDataKeys([keyId]);
         return dataKey;
@@ -230,7 +256,7 @@ export function ScreenForm(props: Props) {
                         >Cancel</Button>
 
                         <Button
-                            disabled={!type && !formIsDirty || disabled}
+                            disabled={(!type && !formIsDirty) || disabled || conditionHasErrors || skipToConditionHasErrors}
                             onClick={() => {
                                 setValue('dataType', getScreenDataType(type));
                                 if (type === 'management') {
@@ -424,11 +450,23 @@ export function ScreenForm(props: Props) {
 
                 <div>
                     <Label secondary htmlFor="condition">Conditional expression <ConditionalExpressionModal /></Label>
-                    <Textarea
-                        {...register('condition', { disabled, })}
+                    <Controller
+                        control={control}
                         name="condition"
-                        noRing={false}
-                        rows={5}
+                        render={({ field: { value, onChange } }) => (
+                            <ConditionEditor
+                                id="condition"
+                                rows={5}
+                                value={value || ''}
+                                onChange={onChange}
+                                keys={conditionKeys}
+                                extraKeys={localConditionKeys}
+                                keysLoading={keysLoading}
+                                disabled={disabled}
+                                initialValue={formData?.condition || ''}
+                                onValidityChange={setConditionHasErrors}
+                            />
+                        )}
                     />
                     <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                 </div>
@@ -436,10 +474,23 @@ export function ScreenForm(props: Props) {
                 <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:items-baseline">
                     <div className="flex-1">
                         <Label secondary htmlFor="skipToCondition">Skip to screen conditional expression</Label>
-                        <Input
-                            {...register('skipToCondition', { disabled, })}
+                        <Controller
+                            control={control}
                             name="skipToCondition"
-                            noRing={false}
+                            render={({ field: { value, onChange } }) => (
+                                <ConditionEditor
+                                    id="skipToCondition"
+                                    rows={3}
+                                    value={value || ''}
+                                    onChange={onChange}
+                                    keys={conditionKeys}
+                                    extraKeys={localConditionKeys}
+                                    keysLoading={keysLoading}
+                                    disabled={disabled}
+                                    initialValue={formData?.skipToCondition || ''}
+                                    onValidityChange={setSkipToConditionHasErrors}
+                                />
+                            )}
                         />
                         <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                     </div>
@@ -1158,7 +1209,7 @@ export function ScreenForm(props: Props) {
                 >Cancel</Button>
 
                 <Button
-                    disabled={disabled}
+                    disabled={disabled || conditionHasErrors || skipToConditionHasErrors}
                     onClick={() => save()}
                 >
                     Save Draft
