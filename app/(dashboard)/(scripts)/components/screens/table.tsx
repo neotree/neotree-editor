@@ -43,13 +43,13 @@ export function ScreensTable(props: Props) {
             {loading && <Loader overlay />}
 
             {!!screensIdsToCopy.length && (
-                <CopyScreensModal 
-                    open 
+                <CopyScreensModal
+                    open
                     screensIds={screensIdsToCopy}
                     onOpenChange={() => {
                         setScreensIdsToCopy([]);
                         setSelected([]);
-                    }} 
+                    }}
                 />
             )}
 
@@ -57,14 +57,14 @@ export function ScreensTable(props: Props) {
                 <div className="pt-4 px-4 text-2xl">Screens</div>
 
                 <div className="px-4">
-                    <ScriptsTableSearch 
+                    <ScriptsTableSearch
                         onSearch={onSearch}
                         search={search}
                         setSearch={setSearch}
                     />
                 </div>
 
-                <DataTable 
+                <DataTable
                     selectedIndexes={selected}
                     onSelect={setSelected}
                     selectable={!disabled}
@@ -108,6 +108,13 @@ export function ScreensTable(props: Props) {
                             name: 'Title',
                             cellRenderer(cell) {
                                 const s = screensArr[cell.rowIndex];
+                                const fieldExpressions = ((s?.fields || []) as any[]).flatMap((f) => {
+                                    const fieldName = f?.key || f?.label || '';
+                                    return [
+                                        { value: f?.condition, label: `Field "${fieldName}" condition`, allowSelf: true },
+                                        { value: f?.calculation, label: `Field "${fieldName}" reference`, mode: 'reference' as const },
+                                    ];
+                                });
                                 return (
                                     <span className="inline-flex items-center gap-x-2">
                                         <span>{s?.title}</span>
@@ -116,8 +123,9 @@ export function ScreensTable(props: Props) {
                                                 keys={conditionKeys}
                                                 keysReady={keysReady}
                                                 expressions={[
-                                                    { value: s.condition, label: 'Condition' },
-                                                    { value: s.skipToCondition, label: 'Skip to screen' },
+                                                    { value: s.condition, label: 'Condition', allowSelf: true },
+                                                    { value: s.skipToCondition, label: 'Skip to screen', allowSelf: true },
+                                                    ...fieldExpressions,
                                                 ]}
                                             />
                                         )}
@@ -153,7 +161,7 @@ export function ScreensTable(props: Props) {
                                 const s = screensArr[cell.rowIndex];
                                 if (!s) return null;
                                 return (
-                                    <ScreensTableRowActions 
+                                    <ScreensTableRowActions
                                         screen={s}
                                         disabled={disabled}
                                         isScriptLocked={isScriptLocked}
@@ -178,7 +186,7 @@ export function ScreensTable(props: Props) {
                 />
             </div>
 
-            <ScreensTableBottomActions 
+            <ScreensTableBottomActions
                 disabled={viewOnly}
                 selected={selected}
                 onCopy={() => setScreensIdsToCopy(selected.map(i => screensArr[i]?.screenId).filter(s => s))}

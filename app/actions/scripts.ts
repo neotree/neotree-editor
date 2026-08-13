@@ -2,7 +2,7 @@
 
 import { v4 } from "uuid";
 import queryString from "query-string";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { screens, diagnoses, problems, screensDrafts, diagnosesDrafts, problemsDrafts, pendingDeletion, scripts as scriptsTable } from "@/databases/pg/schema";
@@ -540,6 +540,113 @@ async function computeConditionReportsLean(
     }));
 
     return reports;
+}
+
+const DRUG_SCREEN_TYPES = ['drugs', 'fluids', 'feeds'];
+function collectDrugKeysFromScreens(scriptScreens: any[]): Set<string> {
+    const keys = new Set<string>();
+    for (const scr of scriptScreens || []) {
+        if (!DRUG_SCREEN_TYPES.includes(`${scr?.type}`)) continue;
+        for (const item of [...(scr?.drugs || []), ...(scr?.fluids || []), ...(scr?.feeds || [])]) {
+            if (item?.key) keys.add(`${item.key}`);
+        }
+    }
+    return keys;
+}
+
+/**
+ * Lean, draft-inclusive computation of a script's condition keys (the scrapped
+ * data keys a conditional expression may reference).
+ *
+ * This powers the child-entity CE badges (screens/diagnoses/problems rows) and
+ * the condition editors' autocomplete. It returns the SAME `scrapDataKeys`
+ * output as `getScriptsWithItems`, but selects only the columns scrapping needs
+ * and skips the heavy full-item load (image blobs, hospital joins, the extra
+ * drugs-library screen pass) — so the keys, and therefore the badges, resolve
+ * promptly instead of lagging behind the rows.
+ *
+ * Draft-inclusive: a draft entity supersedes its published counterpart, and
+ * draft-only entities are included, matching `getScriptsWithItems`.
+ */
+export async function getScriptsConditionKeys(
+    scriptIds: string[],
+): Promise<{ data: { scriptId: string; dataKeys: any[] }[]; errors?: string[] }> {
+    try {
+        const ids = Array.from(new Set((scriptIds || []).map((s) => `${s || ''}`).filter(Boolean)));
+        if (!ids.length) return { data: [] };
+
+        const draftMatch = (scriptCol: any, scriptDraftCol: any) =>
+            or(inArray(scriptCol, ids), inArray(scriptDraftCol, ids));
+
+        const [pubScreens, draftScreens, pubDiag, draftDiag, pubProb, draftProb, dataKeysRes] = await Promise.all([
+            db.select({
+                scriptId: screens.scriptId, screenId: screens.screenId, key: screens.key,
+                label: screens.label, title: screens.title, type: screens.type,
+                fields: screens.fields, items: screens.items,
+                drugs: screens.drugs, fluids: screens.fluids, feeds: screens.feeds,
+            })
+                .from(screens)
+                .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
+                .where(and(isNull(screens.deletedAt), isNull(pendingDeletion.id), inArray(screens.scriptId, ids))),
+            db.select({ screenId: screensDrafts.screenId, data: screensDrafts.data })
+                .from(screensDrafts)
+                .where(draftMatch(screensDrafts.scriptId, screensDrafts.scriptDraftId)),
+            db.select({
+                scriptId: diagnoses.scriptId, diagnosisId: diagnoses.diagnosisId,
+                key: diagnoses.key, name: diagnoses.name, symptoms: diagnoses.symptoms,
+            })
+                .from(diagnoses)
+                .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
+                .where(and(isNull(diagnoses.deletedAt), isNull(pendingDeletion.id), inArray(diagnoses.scriptId, ids))),
+            db.select({ diagnosisId: diagnosesDrafts.diagnosisId, data: diagnosesDrafts.data })
+                .from(diagnosesDrafts)
+                .where(draftMatch(diagnosesDrafts.scriptId, diagnosesDrafts.scriptDraftId)),
+            db.select({
+                scriptId: problems.scriptId, problemId: problems.problemId,
+                key: problems.key, name: problems.name, symptoms: problems.symptoms,
+            })
+                .from(problems)
+                .leftJoin(pendingDeletion, eq(pendingDeletion.problemId, problems.problemId))
+                .where(and(isNull(problems.deletedAt), isNull(pendingDeletion.id), inArray(problems.scriptId, ids))),
+            db.select({ problemId: problemsDrafts.problemId, data: problemsDrafts.data })
+                .from(problemsDrafts)
+                .where(draftMatch(problemsDrafts.scriptId, problemsDrafts.scriptDraftId)),
+            _getDataKeys(),
+        ]);
+
+        // A draft supersedes its published counterpart; draft-only entities are added.
+        const mergeEntities = <T extends Record<string, any>>(pub: T[], drafts: { data: any }[], idField: string) => {
+            const draftedIds = new Set(drafts.map((d: any) => d[idField]).filter(Boolean));
+            return [
+                ...pub.filter((p) => !draftedIds.has((p as any)[idField])),
+                ...drafts.map((d) => d.data),
+            ];
+        };
+
+        const mergedScreens = mergeEntities(pubScreens as any[], draftScreens as any[], 'screenId');
+        const mergedDiagnoses = mergeEntities(pubDiag as any[], draftDiag as any[], 'diagnosisId');
+        const mergedProblems = mergeEntities(pubProb as any[], draftProb as any[], 'problemId');
+
+        const drugKeys = collectDrugKeysFromScreens(mergedScreens);
+        const drugItems = drugKeys.size
+            ? (await _getDrugsLibraryItems({ keys: Array.from(drugKeys) })).data || []
+            : [];
+
+        const dataKeys = await scrapDataKeys({
+            dataKeys: dataKeysRes.data || [],
+            screens: mergedScreens as any,
+            diagnoses: mergedDiagnoses as any,
+            problems: mergedProblems as any,
+            drugsLibrary: drugItems as any,
+        });
+
+        // The keys route flattens dataKeys across returned scripts, so one combined
+        // entry is enough (the API is always called per-script anyway).
+        return { data: [{ scriptId: ids[0], dataKeys }] };
+    } catch (e: any) {
+        logger.error('getScriptsConditionKeys ERROR', e?.message);
+        return { data: [], errors: [e.message] };
+    }
 }
 
 /**
