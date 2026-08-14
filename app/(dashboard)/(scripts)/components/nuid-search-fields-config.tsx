@@ -145,16 +145,24 @@ export function NuidSearchFieldsConfig({
         const changed = updated.some((f, i) => f !== current[i]);
         if (changed) setValue("nuidSearchFields", updated, { shouldDirty: true });
 
-        if (opts?.prompt && (missing.length || conflicts.length)) {
-            setProvision({ missing, conflicts });
+        const hasWork = missing.length > 0 || conflicts.length > 0;
+        if (opts?.prompt) {
+            setProvision(hasWork ? { missing, conflicts } : null);
+        } else {
+            setProvision((prev) => (prev && !hasWork ? null : prev));
         }
     }, [watch, allDataKeys, buildSpecFromFields, setValue]);
 
     useEffect(() => {
-        if (!resolvePending || loadingDataKeys) return;
+        if (!resolvePending || loadingDataKeys || !allDataKeys.length) return;
         runResolve({ prompt: resolvePending === "prompt" });
         setResolvePending(null);
-    }, [resolvePending, loadingDataKeys, runResolve]);
+    }, [resolvePending, loadingDataKeys, allDataKeys, runResolve]);
+
+    useEffect(() => {
+        if (loadingDataKeys) return;
+        runResolve({ prompt: false });
+    }, [allDataKeys, loadingDataKeys, runResolve]);
 
     useEffect(() => {
         if (open && nuidSearchEnabled) setResolvePending("prompt");
@@ -164,10 +172,12 @@ export function NuidSearchFieldsConfig({
         if (!provision) return;
         setProvisioning(true);
         try {
-            const payload = buildNuidProvisionPayload(provision.missing, allDataKeys);
+            const current = watch("nuidSearchFields") || [];
+            const { missing } = resolveNuidTemplate(buildSpecFromFields(current), allDataKeys);
+            const payload = buildNuidProvisionPayload(missing, allDataKeys);
             if (payload.length) {
                 const res = await saveDataKeys(payload as any);
-                if (res?.errors?.length) return; 
+                if (res?.errors?.length) return;
                 router.refresh();
             }
             setProvision(null);
@@ -175,7 +185,7 @@ export function NuidSearchFieldsConfig({
         } finally {
             setProvisioning(false);
         }
-    }, [provision, allDataKeys, saveDataKeys]);
+    }, [provision, allDataKeys, saveDataKeys, watch, buildSpecFromFields]);
 
     const onDelete = useCallback((index: number) => {
         confirm(() => setValue('nuidSearchFields', fields.filter((_, i) => i !== index), { shouldDirty: true, }), {
