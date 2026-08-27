@@ -16,6 +16,7 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { SymptomsBottomActions } from "./symptoms-bottom-actions";
 import { Symptom } from "./symptom";
 import { useProblemForm } from "../../hooks/use-problem-form";
+import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
 
 type Props = {
     disabled?: boolean;
@@ -31,6 +32,7 @@ export function Symptoms({
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
+    const { conditionKeys, keysReady } = useConditionKeys();
 
     const symptoms = form.watch('symptoms');
 
@@ -131,6 +133,24 @@ export function Symptoms({
                     },
                     {
                         name: 'Name',
+                        cellRenderer(cell) {
+                            const symptom = symptoms[cell.rowIndex];
+                            return (
+                                <span className="inline-flex items-center gap-x-2">
+                                    <span>{symptom?.name}</span>
+                                    {!!symptom && (
+                                        <ConditionErrorBadge
+                                            keys={conditionKeys}
+                                            keysReady={keysReady}
+                                            unavailableKeys={unavailableOutcomeKeys}
+                                            expressions={[
+                                                { value: symptom.expression, label: 'Sign/Risk expression' },
+                                            ]}
+                                        />
+                                    )}
+                                </span>
+                            );
+                        },
                     },
                     {
                         name: 'Action',

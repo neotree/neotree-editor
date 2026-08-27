@@ -16,6 +16,7 @@ import { isNumericQueryValue } from "@/lib/query-state";
 import { SymptomsBottomActions } from "./symptoms-bottom-actions";
 import { Symptom } from "./symptom";
 import { useDiagnosisForm } from "../..//hooks/use-diagnosis-form";
+import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -32,6 +33,7 @@ export function Symptoms({
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const { confirm } = useConfirmModal();
+    const { conditionKeys, keysReady } = useConditionKeys();
 
     const symptoms = form.watch('symptoms');
     const [currentSymptom, setCurrentSymptom] = useQueryState('symptom', {
@@ -159,6 +161,24 @@ export function Symptoms({
                     },
                     {
                         name: 'Name',
+                        cellRenderer(cell) {
+                            const symptom = symptoms[cell.rowIndex];
+                            return (
+                                <span className="inline-flex items-center gap-x-2">
+                                    <span>{symptom?.name}</span>
+                                    {!!symptom && (
+                                        <ConditionErrorBadge
+                                            keys={conditionKeys}
+                                            keysReady={keysReady}
+                                            unavailableKeys={unavailableOutcomeKeys}
+                                            expressions={[
+                                                { value: symptom.expression, label: 'Sign/Risk expression' },
+                                            ]}
+                                        />
+                                    )}
+                                </span>
+                            );
+                        },
                     },
                     {
                         name: 'Action',
