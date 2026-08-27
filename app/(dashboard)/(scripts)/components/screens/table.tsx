@@ -38,8 +38,7 @@ export function ScreensTable(props: Props) {
     } = useScreensTable(props);
 
     const { sys, viewOnly } = useAppContext();
-    const { conditionKeys } = useConditionKeys();
-    const keysReady = conditionKeys.length > 0;
+    const { conditionKeys, keysReady } = useConditionKeys();
     const outcomeProducers = useMemo(() => getOutcomeProducers(screens.data), [screens.data]);
     const unavailableByPosition = useMemo(() => {
         const availability = new Map<string, Record<string, string>>();

@@ -51,7 +51,7 @@ const yesNoItems: NonNullable<EligibilityCriteria["items"]> = [
 export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }: Props) {
   const [open, setOpen] = useState(false)
   const { keys, keysLoading } = useScriptsContext()
-  const { conditionKeys } = useConditionKeys({ enabled: open })
+  const { conditionKeys, keysReady: conditionKeysReady } = useConditionKeys({ enabled: open })
   const safeKeys = useMemo(() => {
     try {
       return { options: getKeyOptions(keys), error: "" }
@@ -81,6 +81,7 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
           value={value || null}
           keyOptions={safeKeys.options}
           conditionKeys={conditionKeys}
+          conditionKeysReady={conditionKeysReady}
           keyOptionsError={safeKeys.error}
           keysLoading={keysLoading}
           onClose={() => setOpen(false)}
@@ -98,6 +99,7 @@ function Form({
   value,
   keyOptions,
   conditionKeys,
+  conditionKeysReady,
   keyOptionsError,
   keysLoading,
   onClose,
@@ -106,6 +108,7 @@ function Form({
   value: EligibilityCriteria | null
   keyOptions: KeyOption[]
   conditionKeys: ReturnType<typeof useConditionKeys>["conditionKeys"]
+  conditionKeysReady: boolean
   keyOptionsError: string
   keysLoading: boolean
   onClose: () => void
@@ -381,6 +384,7 @@ function Form({
                   onChange={(next) => onChange(next)}
                   keys={conditionKeys}
                   keysLoading={keysLoading}
+                  keysReady={conditionKeysReady}
                   unavailableKeys={preScriptUnavailableOutcomeKeys}
                   allowSelf
                   selfDataType={criteriaType}
@@ -562,6 +566,7 @@ function Form({
                         onChange={(next) => onChange(next)}
                         keys={conditionKeys}
                         keysLoading={keysLoading}
+                        keysReady={conditionKeysReady}
                         unavailableKeys={preScriptUnavailableOutcomeKeys}
                         allowSelf
                         selfDataType={alternativeCriteriaType}

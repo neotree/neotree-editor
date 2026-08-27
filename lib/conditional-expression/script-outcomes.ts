@@ -1,8 +1,8 @@
 import type { ScriptConditionEntityRef } from "./collect";
 
 export const OUTCOME_COLLECTIONS = {
-  Diagnoses: { screenType: "diagnosis", singular: "diagnosis" },
-  Problems: { screenType: "problems", singular: "problem" },
+  Diagnoses: { screenType: "diagnosis", screenLabel: "diagnosis" },
+  Problems: { screenType: "problems", screenLabel: "Problems" },
 } as const;
 
 export type OutcomeCollectionName = keyof typeof OUTCOME_COLLECTIONS;
@@ -102,7 +102,7 @@ export function getUnavailableOutcomeKeys({
     const config = OUTCOME_COLLECTIONS[collection];
     const producer = producers ? producers[collection] : getOutcomeProducer(screens, collection);
     if (!producer) {
-      unavailable[collection] = `"$${collection}" is not available because this script has no ${config.singular} screen. Add that screen before using this collection.`;
+      unavailable[collection] = `"$${collection}" is not available because this script has no ${config.screenLabel} screen. Add that screen before using this collection.`;
       return;
     }
 
@@ -111,7 +111,7 @@ export function getUnavailableOutcomeKeys({
     // case the ordering is unknown, so availability remains non-blocking.
     if (producerPosition === null) return;
     if (producerPosition >= position) {
-      const producerLabel = `${producer?.title || `${config.singular} screen`}`;
+      const producerLabel = `${producer?.title || `${config.screenLabel} screen`}`;
       unavailable[collection] = `"$${collection}" is only available after ${producerLabel} (position ${producerPosition}). Move this condition to a later screen.`;
     }
   });

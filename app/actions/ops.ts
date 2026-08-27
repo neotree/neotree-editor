@@ -1378,19 +1378,26 @@ export async function publishData({ scope }: { scope: number }): Promise<Publish
     const publishScriptIds = new Set<string>()
     try {
       const draftRows = await Promise.all([
-        db.select({ scriptId: scriptsDrafts.scriptId }).from(scriptsDrafts).where(draftScopeFilter(scriptsDrafts.createdByUserId)),
-        db.select({ scriptId: screensDrafts.scriptId }).from(screensDrafts).where(draftScopeFilter(screensDrafts.createdByUserId)),
-        db.select({ scriptId: diagnosesDrafts.scriptId }).from(diagnosesDrafts).where(draftScopeFilter(diagnosesDrafts.createdByUserId)),
-        db.select({ scriptId: problemsDrafts.scriptId }).from(problemsDrafts).where(draftScopeFilter(problemsDrafts.createdByUserId)),
+        db.select({ scriptId: scriptsDrafts.scriptId, scriptDraftId: scriptsDrafts.scriptDraftId }).from(scriptsDrafts).where(draftScopeFilter(scriptsDrafts.createdByUserId)),
+        db.select({ scriptId: screensDrafts.scriptId, scriptDraftId: screensDrafts.scriptDraftId }).from(screensDrafts).where(draftScopeFilter(screensDrafts.createdByUserId)),
+        db.select({ scriptId: diagnosesDrafts.scriptId, scriptDraftId: diagnosesDrafts.scriptDraftId }).from(diagnosesDrafts).where(draftScopeFilter(diagnosesDrafts.createdByUserId)),
+        db.select({ scriptId: problemsDrafts.scriptId, scriptDraftId: problemsDrafts.scriptDraftId }).from(problemsDrafts).where(draftScopeFilter(problemsDrafts.createdByUserId)),
       ])
-      for (const rows of draftRows) for (const r of rows) if (r?.scriptId) publishScriptIds.add(`${r.scriptId}`)
+      for (const rows of draftRows) {
+        for (const row of rows) {
+          const scriptId = row?.scriptId || row?.scriptDraftId
+          if (scriptId) publishScriptIds.add(`${scriptId}`)
+        }
+      }
     } catch (e: any) {
       logger.error("publishData scope-scripts lookup ERROR", e.message)
     }
 
     const scopedScriptIds = Array.from(publishScriptIds)
-    await recomputeScriptsConditionErrors(scopedScriptIds)
-    const ceGate = await getScriptsWithConditionErrors({ scriptIds: scopedScriptIds })
+    const ceGate = await getScriptsWithConditionErrors({
+      scriptIds: scopedScriptIds,
+      forceRefresh: true,
+    })
     if (ceGate.scripts.length) {
       const top = ceGate.scripts.slice(0, 10)
       const lines = top.map((s) => `• ${s.title} (${s.count} issue${s.count === 1 ? "" : "s"})`)

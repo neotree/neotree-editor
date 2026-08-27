@@ -42,7 +42,7 @@ export function ProblemForm(props: Props) {
         save,
     } = form;
 
-    const { conditionKeys, keysLoading } = useConditionKeys();
+    const { conditionKeys, keysLoading, keysReady } = useConditionKeys();
     const [expressionHasErrors, setExpressionHasErrors] = useState(false);
 
     const name = watch('name');
@@ -164,6 +164,7 @@ export function ProblemForm(props: Props) {
                                 onChange={onChange}
                                 keys={conditionKeys}
                                 keysLoading={keysLoading}
+                                keysReady={keysReady}
                                 unavailableKeys={unavailableOutcomeKeys}
                                 disabled={disabled}
                                 initialValue={`${props.formData?.expression || ''}`}

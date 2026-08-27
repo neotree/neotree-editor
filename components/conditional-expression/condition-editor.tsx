@@ -36,6 +36,8 @@ export interface ConditionEditorProps {
   selfOptions?: string[];
   unavailableKeys?: Record<string, string>;
   keysLoading?: boolean;
+  /** Authoritative catalogue readiness; unlike key count, loaded-empty is ready. */
+  keysReady?: boolean;
   disabled?: boolean;
   rows?: number;
   placeholder?: string;
@@ -66,6 +68,7 @@ export function ConditionEditor({
   selfDataType,
   selfOptions,
   unavailableKeys,
+  keysReady: keysReadyProp,
   disabled,
   rows = 4,
   placeholder,
@@ -76,6 +79,7 @@ export function ConditionEditor({
   const [cursor, setCursor] = useState(value.length);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<string | null>(null);
+  const [acceptedSuggestion, setAcceptedSuggestion] = useState<{ value: string; cursor: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingCursorRef = useRef<number | null>(null);
   const listboxId = useId();
@@ -89,10 +93,10 @@ export function ConditionEditor({
   // targeted diagnostic still prevents an invalid before-producer reference.
   const autocompleteKeys = mergedKeys;
 
-  // Readiness is based on *having* keys, not the transient loading flag —
-  // otherwise a background refetch (keysLoading -> true) would momentarily
-  // blank out key-dependent diagnostics. Keys persist once loaded.
-  const keysReady = keys.length > 0;
+  // Prefer the authoritative loaded signal: an empty-but-loaded catalogue must
+  // still validate, while a background refetch must not blank diagnostics.
+  // Standalone callers retain the non-empty-list fallback.
+  const keysReady = keysReadyProp ?? (keys.length > 0);
 
   const { diagnostics, hasErrors } = useConditionValidation({
     value,
@@ -151,7 +155,12 @@ export function ConditionEditor({
     : valueContext && valueSuggestions.length
       ? `value:${valueContext.insertStart}:${valueContext.insertEnd}:${valueContext.partial}`
       : null;
-  const suggestionsOpen = !!suggestionsSignature && dismissedSuggestions !== suggestionsSignature;
+  const acceptedSuggestionStillCurrent = !!acceptedSuggestion
+    && acceptedSuggestion.value === value
+    && acceptedSuggestion.cursor === cursor;
+  const suggestionsOpen = !!suggestionsSignature
+    && dismissedSuggestions !== suggestionsSignature
+    && !acceptedSuggestionStillCurrent;
   const visibleKeySuggestions = suggestionsOpen ? keySuggestions : [];
   const visibleValueSuggestions = suggestionsOpen ? valueSuggestions : [];
   const suggestionCount = visibleKeySuggestions.length || visibleValueSuggestions.length;
@@ -192,16 +201,22 @@ export function ConditionEditor({
     textareaRef.current?.setSelectionRange(pending, pending);
   }, [value]);
 
-  const moveCursorAfterChange = (nextCursor: number) => {
+  const moveCursorAfterChange = (
+    nextCursor: number,
+    opts?: { acceptedValue?: string },
+  ) => {
     pendingCursorRef.current = nextCursor;
     setCursor(nextCursor);
-    setDismissedSuggestions(null);
+    setDismissedSuggestions(opts?.acceptedValue === undefined ? null : suggestionsSignature);
+    setAcceptedSuggestion(opts?.acceptedValue === undefined
+      ? null
+      : { value: opts.acceptedValue, cursor: nextCursor });
   };
 
   const applyKeySuggestion = (name: string) => {
     const next = insertKeyAtCursor(value, name, activeToken);
     onChange(next.condition);
-    moveCursorAfterChange(next.cursor);
+    moveCursorAfterChange(next.cursor, { acceptedValue: next.condition });
   };
 
   const applyValueSuggestion = (optionValue: string) => {
@@ -212,7 +227,7 @@ export function ConditionEditor({
       quote: valueKey?.dataType?.toLowerCase() !== "boolean",
     });
     onChange(next.condition);
-    moveCursorAfterChange(next.cursor);
+    moveCursorAfterChange(next.cursor, { acceptedValue: next.condition });
   };
 
   const applySuggestion = (diagnostic: Diagnostic) => {
@@ -238,10 +253,14 @@ export function ConditionEditor({
         placeholder={placeholder}
         value={value}
         onChange={(event) => {
+          setAcceptedSuggestion(null);
           onChange(event.target.value);
           setCursor(event.target.selectionStart ?? event.target.value.length);
         }}
-        onClick={(event) => setCursor(event.currentTarget.selectionStart ?? 0)}
+        onClick={(event) => {
+          setAcceptedSuggestion(null);
+          setCursor(event.currentTarget.selectionStart ?? 0);
+        }}
         onKeyDown={(event) => {
           if (!suggestionCount) return;
           // Conditions are intentionally multiline. Keep the standard Enter

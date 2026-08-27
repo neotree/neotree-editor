@@ -101,7 +101,7 @@ export function ScreenForm(props: Props) {
         save,
     } = form;
     const [alias, setAlias] = useState('');
-    const { conditionKeys, keysLoading } = useConditionKeys();
+    const { conditionKeys, keysLoading, keysReady } = useConditionKeys();
     const [conditionHasErrors, setConditionHasErrors] = useState(false);
     const [skipToConditionHasErrors, setSkipToConditionHasErrors] = useState(false);
     const type = watch('type');
@@ -506,6 +506,7 @@ export function ScreenForm(props: Props) {
                                 keys={conditionKeys}
                                 extraKeys={localConditionKeys}
                                 keysLoading={keysLoading}
+                                keysReady={keysReady}
                                 unavailableKeys={unavailableOutcomeKeys}
                                 disabled={disabled}
                                 initialValue={formData?.condition || ''}
@@ -531,6 +532,7 @@ export function ScreenForm(props: Props) {
                                     keys={conditionKeys}
                                     extraKeys={localConditionKeys}
                                     keysLoading={keysLoading}
+                                    keysReady={keysReady}
                                     unavailableKeys={unavailableOutcomeKeys}
                                     disabled={disabled}
                                     initialValue={formData?.skipToCondition || ''}
@@ -1311,6 +1313,7 @@ export function ScreenForm(props: Props) {
                         disabled={disabled}
                         scriptId={scriptId}
                         unavailableOutcomeKeys={unavailableOutcomeKeys}
+                        persistedFields={(formData?.fields || []) as ScriptField[]}
                     />
                     
                     {repeatable && (

@@ -23,13 +23,15 @@ assert.ok(
 )
 
 const publishActionSource = readSource("app/actions/ops.ts")
-const recomputeIndex = publishActionSource.indexOf("await recomputeScriptsConditionErrors(scopedScriptIds)")
-const conditionGateIndex = publishActionSource.indexOf("await getScriptsWithConditionErrors({ scriptIds: scopedScriptIds })")
+const conditionGateIndex = publishActionSource.indexOf("const ceGate = await getScriptsWithConditionErrors({")
 
-assert.ok(recomputeIndex >= 0, "publish should refresh scoped conditional-expression reports")
 assert.ok(
-  conditionGateIndex > recomputeIndex,
-  "publish should wait for report refresh before reading conditional-expression findings",
+  conditionGateIndex >= 0 && publishActionSource.indexOf("forceRefresh: true", conditionGateIndex) > conditionGateIndex,
+  "publish should force a draft-inclusive refresh while reading scoped conditional-expression findings",
+)
+assert.ok(
+  publishActionSource.includes("row?.scriptId || row?.scriptDraftId"),
+  "publish scope should include never-published scripts through scriptDraftId",
 )
 assert.equal(
   publishActionSource.includes("results.blockingDetails = { conditionErrors: ceGate }"),

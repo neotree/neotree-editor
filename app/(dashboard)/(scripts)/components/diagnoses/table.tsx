@@ -37,9 +37,8 @@ export function DiagnosesTable(props: Props) {
     } = useDiagnosesTable(props);
 
     const { sys, viewOnly } = useAppContext();
-    const { conditionKeys } = useConditionKeys();
+    const { conditionKeys, keysReady } = useConditionKeys();
     const { conditionScreens, conditionCatalogueReady } = useScriptsContext();
-    const keysReady = conditionKeys.length > 0;
     const producer = getOutcomeProducer(conditionScreens, "Diagnoses");
     const unavailableOutcomeKeys = getUnavailableOutcomeKeys({
         screens: conditionScreens,

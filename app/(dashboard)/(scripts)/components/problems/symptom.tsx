@@ -43,7 +43,7 @@ export function Symptom<P = {}>({
 
     const [open, setOpen] = useState(false);
     const [expressionHasErrors, setExpressionHasErrors] = useState(false);
-    const { conditionKeys, keysLoading } = useConditionKeys({ enabled: open });
+    const { conditionKeys, keysLoading, keysReady } = useConditionKeys({ enabled: open });
 
     const getDefaultValues = useCallback(() => {
         return {
@@ -210,6 +210,7 @@ export function Symptom<P = {}>({
                                     onChange={onChange}
                                     keys={conditionKeys}
                                     keysLoading={keysLoading}
+                                    keysReady={keysReady}
                                     unavailableKeys={unavailableOutcomeKeys}
                                     disabled={disabled}
                                     rows={3}

@@ -19,11 +19,14 @@ export { toConditionKeys };
 export function useConditionKeys(opts?: { enabled?: boolean }): {
   conditionKeys: ConditionKey[];
   keysLoading: boolean;
+  /** True after the authoritative script catalogue has loaded, even if empty. */
+  keysReady: boolean;
 } {
   const ctx = useScriptsContext();
   const keys = ctx?.keys;
   const contextConditionKeys = ctx?.conditionKeys;
   const keysLoading = ctx?.keysLoading ?? false;
+  const conditionCatalogueReady = ctx?.conditionCatalogueReady ?? false;
   const loadKeys = ctx?.loadKeys;
   const enabled = opts?.enabled ?? true;
 
@@ -38,5 +41,9 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
     [contextConditionKeys, keys],
   );
 
-  return { conditionKeys, keysLoading };
+  return {
+    conditionKeys,
+    keysLoading,
+    keysReady: conditionCatalogueReady || conditionKeys.length > 0,
+  };
 }

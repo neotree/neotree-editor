@@ -562,7 +562,7 @@ export function Field({
         defaultValues: getDefaultValues(),
     });
 
-    const { conditionKeys, keysLoading } = useConditionKeys();
+    const { conditionKeys, keysLoading, keysReady } = useConditionKeys();
     const [conditionHasErrors, setConditionHasErrors] = useState(false);
 
     const type = watch('type');
@@ -760,6 +760,7 @@ export function Field({
                                     keys={conditionKeys}
                                     extraKeys={extraKeys}
                                     keysLoading={keysLoading}
+                                    keysReady={keysReady}
                                     unavailableKeys={preScriptUnavailableOutcomeKeys}
                                     disabled={disabled}
                                     initialValue={`${field?.condition || ''}`}

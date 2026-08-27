@@ -145,19 +145,41 @@ export const deleteScreens: typeof mutations._deleteScreens = async params => {
     }
 };
 
-export const saveScreens: typeof mutations._saveScreens = async params => {
+type OutcomeCollisionBaseline = {
+    screens?: any[];
+    diagnoses?: any[];
+    problems?: any[];
+};
+
+/**
+ * Shared screen save implementation. `collisionBaseline` is deliberately an
+ * internal second argument: ordinary editor requests must always load their
+ * baseline from persistence, while trusted copy/import flows can carry the
+ * source entity forward after minting a new id.
+ */
+async function saveScreensInternal(
+    params: Parameters<typeof mutations._saveScreens>[0],
+    collisionBaseline?: OutcomeCollisionBaseline,
+): Promise<Awaited<ReturnType<typeof mutations._saveScreens>>> {
     try {
         const session = await isAllowed();
         const incoming = (params?.data || []) as any[];
         const affectedScriptIds = await resolveSaveAffectedScriptIds(incoming, "screen");
         let collisions = collectNewOutcomeKeyCollisions({ screens: incoming });
         if (collisions.length) {
-            const screenIds = incoming.map((screen) => screen?.screenId).filter(Boolean);
-            const current = screenIds.length
-                ? await queries._getScreens({ screensIds: screenIds, returnDraftsIfExist: true })
-                : { data: [] as any[], errors: undefined };
-            if (current.errors?.length) throw new Error(current.errors.join(", "));
-            collisions = collectNewOutcomeKeyCollisions({ screens: incoming }, { screens: current.data });
+            if (collisionBaseline?.screens) {
+                collisions = collectNewOutcomeKeyCollisions(
+                    { screens: incoming },
+                    { screens: collisionBaseline.screens },
+                );
+            } else {
+                const screenIds = incoming.map((screen) => screen?.screenId).filter(Boolean);
+                const current = screenIds.length
+                    ? await queries._getScreens({ screensIds: screenIds, returnDraftsIfExist: true })
+                    : { data: [] as any[], errors: undefined };
+                if (current.errors?.length) throw new Error(current.errors.join(", "));
+                collisions = collectNewOutcomeKeyCollisions({ screens: incoming }, { screens: current.data });
+            }
         }
         if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
         const res = await mutations._saveScreens({
@@ -168,9 +190,11 @@ export const saveScreens: typeof mutations._saveScreens = async params => {
         return res;
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [e.message], success: false, };
     }
-};
+}
+
+export const saveScreens: typeof mutations._saveScreens = async params => saveScreensInternal(params);
 
 // DIAGNOSES
 export const countDiagnoses: typeof queries._countDiagnoses = async (...args) => {
@@ -270,19 +294,29 @@ export const deleteProblems: typeof mutations._deleteProblems = async params => 
     }
 };
 
-export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => {
+async function saveDiagnosesInternal(
+    params: Parameters<typeof mutations._saveDiagnoses>[0],
+    collisionBaseline?: OutcomeCollisionBaseline,
+): Promise<Awaited<ReturnType<typeof mutations._saveDiagnoses>>> {
     try {
         const session = await isAllowed();
         const incoming = (params?.data || []) as any[];
         const affectedScriptIds = await resolveSaveAffectedScriptIds(incoming, "diagnosis");
         let collisions = collectNewOutcomeKeyCollisions({ diagnoses: incoming });
         if (collisions.length) {
-            const diagnosisIds = incoming.map((diagnosis) => diagnosis?.diagnosisId).filter(Boolean);
-            const current = diagnosisIds.length
-                ? await queries._getDiagnoses({ diagnosesIds: diagnosisIds, returnDraftsIfExist: true })
-                : { data: [] as any[], errors: undefined };
-            if (current.errors?.length) throw new Error(current.errors.join(", "));
-            collisions = collectNewOutcomeKeyCollisions({ diagnoses: incoming }, { diagnoses: current.data });
+            if (collisionBaseline?.diagnoses) {
+                collisions = collectNewOutcomeKeyCollisions(
+                    { diagnoses: incoming },
+                    { diagnoses: collisionBaseline.diagnoses },
+                );
+            } else {
+                const diagnosisIds = incoming.map((diagnosis) => diagnosis?.diagnosisId).filter(Boolean);
+                const current = diagnosisIds.length
+                    ? await queries._getDiagnoses({ diagnosesIds: diagnosisIds, returnDraftsIfExist: true })
+                    : { data: [] as any[], errors: undefined };
+                if (current.errors?.length) throw new Error(current.errors.join(", "));
+                collisions = collectNewOutcomeKeyCollisions({ diagnoses: incoming }, { diagnoses: current.data });
+            }
         }
         if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
         const res = await saveOutcomeEntityWithReferenceRewrite("diagnosis", params, session.user?.userId);
@@ -290,23 +324,35 @@ export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => {
         return res;
     } catch (e: any) {
         logger.error('saveDiagnoses ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [e.message], success: false, };
     }
-};
+}
 
-export const saveProblems: typeof mutations._saveProblems = async params => {
+export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => saveDiagnosesInternal(params);
+
+async function saveProblemsInternal(
+    params: Parameters<typeof mutations._saveProblems>[0],
+    collisionBaseline?: OutcomeCollisionBaseline,
+): Promise<Awaited<ReturnType<typeof mutations._saveProblems>>> {
     try {
         const session = await isAllowed();
         const incoming = (params?.data || []) as any[];
         const affectedScriptIds = await resolveSaveAffectedScriptIds(incoming, "problem");
         let collisions = collectNewOutcomeKeyCollisions({ problems: incoming });
         if (collisions.length) {
-            const problemIds = incoming.map((problem) => problem?.problemId).filter(Boolean);
-            const current = problemIds.length
-                ? await queries._getProblems({ problemsIds: problemIds, returnDraftsIfExist: true })
-                : { data: [] as any[], errors: undefined };
-            if (current.errors?.length) throw new Error(current.errors.join(", "));
-            collisions = collectNewOutcomeKeyCollisions({ problems: incoming }, { problems: current.data });
+            if (collisionBaseline?.problems) {
+                collisions = collectNewOutcomeKeyCollisions(
+                    { problems: incoming },
+                    { problems: collisionBaseline.problems },
+                );
+            } else {
+                const problemIds = incoming.map((problem) => problem?.problemId).filter(Boolean);
+                const current = problemIds.length
+                    ? await queries._getProblems({ problemsIds: problemIds, returnDraftsIfExist: true })
+                    : { data: [] as any[], errors: undefined };
+                if (current.errors?.length) throw new Error(current.errors.join(", "));
+                collisions = collectNewOutcomeKeyCollisions({ problems: incoming }, { problems: current.data });
+            }
         }
         if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
         const res = await saveOutcomeEntityWithReferenceRewrite("problem", params, session.user?.userId);
@@ -314,9 +360,11 @@ export const saveProblems: typeof mutations._saveProblems = async params => {
         return res;
     } catch (e: any) {
         logger.error('saveProblems ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [e.message], success: false, };
     }
-};
+}
+
+export const saveProblems: typeof mutations._saveProblems = async params => saveProblemsInternal(params);
 
 // SCRIPTS
 export const countScripts: typeof queries._countScripts = async (...args) => {
@@ -753,7 +801,7 @@ async function computeConditionReportsLean(
             .from(problems)
             .leftJoin(pendingDeletion, eq(pendingDeletion.problemId, problems.problemId))
             .where(and(isNull(problems.deletedAt), isNull(pendingDeletion.id), inArray(problems.scriptId, scriptIds))),
-        _getDataKeys(),
+        _getDataKeys({ returnDraftsIfExist: true }),
     ]);
 
     if (dataKeysRes.errors?.length) throw new Error(dataKeysRes.errors.join(", "));
@@ -797,7 +845,7 @@ async function computeConditionReportsLean(
 
     const reports: Record<string, ScriptConditionReport> = {};
 
-    await Promise.all(inputs.map(async (s) => {
+    await runWithConcurrency(inputs, 6, async (s) => {
         const scriptId = `${s?.scriptId || ''}`;
         if (!scriptId) return;
 
@@ -829,7 +877,7 @@ async function computeConditionReportsLean(
             eligibilityCriteria: s?.eligibilityCriteria,
             configurationKeys,
         });
-    }));
+    });
 
     return reports;
 }
@@ -867,9 +915,16 @@ async function computeConditionReportsDraftInclusive(
             nuidSearchFields: scriptsTable.nuidSearchFields,
             eligibilityCriteria: scriptsTable.eligibilityCriteria,
         }).from(scriptsTable).where(and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scriptIds))),
-        db.select({ scriptId: scriptsDrafts.scriptId, data: scriptsDrafts.data })
+        db.select({
+            scriptId: scriptsDrafts.scriptId,
+            scriptDraftId: scriptsDrafts.scriptDraftId,
+            data: scriptsDrafts.data,
+        })
             .from(scriptsDrafts)
-            .where(inArray(scriptsDrafts.scriptId, scriptIds)),
+            .where(or(
+                inArray(scriptsDrafts.scriptId, scriptIds),
+                inArray(scriptsDrafts.scriptDraftId, scriptIds),
+            )),
         db.select({
             scriptId: screens.scriptId,
             screenId: screens.screenId,
@@ -888,9 +943,17 @@ async function computeConditionReportsDraftInclusive(
         }).from(screens)
             .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
             .where(and(isNull(screens.deletedAt), isNull(pendingDeletion.id), inArray(screens.scriptId, scriptIds))),
-        db.select({ screenId: screensDrafts.screenId, scriptId: screensDrafts.scriptId, data: screensDrafts.data })
+        db.select({
+            screenId: screensDrafts.screenId,
+            scriptId: screensDrafts.scriptId,
+            scriptDraftId: screensDrafts.scriptDraftId,
+            data: screensDrafts.data,
+        })
             .from(screensDrafts)
-            .where(inArray(screensDrafts.scriptId, scriptIds)),
+            .where(or(
+                inArray(screensDrafts.scriptId, scriptIds),
+                inArray(screensDrafts.scriptDraftId, scriptIds),
+            )),
         db.select({
             scriptId: diagnoses.scriptId,
             diagnosisId: diagnoses.diagnosisId,
@@ -902,9 +965,17 @@ async function computeConditionReportsDraftInclusive(
         }).from(diagnoses)
             .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
             .where(and(isNull(diagnoses.deletedAt), isNull(pendingDeletion.id), inArray(diagnoses.scriptId, scriptIds))),
-        db.select({ diagnosisId: diagnosesDrafts.diagnosisId, scriptId: diagnosesDrafts.scriptId, data: diagnosesDrafts.data })
+        db.select({
+            diagnosisId: diagnosesDrafts.diagnosisId,
+            scriptId: diagnosesDrafts.scriptId,
+            scriptDraftId: diagnosesDrafts.scriptDraftId,
+            data: diagnosesDrafts.data,
+        })
             .from(diagnosesDrafts)
-            .where(inArray(diagnosesDrafts.scriptId, scriptIds)),
+            .where(or(
+                inArray(diagnosesDrafts.scriptId, scriptIds),
+                inArray(diagnosesDrafts.scriptDraftId, scriptIds),
+            )),
         db.select({
             scriptId: problems.scriptId,
             problemId: problems.problemId,
@@ -916,9 +987,17 @@ async function computeConditionReportsDraftInclusive(
         }).from(problems)
             .leftJoin(pendingDeletion, eq(pendingDeletion.problemId, problems.problemId))
             .where(and(isNull(problems.deletedAt), isNull(pendingDeletion.id), inArray(problems.scriptId, scriptIds))),
-        db.select({ problemId: problemsDrafts.problemId, scriptId: problemsDrafts.scriptId, data: problemsDrafts.data })
+        db.select({
+            problemId: problemsDrafts.problemId,
+            scriptId: problemsDrafts.scriptId,
+            scriptDraftId: problemsDrafts.scriptDraftId,
+            data: problemsDrafts.data,
+        })
             .from(problemsDrafts)
-            .where(inArray(problemsDrafts.scriptId, scriptIds)),
+            .where(or(
+                inArray(problemsDrafts.scriptId, scriptIds),
+                inArray(problemsDrafts.scriptDraftId, scriptIds),
+            )),
         opts?.dataKeys
             ? Promise.resolve({ data: opts.dataKeys, errors: undefined })
             : _getDataKeys({ returnDraftsIfExist: true }),
@@ -939,11 +1018,21 @@ async function computeConditionReportsDraftInclusive(
         }
         return grouped;
     };
-    const groupDrafts = <T extends { scriptId?: string | null; data?: any }>(rows: T[], idField: string) => {
+    const requestedIds = new Set(scriptIds);
+    const resolveDraftScriptId = (row: { scriptId?: string | null; scriptDraftId?: string | null; data?: any }) => {
+        const candidates = [
+            row?.scriptId,
+            row?.scriptDraftId,
+            row?.data?.scriptId,
+            row?.data?.scriptDraftId,
+        ].map((candidate) => `${candidate || ''}`).filter(Boolean);
+        return candidates.find((candidate) => requestedIds.has(candidate)) || '';
+    };
+    const groupDrafts = <T extends { scriptId?: string | null; scriptDraftId?: string | null; data?: any }>(rows: T[], idField: string) => {
         const grouped = new Map<string, any[]>();
         for (const row of rows) {
             const data = row?.data || {};
-            const scriptId = `${row?.scriptId || data?.scriptId || ''}`;
+            const scriptId = resolveDraftScriptId(row);
             if (!scriptId) continue;
             const effective = {
                 ...data,
@@ -966,7 +1055,11 @@ async function computeConditionReportsDraftInclusive(
     };
 
     const publishedScripts = new Map(scriptRows.map((row) => [`${row.scriptId}`, row]));
-    const draftScripts = new Map(scriptDraftRows.map((row) => [`${row.scriptId || ''}`, row.data]));
+    const draftScripts = new Map(
+        scriptDraftRows
+            .map((row) => [resolveDraftScriptId(row), row.data] as const)
+            .filter(([scriptId]) => !!scriptId),
+    );
     const publishedScreens = groupPublished(screenRows);
     const draftScreens = groupDrafts(screenDraftRows, 'screenId');
     const publishedDiagnoses = groupPublished(diagnosisRows);
@@ -984,7 +1077,7 @@ async function computeConditionReportsDraftInclusive(
     const allDrugKeys = new Set<string>();
     for (const input of inputs) {
         const scriptId = `${input?.scriptId || ''}`;
-        if (!scriptId || !publishedScripts.has(scriptId)) continue;
+        if (!scriptId || (!publishedScripts.has(scriptId) && !draftScripts.has(scriptId))) continue;
         const effectiveScreens = mergeEffective(publishedScreens.get(scriptId) || [], draftScreens.get(scriptId) || [], 'screenId');
         const effectiveDiagnoses = mergeEffective(publishedDiagnoses.get(scriptId) || [], draftDiagnoses.get(scriptId) || [], 'diagnosisId');
         const effectiveProblems = mergeEffective(publishedProblems.get(scriptId) || [], draftProblems.get(scriptId) || [], 'problemId');
@@ -994,7 +1087,11 @@ async function computeConditionReportsDraftInclusive(
             screens: effectiveScreens,
             diagnoses: effectiveDiagnoses,
             problems: effectiveProblems,
-            script: { ...publishedScripts.get(scriptId), ...(draftScripts.get(scriptId) || {}) },
+            script: {
+                ...(publishedScripts.get(scriptId) || {}),
+                ...(draftScripts.get(scriptId) || {}),
+                scriptId,
+            },
         });
     }
 
@@ -1009,7 +1106,7 @@ async function computeConditionReportsDraftInclusive(
     }
 
     const reports: Record<string, ScriptConditionReport> = {};
-    await Promise.all(Array.from(effectiveById.entries()).map(async ([scriptId, effective]) => {
+    await runWithConcurrency(Array.from(effectiveById.entries()), 6, async ([scriptId, effective]) => {
         const drugKeys = collectDrugKeysFromScreens(effective.screens);
         const drugsLibrary = Array.from(drugKeys).map((key) => drugItemsByKey.get(key)).filter(Boolean);
         const dataKeys = await scrapDataKeys({
@@ -1035,7 +1132,7 @@ async function computeConditionReportsDraftInclusive(
                 ? effective.script.eligibilityCriteria
                 : effective.input?.eligibilityCriteria,
         });
-    }));
+    });
     return reports;
 }
 
@@ -1112,10 +1209,11 @@ export async function getScriptsConditionKeys(
             db.select({ problemId: problemsDrafts.problemId, data: problemsDrafts.data })
                 .from(problemsDrafts)
                 .where(draftMatch(problemsDrafts.scriptId, problemsDrafts.scriptDraftId)),
-            _getDataKeys(),
+            _getDataKeys({ returnDraftsIfExist: true }),
             _getConfigKeys({ returnDraftsIfExist: true }),
         ]);
 
+        if (dataKeysRes.errors?.length) throw new Error(dataKeysRes.errors.join(", "));
         if (configurationKeysRes.errors?.length) throw new Error(configurationKeysRes.errors.join(", "));
 
         // A draft supersedes its published counterpart; draft-only entities are added.
@@ -1172,7 +1270,8 @@ export async function getScriptsConditionKeys(
  * render latency.
  *
  * Prefers the precomputed `conditionErrorReport` column (kept fresh on write,
- * draft-inclusive) and only computes lean for missing or stale reports. A
+ * draft-inclusive) and computes the effective draft state for missing or stale
+ * reports. A
  * Configuration-key signature makes old cache entries self-expire during a
  * normal read, with no migration or backfill job.
  */
@@ -1212,7 +1311,7 @@ export async function getScriptsConditionErrors(
         }
 
         if (missing.length) {
-            const computed = await computeConditionReportsLean(missing, configurationKeys);
+            const computed = await computeConditionReportsDraftInclusive(missing, configurationKeys);
             Object.assign(result, computed);
             void persistConditionReports(computed);
         }
@@ -1306,11 +1405,10 @@ export async function recomputeScriptConditionErrors(
 
 /** Runs tasks with a bounded concurrency so batches don't stampede the DB. */
 async function runWithConcurrency<T>(items: T[], limit: number, task: (item: T) => Promise<void>): Promise<void> {
-    const queue = [...items];
-    const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
-        while (queue.length) {
-            const item = queue.shift();
-            if (item === undefined) return;
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+            const item = items[nextIndex++];
             await task(item);
         }
     });
@@ -1376,12 +1474,20 @@ export async function recomputeScriptsConditionErrors(scriptIds: (string | null 
             // Any save that arrived during the batch marked its state dirty.
             // Re-read only those scripts until their latest committed state is
             // represented; the common publish path remains a single batch.
-            await runWithConcurrency(ownedStates, 6, async (state) => {
-                while (state.dirty) {
-                    state.dirty = false;
-                    await doRecomputeScriptConditionErrors(state.id, { dataKeys, dataKeyIndex, configurationKeys: resolvedConfigurationKeys });
-                }
-            });
+            // Drain globally, not once per worker. A clean state can become
+            // dirty while another state's refresh is awaiting I/O; rechecking
+            // the full owned set closes that save-vs-cleanup race.
+            while (ownedStates.some((state) => state.dirty)) {
+                const dirtyStates = ownedStates.filter((state) => state.dirty);
+                dirtyStates.forEach((state) => { state.dirty = false; });
+                await runWithConcurrency(dirtyStates, 6, async (state) => {
+                    await doRecomputeScriptConditionErrors(state.id, {
+                        dataKeys,
+                        dataKeyIndex,
+                        configurationKeys: resolvedConfigurationKeys,
+                    });
+                });
+            }
         } catch (e: any) {
             logger.error('recomputeScriptsConditionErrors batch ERROR', e?.message);
         } finally {
@@ -1411,15 +1517,13 @@ async function persistConditionReports(reports: Record<string, ScriptConditionRe
     const entries = Object.entries(reports || {});
     if (!entries.length) return;
     try {
-        await Promise.all(
-            entries.map(([id, report]) =>
-                db
-                    .update(scriptsTable)
-                    .set({ conditionErrorReport: report })
-                    .where(eq(scriptsTable.scriptId, id))
-                    .catch((e: any) => logger.error('persistConditionReports row ERROR', e?.message)),
-            ),
-        );
+        await runWithConcurrency(entries, 6, async ([id, report]) => {
+            await db
+                .update(scriptsTable)
+                .set({ conditionErrorReport: report })
+                .where(eq(scriptsTable.scriptId, id))
+                .catch((e: any) => logger.error('persistConditionReports row ERROR', e?.message));
+        });
     } catch (e: any) {
         logger.error('persistConditionReports ERROR', e?.message);
     }
@@ -1436,62 +1540,133 @@ async function persistConditionReports(reports: Record<string, ScriptConditionRe
  *
  * Pass `scriptIds` to restrict the check to the scripts actually being published
  * (the publish scope) — an empty array means "no scripts in scope" and returns
- * nothing; omit it to scan every script.
+ * nothing; omit it to scan every script. `forceRefresh` computes the effective
+ * draft state in the request itself, including scripts that have never had a
+ * published row and therefore cannot carry a persisted report yet.
  */
-export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[] }): Promise<{
+export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[]; forceRefresh?: boolean }): Promise<{
     scripts: { scriptId: string; title: string; count: number }[];
     totalFindings: number;
 }> {
     try {
-        const scopeIds = opts?.scriptIds;
+        const scopeIds = opts?.scriptIds
+            ? Array.from(new Set(opts.scriptIds.map((id) => `${id || ''}`).filter(Boolean)))
+            : undefined;
         if (scopeIds && !scopeIds.length) return { scripts: [], totalFindings: 0 };
+        const scopeSet = scopeIds ? new Set(scopeIds) : undefined;
 
         const configurationKeysRes = await _getConfigKeys({ returnDraftsIfExist: true });
         if (configurationKeysRes.errors?.length) throw new Error(configurationKeysRes.errors.join(", "));
         const configurationKeys = configurationKeysRes.data || [];
         const configurationSignature = getConfigurationConditionKeySignature(configurationKeys);
 
-        const rows = await db
-            .select({
-                scriptId: scriptsTable.scriptId,
-                title: scriptsTable.title,
-                report: scriptsTable.conditionErrorReport,
-                nuidSearchFields: scriptsTable.nuidSearchFields,
-                eligibilityCriteria: scriptsTable.eligibilityCriteria,
-            })
-            .from(scriptsTable)
-            .where(
-                scopeIds && scopeIds.length
-                    ? and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scopeIds))
-                    : isNull(scriptsTable.deletedAt),
-            );
+        const [rows, draftRows] = await Promise.all([
+            db
+                .select({
+                    scriptId: scriptsTable.scriptId,
+                    title: scriptsTable.title,
+                    report: scriptsTable.conditionErrorReport,
+                    nuidSearchFields: scriptsTable.nuidSearchFields,
+                    eligibilityCriteria: scriptsTable.eligibilityCriteria,
+                })
+                .from(scriptsTable)
+                .where(
+                    scopeIds
+                        ? and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scopeIds))
+                        : isNull(scriptsTable.deletedAt),
+                ),
+            db
+                .select({
+                    scriptId: scriptsDrafts.scriptId,
+                    scriptDraftId: scriptsDrafts.scriptDraftId,
+                    data: scriptsDrafts.data,
+                })
+                .from(scriptsDrafts)
+                .where(scopeIds ? or(
+                    inArray(scriptsDrafts.scriptId, scopeIds),
+                    inArray(scriptsDrafts.scriptDraftId, scopeIds),
+                ) : undefined),
+        ]);
+
+        type EffectiveScript = ScriptConditionErrorInput & {
+            title: string;
+            report: ScriptConditionReport | null;
+            hasDraft: boolean;
+        };
+        const effectiveById = new Map<string, EffectiveScript>();
+        for (const row of rows) {
+            const id = `${row.scriptId || ''}`;
+            if (!id) continue;
+            effectiveById.set(id, {
+                scriptId: id,
+                title: `${row.title || 'Untitled script'}`,
+                report: (row.report as ScriptConditionReport | null) || null,
+                hasDraft: false,
+                nuidSearchFields: row.nuidSearchFields,
+                eligibilityCriteria: row.eligibilityCriteria,
+            });
+        }
+        for (const row of draftRows) {
+            const data = row?.data || {};
+            const candidates = [data?.scriptId, row?.scriptDraftId, row?.scriptId]
+                .map((candidate) => `${candidate || ''}`)
+                .filter(Boolean);
+            const id = scopeSet
+                ? candidates.find((candidate) => scopeSet.has(candidate))
+                : candidates[0];
+            if (!id) continue;
+            const current = effectiveById.get(id);
+            effectiveById.set(id, {
+                scriptId: id,
+                title: data?.title !== undefined
+                    ? `${data.title || 'Untitled script'}`
+                    : current?.title || 'Untitled script',
+                report: current?.report || null,
+                hasDraft: true,
+                nuidSearchFields: data?.nuidSearchFields !== undefined
+                    ? data.nuidSearchFields
+                    : current?.nuidSearchFields,
+                eligibilityCriteria: data?.eligibilityCriteria !== undefined
+                    ? data.eligibilityCriteria
+                    : current?.eligibilityCriteria,
+            });
+        }
 
         const titleById = new Map<string, string>();
         const counts = new Map<string, number>();
         const missing: ScriptConditionErrorInput[] = [];
         const stale: ScriptConditionErrorInput[] = [];
+        const refresh: ScriptConditionErrorInput[] = [];
 
-        for (const row of rows) {
-            const id = `${row.scriptId}`;
-            titleById.set(id, `${row.title || 'Untitled script'}`);
-            const report = (row.report as ScriptConditionReport | null) || null;
-            if (report?.configurationSignature === configurationSignature) {
+        for (const row of effectiveById.values()) {
+            const id = row.scriptId;
+            titleById.set(id, row.title);
+            const input = {
+                scriptId: id,
+                nuidSearchFields: row.nuidSearchFields,
+                eligibilityCriteria: row.eligibilityCriteria,
+            };
+            if (opts?.forceRefresh) {
+                refresh.push(input);
+            } else if (row.report?.configurationSignature === configurationSignature) {
+                const report = row.report;
                 counts.set(id, report.count || 0);
-            } else if (report) {
-                stale.push({
-                    scriptId: id,
-                    nuidSearchFields: row.nuidSearchFields,
-                    eligibilityCriteria: row.eligibilityCriteria,
-                });
+            } else if (row.report || row.hasDraft) {
+                // Draft-only scripts have no published cache row. They must use
+                // the same draft-inclusive computation as stale published rows.
+                stale.push(input);
             } else {
-                missing.push({
-                    scriptId: id,
-                    nuidSearchFields: row.nuidSearchFields,
-                    eligibilityCriteria: row.eligibilityCriteria,
-                });
+                missing.push(input);
             }
         }
 
+        if (refresh.length) {
+            const computed = await computeConditionReportsDraftInclusive(refresh, configurationKeys);
+            for (const [id, report] of Object.entries(computed)) {
+                counts.set(id, report?.count || 0);
+            }
+            await persistConditionReports(computed);
+        }
         // Lazily fill in never-computed scripts (also self-heals the column
         // for next time — computeConditionReportsLean is a bounded bulk query).
         if (missing.length) {
@@ -1527,7 +1702,7 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
     }
 }
 
-export async function saveScriptScreens({
+async function saveScriptScreens({
     screens,
     scriptId,
     preserveScreensIds,
@@ -1591,16 +1766,19 @@ export async function saveScriptScreens({
                 logger.error('process image', e.message);
             }
 
-            const res = await saveScreens({
-                data: [{
-                    ...s,
-                    scriptId,
-                    oldScriptId: script.data.oldScriptId,
-                    screenId,
-                    version: 1,
-                }],
-                draftOrigin,
-            });
+            const incomingScreen = {
+                ...s,
+                scriptId,
+                oldScriptId: script.data.oldScriptId,
+                screenId,
+                version: 1,
+            };
+            const res = await saveScreensInternal(
+                { data: [incomingScreen], draftOrigin },
+                // Rebase the trusted source onto the minted id so unchanged
+                // legacy collisions retain the same stable path identity.
+                { screens: [{ ...screen, scriptId, screenId }] },
+            );
 
             res.errors?.forEach(e => errors.push(`(screenId=${_ignoreScreenId}) ${e || ''}`));
 
@@ -1617,7 +1795,7 @@ export async function saveScriptScreens({
     }
 }
 
-export async function saveScriptDiagnoses({
+async function saveScriptDiagnoses({
     diagnoses,
     scriptId,
     preserveDiagnosesIds,
@@ -1680,16 +1858,17 @@ export async function saveScriptDiagnoses({
                 logger.error('process image', e.message);
             }
 
-            const res = await saveDiagnoses({
-                data: [{
-                    ...d,
-                    scriptId,
-                    oldScriptId: script.data.oldScriptId,
-                    diagnosisId,
-                    version: 1,
-                }],
-                draftOrigin,
-            });
+            const incomingDiagnosis = {
+                ...d,
+                scriptId,
+                oldScriptId: script.data.oldScriptId,
+                diagnosisId,
+                version: 1,
+            };
+            const res = await saveDiagnosesInternal(
+                { data: [incomingDiagnosis], draftOrigin },
+                { diagnoses: [{ ...diagnosis, scriptId, diagnosisId }] },
+            );
 
             res.errors?.forEach(e => errors.push(`(diagnosisId=${_ignoreDiagnosisId}) ${e || ''}`));
 
@@ -1706,7 +1885,7 @@ export async function saveScriptDiagnoses({
     }
 }
 
-export async function saveScriptProblems({
+async function saveScriptProblems({
     problems,
     scriptId,
     preserveProblemsIds,
@@ -1768,16 +1947,17 @@ export async function saveScriptProblems({
                 logger.error('process image', e.message);
             }
 
-            const res = await saveProblems({
-                data: [{
-                    ...d,
-                    scriptId,
-                    oldScriptId: script.data.oldScriptId,
-                    problemId,
-                    version: 1,
-                }],
-                draftOrigin,
-            });
+            const incomingProblem = {
+                ...d,
+                scriptId,
+                oldScriptId: script.data.oldScriptId,
+                problemId,
+                version: 1,
+            };
+            const res = await saveProblemsInternal(
+                { data: [incomingProblem], draftOrigin },
+                { problems: [{ ...problem, scriptId, problemId }] },
+            );
 
             res.errors?.forEach(e => errors.push(`(problemId=${_ignoreProblemId}) ${e || ''}`));
 
@@ -1920,8 +2100,8 @@ export async function saveScriptsWithItems({ data, }: {
             });
 
             const problems = copiedProblems.map(d => {
-                const diagnosisId = v4();
-                return { ...d, diagnosisId, };
+                const problemId = v4();
+                return { ...d, problemId, };
             });
 
             const scriptId = overWriteScript?.data?.scriptId || v4();

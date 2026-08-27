@@ -31,7 +31,7 @@ export function useNuidConfigIssues(
     fields: any[] | undefined,
     enabled: boolean | undefined,
 ) {
-    const { conditionKeys } = useConditionKeys();
+    const { conditionKeys, keysReady: conditionCatalogueReady } = useConditionKeys();
     const { extractDataKeys, loadingDataKeys } = useDataKeysCtx();
 
     const nuidFieldKeys = useMemo<ConditionKey[]>(() => {
@@ -39,7 +39,7 @@ export function useNuidConfigIssues(
         return keyIds.length ? toConditionKeys(extractDataKeys(keyIds, { withNested: true })) : [];
     }, [fields, extractDataKeys]);
 
-    const keysReady = conditionKeys.length > 0 || nuidFieldKeys.length > 0;
+    const keysReady = conditionCatalogueReady || nuidFieldKeys.length > 0;
 
     const { hasIssues, issues } = useMemo(() => {
         if (!enabled || loadingDataKeys) return { hasIssues: false, issues: [] as NuidFieldIssue[] };

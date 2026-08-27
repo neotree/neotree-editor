@@ -49,13 +49,15 @@ type Props = {
     index: number
     data: FieldType
   }
+  /** Persisted field used to grandfather only pre-existing key collisions. */
+  baselineField?: FieldType
   form: ReturnType<typeof useScreenForm>
   onClose: () => void
   scriptId: any
   unavailableOutcomeKeys?: Record<string, string>
 }
 
-export function Field<P = {}>({ open, field: fieldProp, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
+export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
 
@@ -93,7 +95,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, unavaila
     defaultValues: getDefaultValues(),
   })
   const [alias, setAlias] = useState("")
-  const { conditionKeys, keysLoading } = useConditionKeys()
+  const { conditionKeys, keysLoading, keysReady } = useConditionKeys()
   const [conditionHasErrors, setConditionHasErrors] = useState(false)
   const [calculationHasErrors, setCalculationHasErrors] = useState(false)
 
@@ -121,9 +123,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, unavaila
   const reservedKeyCollisions = useMemo(
     () => collectNewOutcomeKeyCollisions(
       { screens: [{ type: "form", fields: [{ fieldId: field?.fieldId, key, label, items }] }] },
-      { screens: [{ type: "form", fields: field ? [field] : [] }] },
+      { screens: [{ type: "form", fields: baselineField ? [baselineField] : [] }] },
     ),
-    [field, items, key, label],
+    [baselineField, field?.fieldId, items, key, label],
   )
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
@@ -370,6 +372,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, unavaila
                       keys={conditionKeys}
                       extraKeys={localConditionKeys}
                       keysLoading={keysLoading}
+                      keysReady={keysReady}
                       unavailableKeys={unavailableOutcomeKeys}
                       disabled={disabled}
                       initialValue={field?.condition || ""}
@@ -603,6 +606,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, unavaila
                           keys={conditionKeys}
                           extraKeys={localConditionKeys}
                           keysLoading={keysLoading}
+                          keysReady={keysReady}
                           unavailableKeys={unavailableOutcomeKeys}
                           disabled={disabled}
                           initialValue={(field as { calculation?: string } | undefined)?.calculation || ""}

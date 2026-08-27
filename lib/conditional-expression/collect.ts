@@ -45,8 +45,9 @@ export interface ScriptConditionFinding {
  *   key set at runtime).
  * - NUID search fields aren't scrapped into the script key set, so their linked
  *   data-key names are merged in (matching how they resolve live).
- * - When a context has no keys, key-dependent checks are skipped (syntax still
- *   runs), matching the editor/list "keysReady" behaviour.
+ * - Callers provide an authoritative, fully loaded script catalogue, so an
+ *   empty key set is still validated and unknown/availability errors apply.
+ *   Drug conditions remain intentionally syntax-only.
  */
 export function collectScriptConditionFindings(script: ScriptWithItems): ScriptConditionFinding[] {
   const keys = buildScriptConditionKeys({
@@ -56,7 +57,7 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
     problems: script?.problems || [],
     screens: script?.screens || [],
   });
-  const scriptCtx: ValidationContext = { keys, allowSelf: true, skipKeyResolution: keys.length === 0 };
+  const scriptCtx: ValidationContext = { keys, allowSelf: true, skipKeyResolution: false };
   const syntaxOnlyCtx: ValidationContext = { keys: [], allowSelf: true, skipKeyResolution: true };
 
   const nuidFields = (script?.nuidSearchFields || []) as any[];
@@ -65,7 +66,7 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
   const nuidCtx: ValidationContext = {
     keys: nuidMergedKeys,
     allowSelf: true,
-    skipKeyResolution: nuidMergedKeys.length === 0,
+    skipKeyResolution: false,
   };
   const outcomeProducers = getOutcomeProducers(script?.screens || []);
   const unavailableByPosition = new Map<string, Record<string, string>>();

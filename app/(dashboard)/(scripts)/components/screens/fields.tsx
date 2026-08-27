@@ -18,12 +18,14 @@ import { isNumericQueryValue } from "@/lib/query-state";
 import { FieldsBottomActions } from "./fields-bottom-actions";
 import { Field } from "./field";
 import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
+import type { ScriptField } from "@/types";
 
 type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
     scriptId? : string;
     unavailableOutcomeKeys?: Record<string, string>;
+    persistedFields?: ScriptField[];
 };
 
 export function Fields({
@@ -31,14 +33,14 @@ export function Fields({
     disabled,
     scriptId,
     unavailableOutcomeKeys,
+    persistedFields = [],
 }: Props) {
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const [manualOnly, setManualOnly] = useState(false);
     const [missingManualLabelOnly, setMissingManualLabelOnly] = useState(false);
     const { confirm } = useConfirmModal();
-    const { conditionKeys } = useConditionKeys();
-    const keysReady = conditionKeys.length > 0;
+    const { conditionKeys, keysReady } = useConditionKeys();
 
     const fields = form.watch('fields');
     // Unsaved sibling field keys, matching what the field editor validates against.
@@ -171,6 +173,9 @@ export function Fields({
     const resolvedFieldIndex = activeFieldIndex >= 0
         ? activeFieldIndex
         : (isNumericQueryValue(currentField) ? Number(currentField) : parsedCurrentFieldIndex);
+    const baselineField = activeField?.fieldId
+        ? persistedFields.find((field) => field?.fieldId === activeField.fieldId)
+        : (resolvedFieldIndex !== null && resolvedFieldIndex >= 0 ? persistedFields[resolvedFieldIndex] : undefined);
 
     return (
         <>
@@ -183,6 +188,7 @@ export function Fields({
                     form={form}
                     scriptId={scriptId}
                     unavailableOutcomeKeys={unavailableOutcomeKeys}
+                    baselineField={baselineField}
                     disabled={disabled}
                     field={!activeField || resolvedFieldIndex === null || resolvedFieldIndex < 0 ? undefined : {
                         data: activeField,
