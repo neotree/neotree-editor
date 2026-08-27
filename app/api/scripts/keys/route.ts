@@ -17,7 +17,10 @@ export async function GET(req: NextRequest) {
         if (errors?.length) return NextResponse.json({ errors, data: [], }, { status: 200, });
 
 		const data = scripts.map(s => ({
+			scriptId: s.scriptId,
 			dataKeys: s.dataKeys,
+			conditionKeys: s.conditionKeys,
+			conditionScreens: s.conditionScreens,
 		}));
 
 		return NextResponse.json({ data, }, { status: 200, });

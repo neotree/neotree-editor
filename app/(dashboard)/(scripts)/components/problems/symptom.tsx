@@ -17,6 +17,8 @@ import { SelectDataKey } from "@/components/select-data-key";
 import { Title } from "../title";
 import { useProblemForm } from "../../hooks/use-problem-form";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
+import { collectOutcomeKeyCollisions } from "@/lib/conditional-expression";
 
 type Props = {
     children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
@@ -26,6 +28,7 @@ type Props = {
         data: DiagnosisSymptom,
     };
     form: ReturnType<typeof useProblemForm>;
+    unavailableOutcomeKeys?: Record<string, string>;
 };
 
 export function Symptom<P = {}>({
@@ -33,11 +36,14 @@ export function Symptom<P = {}>({
     symptom: symptomProp,
     form,
     disabled: disabledProp,
+    unavailableOutcomeKeys,
     ...extraProps
 }: Props & P) {
     const { data: symptom, index: symptomIndex, } = { ...symptomProp, };
 
     const [open, setOpen] = useState(false);
+    const [expressionHasErrors, setExpressionHasErrors] = useState(false);
+    const { conditionKeys, keysLoading } = useConditionKeys({ enabled: open });
 
     const getDefaultValues = useCallback(() => {
         return {
@@ -66,10 +72,15 @@ export function Symptom<P = {}>({
     });
 
     const type = watch('type');
+    const key = watch('key');
     const name = watch('name');
     const printable = watch('printable');
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
+    const reservedKeyCollisions = useMemo(
+        () => collectOutcomeKeyCollisions({ problems: [{ name: form.getValues('name'), symptoms: [{ key, name }] }] }),
+        [form, key, name],
+    );
 
     const onSave = handleSubmit(data => {
         if (!isEmpty(symptomIndex) && symptom) {
@@ -89,7 +100,7 @@ export function Symptom<P = {}>({
         <>
             <Modal
                 open={open}
-                title={symptom ? 'Add symptom' : 'Edit symptom'}
+                title={symptom ? 'Edit symptom' : 'Add symptom'}
                 trigger={typeof children === 'function' ? children({ extraProps }) : children}
                 onOpenChange={open => {
                     setOpen(open);
@@ -110,7 +121,7 @@ export function Symptom<P = {}>({
                         </DialogClose>
 
                         <Button
-                            disabled={disabled}
+                            disabled={disabled || expressionHasErrors || !!reservedKeyCollisions.length}
                             onClick={() => onSave()}
                         >
                             Save
@@ -156,6 +167,9 @@ export function Symptom<P = {}>({
                                                 setValue('keyId', item?.uniqueKey, { shouldDirty: true, });
                                             }}
                                         />
+                                        {!!reservedKeyCollisions.length && (
+                                            <p className="mt-1 text-xs text-destructive">{reservedKeyCollisions[0].message}</p>
+                                        )}
                                     </>
                                 );
                             }}
@@ -183,9 +197,22 @@ export function Symptom<P = {}>({
 
                     <div>
                         <Label htmlFor="expression">Sign/Risk expression <ConditionalExpressionModal /></Label>
-                        <Input
-                            {...register('expression', { disabled, })}
+                        <Controller
+                            control={control}
                             name="expression"
+                            render={({ field: { value, onChange } }) => (
+                                <ConditionEditor
+                                    value={`${value || ''}`}
+                                    onChange={onChange}
+                                    keys={conditionKeys}
+                                    keysLoading={keysLoading}
+                                    unavailableKeys={unavailableOutcomeKeys}
+                                    disabled={disabled}
+                                    rows={3}
+                                    initialValue={`${symptom?.expression || ''}`}
+                                    onValidityChange={setExpressionHasErrors}
+                                />
+                            )}
                         />
                         <span className="text-xs text-muted-foreground">Example: <b>{CONDITIONAL_EXP_EXAMPLE}</b></span>
                     </div>

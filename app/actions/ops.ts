@@ -22,6 +22,7 @@ import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/e
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
 import { buildReleasePublishChangeLog } from "@/databases/mutations/changelogs"
 import { getScriptsWithConditionErrors, recomputeScriptsConditionErrors } from "./scripts"
+import type { PublishDataResponse } from "@/lib/publish-data"
 import db from "@/databases/pg/drizzle"
 import {
   configKeysDrafts,
@@ -1348,8 +1349,8 @@ export const countAllDrafts = async () => {
   }
 }
 
-export async function publishData({ scope }: { scope: number }) {
-  const results: { success: boolean; errors?: string[]; warnings?: string[]; blockingDetails?: any } = { success: true }
+export async function publishData({ scope }: { scope: number }): Promise<PublishDataResponse> {
+  const results: PublishDataResponse = { success: true }
   try {
     const session = await isAllowed([
       "create_config_keys",
@@ -1387,7 +1388,9 @@ export async function publishData({ scope }: { scope: number }) {
       logger.error("publishData scope-scripts lookup ERROR", e.message)
     }
 
-    const ceGate = await getScriptsWithConditionErrors({ scriptIds: Array.from(publishScriptIds) })
+    const scopedScriptIds = Array.from(publishScriptIds)
+    await recomputeScriptsConditionErrors(scopedScriptIds)
+    const ceGate = await getScriptsWithConditionErrors({ scriptIds: scopedScriptIds })
     if (ceGate.scripts.length) {
       const top = ceGate.scripts.slice(0, 10)
       const lines = top.map((s) => `• ${s.title} (${s.count} issue${s.count === 1 ? "" : "s"})`)
@@ -1397,7 +1400,6 @@ export async function publishData({ scope }: { scope: number }) {
         `${ceGate.scripts.length} script${ceGate.scripts.length === 1 ? "" : "s"} being published contain ${ceGate.totalFindings} conditional-expression issue${ceGate.totalFindings === 1 ? "" : "s"}. These will reach the mobile app as-is:`,
         ...lines,
       ]
-      results.blockingDetails = { conditionErrors: ceGate }
     }
 
     await db.transaction(async (tx) => {

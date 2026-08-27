@@ -36,6 +36,7 @@ export function mergeConditionKeys(
       label: primary.label ?? secondary.label,
       dataType: primary.dataType ?? secondary.dataType,
       options: primary.options ?? secondary.options,
+      optionLabels: primary.optionLabels ?? secondary.optionLabels,
     });
   };
 

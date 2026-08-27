@@ -18,7 +18,8 @@ const KEYWORDS = new Set(["and", "or", "includes", "excludes"]);
  *   Line       := Or
  *   Or         := And ("or" And)*
  *   And        := Primary ("and" Primary)*
- *   Primary    := "(" Or ")" | "[" Or "]" | ComparisonOrMembership
+ *   Primary    := LegacyNot | "(" Or ")" | "[" Or "]" | ComparisonOrMembership
+ *   LegacyNot  := "!" ("(" Or ")" | "[" Or "]")
  *   Comparison := Operand CmpOp Operand
  *   Membership := $Var ("includes"|"excludes") "(" ValueList ")"
  *   Operand    := $Var | STRING | NUMBER | BOOL | Array | bareword
@@ -125,6 +126,12 @@ class Parser {
   private parsePrimary(): Node {
     const tok = this.peek();
 
+    if (tok.kind === "not") {
+      this.next();
+      const expr = this.parsePrimary();
+      return { type: "Not", expr, start: tok.start, end: expr.end };
+    }
+
     if (tok.kind === "lparen") {
       this.next();
       const inner = this.parseOr();
@@ -196,10 +203,10 @@ class Parser {
       }
       if (this.atOperandEnd()) {
         this.error("MISSING_OPERAND", `Expected a value after "${opTok.value}".`, opTok.start, opTok.end);
-        return { type: "Comparison", op: opTok.value as ComparisonOp, left, right: { type: "Error", start: opTok.end, end: opTok.end }, start: startTok.start, end: opTok.end };
+        return { type: "Comparison", op: opTok.text as ComparisonOp, left, right: { type: "Error", start: opTok.end, end: opTok.end }, start: startTok.start, end: opTok.end };
       }
       const right = this.parseOperand();
-      return { type: "Comparison", op: opTok.value as ComparisonOp, left, right, start: startTok.start, end: right.end };
+      return { type: "Comparison", op: opTok.text as ComparisonOp, left, right, start: startTok.start, end: right.end };
     }
 
     // Operand with no following operator.

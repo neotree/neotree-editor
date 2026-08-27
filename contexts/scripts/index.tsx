@@ -10,6 +10,8 @@ import * as filesActions from "@/app/actions/files";
 import { getHospitals } from "@/app/actions/hospitals";
 import { useSearchParams } from "@/hooks/use-search-params";
 import { listScreens, getScriptsWithItems } from "@/app/actions/scripts";
+import type { ConditionKey } from "@/lib/conditional-expression";
+import socket from "@/lib/socket";
 
 export interface IScriptsContext extends  
 ScriptsContextProviderProps,
@@ -68,6 +70,9 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
 
     const [keysLoading, setKeysLoading] = useState(false);
     const [keys, setKeys] = useState<Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['dataKeys']>([]);
+    const [conditionKeys, setConditionKeys] = useState<ConditionKey[]>([]);
+    const [conditionScreens, setConditionScreens] = useState<Awaited<ReturnType<typeof serverActions.getScriptsConditionKeys>>['data'][0]['conditionScreens']>([]);
+    const [conditionCatalogueReady, setConditionCatalogueReady] = useState(false);
 
     const keysRequestRef = useRef<Promise<void> | null>(null);
 
@@ -79,6 +84,9 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
         keysScriptIdRef.current = scriptId;
         keysRequestRef.current = null;
         setKeys([]);
+        setConditionKeys([]);
+        setConditionScreens([]);
+        setConditionCatalogueReady(false);
     }, [scriptId]);
 
     const onCancelScriptForm = useCallback(() => {
@@ -127,7 +135,7 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
             try {
                 setKeysLoading(true);
 
-                const { data: res, } = await axios.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/keys?data='+JSON.stringify({
+                const { data: res, } = await axios.get<Awaited<ReturnType<typeof serverActions.getScriptsConditionKeys>>>('/api/scripts/keys?data='+JSON.stringify({
                     returnDraftsIfExist: true,
                     scriptsIds: [scriptId],
                 }));
@@ -140,8 +148,19 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
                 const scripts = res.data;
 
                 const _keys = scripts.reduce((acc, s) => [...acc, ...s.dataKeys], [] as typeof keys);
+                const _conditionKeys = scripts.reduce(
+                    (acc, s) => [...acc, ...(s.conditionKeys || [])],
+                    [] as ConditionKey[],
+                );
+                const _conditionScreens = scripts.reduce(
+                    (acc, s) => [...acc, ...(s.conditionScreens || [])],
+                    [] as typeof conditionScreens,
+                );
 
                 setKeys(_keys);
+                setConditionKeys(_conditionKeys);
+                setConditionScreens(_conditionScreens);
+                setConditionCatalogueReady(true);
             } catch(e: any) {
                 alert({
                     title: '',
@@ -158,12 +177,60 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
         return run;
     }, [scriptId, open, alert]);
 
+    // A write can land while the initial request is still in flight. Waiting
+    // for it and then issuing another request guarantees callers receive the
+    // post-write diagnosis/problem catalogue rather than a stale response.
+    const reloadKeys = useCallback(async () => {
+        if (keysRequestRef.current) await keysRequestRef.current;
+        await loadKeys();
+    }, [loadKeys]);
+
+    // Keep virtual Diagnoses/Problems options current when another editor saves,
+    // deletes, publishes, or reorders CDS content. The root router refresh does
+    // not update client context state, so refresh this catalogue explicitly.
+    useEffect(() => {
+        const relevantActions = new Set([
+            "save_diagnoses",
+            "delete_diagnoses",
+            "save_problems",
+            "delete_problems",
+            "save_screens",
+            "delete_screens",
+            "save_data_keys",
+            "delete_data_keys",
+            "resolve_data_key_integrity_entry",
+            "resolve_data_key_integrity_entries_bulk",
+            "save_scripts",
+            "publish_data",
+            "discard_drafts",
+            "clear_pending_deletion",
+            "rollback_change_log",
+            "rollback_data_version",
+            "copy_scripts",
+        ]);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const onDataChanged = (action?: string) => {
+            if (action && !relevantActions.has(action)) return;
+            clearTimeout(timer);
+            timer = setTimeout(() => void reloadKeys(), 150);
+        };
+        socket.on("data_changed", onDataChanged);
+        return () => {
+            clearTimeout(timer);
+            socket.off("data_changed", onDataChanged);
+        };
+    }, [reloadKeys]);
+
     return {
         screens,
         screensLoading,
         keys,
+        conditionKeys,
+        conditionScreens,
+        conditionCatalogueReady,
         keysLoading,
         loadKeys,
+        reloadKeys,
         loadScreens,
         onCancelDiagnosisForm,
         onCancelScreenForm,

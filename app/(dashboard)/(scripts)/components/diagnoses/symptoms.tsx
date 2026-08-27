@@ -21,11 +21,13 @@ import { cn } from "@/lib/utils";
 type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useDiagnosisForm>;
+    unavailableOutcomeKeys?: Record<string, string>;
 };
 
 export function Symptoms({
     form,
     disabled,
+    unavailableOutcomeKeys,
 }: Props) {
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
@@ -119,6 +121,7 @@ export function Symptoms({
                     onClose={() => setCurrentSymptom('')}
                     disabled={disabled}
                     form={form}
+                    unavailableOutcomeKeys={unavailableOutcomeKeys}
                     symptom={!activeSymptom || resolvedCurrentSymptomIndex === null || resolvedCurrentSymptomIndex < 0 ? undefined : {
                         data: activeSymptom,
                         index: resolvedCurrentSymptomIndex,

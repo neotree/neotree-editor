@@ -13,6 +13,8 @@ import { useDiagnosesTable, UseDiagnosesTableParams } from '../../hooks/use-diag
 import { CopyDiagnosesModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
 import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
+import { useScriptsContext } from "@/contexts/scripts";
+import { getOutcomeProducer, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
 
 type Props = UseDiagnosesTableParams;
 
@@ -36,7 +38,13 @@ export function DiagnosesTable(props: Props) {
 
     const { sys, viewOnly } = useAppContext();
     const { conditionKeys } = useConditionKeys();
+    const { conditionScreens, conditionCatalogueReady } = useScriptsContext();
     const keysReady = conditionKeys.length > 0;
+    const producer = getOutcomeProducer(conditionScreens, "Diagnoses");
+    const unavailableOutcomeKeys = getUnavailableOutcomeKeys({
+        screens: conditionScreens,
+        consumerPosition: Number(producer?.position),
+    });
 
     return (
         <>
@@ -103,7 +111,14 @@ export function DiagnosesTable(props: Props) {
                                             <ConditionErrorBadge
                                                 keys={conditionKeys}
                                                 keysReady={keysReady}
-                                                expressions={[{ value: s.expression, label: 'Expression' }]}
+                                                unavailableKeys={conditionCatalogueReady ? unavailableOutcomeKeys : undefined}
+                                                expressions={[
+                                                    { value: s.expression, label: 'Expression' },
+                                                    ...(s.symptoms || []).map((symptom) => ({
+                                                        value: symptom.expression,
+                                                        label: `Symptom "${symptom.name || symptom.key || ''}" expression`,
+                                                    })),
+                                                ]}
                                             />
                                         )}
                                     </span>

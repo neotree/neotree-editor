@@ -23,12 +23,14 @@ type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
     scriptId? : string;
+    unavailableOutcomeKeys?: Record<string, string>;
 };
 
 export function Fields({
     form,
     disabled,
-    scriptId
+    scriptId,
+    unavailableOutcomeKeys,
 }: Props) {
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
@@ -180,6 +182,7 @@ export function Fields({
                     onClose={closeFieldEditor}
                     form={form}
                     scriptId={scriptId}
+                    unavailableOutcomeKeys={unavailableOutcomeKeys}
                     disabled={disabled}
                     field={!activeField || resolvedFieldIndex === null || resolvedFieldIndex < 0 ? undefined : {
                         data: activeField,
@@ -266,6 +269,7 @@ export function Fields({
                                             keys={conditionKeys}
                                             extraKeys={siblingConditionKeys}
                                             keysReady={keysReady}
+                                            unavailableKeys={unavailableOutcomeKeys}
                                             expressions={[
                                                 { value: field.condition, label: 'Condition', allowSelf: true },
                                                 { value: (field as { calculation?: string }).calculation, label: 'Reference expression', mode: 'reference' },

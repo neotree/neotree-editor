@@ -1,14 +1,25 @@
 import assert from "assert";
 
 import {
+  buildScriptConditionKeys,
+  buildScriptOutcomeReferencePatches,
+  collectOutcomeKeyCollisions,
+  collectScriptOutcomeReferences,
+  getUnavailableOutcomeKeys,
   getScriptConditionErrorCount,
   mergeConditionKeys,
+  rewriteOutcomeValueReferences,
   validateCondition,
   validateReferenceExpression,
   type ConditionKey,
   type ValidationContext,
 } from "../lib/conditional-expression";
-import { getValueContextAtCursor, quoteValue } from "../components/conditional-expression/autocomplete";
+import {
+  getConditionValueMatches,
+  getValueContextAtCursor,
+  quoteValue,
+} from "../components/conditional-expression/autocomplete";
+import { evaluateCondition, parseCondition } from "../app/(ops)/conditional-exp/_eval";
 
 const keys: ConditionKey[] = [
   { name: "Sex", dataType: "dropdown", options: ["M", "F"] },
@@ -60,6 +71,270 @@ assert.ok(codes("$Gestation >").includes("MISSING_OPERAND"), "missing operand");
 assert.ok(codes("$Diagnoses includes 'LBW'").includes("MEMBERSHIP_SYNTAX"), "membership without parens");
 assert.ok(codes("[]").includes("EMPTY_GROUP"), "empty group");
 assert.ok(codes("$Gestation 'x'").includes("MISSING_OPERATOR"), "missing operator between operands");
+
+// ---- Legacy negation and not-equal authoring guidance ----------------------
+
+const legacyNegation = validateCondition("!($Sex = 'M')", ctx);
+const legacyWarning = legacyNegation.diagnostics.find((d) => d.code === "LEGACY_NEGATION");
+assert.equal(legacyNegation.hasErrors, false, "legacy !(...) syntax should remain non-blocking");
+assert.equal(legacyWarning?.severity, "warning", "legacy !(...) should be a deprecation warning");
+assert.equal(legacyWarning?.suggestion, "$Sex != 'M'", "simple legacy negation should suggest !=");
+
+const complexLegacyNegation = validateCondition(
+  "!($Sex = 'M' or [$Diagnoses includes ('LBW')])",
+  ctx,
+);
+assert.equal(complexLegacyNegation.hasErrors, false, "valid legacy compound negation should remain non-blocking");
+assert.equal(
+  complexLegacyNegation.diagnostics.find((d) => d.code === "LEGACY_NEGATION")?.suggestion,
+  "($Sex != 'M' and [$Diagnoses excludes ('LBW')])",
+  "compound legacy negation should apply De Morgan's law in its suggestion",
+);
+
+const screenshotLegacyNegation = validateCondition(
+  "!($AdmReason = 'DU' or [$AdmReasonAdd includes ('DU')])",
+  { keys: [], skipKeyResolution: true },
+);
+assert.equal(screenshotLegacyNegation.hasErrors, false, "the reported legacy expression should remain saveable");
+assert.equal(
+  screenshotLegacyNegation.diagnostics.find((d) => d.code === "LEGACY_NEGATION")?.suggestion,
+  "($AdmReason != 'DU' and [$AdmReasonAdd excludes ('DU')])",
+  "the reported legacy expression should receive a complete modern rewrite",
+);
+assert.equal(
+  validateCondition(
+    "!($AdmReason = 'DU' or [$AdmReasonAdd includes ('DU')])\n$AdmReason != 'BBA'",
+    { keys: [], skipKeyResolution: true },
+  ).hasErrors,
+  false,
+  "the reported multiline expression should contain only the legacy warning",
+);
+
+const spacedNotEqual = validateCondition("$Sex ! = 'M'", ctx);
+const spacedNotEqualError = spacedNotEqual.diagnostics.find((d) => d.code === "SPACED_NOT_EQUAL");
+assert.equal(spacedNotEqual.hasErrors, true, "a spaced not-equal operator should block saving");
+assert.equal(spacedNotEqualError?.severity, "error", "spaced ! = should have a targeted error");
+assert.equal(spacedNotEqualError?.suggestion, "!=", "spaced ! = should suggest the valid operator");
+assert.equal(
+  spacedNotEqual.diagnostics.some((d) => d.message.includes('Unexpected character "!"')),
+  false,
+  "spaced ! = should not fall back to a generic unexpected-character error",
+);
+assert.equal(
+  validateCondition("$Sex !   = 'M'", ctx).diagnostics.find((d) => d.code === "SPACED_NOT_EQUAL")?.suggestion,
+  "!=",
+  "multiple spaces inside the operator should receive the same quick fix",
+);
+assert.equal(
+  validateCondition("$Sex !\t= 'M'", ctx).diagnostics.find((d) => d.code === "SPACED_NOT_EQUAL")?.suggestion,
+  "!=",
+  "a tab inside the operator should receive the same quick fix",
+);
+assert.equal(validateCondition("$Sex != 'M'", ctx).hasErrors, false, "the modern != operator should remain valid");
+
+// ---- Script-scoped Diagnoses and Problems collections ----------------------
+
+const scriptOutcomeKeys = buildScriptConditionKeys({
+  dataKeys: [
+    {
+      name: "Diagnoses",
+      label: "Clinician diagnoses",
+      dataType: "diagnosis",
+      uniqueKey: "diagnoses-parent",
+      options: ["manual-diagnosis"],
+    },
+    {
+      name: "ManualDiagnosis",
+      label: "Clinician-entered diagnosis",
+      dataType: "option",
+      uniqueKey: "manual-diagnosis",
+      options: [],
+    },
+  ],
+  diagnoses: [
+    { key: "RDS", name: "Respiratory distress syndrome", position: 2 },
+    { key: "Sepsis", name: "Neonatal sepsis", position: 1 },
+    { key: "rds", name: "Duplicate RDS", position: 3 },
+    { key: "", name: "Missing runtime key", position: 4 },
+  ],
+  problems: [
+    { key: "Airway", name: "Airway problem", position: 2 },
+    { key: "Breathing", name: "Breathing problem", position: 1 },
+  ],
+  screens: [
+    { type: "diagnosis" },
+    { type: "problems" },
+  ],
+});
+
+const diagnosesCollection = scriptOutcomeKeys.find((key) => key.name === "Diagnoses");
+const problemsCollection = scriptOutcomeKeys.find((key) => key.name === "Problems");
+assert.deepEqual(
+  diagnosesCollection?.options,
+  ["Sepsis", "RDS"],
+  "CDS diagnoses should be position-sorted, deduplicated, and isolated from colliding raw collection options",
+);
+assert.equal(
+  diagnosesCollection?.optionLabels?.RDS,
+  "Respiratory distress syndrome",
+  "diagnosis suggestions should display the name while retaining the machine key",
+);
+assert.deepEqual(
+  problemsCollection?.options,
+  ["Breathing", "Airway"],
+  "problems should come from the current script in configured order",
+);
+assert.deepEqual(
+  buildScriptConditionKeys({ screens: [{ type: "diagnosis" }], diagnoses: [] })
+    .find((key) => key.name === "Diagnoses")?.options,
+  [],
+  "an empty diagnosis screen should still expose an empty virtual collection for targeted guidance",
+);
+assert.deepEqual(
+  getConditionValueMatches(diagnosesCollection, "resp"),
+  [{ value: "RDS", label: "Respiratory distress syndrome" }],
+  "value autocomplete should search human-readable outcome names",
+);
+assert.equal(
+  validateCondition("[$Diagnoses includes ('RDS')]", { keys: scriptOutcomeKeys }).hasErrors,
+  false,
+  "a configured diagnosis should validate as a collection member",
+);
+assert.ok(
+  validateCondition("[$Problems includes ('UnknownProblem')]", { keys: scriptOutcomeKeys }).diagnostics.some(
+    (diagnostic) => diagnostic.code === "UNKNOWN_OPTION" && diagnostic.severity === "error",
+  ),
+  "an unknown problem should be rejected against script-scoped options",
+);
+assert.ok(
+  validateCondition("[$Problem includes ('Airway')]", { keys: scriptOutcomeKeys }).diagnostics.some(
+    (diagnostic) => diagnostic.code === "UNKNOWN_KEY" && diagnostic.suggestion === "$Problems",
+  ),
+  "the singular $Problem spelling should suggest the canonical $Problems key",
+);
+
+const outcomeRuntimeEntries = [{
+  screen: { type: "diagnosis" },
+  values: [
+    { key: "Diagnoses", value: [{ key: "RDS" }] },
+    { key: "Problems", value: [{ key: "Airway" }] },
+  ],
+}];
+assert.equal(
+  evaluateCondition(parseCondition("[$Diagnoses includes ('RDS')]", outcomeRuntimeEntries)),
+  true,
+  "diagnosis suggestions should insert the key used by the runtime collection",
+);
+assert.equal(
+  evaluateCondition(parseCondition("[$Problems includes ('Airway')]", outcomeRuntimeEntries)),
+  true,
+  "problem suggestions should insert the key used by the runtime collection",
+);
+
+// ---- Runtime availability and reserved-key protection ---------------------
+
+const orderedOutcomeScreens = [
+  { screenId: "diagnosis-screen", type: "diagnosis", key: "Diagnoses", title: "Compile diagnoses", position: 2 },
+  { screenId: "problem-screen", type: "problems", key: "Problems", title: "Compile problems", position: 4 },
+];
+assert.deepEqual(
+  getUnavailableOutcomeKeys({ screens: orderedOutcomeScreens, consumerPosition: 5 }),
+  {},
+  "both outcome collections are available after their producer screens",
+);
+assert.match(
+  getUnavailableOutcomeKeys({ screens: orderedOutcomeScreens, consumerPosition: 3 }).Problems,
+  /only available after/i,
+  "Problems is unavailable before the problems screen",
+);
+assert.ok(
+  validateCondition("[$Problems includes ('Airway')]", {
+    keys: scriptOutcomeKeys,
+    unavailableKeys: getUnavailableOutcomeKeys({ screens: orderedOutcomeScreens, consumerPosition: 3 }),
+  }).diagnostics.some((diagnostic) => diagnostic.code === "OUTCOME_NOT_AVAILABLE"),
+  "editor validation explains an outcome reference used before it exists",
+);
+assert.ok(
+  validateCondition("[$Diagnoses includes ('RDS')]", {
+    keys: [],
+    skipKeyResolution: true,
+    unavailableKeys: getUnavailableOutcomeKeys({ screens: [], consumerPosition: 1 }),
+  }).diagnostics.some((diagnostic) => diagnostic.code === "OUTCOME_NOT_AVAILABLE"),
+  "known virtual collections retain targeted availability errors even when the general key catalogue is empty",
+);
+assert.match(
+  getUnavailableOutcomeKeys({
+    screens: [{ type: "diagnosis", key: "ClinicalDx", title: "Compile diagnoses", position: 2 }],
+    consumerPosition: 3,
+  }).Diagnoses,
+  /currently saves to "\$ClinicalDx"/,
+  "a producer using a noncanonical runtime key gets a targeted contract error",
+);
+
+const reservedCollisions = collectOutcomeKeyCollisions({
+  screens: [
+    { screenId: "allowed", type: "diagnosis", key: "Diagnoses", title: "Diagnosis" },
+    { screenId: "bad", type: "form", key: "Problems", title: "Other form", fields: [{ key: "Diagnoses", label: "Bad field" }] },
+  ],
+  diagnoses: [{ diagnosisId: "bad-dx", key: "Problems", name: "Bad diagnosis" }],
+});
+assert.equal(reservedCollisions.length, 3, "only the matching producer screen may own a reserved collection key");
+assert.equal(
+  collectOutcomeKeyCollisions({
+    screens: [{ type: "form", key: "Safe", items: [{ key: "Diagnoses", label: "Bad item" }] }],
+    diagnoses: [{ key: "SafeDiagnosis", symptoms: [{ key: "Problems", name: "Bad symptom" }] }],
+  }).length,
+  2,
+  "nested item and symptom keys cannot shadow virtual outcome collections",
+);
+
+// ---- Outcome reference impact and safe rename rewriting -------------------
+
+const renameExpression = "[$Diagnoses includes ('RDS', \"Sepsis\")] and $Other = 'RDS'";
+const renamed = rewriteOutcomeValueReferences(renameExpression, "Diagnoses", "RDS", "RespiratoryDistress");
+assert.equal(renamed.occurrences, 1, "only collection-bound values count as rename references");
+assert.equal(
+  renamed.expression,
+  "[$Diagnoses includes ('RespiratoryDistress', \"Sepsis\")] and $Other = 'RDS'",
+  "rename preserves the original delimiter and does not rewrite unrelated literals",
+);
+
+const referenceScript = {
+  scriptId: "script-1",
+  screens: [{
+    screenId: "screen-1",
+    scriptId: "script-1",
+    title: "After diagnoses",
+    condition: "[$Diagnoses includes ('RDS')]",
+    fields: [{ key: "FieldA", label: "Field A", condition: "$Sex = 'M'" }],
+    items: [{ key: "ItemA", label: "Item A", condition: "[$Diagnoses includes ('RDS')]" }],
+  }],
+  diagnoses: [{
+    diagnosisId: "dx-1",
+    scriptId: "script-1",
+    key: "RDS",
+    expression: "$Temp > 37",
+    symptoms: [{ key: "Tachypnoea", name: "Tachypnoea", expression: "[$Diagnoses includes ('RDS')]" }],
+  }],
+  problems: [{
+    problemId: "problem-1",
+    scriptId: "script-1",
+    expression: "[$Diagnoses excludes ('RDS')]",
+    symptoms: [{ key: "WorkOfBreathing", name: "Work of breathing", expression: "[$Diagnoses includes ('RDS')]" }],
+  }],
+};
+assert.equal(
+  collectScriptOutcomeReferences(referenceScript, "Diagnoses", ["RDS"]).length,
+  5,
+  "impact preview reports top-level, item, and symptom expressions that reference an outcome value",
+);
+const referencePatches = buildScriptOutcomeReferencePatches(referenceScript, "Diagnoses", "RDS", "RDS_NEW");
+assert.equal(referencePatches.occurrences, 5, "rewrite reports the exact occurrence count");
+assert.equal(referencePatches.screens[0].condition, "[$Diagnoses includes ('RDS_NEW')]", "screen condition is patched");
+assert.equal(referencePatches.screens[0].items[0].condition, "[$Diagnoses includes ('RDS_NEW')]", "screen item condition is patched");
+assert.equal(referencePatches.diagnoses[0].symptoms[0].expression, "[$Diagnoses includes ('RDS_NEW')]", "diagnosis symptom is patched");
+assert.equal(referencePatches.problems[0].expression, "[$Diagnoses excludes ('RDS_NEW')]", "problem expression is patched");
+assert.equal(referencePatches.problems[0].symptoms[0].expression, "[$Diagnoses includes ('RDS_NEW')]", "problem symptom is patched");
 
 // ---- A key on its own (nothing after it) is rejected -----------------------
 
@@ -312,12 +587,13 @@ assert.equal(collision.length, 1, "base/extra case-insensitive collision merges"
 assert.equal(collision[0].dataType, "text", "local dataType wins over persisted");
 
 const fallback = mergeConditionKeys(
-  [{ name: "A", label: "A - persisted", dataType: "number" }],
+  [{ name: "A", label: "A - persisted", dataType: "number", optionLabels: { x: "Option X" } }],
   [{ name: "A" }],
 );
 assert.equal(fallback.length, 1, "fallback merges to one");
 assert.equal(fallback[0].label, "A - persisted", "keeps persisted label when local omits it");
 assert.equal(fallback[0].dataType, "number", "keeps persisted dataType when local omits it");
+assert.deepEqual(fallback[0].optionLabels, { x: "Option X" }, "keeps persisted option labels when local omits them");
 
 assert.equal(mergeConditionKeys([{ name: "" }], [{ name: "  " }]).length, 0, "blank names dropped");
 
@@ -396,6 +672,64 @@ assert.equal(
   "clean script has no CE errors",
 );
 
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: scriptKeys,
+    screens: [{ condition: "!($Sex = 'M')" }],
+  }),
+  0,
+  "deprecated legacy negation warnings should not count as blocking script errors",
+);
+
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: [],
+    diagnoses: [{ key: "RDS", name: "Respiratory distress syndrome", position: 1 }],
+    problems: [{ key: "Airway", name: "Airway problem", position: 1 }],
+    screens: [
+      { type: "diagnosis", key: "Diagnoses", title: "Diagnoses", position: 1 },
+      { type: "problems", key: "Problems", title: "Problems", position: 2 },
+      { type: "management", key: "Plan", title: "Plan", position: 3, condition: "[$Diagnoses includes ('RDS')] and [$Problems includes ('Airway')]" },
+    ],
+  }),
+  0,
+  "publish validation should use the same script-scoped diagnosis and problem options as the editor",
+);
+
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: [],
+    diagnoses: [{ key: "RDS", name: "Respiratory distress syndrome", position: 1 }],
+    screens: [
+      { type: "diagnosis", key: "Diagnoses", title: "Diagnoses", position: 1 },
+      { type: "management", key: "Plan", title: "Plan", position: 2, condition: "[$Diagnoses includes ('NotInThisScript')]" },
+    ],
+  }),
+  1,
+  "publish validation should reject diagnosis values that are not defined by this script",
+);
+
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: [],
+    diagnoses: [{ key: "RDS", name: "Respiratory distress syndrome", position: 1 }],
+    screens: [
+      { type: "management", key: "Early", title: "Too early", position: 1, condition: "[$Diagnoses includes ('RDS')]" },
+      { type: "diagnosis", key: "Diagnoses", title: "Diagnoses", position: 2 },
+    ],
+  }),
+  1,
+  "publish validation blocks a runtime outcome reference before its producer screen",
+);
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: [{ name: "Problems", label: "Unrelated form value", dataType: "text" }],
+    screens: [{ type: "form", key: "Problems", title: "Conflicting form", position: 1 }],
+  }),
+  1,
+  "publish validation blocks real keys that shadow a reserved outcome collection",
+);
+
 // Distinct broken expressions counted once each (unknown key + missing operand).
 assert.equal(
   getScriptConditionErrorCount({
@@ -404,6 +738,15 @@ assert.equal(
   }),
   2,
   "counts each broken expression once",
+);
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: scriptKeys,
+    screens: [{ title: "Items", items: [{ label: "Bad item", condition: "$MissingItemKey = 'x'" }] }],
+    diagnoses: [{ name: "Diagnosis", symptoms: [{ name: "Bad symptom", expression: "$MissingSymptomKey = 'x'" }] }],
+  }),
+  2,
+  "publish validation includes nested screen-item and CDS symptom expressions",
 );
 
 // NUID conditions resolve against the NUID fields' LINKED registry keys

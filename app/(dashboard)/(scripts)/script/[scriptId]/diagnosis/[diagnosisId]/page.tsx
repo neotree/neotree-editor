@@ -1,4 +1,4 @@
-import { getDiagnosis, getScript } from "@/app/actions/scripts";
+import { getDiagnosis, getScript, listScreens } from "@/app/actions/scripts";
 import { Title } from "@/components/title";
 import { Alert } from "@/components/alert";
 import { EntityHistoryButton } from "@/app/(dashboard)/components/entity-history";
@@ -13,9 +13,10 @@ type Props = {
 export const dynamic = 'force-dynamic';
 
 export default async function Diagnoses({ params: { diagnosisId, scriptId } }: Props) {
-    const [diagnosis, script] = await Promise.all([
+    const [diagnosis, script, screens] = await Promise.all([
         getDiagnosis({ diagnosisId, returnDraftIfExists: true, }),
         getScript({ scriptId, returnDraftIfExists: true, }),
+        listScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
     ]);
 
     if (!script.data) {
@@ -51,6 +52,7 @@ export default async function Diagnoses({ params: { diagnosisId, scriptId } }: P
                     scriptId={scriptId}
                     formData={diagnosis.data} 
                     script={script.data}
+                    screens={screens.data}
                 />
             </PageContainer>
         </>

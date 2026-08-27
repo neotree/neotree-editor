@@ -28,6 +28,7 @@ export interface ConditionErrorBadgeProps {
   extraKeys?: ConditionKey[];
   /** Whether the key catalogue is authoritative (else key-dependent checks are skipped). */
   keysReady?: boolean;
+  unavailableKeys?: Record<string, string>;
   className?: string;
 }
 
@@ -36,14 +37,14 @@ export interface ConditionErrorBadgeProps {
  * has a blocking error — so invalid legacy CE is visible in list/overview views
  * without opening each item. Renders nothing when everything is valid.
  */
-export function ConditionErrorBadge({ expressions, keys, extraKeys, keysReady, className }: ConditionErrorBadgeProps) {
+export function ConditionErrorBadge({ expressions, keys, extraKeys, keysReady, unavailableKeys, className }: ConditionErrorBadgeProps) {
   const messages = useMemo(() => {
     const mergedKeys = extraKeys?.length ? mergeConditionKeys(keys, extraKeys) : keys;
     const out: string[] = [];
     for (const expression of expressions) {
       const value = `${expression?.value ?? ""}`.trim();
       if (!value) continue;
-      const ctx = { keys: mergedKeys, allowSelf: expression.allowSelf, skipKeyResolution: !keysReady };
+      const ctx = { keys: mergedKeys, allowSelf: expression.allowSelf, unavailableKeys, skipKeyResolution: !keysReady };
       const result =
         expression.mode === "reference"
           ? validateReferenceExpression(value, ctx)
@@ -54,7 +55,7 @@ export function ConditionErrorBadge({ expressions, keys, extraKeys, keysReady, c
       }
     }
     return out;
-  }, [expressions, keys, extraKeys, keysReady]);
+  }, [expressions, keys, extraKeys, keysReady, unavailableKeys]);
 
   if (!messages.length) return null;
 

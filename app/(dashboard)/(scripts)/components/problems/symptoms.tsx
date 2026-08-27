@@ -20,11 +20,13 @@ import { useProblemForm } from "../../hooks/use-problem-form";
 type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useProblemForm>;
+    unavailableOutcomeKeys?: Record<string, string>;
 };
 
 export function Symptoms({
     form,
     disabled,
+    unavailableOutcomeKeys,
 }: Props) {
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
@@ -110,6 +112,7 @@ export function Symptoms({
                         <Symptom
                             form={form}
                             disabled={disabled}
+                            unavailableOutcomeKeys={unavailableOutcomeKeys}
                         >
                             {!disabled && (
                                 <DialogTrigger asChild>
@@ -152,6 +155,7 @@ export function Symptoms({
                                             <Symptom 
                                                 disabled={disabled} 
                                                 form={form}
+                                                unavailableOutcomeKeys={unavailableOutcomeKeys}
                                                 symptom={{
                                                     data: symptom,
                                                     index: rowIndex,

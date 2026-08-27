@@ -40,7 +40,7 @@ import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
-import type { ConditionKey } from "@/lib/conditional-expression"
+import { collectOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
 
 type Props = {
   open: boolean
@@ -52,9 +52,10 @@ type Props = {
   form: ReturnType<typeof useScreenForm>
   onClose: () => void
   scriptId: any
+  unavailableOutcomeKeys?: Record<string, string>
 }
 
-export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled: disabledProp, onClose }: Props & P) {
+export function Field<P = {}>({ open, field: fieldProp, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
 
@@ -117,6 +118,10 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const valuesOptions = watch("valuesOptions")
   const editable = watch("editable")
   const printDisplayColumns = watch('printDisplayColumns');
+  const reservedKeyCollisions = useMemo(
+    () => collectOutcomeKeyCollisions({ screens: [{ type: "form", fields: [{ key, label, items }] }] }),
+    [items, key, label],
+  )
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
 
@@ -277,7 +282,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
             </DialogClose>
 
             <Button
-              disabled={disabled || !type || (showForm && (conditionHasErrors || calculationHasErrors))}
+              disabled={disabled || !type || !!reservedKeyCollisions.length || (showForm && (conditionHasErrors || calculationHasErrors))}
               onClick={() => {
                 if (!showForm) {
                   setShowForm(true)
@@ -362,6 +367,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       keys={conditionKeys}
                       extraKeys={localConditionKeys}
                       keysLoading={keysLoading}
+                      unavailableKeys={unavailableOutcomeKeys}
                       disabled={disabled}
                       initialValue={field?.condition || ""}
                       onValidityChange={setConditionHasErrors}
@@ -412,6 +418,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                   />
                 </div>
               </div>
+              {!!reservedKeyCollisions.length && (
+                <p className="text-xs text-destructive">{reservedKeyCollisions[0].message}</p>
+              )}
 
               {(isTextField || isNumberField) && (
                 <div>
@@ -591,6 +600,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                           keys={conditionKeys}
                           extraKeys={localConditionKeys}
                           keysLoading={keysLoading}
+                          unavailableKeys={unavailableOutcomeKeys}
                           disabled={disabled}
                           initialValue={(field as { calculation?: string } | undefined)?.calculation || ""}
                           onValidityChange={setCalculationHasErrors}

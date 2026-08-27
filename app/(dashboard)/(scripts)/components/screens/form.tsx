@@ -59,7 +59,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
-import type { ConditionKey } from "@/lib/conditional-expression";
+import { collectOutcomeKeyCollisions, getUnavailableOutcomeKeys, type ConditionKey } from "@/lib/conditional-expression";
 
 type Props = {
     scriptId: string;
@@ -122,7 +122,34 @@ export function ScreenForm(props: Props) {
     const listStyle = form.watch('listStyle');
     const printDisplayColumns = form.watch('printDisplayColumns');
     const screenFields = watch('fields');
+    const screenItems = watch('items');
     const screenLabel = watch('label');
+    const screenTitle = watch('title');
+    const currentPosition = Number(formData?.position) || Math.max(0, ...screens.map(screen => Number(screen?.position) || 0)) + 1;
+    const screensForValidation = useMemo(() => {
+        const current = {
+            screenId: formData?.screenId,
+            title: screenTitle,
+            type,
+            key,
+            position: currentPosition,
+            fields: screenFields,
+            items: screenItems,
+        };
+        const currentId = `${formData?.screenId || ''}`;
+        return [
+            ...screens.filter(screen => !currentId || `${screen?.screenId || ''}` !== currentId),
+            current,
+        ];
+    }, [currentPosition, formData?.screenId, key, screenFields, screenItems, screenTitle, screens, type]);
+    const unavailableOutcomeKeys = useMemo(
+        () => getUnavailableOutcomeKeys({ screens: screensForValidation, consumerPosition: currentPosition }),
+        [currentPosition, screensForValidation],
+    );
+    const reservedKeyCollisions = useMemo(
+        () => collectOutcomeKeyCollisions({ screens: screensForValidation }),
+        [screensForValidation],
+    );
     // Keys defined on this (possibly unsaved) screen, so conditions can
     // reference sibling fields before the first save. Use the screen `type`
     // (e.g. multi_select) rather than its stored dataType (e.g. set<id>) so
@@ -462,6 +489,7 @@ export function ScreenForm(props: Props) {
                                 keys={conditionKeys}
                                 extraKeys={localConditionKeys}
                                 keysLoading={keysLoading}
+                                unavailableKeys={unavailableOutcomeKeys}
                                 disabled={disabled}
                                 initialValue={formData?.condition || ''}
                                 onValidityChange={setConditionHasErrors}
@@ -486,6 +514,7 @@ export function ScreenForm(props: Props) {
                                     keys={conditionKeys}
                                     extraKeys={localConditionKeys}
                                     keysLoading={keysLoading}
+                                    unavailableKeys={unavailableOutcomeKeys}
                                     disabled={disabled}
                                     initialValue={formData?.skipToCondition || ''}
                                     onValidityChange={setSkipToConditionHasErrors}
@@ -530,6 +559,14 @@ export function ScreenForm(props: Props) {
                 </div>
 
                 <Title>Properties</Title>
+
+                {!!reservedKeyCollisions.length && (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        {reservedKeyCollisions.map((collision, index) => (
+                            <p key={`${collision.location}-${index}`}>{collision.message}</p>
+                        ))}
+                    </div>
+                )}
 
                 <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
                     <div>
@@ -1209,7 +1246,7 @@ export function ScreenForm(props: Props) {
                 >Cancel</Button>
 
                 <Button
-                    disabled={disabled || conditionHasErrors || skipToConditionHasErrors}
+                    disabled={disabled || conditionHasErrors || skipToConditionHasErrors || !!reservedKeyCollisions.length}
                     onClick={() => save()}
                 >
                     Save Draft
@@ -1243,6 +1280,7 @@ export function ScreenForm(props: Props) {
                         form={form}
                         disabled={disabled}
                         scriptId={scriptId}
+                        unavailableOutcomeKeys={unavailableOutcomeKeys}
                     />
                     
                     {repeatable && (

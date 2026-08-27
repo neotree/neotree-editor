@@ -1,8 +1,10 @@
-import type { ConditionKey, Diagnostic } from "./ast";
+import type { ConditionKey, Diagnostic, ValidationContext } from "./ast";
 import { toConditionKeys } from "./keys";
 import { mergeConditionKeys } from "./merge-keys";
 import { validateCondition } from "./index";
 import { validateReferenceExpression } from "./reference-expr";
+import { buildScriptConditionKeys } from "./script-keys";
+import { collectOutcomeKeyCollisions, getOutcomeProducer, getPreScriptUnavailableOutcomeKeys, getUnavailableOutcomeKeys } from "./script-outcomes";
 
 export interface ScriptWithItems {
   scriptId?: string;
@@ -46,7 +48,12 @@ export interface ScriptConditionFinding {
  *   runs), matching the editor/list "keysReady" behaviour.
  */
 export function collectScriptConditionFindings(script: ScriptWithItems): ScriptConditionFinding[] {
-  const keys = toConditionKeys(script?.dataKeys || []);
+  const keys = buildScriptConditionKeys({
+    dataKeys: script?.dataKeys || [],
+    diagnoses: script?.diagnoses || [],
+    problems: script?.problems || [],
+    screens: script?.screens || [],
+  });
   const scriptCtx = { keys, allowSelf: true, skipKeyResolution: keys.length === 0 };
   const syntaxOnlyCtx = { keys: [] as ConditionKey[], allowSelf: true, skipKeyResolution: true };
 
@@ -61,11 +68,23 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
     expression: unknown,
     field: string,
     location: string,
-    opts?: { mode?: "boolean" | "reference"; ctx?: typeof scriptCtx | typeof syntaxOnlyCtx; entity?: ScriptConditionEntityRef },
+    opts?: {
+      mode?: "boolean" | "reference";
+      ctx?: ValidationContext;
+      entity?: ScriptConditionEntityRef;
+      consumerPosition?: number | null;
+    },
   ) => {
     const value = `${expression ?? ""}`.trim();
     if (!value) return;
-    const ctx = opts?.ctx ?? scriptCtx;
+    const baseCtx = opts?.ctx ?? scriptCtx;
+    const ctx = baseCtx === syntaxOnlyCtx ? baseCtx : {
+      ...baseCtx,
+      unavailableKeys: baseCtx.unavailableKeys ?? getUnavailableOutcomeKeys({
+        screens: script?.screens || [],
+        consumerPosition: opts?.consumerPosition,
+      }),
+    };
     const result =
       opts?.mode === "reference" ? validateReferenceExpression(value, ctx) : validateCondition(value, ctx);
     const errors = result.diagnostics.filter((d) => d.severity === "error");
@@ -75,25 +94,49 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
   for (const screen of (script?.screens || []) as any[]) {
     const loc = `Screen "${screen?.title || screen?.key || screen?.screenId || ""}"`;
     const entity: ScriptConditionEntityRef = { kind: "screen", screenId: screen?.screenId };
-    check(screen?.condition, "condition", loc, { entity });
-    check(screen?.skipToCondition, "skipToCondition", loc, { entity });
+    check(screen?.condition, "condition", loc, { entity, consumerPosition: screen?.position });
+    check(screen?.skipToCondition, "skipToCondition", loc, { entity, consumerPosition: screen?.position });
     for (const field of (screen?.fields || []) as any[]) {
       const fieldLoc = `${loc} > field "${field?.key || field?.label || ""}"`;
-      check(field?.condition, "field.condition", fieldLoc, { entity });
-      check(field?.calculation, "field.calculation", fieldLoc, { mode: "reference", entity });
+      check(field?.condition, "field.condition", fieldLoc, { entity, consumerPosition: screen?.position });
+      check(field?.calculation, "field.calculation", fieldLoc, { mode: "reference", entity, consumerPosition: screen?.position });
+    }
+    for (const item of (screen?.items || []) as any[]) {
+      const itemLoc = `${loc} > item "${item?.key || item?.label || ""}"`;
+      check(item?.condition, "item.condition", itemLoc, { entity, consumerPosition: screen?.position });
     }
   }
 
   for (const diagnosis of (script?.diagnoses || []) as any[]) {
+    const producer = getOutcomeProducer(script?.screens || [], "Diagnoses");
+    const location = `Diagnosis "${diagnosis?.name || diagnosis?.key || ""}"`;
+    const entity: ScriptConditionEntityRef = { kind: "diagnosis", diagnosisId: diagnosis?.diagnosisId };
     check(diagnosis?.expression, "expression", `Diagnosis "${diagnosis?.name || diagnosis?.key || ""}"`, {
-      entity: { kind: "diagnosis", diagnosisId: diagnosis?.diagnosisId },
+      entity,
+      consumerPosition: Number(producer?.position),
     });
+    for (const symptom of (diagnosis?.symptoms || []) as any[]) {
+      check(symptom?.expression, "symptom.expression", `${location} > symptom "${symptom?.name || symptom?.key || ""}"`, {
+        entity,
+        consumerPosition: Number(producer?.position),
+      });
+    }
   }
 
   for (const problem of (script?.problems || []) as any[]) {
-    check(problem?.expression, "expression", `Problem "${problem?.name || problem?.key || ""}"`, {
-      entity: { kind: "problem", problemId: problem?.problemId },
+    const producer = getOutcomeProducer(script?.screens || [], "Problems");
+    const location = `Problem "${problem?.name || problem?.key || ""}"`;
+    const entity: ScriptConditionEntityRef = { kind: "problem", problemId: problem?.problemId };
+    check(problem?.expression, "expression", location, {
+      entity,
+      consumerPosition: Number(producer?.position),
     });
+    for (const symptom of (problem?.symptoms || []) as any[]) {
+      check(symptom?.expression, "symptom.expression", `${location} > symptom "${symptom?.name || symptom?.key || ""}"`, {
+        entity,
+        consumerPosition: Number(producer?.position),
+      });
+    }
   }
 
   for (const item of (script?.drugsLibrary || []) as any[]) {
@@ -104,15 +147,31 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
 
   for (const field of nuidFields) {
     check(field?.condition, "condition", `NUID search field "${field?.key || field?.label || ""}"`, {
-      ctx: nuidCtx,
+      ctx: { ...nuidCtx, unavailableKeys: getPreScriptUnavailableOutcomeKeys() },
       entity: { kind: "nuid" },
     });
   }
 
   const eligibility = script?.eligibilityCriteria;
   if (eligibility) {
-    check(eligibility?.criteria_condition, "criteria_condition", "Eligibility criteria", { ctx: nuidCtx, entity: { kind: "eligibility" } });
-    check(eligibility?.alternative_criteria_condition, "alternative_criteria_condition", "Eligibility criteria (alternative)", { ctx: nuidCtx, entity: { kind: "eligibility" } });
+    check(eligibility?.criteria_condition, "criteria_condition", "Eligibility criteria", { ctx: { ...nuidCtx, unavailableKeys: getPreScriptUnavailableOutcomeKeys() }, entity: { kind: "eligibility" } });
+    check(eligibility?.alternative_criteria_condition, "alternative_criteria_condition", "Eligibility criteria (alternative)", { ctx: { ...nuidCtx, unavailableKeys: getPreScriptUnavailableOutcomeKeys() }, entity: { kind: "eligibility" } });
+  }
+
+  for (const collision of collectOutcomeKeyCollisions(script)) {
+    findings.push({
+      location: collision.location,
+      field: "key",
+      expression: `$${collision.collection}`,
+      entity: collision.entity,
+      errors: [{
+        severity: "error",
+        code: "RESERVED_KEY_COLLISION",
+        message: collision.message,
+        start: 0,
+        end: collision.collection.length + 1,
+      }],
+    });
   }
 
   return findings;

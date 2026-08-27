@@ -95,6 +95,19 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
       return;
     }
 
+    const unavailable = Object.entries(ctx.unavailableKeys || {})
+      .find(([key]) => key.toLowerCase() === name)?.[1];
+    if (unavailable) {
+      diagnostics.push({
+        severity: "error",
+        code: "OUTCOME_NOT_AVAILABLE",
+        message: unavailable,
+        start: node.start,
+        end: node.end,
+      });
+      return;
+    }
+
     if (ctx.skipKeyResolution) return;
 
     // Exact (case-sensitive) match is required.
@@ -372,6 +385,9 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
             ? { bracketDepth: env.bracketDepth + 1, combinedInScope: false }
             : env,
         );
+        break;
+      case "Not":
+        walk(node.expr, env);
         break;
       case "Comparison":
         checkComparison(node);

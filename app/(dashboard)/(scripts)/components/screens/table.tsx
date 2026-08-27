@@ -13,6 +13,7 @@ import { useScreensTable, UseScreensTableParams } from '../../hooks/use-screens-
 import { CopyScreensModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
 import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
+import { getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
 
 type Props = UseScreensTableParams;
 
@@ -25,6 +26,7 @@ export function ScreensTable(props: Props) {
         isScriptLocked,
         scriptLockedByUserId,
         search,
+        screens,
         screensArr,
         setSearch,
         onSearch,
@@ -115,6 +117,11 @@ export function ScreensTable(props: Props) {
                                         { value: f?.calculation, label: `Field "${fieldName}" reference`, mode: 'reference' as const },
                                     ];
                                 });
+                                const itemExpressions = ((s?.items || []) as any[]).map((item) => ({
+                                    value: item?.condition,
+                                    label: `Item "${item?.label || item?.key || ''}" condition`,
+                                    allowSelf: true,
+                                }));
                                 return (
                                     <span className="inline-flex items-center gap-x-2">
                                         <span>{s?.title}</span>
@@ -122,10 +129,15 @@ export function ScreensTable(props: Props) {
                                             <ConditionErrorBadge
                                                 keys={conditionKeys}
                                                 keysReady={keysReady}
+                                                unavailableKeys={getUnavailableOutcomeKeys({
+                                                    screens: screens.data,
+                                                    consumerPosition: s.position,
+                                                })}
                                                 expressions={[
                                                     { value: s.condition, label: 'Condition', allowSelf: true },
                                                     { value: s.skipToCondition, label: 'Skip to screen', allowSelf: true },
                                                     ...fieldExpressions,
+                                                    ...itemExpressions,
                                                 ]}
                                             />
                                         )}

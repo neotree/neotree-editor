@@ -57,6 +57,14 @@ export function ConditionalExpressionModal() {
                                 <p><b>$Diagnoses</b> = [&apos;Sepsis&apos;, &apos;Jaundice&apos;, &apos;Premature&apos;]</p>
                             </code>
 
+                            <h6>Not equal</h6>
+                            <div>
+                                Write the not-equal operator as <b>!=</b> without spaces. Legacy <b>!(...)</b> expressions are still accepted, but the editor will suggest the equivalent modern expression.
+                            </div>
+                            <code>
+                                <p><b>$Sex</b> != &apos;M&apos;</p>
+                            </code>
+
                             <br />
 
                             <code>
@@ -73,6 +81,21 @@ export function ConditionalExpressionModal() {
 
                             <div>
                                 Always wrap <b>includes</b> / <b>excludes</b> in <b>[ ]</b> — especially when combining with <b>and</b> / <b>or</b>, e.g. <i>[$Diagnoses includes (&apos;LBW&apos;)] and $Sex = &apos;M&apos;</i>. Without the brackets the list reference will not evaluate correctly.
+                            </div>
+
+                            <h6>Script diagnoses and problems</h6>
+                            <div>
+                                Use <b>$Diagnoses</b> and <b>$Problems</b> to check outcomes defined in this script&apos;s CDS sections. Suggestions display the outcome name and insert its key.
+                            </div>
+                            <div>
+                                These collections become available only after their Diagnosis or Problems screen has run. Keep each producer screen&apos;s key as <b>Diagnoses</b> or <b>Problems</b>, then place dependent conditions on later screens.
+                            </div>
+                            <code>
+                                <p>[<b>$Diagnoses</b> includes (&apos;RDS&apos;)]</p>
+                                <p>[<b>$Problems</b> includes (&apos;RespiratoryDistress&apos;)]</p>
+                            </code>
+                            <div>
+                                If no values are suggested, add diagnoses or problems in the matching CDS section first. Use the configured machine key in expressions; the editor shows the human-readable name alongside it.
                             </div>
 
                             <code>

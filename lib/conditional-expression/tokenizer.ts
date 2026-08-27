@@ -7,6 +7,7 @@ export type TokenKind =
   | "bool"
   | "ident"
   | "op"
+  | "not"
   | "lparen"
   | "rparen"
   | "lbracket"
@@ -118,6 +119,36 @@ export function tokenize(input: string): { tokens: Token[]; diagnostics: Diagnos
       const raw = input.slice(start, i);
       tokens.push({ kind: "number", value: raw, text: raw, start, end: i });
       continue;
+    }
+
+    // A spaced not-equal operator is a common authoring mistake. Normalize it
+    // to a parseable != token, but keep a blocking diagnostic with a quick fix.
+    if (c === "!") {
+      let lookahead = i + 1;
+      while (lookahead < n && (input[lookahead] === " " || input[lookahead] === "\t")) lookahead++;
+
+      if (lookahead > i + 1 && input[lookahead] === "=") {
+        const end = lookahead + 1;
+        tokens.push({ kind: "op", value: input.slice(i, end), text: "!=", start: i, end });
+        diagnostics.push({
+          severity: "error",
+          code: "SPACED_NOT_EQUAL",
+          message: 'The not-equal operator cannot contain spaces. Write "!=" instead of "! =".',
+          start: i,
+          end,
+          suggestion: "!=",
+        });
+        i = end;
+        continue;
+      }
+
+      // Legacy boolean negation: !(...) or ![...]. The parser accepts it so
+      // existing content remains saveable and can offer an equivalent rewrite.
+      if (input[lookahead] === "(" || input[lookahead] === "[") {
+        tokens.push({ kind: "not", value: "!", text: "!", start: i, end: i + 1 });
+        i++;
+        continue;
+      }
     }
 
     // Comparison operator

@@ -16,6 +16,26 @@ export interface ValueContext {
   insertEnd: number;
 }
 
+export interface ConditionValueMatch {
+  value: string;
+  label?: string;
+}
+
+/** Filters a key's values by either their machine value or display label. */
+export function getConditionValueMatches(key: ConditionKey | undefined, partial: string): ConditionValueMatch[] {
+  if (!key?.options?.length) return [];
+  const normalized = partial.toLowerCase();
+  if (normalized && key.options.some((option) => option.toLowerCase() === normalized)) return [];
+
+  return key.options
+    .filter((option) => {
+      if (!normalized) return true;
+      const label = key.optionLabels?.[option] || "";
+      return option.toLowerCase().includes(normalized) || label.toLowerCase().includes(normalized);
+    })
+    .map((option) => ({ value: option, label: key.optionLabels?.[option] }));
+}
+
 /**
  * Detects when the caret is in a *value* position — the right side of a
  * comparison or an item inside includes/excludes(...) — and returns the

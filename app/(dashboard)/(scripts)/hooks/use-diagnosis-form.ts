@@ -10,10 +10,13 @@ import { useAppContext } from "@/contexts/app";
 import { defaultPreferences } from "@/constants";
 import { useIsLocked } from "@/hooks/use-is-locked";
 import { ScriptType } from "@/databases/queries/scripts";
+import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { fetchOutcomeReferenceImpact, formatOutcomeImpactMessage } from "@/components/conditional-expression/outcome-impact";
 
 export type UseDiagnosisFormParams = {
     scriptId: string;
     script?: ScriptType;
+    screens?: { screenId?: string; type?: string; key?: string; title?: string; position?: number }[];
     formData?: DiagnosisFormDataType;
 };
 
@@ -26,8 +29,9 @@ export function useDiagnosisForm({
 
     const [saving, setSaving] = useState(false);
 
-    const { saveDiagnoses } = useScriptsContext();
+    const { saveDiagnoses, reloadKeys } = useScriptsContext();
     const { alert } = useAlertModal();
+    const { confirm } = useConfirmModal();
     const { viewOnly } = useAppContext();
 
     const scriptPageHref = useMemo(() => `/script/${scriptId}?section=diagnoses`, [scriptId]);
@@ -71,7 +75,7 @@ export function useDiagnosisForm({
 
     const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields]);
 
-    const save = handleSubmit(async (data) => {
+    const persist = async (data: DiagnosisFormDataType, rewrittenReferences = 0) => {
         try {
             setSaving(true);
 
@@ -92,10 +96,13 @@ export function useDiagnosisForm({
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 
+            await reloadKeys();
             router.refresh();
             alert({
                 variant: 'success',
-                message: 'Diagnosis draft was saved successfully!',
+                message: rewrittenReferences
+                    ? `Diagnosis draft was saved and ${rewrittenReferences} conditional-expression reference${rewrittenReferences === 1 ? '' : 's'} were updated.`
+                    : 'Diagnosis draft was saved successfully!',
                 onClose: () => router.push(scriptPageHref),
             });
         } catch(e: any) {
@@ -106,6 +113,38 @@ export function useDiagnosisForm({
         } finally {
             setSaving(false);
         }
+    };
+
+    const save = handleSubmit(async (data) => {
+        const oldKey = `${formData?.key || ''}`.trim();
+        const newKey = `${data?.key || ''}`.trim();
+        if (formData?.diagnosisId && oldKey && newKey && oldKey !== newKey) {
+            try {
+                setSaving(true);
+                const impact = await fetchOutcomeReferenceImpact({
+                    scriptId,
+                    collection: "Diagnoses",
+                    values: [oldKey],
+                    sourceEntityId: formData.diagnosisId,
+                });
+                if (impact?.count) {
+                    setSaving(false);
+                    confirm(() => void persist(data, impact.occurrences), {
+                        title: "Rename diagnosis key",
+                        message: formatOutcomeImpactMessage(impact, "rename"),
+                        positiveLabel: "Rename and update references",
+                        negativeLabel: "Cancel",
+                    });
+                    return;
+                }
+            } catch (e: any) {
+                alert({ variant: "error", title: "Could not inspect references", message: e.message });
+                return;
+            } finally {
+                setSaving(false);
+            }
+        }
+        await persist(data);
     });
 
     const isLocked = useIsLocked({

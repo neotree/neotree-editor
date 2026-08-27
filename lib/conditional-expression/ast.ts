@@ -7,6 +7,8 @@ export type Severity = "error" | "warning";
 export type DiagnosticCode =
   // Syntactic (from the parser/tokenizer)
   | "UNEXPECTED_TOKEN"
+  | "SPACED_NOT_EQUAL"
+  | "LEGACY_NEGATION"
   | "UNBALANCED_PAREN"
   | "UNBALANCED_BRACKET"
   | "UNTERMINATED_STRING"
@@ -22,6 +24,8 @@ export type DiagnosticCode =
   // Semantic (needs the script key context)
   | "UNKNOWN_KEY"
   | "KEY_CASE"
+  | "OUTCOME_NOT_AVAILABLE"
+  | "RESERVED_KEY_COLLISION"
   | "SELF_NOT_ALLOWED"
   | "TYPE_MISMATCH"
   | "VALUE_TYPE"
@@ -77,6 +81,11 @@ export interface GroupNode extends Span {
   expr: Node;
 }
 
+export interface NotNode extends Span {
+  type: "Not";
+  expr: Node;
+}
+
 export interface ComparisonNode extends Span {
   type: "Comparison";
   op: ComparisonOp;
@@ -118,6 +127,7 @@ export type Node =
   | ProgramNode
   | LogicalNode
   | GroupNode
+  | NotNode
   | ComparisonNode
   | MembershipNode
   | VarNode
@@ -142,6 +152,8 @@ export interface ValidationContext {
   allowSelf?: boolean;
   selfDataType?: string;
   selfOptions?: string[];
+  /** Targeted reasons why otherwise-known keys cannot exist at this runtime point. */
+  unavailableKeys?: Record<string, string>;
   /**
    * Skip key-dependent semantic checks (unknown key, type, options).
    * Set while keys are still loading so we never false-flag every key.

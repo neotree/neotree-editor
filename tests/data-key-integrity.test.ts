@@ -7,6 +7,7 @@ import {
   isBlockingEntry,
   type DataKeyIntegrityEntry,
 } from "../lib/data-key-integrity"
+import { isDataKeyIntegrityPublishDetails } from "../lib/publish-data"
 
 const legacyMatch: DataKeyIntegrityEntry = {
   status: "legacy_match",
@@ -68,6 +69,46 @@ assert.equal(
   fingerprintA,
   fingerprintB,
   "fingerprint should stay stable across presentation-only and library-suggestion changes",
+)
+
+const validPublishDetails = {
+  totalIssues: 1,
+  totalScripts: 1,
+  summary: ["One blocking issue"],
+  scripts: [{
+    scriptId: "script-1",
+    scriptTitle: "Example script",
+    totalIssues: 1,
+    registryHref: "/script/script-1/data-keys",
+    scriptHref: "/script/script-1",
+    issues: [{
+      scriptId: "script-1",
+      scriptTitle: "Example script",
+      ruleLabel: "missing data key",
+      displayName: "Field A",
+      reason: "Missing from the registry",
+      location: "Screen A > Field A",
+      usageHref: "/script/script-1/screen/screen-1",
+      registryHref: "/script/script-1/data-keys",
+      scriptHref: "/script/script-1",
+    }],
+  }],
+}
+
+assert.equal(
+  isDataKeyIntegrityPublishDetails(validPublishDetails),
+  true,
+  "valid data-key publish details should be accepted",
+)
+assert.equal(
+  isDataKeyIntegrityPublishDetails({ conditionErrors: { scripts: [], totalFindings: 0 } }),
+  false,
+  "conditional-expression warning details must not be treated as data-key blocking details",
+)
+assert.equal(
+  isDataKeyIntegrityPublishDetails({ ...validPublishDetails, scripts: undefined }),
+  false,
+  "publish details without a scripts array should be rejected before rendering",
 )
 
 console.log("data key integrity tests passed")

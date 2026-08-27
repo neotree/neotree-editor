@@ -34,6 +34,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { pendingChangesAPI } from "@/lib/indexed-db"
 import type { DataKeyIntegrityPublishDetails } from "@/lib/data-key-integrity"
+import { isDataKeyIntegrityPublishDetails } from "@/lib/publish-data"
 import { getDataKeyIntegrityRulesHref } from "@/lib/data-key-integrity-rules"
 
 type Props = {
@@ -107,10 +108,14 @@ export function PublishDrafts({ variant }: Props) {
       const res = response.data as Awaited<ReturnType<typeof _publishData>>
 
       if (res.errors) {
-        if (res.blockingDetails) {
+        const blockingDetails = isDataKeyIntegrityPublishDetails(res.blockingDetails)
+          ? res.blockingDetails
+          : null
+
+        if (blockingDetails && !isCreatingDataKey) {
           setPublishBlockingErrors(res.errors)
-          setPublishBlockingDetails(res.blockingDetails)
-          setPublishBlockingModalOpen(!isCreatingDataKey)
+          setPublishBlockingDetails(blockingDetails)
+          setPublishBlockingModalOpen(true)
         } else {
           alert({
             variant: "error",
@@ -188,12 +193,12 @@ export function PublishDrafts({ variant }: Props) {
     ) : (
       <Button className="h-auto text-xs px-4 py-1">Publish</Button>
     )
-  const validationRulesHref = publishBlockingDetails?.scripts[0]?.scriptId
+  const validationRulesHref = publishBlockingDetails?.scripts?.[0]?.scriptId
     ? getDataKeyIntegrityRulesHref(publishBlockingDetails.scripts[0].scriptId)
     : null
-  const primaryRegistryHref = publishBlockingDetails?.scripts[0]?.registryHref || null
+  const primaryRegistryHref = publishBlockingDetails?.scripts?.[0]?.registryHref || null
   const ruleCounts = publishBlockingDetails ? getRuleCounts(publishBlockingDetails) : []
-  const blocksOnlyNewIssues = !!publishBlockingDetails?.summary.some((line) => line.toLowerCase().includes("block new issues only"))
+  const blocksOnlyNewIssues = !!publishBlockingDetails?.summary?.some((line) => line.toLowerCase().includes("block new issues only"))
 
   return (
     <>

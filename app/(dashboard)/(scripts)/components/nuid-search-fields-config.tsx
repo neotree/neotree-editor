@@ -38,7 +38,7 @@ import { useScriptForm } from "../hooks/use-script-form";
 import { useNuidConfigIssues } from "../hooks/use-nuid-config-issues";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
-import { type ConditionKey } from "@/lib/conditional-expression";
+import { getPreScriptUnavailableOutcomeKeys, type ConditionKey } from "@/lib/conditional-expression";
 import { SelectDataKey } from "@/components/select-data-key";
 import { useDataKeysCtx, type DataKey } from "@/contexts/data-keys";
 import { isNumericQueryValue } from "@/lib/query-state";
@@ -56,6 +56,8 @@ type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useScriptForm>;
 };
+
+const preScriptUnavailableOutcomeKeys = getPreScriptUnavailableOutcomeKeys();
 
 export function NuidSearchFieldsConfig({ 
     disabled,
@@ -407,6 +409,7 @@ export function NuidSearchFieldsConfig({
                                                         keys={conditionKeys}
                                                         extraKeys={nuidFieldKeys}
                                                         keysReady={keysReady}
+                                                        unavailableKeys={preScriptUnavailableOutcomeKeys}
                                                         expressions={[{ value: f.condition, label: 'Condition' }]}
                                                     />
                                                 )}
@@ -757,6 +760,7 @@ export function Field({
                                     keys={conditionKeys}
                                     extraKeys={extraKeys}
                                     keysLoading={keysLoading}
+                                    unavailableKeys={preScriptUnavailableOutcomeKeys}
                                     disabled={disabled}
                                     initialValue={`${field?.condition || ''}`}
                                     onValidityChange={setConditionHasErrors}

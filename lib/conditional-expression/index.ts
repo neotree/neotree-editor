@@ -1,6 +1,7 @@
 import type { Diagnostic, ValidationContext, ValidationResult } from "./ast";
 import { parse } from "./parser";
 import { analyze } from "./semantics";
+import { findLegacyNegationDiagnostics } from "./legacy";
 
 export type {
   ConditionKey,
@@ -13,6 +14,24 @@ export type {
 export { validateReferenceExpression } from "./reference-expr";
 export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
+export { buildScriptConditionKeys, type BuildScriptConditionKeysInput } from "./script-keys";
+export {
+  OUTCOME_COLLECTIONS,
+  collectOutcomeKeyCollisions,
+  getOutcomeProducer,
+  getPreScriptUnavailableOutcomeKeys,
+  getUnavailableOutcomeKeys,
+  isOutcomeCollectionName,
+  type OutcomeCollectionName,
+  type OutcomeKeyCollision,
+} from "./script-outcomes";
+export {
+  buildScriptOutcomeReferencePatches,
+  collectScriptOutcomeReferences,
+  rewriteOutcomeValueReferences,
+  type OutcomeReferenceFinding,
+  type ScriptOutcomeReferencePatches,
+} from "./outcome-references";
 export {
   collectScriptConditionFindings,
   getScriptConditionErrorCount,
@@ -53,9 +72,10 @@ export function validateCondition(input: string, ctx: ValidationContext): Valida
 
   const { ast, diagnostics: syntax } = parse(src);
   const semantic = analyze(ast, ctx);
+  const legacy = findLegacyNegationDiagnostics(ast, src);
   const whitespace = findTrailingWhitespace(src);
 
-  const diagnostics: Diagnostic[] = [...syntax, ...semantic, ...whitespace].sort(
+  const diagnostics: Diagnostic[] = [...syntax, ...legacy, ...semantic, ...whitespace].sort(
     (a, b) => a.start - b.start || (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1),
   );
 

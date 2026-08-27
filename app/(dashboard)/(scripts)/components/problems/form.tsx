@@ -19,6 +19,7 @@ import { Symptoms } from "./symptoms";
 import { LockStatus } from "@/components/lock-status";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
+import { collectOutcomeKeyCollisions, getOutcomeProducer, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
 
 type Props = UseProblemFormParams;
 
@@ -50,6 +51,16 @@ export function ProblemForm(props: Props) {
     const image2 = watch('image2');
     const image3 = watch('image3');
     const preferences = watch('preferences');
+    const symptoms = watch('symptoms');
+    const producer = getOutcomeProducer(props.screens || [], "Problems");
+    const unavailableOutcomeKeys = useMemo(
+        () => getUnavailableOutcomeKeys({ screens: props.screens || [], consumerPosition: Number(producer?.position) }),
+        [producer?.position, props.screens],
+    );
+    const reservedKeyCollisions = useMemo(
+        () => collectOutcomeKeyCollisions({ problems: [{ problemId: props.formData?.problemId, key, name, symptoms }] }),
+        [key, name, props.formData?.problemId, symptoms],
+    );
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -94,6 +105,9 @@ export function ProblemForm(props: Props) {
                             );
                         }}
                     />
+                    {!!reservedKeyCollisions.length && (
+                        <p className="mt-1 text-xs text-destructive">{reservedKeyCollisions[0].message}</p>
+                    )}
                 </div>
 
                 <div className="flex gap-x-2">
@@ -147,6 +161,7 @@ export function ProblemForm(props: Props) {
                                 onChange={onChange}
                                 keys={conditionKeys}
                                 keysLoading={keysLoading}
+                                unavailableKeys={unavailableOutcomeKeys}
                                 disabled={disabled}
                                 initialValue={`${props.formData?.expression || ''}`}
                                 onValidityChange={setExpressionHasErrors}
@@ -222,7 +237,7 @@ export function ProblemForm(props: Props) {
                 >Cancel</Button>
 
                 <Button
-                    disabled={disabled || expressionHasErrors}
+                    disabled={disabled || expressionHasErrors || !!reservedKeyCollisions.length}
                     onClick={() => save()}
                 >
                     Save Draft
@@ -235,6 +250,7 @@ export function ProblemForm(props: Props) {
                 <Symptoms 
                     disabled={disabled}
                     form={form}
+                    unavailableOutcomeKeys={unavailableOutcomeKeys}
                 />
             </div>
         </>

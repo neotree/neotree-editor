@@ -9,10 +9,9 @@ import { toConditionKeys, type ConditionKey } from "@/lib/conditional-expression
 export { toConditionKeys };
 
 /**
- * Loads the data keys scoped to the current script and adapts them into the
- * shape <ConditionEditor> expects. This is the authoritative set of keys a
- * conditional expression is allowed to reference, so validation matches what
- * the mobile app will actually resolve at runtime.
+ * Loads the authoritative condition-key catalogue scoped to the current script,
+ * including its virtual Diagnoses and Problems outcome collections. This keeps
+ * editor validation aligned with publish validation and runtime values.
  *
  * Safe to call outside a ScriptsContextProvider — it degrades to an empty key
  * list (which suppresses key-dependent checks) instead of throwing.
@@ -23,6 +22,7 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
 } {
   const ctx = useScriptsContext();
   const keys = ctx?.keys;
+  const contextConditionKeys = ctx?.conditionKeys;
   const keysLoading = ctx?.keysLoading ?? false;
   const loadKeys = ctx?.loadKeys;
   const enabled = opts?.enabled ?? true;
@@ -31,7 +31,10 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
     if (enabled && loadKeys) loadKeys();
   }, [enabled, loadKeys]);
 
-  const conditionKeys = useMemo<ConditionKey[]>(() => toConditionKeys((keys || []) as any[]), [keys]);
+  const conditionKeys = useMemo<ConditionKey[]>(
+    () => contextConditionKeys || toConditionKeys((keys || []) as any[]),
+    [contextConditionKeys, keys],
+  );
 
   return { conditionKeys, keysLoading };
 }
