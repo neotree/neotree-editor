@@ -1,6 +1,7 @@
 import type { ConditionKey } from "./ast";
 import { toConditionKeys } from "./keys";
 import { mergeConditionKeys } from "./merge-keys";
+import { getOutcomeCollectionForScreenType } from "./script-outcomes";
 
 type ScriptOutcome = {
   key?: unknown;
@@ -115,7 +116,7 @@ export function buildScriptConditionKeys({
   screens = [],
 }: BuildScriptConditionKeysInput): ConditionKey[] {
   let keys = mergeConditionKeys([], toConditionKeys(dataKeys));
-  if (diagnoses.length || screens.some((screen) => `${screen?.type || ""}` === "diagnosis")) {
+  if (diagnoses.length || screens.some((screen) => getOutcomeCollectionForScreenType(screen?.type) === "Diagnoses")) {
     keys = withOutcomeCollection(keys, {
       name: "Diagnoses",
       label: "Diagnoses — script CDS diagnoses",
@@ -123,7 +124,7 @@ export function buildScriptConditionKeys({
       outcomes: diagnoses,
     });
   }
-  if (problems.length || screens.some((screen) => `${screen?.type || ""}` === "problems")) {
+  if (problems.length || screens.some((screen) => getOutcomeCollectionForScreenType(screen?.type) === "Problems")) {
     keys = withOutcomeCollection(keys, {
       name: "Problems",
       label: "Problems — script CDS problems",

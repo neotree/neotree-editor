@@ -1,5 +1,6 @@
 import { configKeys, diagnoses, problems, screens, scripts } from "@/databases/pg/schema";
 import { ScreenReviewField, ScriptField } from "@/types";
+import { getOutcomeCollectionForScreenType } from "@/lib/conditional-expression/script-outcomes";
 
 export function mapNewConfigKeysToOld(s: typeof configKeys.$inferSelect) {
     return {
@@ -116,6 +117,8 @@ export function mapNewProblemToOld(s: typeof problems.$inferSelect) {
 }
 
 export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
+    const outcomeCollection = getOutcomeCollectionForScreenType(s.type);
+
     return {
         id: s.id,
         screen_id: s.oldScreenId || s.screenId,
@@ -179,8 +182,12 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
             // order: s.order,
             metadata: {
                 confidential: s.confidential,
-                dataType: s.dataType,
-                key: s.key,
+                dataType: outcomeCollection === 'Diagnoses'
+                    ? 'diagnosis'
+                    : outcomeCollection === 'Problems'
+                        ? 'problem'
+                        : s.dataType,
+                key: outcomeCollection || s.key,
                 label: s.label,
                 text3: s.text3,
                 title1: s.title1,

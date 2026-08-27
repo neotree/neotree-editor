@@ -5,6 +5,7 @@ import {
   getDataKeyIntegrityStatusLabel,
   getDataKeyIntegrityEntryFingerprint,
   isBlockingEntry,
+  scanDataKeyIntegrity,
   type DataKeyIntegrityEntry,
 } from "../lib/data-key-integrity"
 import { isDataKeyIntegrityPublishDetails } from "../lib/publish-data"
@@ -46,6 +47,26 @@ assert.equal(getDataKeyIntegrityStatusLabel("unmanaged"), "Unmanaged reference")
 assert.equal(isBlockingEntry(legacyMatch), true, "legacy matches should block")
 assert.equal(isBlockingEntry(duplicateParent), true, "duplicate parent datakey should block")
 assert.equal(isBlockingEntry(resolved), false, "resolved entries must not block")
+
+const virtualOutcomeReport = scanDataKeyIntegrity({
+  screens: [{
+    scriptId: "script-1",
+    screenId: "diagnosis-screen",
+    type: "diagnosis",
+    title: "Select diagnoses",
+    key: "",
+    keyId: "",
+    items: [],
+    fields: [],
+  } as any],
+  dataKeys: [],
+  onlyIssues: true,
+})
+assert.equal(
+  virtualOutcomeReport.entries.some((entry) => entry.kind === "screen"),
+  false,
+  "virtual outcome collections must not require a global parent data key",
+)
 
 const blocking = getBlockingIntegrityEntries([legacyMatch, duplicateParent, resolved])
 assert.equal(blocking.length, 2, "blocking helper should only return blocking entries")

@@ -262,13 +262,13 @@ assert.ok(
   }).diagnostics.some((diagnostic) => diagnostic.code === "OUTCOME_NOT_AVAILABLE"),
   "known virtual collections retain targeted availability errors even when the general key catalogue is empty",
 );
-assert.match(
+assert.equal(
   getUnavailableOutcomeKeys({
     screens: [{ type: "diagnosis", key: "ClinicalDx", title: "Compile diagnoses", position: 2 }],
     consumerPosition: 3,
   }).Diagnoses,
-  /currently saves to "\$ClinicalDx"/,
-  "a producer using a noncanonical runtime key gets a targeted contract error",
+  undefined,
+  "the producer type supplies the virtual collection key without requiring stored-key backfills",
 );
 
 const reservedCollisions = collectOutcomeKeyCollisions({
@@ -278,7 +278,12 @@ const reservedCollisions = collectOutcomeKeyCollisions({
   ],
   diagnoses: [{ diagnosisId: "bad-dx", key: "Problems", name: "Bad diagnosis" }],
 });
-assert.equal(reservedCollisions.length, 3, "only the matching producer screen may own a reserved collection key");
+assert.equal(reservedCollisions.length, 3, "reserved collection names remain blocked outside virtual outcome producers");
+assert.equal(
+  collectOutcomeKeyCollisions({ screens: [{ type: "diagnosis", key: "Problems", title: "Legacy diagnosis screen" }] }).length,
+  0,
+  "legacy stored parent keys are ignored because outcome collection identity comes from screen type",
+);
 assert.equal(
   collectOutcomeKeyCollisions({
     screens: [{ type: "form", key: "Safe", items: [{ key: "Diagnoses", label: "Bad item" }] }],

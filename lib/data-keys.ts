@@ -5,6 +5,7 @@ import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 import { diagnoses, drugsLibrary } from "@/databases/pg/schema";
 import { normalizeDataKeyType } from "@/lib/data-key-types";
+import { getOutcomeCollectionForScreenType } from "@/lib/conditional-expression/script-outcomes";
 
 type KeyWithoutOptions = {
     name: string;
@@ -122,13 +123,17 @@ export async function scrapDataKeys({
 
     let screensKeys: Scrapped[] = screens.map(s => {
         let dataType = s.type;
+        const outcomeCollection = getOutcomeCollectionForScreenType(s.type);
 
         return {
             id: s.screenId,
             type: 'screen',
             key: {
-                name: s.key,
-                label: s.label,
+                // The collection itself is virtual and must not be linked to
+                // the global data-key registry. Its CDS children remain normal
+                // script keys and are collected below.
+                name: outcomeCollection ? '' : s.key,
+                label: outcomeCollection ? '' : s.label,
                 dataType,
                 children: [
                     ...(s.fields || []).map(f => {

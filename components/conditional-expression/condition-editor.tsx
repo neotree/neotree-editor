@@ -84,10 +84,10 @@ export function ConditionEditor({
     () => (extraKeys?.length ? mergeConditionKeys(keys, extraKeys) : keys),
     [keys, extraKeys],
   );
-  const autocompleteKeys = useMemo(() => {
-    const unavailable = new Set(Object.keys(unavailableKeys || {}).map((key) => key.toLowerCase()));
-    return mergedKeys.filter((key) => !unavailable.has(key.name.toLowerCase()));
-  }, [mergedKeys, unavailableKeys]);
+  // Availability controls validation, not discovery. Keeping unavailable keys
+  // in autocomplete lets authors inspect configured CDS values while the
+  // targeted diagnostic still prevents an invalid before-producer reference.
+  const autocompleteKeys = mergedKeys;
 
   // Readiness is based on *having* keys, not the transient loading flag —
   // otherwise a background refetch (keysLoading -> true) would momentarily

@@ -18,6 +18,7 @@ export { buildScriptConditionKeys, type BuildScriptConditionKeysInput } from "./
 export {
   OUTCOME_COLLECTIONS,
   collectOutcomeKeyCollisions,
+  getOutcomeCollectionForScreenType,
   getOutcomeProducer,
   getPreScriptUnavailableOutcomeKeys,
   getUnavailableOutcomeKeys,

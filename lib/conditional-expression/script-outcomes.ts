@@ -28,6 +28,17 @@ export function isOutcomeCollectionName(value: unknown): value is OutcomeCollect
   return Object.keys(OUTCOME_COLLECTIONS).includes(`${value || ""}` as OutcomeCollectionName);
 }
 
+/**
+ * Diagnosis and Problems screens expose virtual, script-scoped collections.
+ * Their runtime key is derived from the screen type rather than a global data
+ * key, which keeps legacy screens with an empty stored key usable without a
+ * database backfill.
+ */
+export function getOutcomeCollectionForScreenType(type: unknown): OutcomeCollectionName | undefined {
+  return (Object.keys(OUTCOME_COLLECTIONS) as OutcomeCollectionName[])
+    .find((collection) => OUTCOME_COLLECTIONS[collection].screenType === `${type || ""}`);
+}
+
 function positionOf(screen: OutcomeScreen | undefined): number | null {
   const position = Number(screen?.position);
   return Number.isFinite(position) ? position : null;
@@ -37,9 +48,8 @@ export function getOutcomeProducer(
   screens: OutcomeScreen[] = [],
   collection: OutcomeCollectionName,
 ): OutcomeScreen | undefined {
-  const type = OUTCOME_COLLECTIONS[collection].screenType;
   return [...screens]
-    .filter((screen) => `${screen?.type || ""}` === type)
+    .filter((screen) => getOutcomeCollectionForScreenType(screen?.type) === collection)
     .sort((a, b) => (positionOf(a) ?? Number.MAX_SAFE_INTEGER) - (positionOf(b) ?? Number.MAX_SAFE_INTEGER))[0];
 }
 
@@ -64,12 +74,6 @@ export function getUnavailableOutcomeKeys({
     const producer = getOutcomeProducer(screens, collection);
     if (!producer) {
       unavailable[collection] = `"$${collection}" is not available because this script has no ${config.singular} screen. Add that screen before using this collection.`;
-      return;
-    }
-
-    const producerKey = `${producer?.key || ""}`.trim();
-    if (producerKey.toLowerCase() !== collection.toLowerCase()) {
-      unavailable[collection] = `"$${collection}" is produced by the ${config.singular} screen, but that screen currently saves to "$${producerKey || "(no key)"}". Set its key to "${collection}" first.`;
       return;
     }
 
@@ -121,9 +125,11 @@ export function collectOutcomeKeyCollisions(script: {
   screens.forEach((screen) => {
     const location = `Screen "${screen?.title || screen?.key || screen?.screenId || ""}"`;
     const entity: ScriptConditionEntityRef = { kind: "screen", screenId: screen?.screenId };
-    const allowed = (Object.keys(OUTCOME_COLLECTIONS) as OutcomeCollectionName[])
-      .find((collection) => OUTCOME_COLLECTIONS[collection].screenType === `${screen?.type || ""}`);
-    addIfReserved(screen?.key, location, entity, allowed);
+    const allowed = getOutcomeCollectionForScreenType(screen?.type);
+    // Outcome-screen parent keys are legacy storage only. Runtime collection
+    // identity is derived from the type, so the stored parent key is neither a
+    // collision nor a data-key reference.
+    if (!allowed) addIfReserved(screen?.key, location, entity);
     (screen?.fields || []).forEach((field) => {
       addIfReserved(field?.key, `${location} > field "${field?.label || field?.key || ""}"`, entity);
       (field?.items || []).forEach((item) => {

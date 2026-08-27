@@ -28,6 +28,7 @@ import {
     collectOutcomeKeyCollisions,
     collectScriptConditionFindings,
     collectScriptOutcomeReferences,
+    getOutcomeCollectionForScreenType,
     isOutcomeCollectionName,
     type OutcomeCollectionName,
     type OutcomeReferenceFinding,
@@ -909,7 +910,7 @@ export async function getScriptsConditionKeys(
         const conditionScreens = mergedScreens.map((screen: any) => ({
             screenId: screen?.screenId,
             type: screen?.type,
-            key: screen?.key,
+            key: getOutcomeCollectionForScreenType(screen?.type) || screen?.key,
             title: screen?.title,
             position: screen?.position,
         }));

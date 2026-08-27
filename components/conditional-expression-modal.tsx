@@ -88,7 +88,7 @@ export function ConditionalExpressionModal() {
                                 Use <b>$Diagnoses</b> and <b>$Problems</b> to check outcomes defined in this script&apos;s CDS sections. Suggestions display the outcome name and insert its key.
                             </div>
                             <div>
-                                These collections become available only after their Diagnosis or Problems screen has run. Keep each producer screen&apos;s key as <b>Diagnoses</b> or <b>Problems</b>, then place dependent conditions on later screens.
+                                These collections become available only after their Diagnosis or Problems screen has run. The editor assigns the virtual <b>Diagnoses</b> or <b>Problems</b> collection automatically; place dependent conditions on later screens.
                             </div>
                             <code>
                                 <p>[<b>$Diagnoses</b> includes (&apos;RDS&apos;)]</p>

@@ -59,7 +59,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
-import { collectOutcomeKeyCollisions, getUnavailableOutcomeKeys, type ConditionKey } from "@/lib/conditional-expression";
+import { collectOutcomeKeyCollisions, getOutcomeCollectionForScreenType, getUnavailableOutcomeKeys, type ConditionKey } from "@/lib/conditional-expression";
 
 type Props = {
     scriptId: string;
@@ -302,6 +302,7 @@ export function ScreenForm(props: Props) {
 
     const isDiagnosisScreen = type === 'diagnosis';
     const isProblemsScreen = type === 'problems';
+    const outcomeCollection = getOutcomeCollectionForScreenType(type);
     const isProgressScreen = type === 'progress';
     const isFormScreen = type === 'form';
     const isChecklistScreen = type === 'checklist';
@@ -625,6 +626,19 @@ export function ScreenForm(props: Props) {
 
                 {(isDiagnosisScreen || isProblemsScreen) && (
                     <>
+                        <div>
+                            <Label secondary htmlFor="outcomeCollection">Conditional-expression collection</Label>
+                            <Input
+                                id="outcomeCollection"
+                                value={`$${outcomeCollection}`}
+                                readOnly
+                                noRing={false}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                This virtual collection is assigned automatically. Its suggested values come from the script&apos;s Problems &amp; Diagnoses section.
+                            </span>
+                        </div>
+
                         <div>
                             <Label secondary htmlFor="title2">Title 2 *</Label>
                             <Input
