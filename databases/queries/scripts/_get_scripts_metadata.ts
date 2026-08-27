@@ -4,7 +4,6 @@ import db from "@/databases/pg/drizzle";
 import { scripts, screens, hospitals, scriptsDrafts, problems, diagnoses } from "@/databases/pg/schema";
 import { DiagnosisSymptom, ScriptField, ScriptImage, ScriptItem } from "@/types";
 import * as uuid from "uuid";
-import { getOutcomeCollectionForScreenType } from "@/lib/conditional-expression/script-outcomes";
 
 export type GetScriptsMetadataParams = {
     scriptsIds?: string[];
@@ -342,7 +341,6 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                     };
                 }),
                 screens: script.screens.map(screen => {
-                    const screenKey = getOutcomeCollectionForScreenType(screen.type) || screen.key;
                     const items = screen.items as ScriptItem[];
                     const screenFields = screen.fields as ScriptField[];
                     const skipToScreen = !screen.skipToScreenId
@@ -407,7 +405,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
 
                     let fields: (GetScriptsMetadataResponse['data'][0]['screens'][0]['fields'][0])[] = [{
                         label: screen.label,
-                        key: screenKey,
+                        key: screen.key,
                         type: screen.type,
                         ...(() => {
                             switch (screen.type) {
@@ -441,7 +439,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         case 'yesno':
                             fields = [{
                                 label: screen.label,
-                                key: screenKey,
+                                key: screen.key,
                                 type: screen.type,
                                 dataType: 'boolean',
                                 optional: screen.skippable,
@@ -463,7 +461,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         case 'diagnosis':
                             fields = [{
                                 label: screen.label,
-                                key: screenKey,
+                                key: screen.key,
                                 type: screen.type,
                                 dataType: 'diagnosis',
                                 optional: screen.skippable,
@@ -476,7 +474,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         case 'checklist':
                             fields = [{
                                 label: screen.label,
-                                key: screenKey,
+                                key: screen.key,
                                 type: screen.type,
                                 dataType: null,
                                 optional: screen.skippable,
@@ -593,7 +591,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         case 'single_select':
                             fields = [{
                                 label: screen.label,
-                                key: screenKey,
+                                key: screen.key,
                                 type: screen.type,
                                 dataType: 'single_select_option',
                                 optional: screen.skippable,
@@ -606,7 +604,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         case 'multi_select':
                             fields = [{
                                 label: screen.label,
-                                key: screenKey,
+                                key: screen.key,
                                 type: screen.type,
                                 dataType: 'multi_select_option',
                                 optional: screen.skippable,

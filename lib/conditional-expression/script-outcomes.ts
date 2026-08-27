@@ -32,9 +32,13 @@ export function isOutcomeCollectionName(value: unknown): value is OutcomeCollect
 
 /**
  * Diagnosis and Problems screens expose virtual, script-scoped collections.
- * Their runtime key is derived from the screen type rather than a global data
- * key, which keeps legacy screens with an empty stored key usable without a
- * database backfill.
+ * The editor derives their CE identity from the screen type rather than a
+ * global data key, which keeps legacy screens with an empty stored key usable
+ * without a database backfill.
+ *
+ * This mapping is editor-side only. Do not use it to rewrite script metadata
+ * exports: those payloads are an existing mobile-app contract and must retain
+ * their stored keys and datatypes.
  */
 export function getOutcomeCollectionForScreenType(type: unknown): OutcomeCollectionName | undefined {
   return (Object.keys(OUTCOME_COLLECTIONS) as OutcomeCollectionName[])
