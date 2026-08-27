@@ -59,7 +59,7 @@ export function ConditionalExpressionModal() {
 
                             <h6>Not equal</h6>
                             <div>
-                                Write the not-equal operator as <b>!=</b> without spaces. Legacy <b>!(...)</b> expressions are still accepted, but the editor will suggest the equivalent modern expression.
+                                Write the not-equal operator as <b>!=</b> without spaces. Legacy <b>!(...)</b> and <b>!$Key = value</b> expressions are still accepted, but the editor will suggest the equivalent modern expression.
                             </div>
                             <code>
                                 <p><b>$Sex</b> != &apos;M&apos;</p>

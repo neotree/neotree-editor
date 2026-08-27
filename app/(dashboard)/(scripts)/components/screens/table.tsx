@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Edit } from "lucide-react";
 
@@ -13,7 +14,7 @@ import { useScreensTable, UseScreensTableParams } from '../../hooks/use-screens-
 import { CopyScreensModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
 import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
-import { getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { getOutcomeProducers, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
 
 type Props = UseScreensTableParams;
 
@@ -39,6 +40,20 @@ export function ScreensTable(props: Props) {
     const { sys, viewOnly } = useAppContext();
     const { conditionKeys } = useConditionKeys();
     const keysReady = conditionKeys.length > 0;
+    const outcomeProducers = useMemo(() => getOutcomeProducers(screens.data), [screens.data]);
+    const unavailableByPosition = useMemo(() => {
+        const availability = new Map<string, Record<string, string>>();
+        screensArr.forEach((screen) => {
+            const key = `${screen?.position ?? ''}`;
+            if (availability.has(key)) return;
+            availability.set(key, getUnavailableOutcomeKeys({
+                screens: screens.data,
+                consumerPosition: screen?.position,
+                producers: outcomeProducers,
+            }));
+        });
+        return availability;
+    }, [outcomeProducers, screens.data, screensArr]);
 
     return (
         <>
@@ -129,10 +144,7 @@ export function ScreensTable(props: Props) {
                                             <ConditionErrorBadge
                                                 keys={conditionKeys}
                                                 keysReady={keysReady}
-                                                unavailableKeys={getUnavailableOutcomeKeys({
-                                                    screens: screens.data,
-                                                    consumerPosition: s.position,
-                                                })}
+                                                unavailableKeys={unavailableByPosition.get(`${s.position ?? ''}`) || {}}
                                                 expressions={[
                                                     { value: s.condition, label: 'Condition', allowSelf: true },
                                                     { value: s.skipToCondition, label: 'Skip to screen', allowSelf: true },

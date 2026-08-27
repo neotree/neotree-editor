@@ -461,12 +461,11 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                             break;
 
                         case 'diagnosis':
-                        case 'problems':
                             fields = [{
                                 label: screen.label,
                                 key: screenKey,
                                 type: screen.type,
-                                dataType: screen.type === 'diagnosis' ? 'diagnosis' : 'problem',
+                                dataType: 'diagnosis',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
                                 condition: screen.condition || '',

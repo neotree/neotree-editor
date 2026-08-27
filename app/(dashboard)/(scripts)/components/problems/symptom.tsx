@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { v4 } from "uuid";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 
 import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
@@ -18,7 +18,7 @@ import { Title } from "../title";
 import { useProblemForm } from "../../hooks/use-problem-form";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
-import { collectOutcomeKeyCollisions } from "@/lib/conditional-expression";
+import { collectNewOutcomeKeyCollisions } from "@/lib/conditional-expression";
 
 type Props = {
     children: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
@@ -75,11 +75,15 @@ export function Symptom<P = {}>({
     const key = watch('key');
     const name = watch('name');
     const printable = watch('printable');
+    const parentName = useWatch({ control: form.control, name: 'name' });
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
     const reservedKeyCollisions = useMemo(
-        () => collectOutcomeKeyCollisions({ problems: [{ name: form.getValues('name'), symptoms: [{ key, name }] }] }),
-        [form, key, name],
+        () => collectNewOutcomeKeyCollisions(
+            { problems: [{ name: parentName, symptoms: [{ symptomId: symptom?.symptomId, key, name }] as any }] },
+            { problems: [{ name: parentName, symptoms: symptom ? [symptom] : [] }] },
+        ),
+        [key, name, parentName, symptom],
     );
 
     const onSave = handleSubmit(data => {

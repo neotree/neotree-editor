@@ -19,7 +19,7 @@ import { Symptoms } from "./symptoms";
 import { LockStatus } from "@/components/lock-status";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
-import { collectOutcomeKeyCollisions, getOutcomeProducer, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { collectNewOutcomeKeyCollisions, getOutcomeProducer, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
 
 type Props = UseProblemFormParams;
 
@@ -58,7 +58,10 @@ export function ProblemForm(props: Props) {
         [producer?.position, props.screens],
     );
     const reservedKeyCollisions = useMemo(
-        () => collectOutcomeKeyCollisions({ problems: [{ problemId: props.formData?.problemId, key, name, symptoms }] }),
+        () => collectNewOutcomeKeyCollisions(
+            { problems: [{ problemId: props.formData?.problemId, key, name, symptoms }] },
+            { problems: props.formData ? [props.formData] : [] },
+        ),
         [key, name, props.formData?.problemId, symptoms],
     );
 

@@ -16,15 +16,23 @@ export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
 export { buildScriptConditionKeys, type BuildScriptConditionKeysInput } from "./script-keys";
 export {
+  getConfigurationConditionKeySignature,
+  toConfigurationConditionKeys,
+  type ConfigurationConditionKeySource,
+} from "./configuration-keys";
+export {
   OUTCOME_COLLECTIONS,
+  collectNewOutcomeKeyCollisions,
   collectOutcomeKeyCollisions,
   getOutcomeCollectionForScreenType,
   getOutcomeProducer,
+  getOutcomeProducers,
   getPreScriptUnavailableOutcomeKeys,
   getUnavailableOutcomeKeys,
   isOutcomeCollectionName,
   type OutcomeCollectionName,
   type OutcomeKeyCollision,
+  type OutcomeProducers,
 } from "./script-outcomes";
 export {
   buildScriptOutcomeReferencePatches,

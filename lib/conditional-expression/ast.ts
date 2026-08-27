@@ -8,6 +8,7 @@ export type DiagnosticCode =
   // Syntactic (from the parser/tokenizer)
   | "UNEXPECTED_TOKEN"
   | "SPACED_NOT_EQUAL"
+  | "LEGACY_REVERSED_COMPARISON"
   | "LEGACY_NEGATION"
   | "UNBALANCED_PAREN"
   | "UNBALANCED_BRACKET"

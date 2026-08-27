@@ -24,16 +24,40 @@ export interface ConditionValueMatch {
 /** Filters a key's values by either their machine value or display label. */
 export function getConditionValueMatches(key: ConditionKey | undefined, partial: string): ConditionValueMatch[] {
   if (!key?.options?.length) return [];
-  const normalized = partial.toLowerCase();
-  if (normalized && key.options.some((option) => option.toLowerCase() === normalized)) return [];
-
-  return key.options
-    .filter((option) => {
-      if (!normalized) return true;
-      const label = key.optionLabels?.[option] || "";
-      return option.toLowerCase().includes(normalized) || label.toLowerCase().includes(normalized);
+  const normalized = partial.trim().toLowerCase();
+  const matches = key.options
+    .map((option, index) => {
+      const label = key.optionLabels?.[option];
+      const valueSearch = option.toLowerCase();
+      const labelSearch = (label || "").toLowerCase();
+      const rank = !normalized
+        ? 0
+        : valueSearch.startsWith(normalized)
+          ? 0
+          : labelSearch.startsWith(normalized)
+            ? 1
+            : valueSearch.includes(normalized)
+              ? 2
+              : labelSearch.includes(normalized)
+                ? 3
+                : Number.MAX_SAFE_INTEGER;
+      return { value: option, label, index, rank, exact: valueSearch === normalized };
     })
-    .map((option) => ({ value: option, label: key.optionLabels?.[option] }));
+    .filter((option) => option.rank !== Number.MAX_SAFE_INTEGER);
+
+  if (!normalized) {
+    return matches.map(({ value, label }) => ({ value, label }));
+  }
+
+  // Typing an option that is also the prefix of other options must not close
+  // autocomplete. Hide only the already-complete value and keep its remaining
+  // continuations visible. A unique exact match still closes naturally.
+  const alternatives = matches.filter((option) => !option.exact);
+  if (!alternatives.length && matches.some((option) => option.exact)) return [];
+
+  return alternatives
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(({ value, label }) => ({ value, label }));
 }
 
 /**
@@ -112,11 +136,16 @@ export function quoteValue(value: string): string {
   return `'${value.replace(/'/g, "")}'`;
 }
 
-/** Inserts a quoted value at the value context, returning the new text + caret. */
-export function insertValueAtContext(condition: string, value: string, context: ValueContext) {
+/** Inserts a value at the value context, returning the new text + caret. */
+export function insertValueAtContext(
+  condition: string,
+  value: string,
+  context: ValueContext,
+  opts?: { quote?: boolean },
+) {
   const before = condition.slice(0, context.insertStart);
   const after = condition.slice(context.insertEnd);
-  const inserted = quoteValue(value);
+  const inserted = opts?.quote === false ? value : quoteValue(value);
   return { condition: `${before}${inserted}${after}`, cursor: before.length + inserted.length };
 }
 
@@ -180,7 +209,7 @@ export function sortKeyMatches(keys: ConditionKey[], token: string): ConditionKe
     );
   });
 
-  return matches.sort((a, b) => {
+  const sorted = matches.sort((a, b) => {
     const aName = a.name.toLowerCase();
     const bName = b.name.toLowerCase();
     const aStarts = aName.startsWith(normalized);
@@ -188,4 +217,11 @@ export function sortKeyMatches(keys: ConditionKey[], token: string): ConditionKe
     if (aStarts !== bStarts) return aStarts ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
+
+  // As with option values, an exact key can also be a prefix of another key.
+  // Hide only the already-complete key and retain its remaining matches.
+  const hasExactMatch = !!normalized && sorted.some((key) => key.name.toLowerCase() === normalized);
+  return hasExactMatch
+    ? sorted.filter((key) => key.name.toLowerCase() !== normalized)
+    : sorted;
 }

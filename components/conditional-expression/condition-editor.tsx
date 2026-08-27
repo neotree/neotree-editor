@@ -128,8 +128,6 @@ export function ConditionEditor({
     if (!activeToken || !autocompleteKeys.length) return [];
     const token = activeToken.token;
     if (token.toLowerCase() === "self") return [];
-    // Hide once the token already exactly matches a known key.
-    if (token.length > 2 && autocompleteKeys.some((k) => k.name.toLowerCase() === token.toLowerCase())) return [];
     return sortKeyMatches(autocompleteKeys, token);
   }, [activeToken, autocompleteKeys]);
 
@@ -159,6 +157,9 @@ export function ConditionEditor({
   const suggestionCount = visibleKeySuggestions.length || visibleValueSuggestions.length;
   const valueKey = valueContext
     ? mergedKeys.find((key) => key.name.toLowerCase() === valueContext.keyName.toLowerCase())
+    : undefined;
+  const exactValueMatch = valueContext
+    ? valueKey?.options?.find((option) => option.toLowerCase() === valueContext.partial.trim().toLowerCase())
     : undefined;
   const emptyOutcomeCollections = useMemo(() => {
     const referenced = mergedKeys.filter((key) => (
@@ -205,7 +206,11 @@ export function ConditionEditor({
 
   const applyValueSuggestion = (optionValue: string) => {
     if (!valueContext) return;
-    const next = insertValueAtContext(value, optionValue, valueContext);
+    const next = insertValueAtContext(value, optionValue, valueContext, {
+      // Configuration and other boolean keys must remain real runtime booleans;
+      // quoted "true"/"false" values do not have equivalent runtime semantics.
+      quote: valueKey?.dataType?.toLowerCase() !== "boolean",
+    });
     onChange(next.condition);
     moveCursorAfterChange(next.cursor);
   };
@@ -219,7 +224,7 @@ export function ConditionEditor({
 
   const canApplySuggestion = (diagnostic: Diagnostic) => (
     !!diagnostic.suggestion
-    && ["LEGACY_NEGATION", "SPACED_NOT_EQUAL", "KEY_CASE", "UNKNOWN_KEY"].includes(diagnostic.code)
+    && ["LEGACY_NEGATION", "LEGACY_REVERSED_COMPARISON", "SPACED_NOT_EQUAL", "KEY_CASE", "UNKNOWN_KEY"].includes(diagnostic.code)
   );
 
   return (
@@ -239,13 +244,17 @@ export function ConditionEditor({
         onClick={(event) => setCursor(event.currentTarget.selectionStart ?? 0)}
         onKeyDown={(event) => {
           if (!suggestionCount) return;
+          // Conditions are intentionally multiline. Keep the standard Enter
+          // shortcut for accepting a suggestion, while Shift+Enter always
+          // remains available for inserting a newline mid-token.
+          if (event.key === "Enter" && event.shiftKey) return;
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
             const direction = event.key === "ArrowDown" ? 1 : -1;
             setSelectedSuggestion((current) => (current + direction + suggestionCount) % suggestionCount);
             return;
           }
-          if (event.key === "Enter" || event.key === "Tab") {
+          if (event.key === "Enter") {
             event.preventDefault();
             const keyOption = visibleKeySuggestions[selectedSuggestion];
             const valueOption = visibleValueSuggestions[selectedSuggestion];
@@ -259,7 +268,11 @@ export function ConditionEditor({
           }
         }}
         onKeyUp={(event) => {
-          if (["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key) && suggestionCount) return;
+          if (event.key === "Enter" && event.shiftKey) {
+            setCursor(event.currentTarget.selectionStart ?? 0);
+            return;
+          }
+          if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(event.key) && suggestionCount) return;
           setCursor(event.currentTarget.selectionStart ?? 0);
         }}
         aria-autocomplete="list"
@@ -291,12 +304,17 @@ export function ConditionEditor({
               +{matches.length - MAX_SUGGESTIONS} more — keep typing to narrow…
             </p>
           )}
-          <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">↑↓ navigate · Enter/Tab apply · Esc close</p>
+          <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">↑↓ navigate · Enter apply · Shift+Enter newline · Esc close</p>
         </div>
       )}
 
       {!!visibleValueSuggestions.length && !!valueContext && (
         <div id={listboxId} role="listbox" className="max-h-56 overflow-y-auto rounded-md border border-border">
+          {exactValueMatch && (
+            <p className="border-b bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{exactValueMatch}</span> is valid. Additional matches are available below.
+            </p>
+          )}
           {visibleValueSuggestions.map((option, index) => (
             <button
               type="button"
@@ -318,7 +336,7 @@ export function ConditionEditor({
               +{valueMatches.length - MAX_SUGGESTIONS} more — keep typing to narrow…
             </p>
           )}
-          <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">↑↓ navigate · Enter/Tab apply · Esc close</p>
+          <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">↑↓ navigate · Enter apply · Shift+Enter newline · Esc close</p>
         </div>
       )}
 

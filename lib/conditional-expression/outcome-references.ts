@@ -22,7 +22,7 @@ function quoteOutcomeValue(value: string): string {
   if (!value.includes("'")) return `'${value}'`;
   if (!value.includes('"')) return `"${value}"`;
   if (!value.includes("`")) return `\`${value}\``;
-  return `'${value.replace(/'/g, "")}'`;
+  throw new Error("Cannot safely rewrite an outcome key containing single quotes, double quotes, and backticks.");
 }
 
 function outcomeLiteralSpans(expression: string, collection: OutcomeCollectionName): LiteralSpan[] {

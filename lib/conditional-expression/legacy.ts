@@ -76,7 +76,7 @@ function legacySuggestion(node: Extract<Node, { type: "Not" }>, source: string):
   return inverted.text;
 }
 
-/** Finds accepted legacy !(...) expressions and offers an equivalent modern rewrite. */
+/** Finds accepted legacy ! expressions and offers an equivalent modern rewrite. */
 export function findLegacyNegationDiagnostics(ast: ProgramNode, source: string): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
@@ -86,7 +86,7 @@ export function findLegacyNegationDiagnostics(ast: ProgramNode, source: string):
         diagnostics.push({
           severity: "warning",
           code: "LEGACY_NEGATION",
-          message: 'Legacy "!(...)" syntax is deprecated. Use explicit inverse operators such as "!=" or "excludes".',
+          message: 'Legacy "!" negation syntax is deprecated. Use explicit inverse operators such as "!=" or "excludes".',
           start: node.start,
           end: node.end,
           suggestion: legacySuggestion(node, source),

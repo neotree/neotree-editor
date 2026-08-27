@@ -142,11 +142,38 @@ export function tokenize(input: string): { tokens: Token[]; diagnostics: Diagnos
         continue;
       }
 
-      // Legacy boolean negation: !(...) or ![...]. The parser accepts it so
-      // existing content remains saveable and can offer an equivalent rewrite.
-      if (input[lookahead] === "(" || input[lookahead] === "[") {
+      // Legacy boolean negation: !(...), ![...] or !$Key = value. The parser
+      // accepts these bounded forms so existing content remains saveable and
+      // can offer an equivalent rewrite. Other standalone uses of "!" remain
+      // genuine syntax errors.
+      if (input[lookahead] === "(" || input[lookahead] === "[" || input[lookahead] === "$") {
         tokens.push({ kind: "not", value: "!", text: "!", start: i, end: i + 1 });
         i++;
+        continue;
+      }
+    }
+
+    // Some legacy scripts use reversed inclusive comparisons (`=<` / `=>`).
+    // Normalize the bounded operator for parsing while retaining its complete
+    // source range so the editor can offer a one-click canonical replacement.
+    if (c === "=") {
+      let lookahead = i + 1;
+      while (lookahead < n && (input[lookahead] === " " || input[lookahead] === "\t")) lookahead++;
+
+      if (input[lookahead] === "<" || input[lookahead] === ">") {
+        const end = lookahead + 1;
+        const normalized = input[lookahead] === "<" ? "<=" : ">=";
+        const legacy = input.slice(i, end);
+        tokens.push({ kind: "op", value: legacy, text: normalized, start: i, end });
+        diagnostics.push({
+          severity: "warning",
+          code: "LEGACY_REVERSED_COMPARISON",
+          message: `Legacy "${legacy}" comparison syntax is deprecated. Use "${normalized}" instead.`,
+          start: i,
+          end,
+          suggestion: normalized,
+        });
+        i = end;
         continue;
       }
     }

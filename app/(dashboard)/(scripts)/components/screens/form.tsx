@@ -59,7 +59,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
-import { collectOutcomeKeyCollisions, getOutcomeCollectionForScreenType, getUnavailableOutcomeKeys, type ConditionKey } from "@/lib/conditional-expression";
+import { collectNewOutcomeKeyCollisions, getOutcomeCollectionForScreenType, getUnavailableOutcomeKeys, type ConditionKey } from "@/lib/conditional-expression";
 
 type Props = {
     scriptId: string;
@@ -125,7 +125,12 @@ export function ScreenForm(props: Props) {
     const screenItems = watch('items');
     const screenLabel = watch('label');
     const screenTitle = watch('title');
-    const currentPosition = Number(formData?.position) || Math.max(0, ...screens.map(screen => Number(screen?.position) || 0)) + 1;
+    const parsedPosition = formData?.position === null || formData?.position === undefined
+        ? Number.NaN
+        : Number(formData.position);
+    const currentPosition = Number.isFinite(parsedPosition)
+        ? parsedPosition
+        : Math.max(0, ...screens.map(screen => Number(screen?.position) || 0)) + 1;
     const screensForValidation = useMemo(() => {
         const current = {
             screenId: formData?.screenId,
@@ -147,8 +152,19 @@ export function ScreenForm(props: Props) {
         [currentPosition, screensForValidation],
     );
     const reservedKeyCollisions = useMemo(
-        () => collectOutcomeKeyCollisions({ screens: screensForValidation }),
-        [screensForValidation],
+        () => collectNewOutcomeKeyCollisions({
+            screens: [{
+                screenId: formData?.screenId,
+                title: screenTitle,
+                type,
+                key,
+                fields: screenFields,
+                items: screenItems,
+            }],
+        }, {
+            screens: formData ? [formData as any] : [],
+        }),
+        [formData, key, screenFields, screenItems, screenTitle, type],
     );
     // Keys defined on this (possibly unsaved) screen, so conditions can
     // reference sibling fields before the first save. Use the screen `type`

@@ -19,7 +19,7 @@ import { Symptoms } from "./symptoms";
 import { LockStatus } from "@/components/lock-status";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
-import { collectOutcomeKeyCollisions, getOutcomeProducer, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { collectNewOutcomeKeyCollisions, getOutcomeProducer, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
 
 type Props = UseDiagnosisFormParams;
 
@@ -58,7 +58,10 @@ export function DiagnosisForm(props: Props) {
         [producer?.position, props.screens],
     );
     const reservedKeyCollisions = useMemo(
-        () => collectOutcomeKeyCollisions({ diagnoses: [{ diagnosisId: props.formData?.diagnosisId, key, name, symptoms }] }),
+        () => collectNewOutcomeKeyCollisions(
+            { diagnoses: [{ diagnosisId: props.formData?.diagnosisId, key, name, symptoms }] },
+            { diagnoses: props.formData ? [props.formData] : [] },
+        ),
         [key, name, props.formData?.diagnosisId, symptoms],
     );
 

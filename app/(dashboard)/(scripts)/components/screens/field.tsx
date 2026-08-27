@@ -40,7 +40,7 @@ import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
-import { collectOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
+import { collectNewOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
 
 type Props = {
   open: boolean
@@ -119,8 +119,11 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, unavaila
   const editable = watch("editable")
   const printDisplayColumns = watch('printDisplayColumns');
   const reservedKeyCollisions = useMemo(
-    () => collectOutcomeKeyCollisions({ screens: [{ type: "form", fields: [{ key, label, items }] }] }),
-    [items, key, label],
+    () => collectNewOutcomeKeyCollisions(
+      { screens: [{ type: "form", fields: [{ fieldId: field?.fieldId, key, label, items }] }] },
+      { screens: [{ type: "form", fields: field ? [field] : [] }] },
+    ),
+    [field, items, key, label],
   )
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])

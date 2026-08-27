@@ -185,9 +185,9 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
         await loadKeys();
     }, [loadKeys]);
 
-    // Keep virtual Diagnoses/Problems options current when another editor saves,
-    // deletes, publishes, or reorders CDS content. The root router refresh does
-    // not update client context state, so refresh this catalogue explicitly.
+    // Keep virtual outcomes and legacy Configuration keys current when another
+    // editor changes their source data. The root router refresh does not update
+    // client context state, so refresh this catalogue explicitly.
     useEffect(() => {
         const relevantActions = new Set([
             "save_diagnoses",
@@ -198,6 +198,8 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
             "delete_screens",
             "save_data_keys",
             "delete_data_keys",
+            "save_config_keys",
+            "delete_config_keys",
             "resolve_data_key_integrity_entry",
             "resolve_data_key_integrity_entries_bulk",
             "save_scripts",
@@ -210,6 +212,9 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
         ]);
         let timer: ReturnType<typeof setTimeout> | undefined;
         const onDataChanged = (action?: string) => {
+            // Do not fan out expensive key-catalogue requests to script pages
+            // that have never opened a condition-aware surface.
+            if (!conditionCatalogueReady) return;
             if (action && !relevantActions.has(action)) return;
             clearTimeout(timer);
             timer = setTimeout(() => void reloadKeys(), 150);
@@ -219,7 +224,7 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
             clearTimeout(timer);
             socket.off("data_changed", onDataChanged);
         };
-    }, [reloadKeys]);
+    }, [conditionCatalogueReady, reloadKeys]);
 
     return {
         screens,

@@ -95,6 +95,10 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
       return;
     }
 
+    // A partially loaded catalogue must never emit key-dependent errors,
+    // including availability errors derived from not-yet-loaded screens.
+    if (ctx.skipKeyResolution) return;
+
     const unavailable = Object.entries(ctx.unavailableKeys || {})
       .find(([key]) => key.toLowerCase() === name)?.[1];
     if (unavailable) {
@@ -107,8 +111,6 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
       });
       return;
     }
-
-    if (ctx.skipKeyResolution) return;
 
     // Exact (case-sensitive) match is required.
     if (exactNames.has(node.name)) return;

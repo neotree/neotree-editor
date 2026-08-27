@@ -32,7 +32,9 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
   }, [enabled, loadKeys]);
 
   const conditionKeys = useMemo<ConditionKey[]>(
-    () => contextConditionKeys || toConditionKeys((keys || []) as any[]),
+    () => contextConditionKeys?.length
+      ? contextConditionKeys
+      : toConditionKeys((keys || []) as any[]),
     [contextConditionKeys, keys],
   );
 

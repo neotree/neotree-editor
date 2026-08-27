@@ -13,12 +13,14 @@ type OutcomeScreen = {
   key?: unknown;
   title?: unknown;
   position?: unknown;
-  fields?: { key?: unknown; label?: unknown; items?: { key?: unknown; value?: unknown; label?: unknown }[] }[];
-  items?: { key?: unknown; id?: unknown; label?: unknown }[];
+  fields?: { fieldId?: unknown; key?: unknown; label?: unknown; items?: { itemId?: unknown; key?: unknown; value?: unknown; label?: unknown }[] }[];
+  items?: { itemId?: unknown; key?: unknown; id?: unknown; label?: unknown }[];
 };
 
 export type OutcomeKeyCollision = {
   collection: OutcomeCollectionName;
+  /** Stable entity/path identity used to grandfather an unchanged legacy key. */
+  identity: string;
   location: string;
   entity?: ScriptConditionEntityRef;
   message: string;
@@ -40,6 +42,7 @@ export function getOutcomeCollectionForScreenType(type: unknown): OutcomeCollect
 }
 
 function positionOf(screen: OutcomeScreen | undefined): number | null {
+  if (screen?.position === null || screen?.position === undefined || screen?.position === "") return null;
   const position = Number(screen?.position);
   return Number.isFinite(position) ? position : null;
 }
@@ -53,6 +56,20 @@ export function getOutcomeProducer(
     .sort((a, b) => (positionOf(a) ?? Number.MAX_SAFE_INTEGER) - (positionOf(b) ?? Number.MAX_SAFE_INTEGER))[0];
 }
 
+export type OutcomeProducers = Partial<Record<OutcomeCollectionName, OutcomeScreen>>;
+
+/** Computes both virtual collection producers once for repeated availability checks. */
+export function getOutcomeProducers(screens: OutcomeScreen[] = []): OutcomeProducers {
+  return (Object.keys(OUTCOME_COLLECTIONS) as OutcomeCollectionName[]).reduce<OutcomeProducers>(
+    (producers, collection) => {
+      const producer = getOutcomeProducer(screens, collection);
+      if (producer) producers[collection] = producer;
+      return producers;
+    },
+    {},
+  );
+}
+
 /**
  * Returns targeted reasons why a virtual outcome collection is unavailable at
  * a given point in the script. A condition is evaluated before its screen, so
@@ -61,27 +78,37 @@ export function getOutcomeProducer(
 export function getUnavailableOutcomeKeys({
   screens = [],
   consumerPosition,
+  producers,
 }: {
   screens?: OutcomeScreen[];
   consumerPosition?: number | null;
+  producers?: OutcomeProducers;
 }): Record<string, string> {
   const unavailable: Record<string, string> = {};
-  const position = Number(consumerPosition);
+  const position = consumerPosition === null || consumerPosition === undefined
+    ? Number.NaN
+    : Number(consumerPosition);
   const hasConsumerPosition = Number.isFinite(position);
+  // When the consuming runtime point is unknown (missing producer, imported
+  // null position, or still-loading form data), ordering cannot be established.
+  // Do not manufacture a blocking "move later" error from that uncertainty.
+  if (!hasConsumerPosition) return unavailable;
 
   (Object.keys(OUTCOME_COLLECTIONS) as OutcomeCollectionName[]).forEach((collection) => {
     const config = OUTCOME_COLLECTIONS[collection];
-    const producer = getOutcomeProducer(screens, collection);
+    const producer = producers ? producers[collection] : getOutcomeProducer(screens, collection);
     if (!producer) {
       unavailable[collection] = `"$${collection}" is not available because this script has no ${config.singular} screen. Add that screen before using this collection.`;
       return;
     }
 
     const producerPosition = positionOf(producer);
-    if (!hasConsumerPosition || producerPosition === null || producerPosition >= position) {
+    // Imported producer screens can also lack a reliable position. In that
+    // case the ordering is unknown, so availability remains non-blocking.
+    if (producerPosition === null) return;
+    if (producerPosition >= position) {
       const producerLabel = `${producer?.title || `${config.singular} screen`}`;
-      const at = producerPosition === null ? "" : ` (position ${producerPosition})`;
-      unavailable[collection] = `"$${collection}" is only available after ${producerLabel}${at}. Move this condition to a later screen.`;
+      unavailable[collection] = `"$${collection}" is only available after ${producerLabel} (position ${producerPosition}). Move this condition to a later screen.`;
     }
   });
 
@@ -106,6 +133,7 @@ export function collectOutcomeKeyCollisions(script: {
 
   const addIfReserved = (
     rawKey: unknown,
+    identity: string,
     location: string,
     entity: ScriptConditionEntityRef | undefined,
     allowedCollection?: OutcomeCollectionName,
@@ -116,54 +144,63 @@ export function collectOutcomeKeyCollisions(script: {
     if (!collection || collection === allowedCollection) return;
     collisions.push({
       collection,
+      identity,
       location,
       entity,
       message: `The key "$${key}" conflicts with the reserved script outcome collection "$${collection}". Choose a different data key.`,
     });
   };
 
-  screens.forEach((screen) => {
+  screens.forEach((screen, screenIndex) => {
+    const screenIdentity = `screen:${screen?.screenId || screenIndex}`;
     const location = `Screen "${screen?.title || screen?.key || screen?.screenId || ""}"`;
     const entity: ScriptConditionEntityRef = { kind: "screen", screenId: screen?.screenId };
     const allowed = getOutcomeCollectionForScreenType(screen?.type);
     // Outcome-screen parent keys are legacy storage only. Runtime collection
     // identity is derived from the type, so the stored parent key is neither a
     // collision nor a data-key reference.
-    if (!allowed) addIfReserved(screen?.key, location, entity);
-    (screen?.fields || []).forEach((field) => {
-      addIfReserved(field?.key, `${location} > field "${field?.label || field?.key || ""}"`, entity);
-      (field?.items || []).forEach((item) => {
-        addIfReserved(item?.key || item?.value, `${location} > field "${field?.label || field?.key || ""}" > item "${item?.label || item?.key || item?.value || ""}"`, entity);
+    if (!allowed) addIfReserved(screen?.key, `${screenIdentity}:key`, location, entity);
+    (screen?.fields || []).forEach((field, fieldIndex) => {
+      const fieldIdentity = `${screenIdentity}:field:${field?.fieldId || fieldIndex}`;
+      addIfReserved(field?.key, `${fieldIdentity}:key`, `${location} > field "${field?.label || field?.key || ""}"`, entity);
+      (field?.items || []).forEach((item, itemIndex) => {
+        addIfReserved(item?.key || item?.value, `${fieldIdentity}:item:${item?.itemId || itemIndex}:key`, `${location} > field "${field?.label || field?.key || ""}" > item "${item?.label || item?.key || item?.value || ""}"`, entity);
       });
     });
-    (screen?.items || []).forEach((item) => {
-      addIfReserved(item?.key || item?.id, `${location} > item "${item?.label || item?.key || item?.id || ""}"`, entity);
+    (screen?.items || []).forEach((item, itemIndex) => {
+      addIfReserved(item?.key || item?.id, `${screenIdentity}:item:${item?.itemId || itemIndex}:key`, `${location} > item "${item?.label || item?.key || item?.id || ""}"`, entity);
     });
   });
 
-  (script?.diagnoses || []).forEach((diagnosis) => {
+  (script?.diagnoses || []).forEach((diagnosis, diagnosisIndex) => {
+    const diagnosisIdentity = `diagnosis:${diagnosis?.diagnosisId || diagnosisIndex}`;
     addIfReserved(
       diagnosis?.key,
+      `${diagnosisIdentity}:key`,
       `Diagnosis "${diagnosis?.name || diagnosis?.key || ""}"`,
       { kind: "diagnosis", diagnosisId: diagnosis?.diagnosisId },
     );
-    (diagnosis?.symptoms || []).forEach((symptom) => {
+    (diagnosis?.symptoms || []).forEach((symptom, symptomIndex) => {
       addIfReserved(
         symptom?.key,
+        `${diagnosisIdentity}:symptom:${(symptom as any)?.symptomId || symptomIndex}:key`,
         `Diagnosis "${diagnosis?.name || diagnosis?.key || ""}" > symptom "${symptom?.name || symptom?.key || ""}"`,
         { kind: "diagnosis", diagnosisId: diagnosis?.diagnosisId },
       );
     });
   });
-  (script?.problems || []).forEach((problem) => {
+  (script?.problems || []).forEach((problem, problemIndex) => {
+    const problemIdentity = `problem:${problem?.problemId || problemIndex}`;
     addIfReserved(
       problem?.key,
+      `${problemIdentity}:key`,
       `Problem "${problem?.name || problem?.key || ""}"`,
       { kind: "problem", problemId: problem?.problemId },
     );
-    (problem?.symptoms || []).forEach((symptom) => {
+    (problem?.symptoms || []).forEach((symptom, symptomIndex) => {
       addIfReserved(
         symptom?.key,
+        `${problemIdentity}:symptom:${(symptom as any)?.symptomId || symptomIndex}:key`,
         `Problem "${problem?.name || problem?.key || ""}" > symptom "${symptom?.name || symptom?.key || ""}"`,
         { kind: "problem", problemId: problem?.problemId },
       );
@@ -171,4 +208,20 @@ export function collectOutcomeKeyCollisions(script: {
   });
 
   return collisions;
+}
+
+/**
+ * Blocks newly introduced reserved-key collisions while allowing a legacy
+ * collision at the same stable entity/path to be saved unchanged. This keeps
+ * unrelated edits possible without silently permitting a new ambiguity.
+ */
+export function collectNewOutcomeKeyCollisions(
+  incoming: Parameters<typeof collectOutcomeKeyCollisions>[0],
+  current?: Parameters<typeof collectOutcomeKeyCollisions>[0],
+): OutcomeKeyCollision[] {
+  const existing = new Set(
+    collectOutcomeKeyCollisions(current || {}).map((collision) => `${collision.collection}:${collision.identity}`),
+  );
+  return collectOutcomeKeyCollisions(incoming)
+    .filter((collision) => !existing.has(`${collision.collection}:${collision.identity}`));
 }

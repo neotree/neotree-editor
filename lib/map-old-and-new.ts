@@ -182,11 +182,9 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
             // order: s.order,
             metadata: {
                 confidential: s.confidential,
-                dataType: outcomeCollection === 'Diagnoses'
-                    ? 'diagnosis'
-                    : outcomeCollection === 'Problems'
-                        ? 'problem'
-                        : s.dataType,
+                // Preserve the legacy metadata datatype contract. The virtual
+                // outcome name only changes the runtime key consumed by CEs.
+                dataType: s.dataType,
                 key: outcomeCollection || s.key,
                 label: s.label,
                 text3: s.text3,

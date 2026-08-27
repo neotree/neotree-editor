@@ -2,6 +2,7 @@ import type { ConditionKey } from "./ast";
 import { toConditionKeys } from "./keys";
 import { mergeConditionKeys } from "./merge-keys";
 import { getOutcomeCollectionForScreenType } from "./script-outcomes";
+import { toConfigurationConditionKeys, type ConfigurationConditionKeySource } from "./configuration-keys";
 
 type ScriptOutcome = {
   key?: unknown;
@@ -16,6 +17,8 @@ type ScriptScreen = {
 export interface BuildScriptConditionKeysInput {
   /** Raw scrapped data keys, before conversion to the editor shape. */
   dataKeys?: any[];
+  /** Existing global Configuration rows, exposed as legacy boolean CE keys. */
+  configurationKeys?: ConfigurationConditionKeySource[];
   diagnoses?: ScriptOutcome[];
   problems?: ScriptOutcome[];
   screens?: ScriptScreen[];
@@ -106,16 +109,27 @@ function withOutcomeCollection(
 
 /**
  * Builds the authoritative conditional-expression key catalogue for one script.
- * Diagnoses and Problems are virtual, script-scoped collections and are never
- * persisted to the global data-key registry.
+ * Configuration rows remain global legacy boolean inputs; Diagnoses and
+ * Problems remain virtual script-scoped collections. None are persisted to the
+ * global data-key registry by this adapter.
  */
 export function buildScriptConditionKeys({
   dataKeys = [],
+  configurationKeys = [],
   diagnoses = [],
   problems = [],
   screens = [],
 }: BuildScriptConditionKeysInput): ConditionKey[] {
-  let keys = mergeConditionKeys([], toConditionKeys(dataKeys));
+  // Configuration is global fallback state. Script/data keys take precedence
+  // on a name collision, matching the runtime's substitution order.
+  const scriptDataKeys = toConditionKeys(dataKeys);
+  const scriptDataKeyNames = new Set(scriptDataKeys.map((key) => key.name.toLowerCase()));
+  const nonShadowedConfigurationKeys = toConfigurationConditionKeys(configurationKeys)
+    .filter((key) => !scriptDataKeyNames.has(key.name.toLowerCase()));
+  let keys = mergeConditionKeys(
+    nonShadowedConfigurationKeys,
+    scriptDataKeys,
+  );
   if (diagnoses.length || screens.some((screen) => getOutcomeCollectionForScreenType(screen?.type) === "Diagnoses")) {
     keys = withOutcomeCollection(keys, {
       name: "Diagnoses",
