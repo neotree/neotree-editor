@@ -26,5 +26,4 @@
 /pnpm-workspace.yaml        @neotree/core-devs
 /.github/CODEOWNERS         @neotree/core-devs
 /.github/dependabot.yml     @neotree/core-devs
-/SECURITY.md                @neotree/core-devs
 /LICENSE                    @neotree/core-devs

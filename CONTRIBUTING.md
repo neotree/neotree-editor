@@ -64,4 +64,10 @@ Changes to `security/**`, `.github/workflows/**`, `.github/actions/**`, CODEOWNE
 
 ## Reporting a vulnerability
 
-Please do not open a public issue. See [`SECURITY.md`](SECURITY.md).
+Please do not open a public issue. This repository uses the organisation-wide policy in
+[neotree/.github](https://github.com/neotree/.github/blob/main/SECURITY.md); the reporting channel is linked from the
+repository's [Security tab](https://github.com/neotree/neotree-editor/security/policy).
+
+See also the organisation [Code of Conduct](https://github.com/neotree/.github/blob/main/CODE_OF_CONDUCT.md) and
+[general contributing guide](https://github.com/neotree/.github/blob/main/CONTRIBUTING.md). This file covers only what is
+specific to this repository: its build, its tests, and what the security gate expects.
