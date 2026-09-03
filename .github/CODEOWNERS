@@ -1,45 +1,30 @@
 # Code Owners.
 #
 # Branch protection must have "Require review from Code Owners" enabled for any of this
-# to bind. GitHub silently ignores an entry whose team has no access to this repository,
-# so confirm each team below is granted at least Write access under
-# Settings -> Collaborators and teams. An invalid entry fails open.
+# to bind, and the team must have at least Write access to this repository. GitHub rejects
+# an entry whose team lacks access with "Unknown owner", and until it is fixed the control
+# does nothing.
+#
+# @neotree/core-devs owns every protected path. It has three members, so a pull-request
+# author - who never satisfies their own Code Owner review - always leaves two possible
+# reviewers. @neotree/maintainers is deliberately NOT listed: it is scoped to the
+# org-governance repositories and has no access to the code repositories, so naming it
+# here would fail validation.
 #
 # CODEOWNERS uses LAST-MATCH-WINS: the final matching line decides the owner.
-#
-# A pull request author never satisfies their own Code Owner review, so every protected
-# path is owned by more than one person. That is deliberate: a control only one person can
-# approve is a control that gets bypassed the week they are on leave.
 
-# ---------------------------------------------------------------------------
-# Default owner for everything in the repository.
-# ---------------------------------------------------------------------------
 *                           @neotree/core-devs
-
-# ---------------------------------------------------------------------------
-# Security controls.
-#
-# These are the paths the trusted PR gate blocks on. Both teams are listed so either can
-# approve: core-devs for the engineering context, maintainers for organisation oversight.
-# ---------------------------------------------------------------------------
-/security/                  @neotree/core-devs @neotree/maintainers
-/.github/workflows/         @neotree/core-devs @neotree/maintainers
-/.github/actions/           @neotree/core-devs @neotree/maintainers
-/.gitattributes             @neotree/core-devs @neotree/maintainers
-/.semgrepignore             @neotree/core-devs @neotree/maintainers
-
-# Package-manager execution configuration. These files can run code at install time.
-/.npmrc                     @neotree/core-devs @neotree/maintainers
-/.yarnrc                    @neotree/core-devs @neotree/maintainers
-/.yarnrc.yml                @neotree/core-devs @neotree/maintainers
-/.pnpmfile.cjs              @neotree/core-devs @neotree/maintainers
-/pnpm-workspace.yaml        @neotree/core-devs @neotree/maintainers
-
-# ---------------------------------------------------------------------------
-# Organisation-level governance. Maintainers listed first as the primary owner.
-# ---------------------------------------------------------------------------
-/.github/CODEOWNERS         @neotree/maintainers @neotree/core-devs
-/.github/dependabot.yml     @neotree/maintainers @neotree/core-devs
-/SECURITY.md                @neotree/maintainers @neotree/core-devs
-/LICENSE                    @neotree/maintainers
-
+/security/                  @neotree/core-devs
+/.github/workflows/         @neotree/core-devs
+/.github/actions/           @neotree/core-devs
+/.gitattributes             @neotree/core-devs
+/.semgrepignore             @neotree/core-devs
+/.npmrc                     @neotree/core-devs
+/.yarnrc                    @neotree/core-devs
+/.yarnrc.yml                @neotree/core-devs
+/.pnpmfile.cjs              @neotree/core-devs
+/pnpm-workspace.yaml        @neotree/core-devs
+/.github/CODEOWNERS         @neotree/core-devs
+/.github/dependabot.yml     @neotree/core-devs
+/SECURITY.md                @neotree/core-devs
+/LICENSE                    @neotree/core-devs
