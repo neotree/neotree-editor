@@ -1,6 +1,7 @@
 export { ConditionEditor, type ConditionEditorProps } from "./condition-editor";
 export {
   ConditionErrorBadge,
+  collectConditionErrorMessages,
   type ConditionErrorBadgeProps,
   type ConditionExpressionInput,
 } from "./condition-error-badge";

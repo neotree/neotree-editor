@@ -81,6 +81,10 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
       const fieldLoc = `${loc} > field "${field?.key || field?.label || ""}"`;
       check(field?.condition, "field.condition", fieldLoc, { entity });
       check(field?.calculation, "field.calculation", fieldLoc, { mode: "reference", entity });
+      for (const item of (field?.items || []) as any[]) {
+        if (!`${item?.condition ?? ""}`.trim()) continue;
+        check(item.condition, "item.condition", `${fieldLoc} > option "${item?.value || item?.label || ""}"`, { entity });
+      }
     }
   }
 

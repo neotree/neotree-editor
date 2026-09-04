@@ -24,6 +24,7 @@ import { _getEditorInfo } from "@/databases/queries/editor-info";
 import { getIntegrityPolicyState } from "@/lib/integrity-policy";
 import { createIntegrityImportSnapshot } from "./integrity-imports";
 import { collectScriptConditionFindings, type ScriptConditionEntityRef } from "@/lib/conditional-expression";
+import { findScriptFieldKeyCollisions, type FieldKeyCollision } from "@/lib/field-key-collisions";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
@@ -816,6 +817,127 @@ async function persistConditionReports(reports: Record<string, ScriptConditionRe
         );
     } catch (e: any) {
         logger.error('persistConditionReports ERROR', e?.message);
+    }
+}
+
+export type ScriptFieldKeyCollisionReport = {
+    scriptId: string;
+    title: string;
+    blocking: number;
+    warnings: number;
+    examples: { location: string; message: string; href?: string }[];
+};
+
+/**
+ * Summarizes duplicate field keys across the scripts being published.
+ *
+ * Unlike the conditional-expression gate this needs no precomputed column:
+ * collisions are a group-by over each screen's `fields`, and conditions are only
+ * parsed for keys that actually repeat — which is rare. One screens query per
+ * publish covers the whole scope. Never throws: a failure here must not block
+ * publishing.
+ */
+export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: string[] }): Promise<{
+    scripts: ScriptFieldKeyCollisionReport[];
+    totalBlocking: number;
+    totalWarnings: number;
+}> {
+    const empty = { scripts: [] as ScriptFieldKeyCollisionReport[], totalBlocking: 0, totalWarnings: 0 };
+    try {
+        const scopeIds = opts?.scriptIds;
+        if (scopeIds && !scopeIds.length) return empty;
+
+        const scriptFilter = scopeIds?.length
+            ? and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scopeIds))
+            : isNull(scriptsTable.deletedAt);
+
+        const [scriptRows, screenRows, draftRows] = await Promise.all([
+            db.select({ scriptId: scriptsTable.scriptId, title: scriptsTable.title })
+                .from(scriptsTable)
+                .where(scriptFilter),
+            db.select({
+                scriptId: screens.scriptId,
+                screenId: screens.screenId,
+                title: screens.title,
+                label: screens.label,
+                key: screens.key,
+                position: screens.position,
+                condition: screens.condition,
+                repeatable: screens.repeatable,
+                fields: screens.fields,
+            })
+                .from(screens)
+                .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
+                .where(
+                    scopeIds?.length
+                        ? and(isNull(screens.deletedAt), isNull(pendingDeletion.id), inArray(screens.scriptId, scopeIds))
+                        : and(isNull(screens.deletedAt), isNull(pendingDeletion.id)),
+                ),
+            db.select({ scriptId: screensDrafts.scriptId, screenId: screensDrafts.screenId, data: screensDrafts.data })
+                .from(screensDrafts)
+                .where(scopeIds?.length ? inArray(screensDrafts.scriptId, scopeIds) : undefined),
+        ]);
+
+        // A draft supersedes its published screen; draft-only screens are added.
+        const draftedScreenIds = new Set<string>();
+        for (const row of draftRows) {
+            const id = `${row?.screenId || (row?.data as any)?.screenId || ''}`;
+            if (id) draftedScreenIds.add(id);
+        }
+
+        const screensByScript = new Map<string, any[]>();
+        const pushScreen = (scriptId: string, screen: any) => {
+            if (!scriptId) return;
+            const list = screensByScript.get(scriptId);
+            if (list) list.push(screen);
+            else screensByScript.set(scriptId, [screen]);
+        };
+
+        for (const row of screenRows) {
+            if (draftedScreenIds.has(`${row?.screenId || ''}`)) continue;
+            pushScreen(`${row?.scriptId || ''}`, row);
+        }
+        for (const row of draftRows) {
+            const data = (row?.data || {}) as any;
+            pushScreen(`${row?.scriptId || data?.scriptId || ''}`, data);
+        }
+
+        const scripts: ScriptFieldKeyCollisionReport[] = [];
+        let totalBlocking = 0;
+        let totalWarnings = 0;
+
+        for (const script of scriptRows) {
+            const scriptId = `${script?.scriptId || ''}`;
+            const scriptScreens = screensByScript.get(scriptId) || [];
+            if (!scriptScreens.length) continue;
+
+            const collisions = findScriptFieldKeyCollisions({ scriptId, screens: scriptScreens as any });
+            if (!collisions.length) continue;
+
+            const blocking = collisions.filter((c: FieldKeyCollision) => c.severity === 'blocking');
+            const warnings = collisions.length - blocking.length;
+            totalBlocking += blocking.length;
+            totalWarnings += warnings;
+
+            scripts.push({
+                scriptId,
+                title: `${script?.title || 'Untitled script'}`,
+                blocking: blocking.length,
+                warnings,
+                examples: (blocking.length ? blocking : collisions).slice(0, 5).map((c) => ({
+                    location: c.location,
+                    message: c.message,
+                    href: c.screenId ? `/script/${scriptId}/screen/${c.screenId}` : `/script/${scriptId}?section=screens`,
+                })),
+            });
+        }
+
+        // Worst offenders first.
+        scripts.sort((a, b) => (b.blocking - a.blocking) || (b.warnings - a.warnings));
+        return { scripts, totalBlocking, totalWarnings };
+    } catch (e: any) {
+        logger.error('getScriptsWithFieldKeyCollisions ERROR', e?.message);
+        return empty;
     }
 }
 

@@ -40,6 +40,7 @@ import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
+import { useFieldKeyCollisions } from "@/components/field-key-collisions"
 import type { ConditionKey } from "@/lib/conditional-expression"
 
 type Props = {
@@ -119,6 +120,27 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const printDisplayColumns = watch('printDisplayColumns');
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
+
+  // The screen as it would look once this field is saved, so a key clash shows
+  // up here rather than at publish time.
+  const condition = watch("condition")
+  const screenFields = form.watch("fields")
+  const screenRepeatable = form.watch("repeatable")
+  const candidateFields = useMemo(() => {
+    const siblings: FieldType[] = screenFields || []
+    const edited = { fieldId: fieldProp?.data?.fieldId, key, label, type, condition }
+    if (fieldProp && fieldProp.index >= 0) {
+      return siblings.map((f, i) => (i === fieldProp.index ? { ...f, ...edited } : f))
+    }
+    return [...siblings, edited as FieldType]
+  }, [screenFields, fieldProp, key, label, type, condition])
+
+  const keyCollisions = useFieldKeyCollisions({
+    fields: candidateFields as any,
+    repeatable: screenRepeatable,
+    keys: conditionKeys,
+  })
+  const currentKeyCollisions = keyCollisions.forKey(key)
 
   // Keys on the parent screen (incl. this field), so conditions can reference
   // sibling fields that haven't been saved yet. Deduplication + precedence is
@@ -397,6 +419,18 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       setValue("confidential", !!item?.confidential, { shouldDirty: true })
                     }}
                   />
+
+                  {currentKeyCollisions.map((collision, i) => (
+                    <p
+                      key={`${collision.kind}-${i}`}
+                      className={cn(
+                        "mt-1 max-w-[280px] text-xs",
+                        collision.severity === "blocking" ? "text-destructive" : "text-amber-600",
+                      )}
+                    >
+                      {collision.message}
+                    </p>
+                  ))}
                 </div>
 
                 <div className="flex-1">
@@ -567,6 +601,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                           fieldType={type}
                           onChange={onChange}
                           dataKey={dataKey}
+                          conditionKeys={conditionKeys}
+                          extraConditionKeys={localConditionKeys}
+                          conditionKeysLoading={keysLoading}
                         />
                       )
                     }}
