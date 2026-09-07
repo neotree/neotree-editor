@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -26,7 +26,8 @@ export type GetDataKeysParams = {
     pagination?: {
         limit: number;
         page: number;
-    }
+    };
+    dateAfter?: string;
 };
 
 export type GetDataKeysResults = {
@@ -75,16 +76,31 @@ export async function _getDataKeys(
             uniqueKeys: uniqueKeysParam = [],
             returnDraftsIfExist = true, 
             pagination: paginationParam,
+            dateAfter: _dateAfter = null,
         } = { ...params };
 
         let dataKeysIds = _dataKeysIds || [];
         const names = namesParam.map(n => `${n || ''}`.toLowerCase()).filter(n => n);
         const uniqueKeys = uniqueKeysParam.filter(n => n);
 
+        const dateAfter = !_dateAfter ? null : new Date(_dateAfter);
+
+        const whereDraftsDateAfter = !dateAfter ? undefined : or(
+            gt(dataKeysDrafts.createdAt, dateAfter),
+            gt(dataKeysDrafts.updatedAt, dateAfter)
+        );
+
+        const wherePublishedDateAfter = !dateAfter ? undefined : or(
+            gt(dataKeys.createdAt, dateAfter),
+            gt(dataKeys.updatedAt, dateAfter)
+        );
+
         let drafts: typeof dataKeysDrafts.$inferSelect[] = [];
 
         if (keys.length) {
-            drafts = await db.query.dataKeysDrafts.findMany();
+            drafts = await db.query.dataKeysDrafts.findMany({
+                where: whereDraftsDateAfter,
+            });
 
             drafts = drafts
                 .filter(d => !dataKeysIds.length ? true : dataKeysIds.includes(d.uuid))
@@ -105,6 +121,8 @@ export async function _getDataKeys(
         } else {
             // unpublished dataKeys conditions
             const whereDataKeysDrafts = [
+                whereDraftsDateAfter,
+
                 !dataKeysIds?.length ? 
                     undefined 
                     : 
@@ -122,7 +140,7 @@ export async function _getDataKeys(
             ].filter(q => q);
 
             drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
-                where:!whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
+                where: !whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
             });
         }
 
@@ -130,6 +148,7 @@ export async function _getDataKeys(
 
         // published dataKeys conditions
         const whereDataKeys = [
+            wherePublishedDateAfter,
             isNull(dataKeys.deletedAt),
             isNull(pendingDeletion),
 
