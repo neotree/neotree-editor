@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { SelectModal, SelectModalOption } from "@/components/select-modal";
 import { type DataKey, useDataKeysCtx } from "@/contexts/data-keys";
+import { Loader } from "@/components/loader";
 
 type OnChangeValue = DataKey & {
     children: DataKey[];
@@ -31,7 +32,12 @@ export function SelectDataKey({
     onChange?: (value: OnChangeValue[]) => void
 }) {
    
-    const { allDataKeys, extractDataKeys } = useDataKeysCtx();
+    const { 
+        allDataKeys, 
+        loadingDataKeys,
+        extractDataKeys, 
+        getLatestDataKeys 
+    } = useDataKeysCtx();
 
     const options = useMemo(() => {
         let keys = allDataKeys;
@@ -54,6 +60,10 @@ export function SelectDataKey({
         } satisfies SelectModalOption));
     }, [allDataKeys, type, filterDataKeys]);
 
+    const onModalOpen = useCallback((open: boolean) => {
+        if (open) getLatestDataKeys();
+    }, [getLatestDataKeys]);
+
     return (
         <>
             <SelectModal 
@@ -74,7 +84,10 @@ export function SelectDataKey({
                         }));
                     onChange?.(keys);
                 }}
+                onModalOpenChange={onModalOpen}
             />
+
+            {loadingDataKeys && <Loader overlay />}
         </>
     );
 }

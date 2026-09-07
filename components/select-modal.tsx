@@ -43,6 +43,7 @@ type Props = {
     trigger?: React.ReactNode;
     onSelect: (selected: SelectModalOption[]) => void;
     onTrigger?: () => void;
+    onModalOpenChange?: (open: boolean) => void;
 };
 
 export function SelectModal({ 
@@ -84,6 +85,7 @@ function Modal({
     trigger,
     onTrigger,
     onSelect,
+    onModalOpenChange,
 }: Omit<Props, 'selected' | 'options'> & {
     selected: string[];
     options: (Omit<SelectModalOption, 'value'> & {
@@ -164,13 +166,14 @@ function Modal({
         <>
             <Dialog
                 modal={modal}
-                onOpenChange={() => {
+                onOpenChange={open => {
                     setSearchValue('');
                     if (multiple) {
                         setSelectedPending(selected.map(o => o.value));
                     } else {
                         setSelectedPending([]);
                     }
+                    onModalOpenChange?.(open);
                 }}
             >
                 <DialogTrigger asChild>
