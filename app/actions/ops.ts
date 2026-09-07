@@ -21,7 +21,7 @@ import * as dataKeysQueries from "@/databases/queries/data-keys"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
 import { buildReleasePublishChangeLog } from "@/databases/mutations/changelogs"
-import { getScriptsWithConditionErrors, recomputeScriptsConditionErrors } from "./scripts"
+import { getScriptsWithConditionErrors, getScriptsWithFieldKeyCollisions, recomputeScriptsConditionErrors } from "./scripts"
 import db from "@/databases/pg/drizzle"
 import {
   configKeysDrafts,
@@ -1387,7 +1387,9 @@ export async function publishData({ scope }: { scope: number }) {
       logger.error("publishData scope-scripts lookup ERROR", e.message)
     }
 
-    const ceGate = await getScriptsWithConditionErrors({ scriptIds: Array.from(publishScriptIds) })
+    const publishScope = Array.from(publishScriptIds)
+
+    const ceGate = await getScriptsWithConditionErrors({ scriptIds: publishScope })
     if (ceGate.scripts.length) {
       const top = ceGate.scripts.slice(0, 10)
       const lines = top.map((s) => `• ${s.title} (${s.count} issue${s.count === 1 ? "" : "s"})`)
@@ -1398,6 +1400,30 @@ export async function publishData({ scope }: { scope: number }) {
         ...lines,
       ]
       results.blockingDetails = { conditionErrors: ceGate }
+    }
+
+    // Duplicate field keys break a screen in the app before conditions are even
+    // evaluated: one field is dropped and both answers land on the same key.
+    const keyGate = await getScriptsWithFieldKeyCollisions({ scriptIds: publishScope })
+    if (keyGate.scripts.length) {
+      const affected = keyGate.scripts.filter((s) => s.blocking > 0)
+      const top = (affected.length ? affected : keyGate.scripts).slice(0, 10)
+      const lines = top.map((s) => {
+        const parts = [
+          s.blocking ? `${s.blocking} duplicate key${s.blocking === 1 ? "" : "s"}` : "",
+          s.warnings ? `${s.warnings} shared key${s.warnings === 1 ? "" : "s"}` : "",
+        ].filter(Boolean)
+        return `• ${s.title} (${parts.join(", ")})`
+      })
+      const more = (affected.length ? affected : keyGate.scripts).length - top.length
+      if (more > 0) lines.push(`• …and ${more} more script${more === 1 ? "" : "s"}`)
+
+      const headline = keyGate.totalBlocking
+        ? `${keyGate.totalBlocking} field${keyGate.totalBlocking === 1 ? " uses a key that is" : "s use keys that are"} used more than once on the same screen. The app drops one field per duplicate and writes both answers to the same key:`
+        : `${keyGate.totalWarnings} field key${keyGate.totalWarnings === 1 ? " is" : "s are"} shared between fields. Review before this reaches the app:`
+
+      results.warnings = [...(results.warnings || []), headline, ...lines]
+      results.blockingDetails = { ...(results.blockingDetails || {}), fieldKeyCollisions: keyGate }
     }
 
     await db.transaction(async (tx) => {

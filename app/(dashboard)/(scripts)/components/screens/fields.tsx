@@ -17,7 +17,9 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { isNumericQueryValue } from "@/lib/query-state";
 import { FieldsBottomActions } from "./fields-bottom-actions";
 import { Field } from "./field";
-import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
+import { useConditionKeys } from "@/components/conditional-expression";
+import { useFieldKeyCollisions } from "@/components/field-key-collisions";
+import { ScriptIssueBadge, collisionIssues, conditionIssues } from "@/components/script-issues";
 
 type Props = {
     disabled?: boolean;
@@ -39,6 +41,7 @@ export function Fields({
     const keysReady = conditionKeys.length > 0;
 
     const fields = form.watch('fields');
+    const repeatable = form.watch('repeatable');
     // Unsaved sibling field keys, matching what the field editor validates against.
     const siblingConditionKeys = useMemo(
         () => (fields || [])
@@ -46,6 +49,14 @@ export function Fields({
             .filter((k) => !!k.name),
         [fields],
     );
+    // Duplicate keys break the mobile screen before conditions are evaluated, so
+    // they are flagged from the unsaved form state as the second key is entered.
+    const keyCollisions = useFieldKeyCollisions({
+        fields,
+        repeatable,
+        keys: conditionKeys,
+    });
+
     const fieldMeta = useMemo(() => {
         return fields.map((field) => {
             const items = field.items || [];
@@ -262,13 +273,24 @@ export function Fields({
                                 <span className="inline-flex items-center gap-x-2">
                                     <span>{field?.label}</span>
                                     {!!field && (
-                                        <ConditionErrorBadge
-                                            keys={conditionKeys}
-                                            extraKeys={siblingConditionKeys}
-                                            keysReady={keysReady}
-                                            expressions={[
-                                                { value: field.condition, label: 'Condition', allowSelf: true },
-                                                { value: (field as { calculation?: string }).calculation, label: 'Reference expression', mode: 'reference' },
+                                        <ScriptIssueBadge
+                                            issues={[
+                                                ...collisionIssues(keyCollisions.forFieldIndex(cell.rowIndex)),
+                                                ...conditionIssues({
+                                                    keys: conditionKeys,
+                                                    extraKeys: siblingConditionKeys,
+                                                    keysReady,
+                                                    expressions: [
+                                                        { value: field.condition, label: 'Condition', allowSelf: true },
+                                                        { value: (field as { calculation?: string }).calculation, label: 'Reference expression', mode: 'reference' },
+                                                        ...(field.items || [])
+                                                            .filter((item) => `${item?.condition || ''}`.trim())
+                                                            .map((item) => ({
+                                                                value: item.condition,
+                                                                label: `Option "${item.value || item.label}" shown when`,
+                                                            })),
+                                                    ],
+                                                }),
                                             ]}
                                         />
                                     )}

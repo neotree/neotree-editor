@@ -14,6 +14,14 @@ export { validateReferenceExpression } from "./reference-expr";
 export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
 export {
+  compareConditions,
+  compareConditionSet,
+  exclusivityContextFrom,
+  type ConditionComparison,
+  type ExclusivityContext,
+  type ExclusivityVerdict,
+} from "./exclusivity";
+export {
   collectScriptConditionFindings,
   getScriptConditionErrorCount,
   type ScriptWithItems,
