@@ -23,7 +23,7 @@ import { Pagination } from "@/types";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
 import { useAppContext } from "@/contexts/app";
 import { matchesDataKeySearch } from "@/lib/data-keys-search";
-
+import { SocketEventsListener } from "@/components/socket-events-listener";
 
 function paginateData<T>(
     data: T[],
@@ -145,6 +145,11 @@ export type tDataKeysCtx = {
     }) => DataKey[];
 };
 
+type LoadDataKeysOpts = { 
+    silent?: boolean;
+    appendResults?: boolean; 
+};
+
 export const DataKeysCtx = createContext<tDataKeysCtx>(null!);
 
 export const useDataKeysCtx = () => {
@@ -196,7 +201,7 @@ export function DataKeysCtxProvider({
     // Fetch ALL data once without pagination
     const loadDataKeys = useCallback(async (
         params?: GetDataKeysParams,
-        opts?: { appendResults?: boolean; },
+        opts?: LoadDataKeysOpts,
     ) => {
         setLoadingDataKeys(true);
 
@@ -220,7 +225,9 @@ export function DataKeysCtxProvider({
 
             const response = await axios.get<{ data: DataKey[], errors?: string[] }>(`/api/data-keys?${queryParams.toString()}`);
 
-            if (response.data.errors?.length) throw new Error(response.data.errors.join(', '));
+            const errors = response.data.errors || [];
+
+            if (errors.length) throw new Error(errors.join(', '));
 
             // Apply sorting on client side using current sort value
             const sortedData = sortDataKeys(response.data.data, sort);
@@ -239,18 +246,19 @@ export function DataKeysCtxProvider({
                     return sortedData;
                 }
             });
-            setErrors(response.data.errors);
             setCurrentPage(1);
             setAllDataKeysLastFetchedDate(new Date().toISOString());
         } catch (e: any) {
-            setErrors([e.message]);
-            alert({
-                variant: 'error',
-                title: "Error",
-                message: "Failed to load data keys: " + e.message,
-                buttonLabel: "Try again",
-                onClose: () => loadDataKeys(),
-            });
+            if (!opts?.silent) {
+                setErrors([e.message]);
+                alert({
+                    variant: 'error',
+                    title: "Error",
+                    message: "Failed to load data keys: " + e.message,
+                    buttonLabel: "Try again",
+                    onClose: () => loadDataKeys(),
+                });
+            }
         } finally {
             setLoadingDataKeys(false);
         }
@@ -518,11 +526,11 @@ export function DataKeysCtxProvider({
         return keys.filter((k, i) => keys.map(k => k.uniqueKey).indexOf(k.uniqueKey) === i);
     }, [allDataKeys]);
 
-    const getLatestDataKeys = useCallback(async () => {
+    const getLatestDataKeys = useCallback(async (opts?: LoadDataKeysOpts) => {
         if (allDataKeysLastFetchedDate) {
             loadDataKeys(
                 { dateAfter: allDataKeysLastFetchedDate },
-                { appendResults: true, },
+                { appendResults: true, ...opts },
             );
         }
     }, [allDataKeysLastFetchedDate, loadDataKeys]);
@@ -568,6 +576,24 @@ export function DataKeysCtxProvider({
             >
                 {children}
             </DataKeysCtx.Provider>
+
+            <SocketEventsListener
+                events={[
+                    {
+                        name: 'mode_changed',
+                        onEvent: { refreshRouter: true, },
+                    },
+                    {
+                        name: 'update_system',
+                        onEvent: { refreshRouter: true, },
+                    },
+                    {
+                        name: 'data_changed',
+                        onEvent: { callback: () => getLatestDataKeys({ silent: true, }), },
+                    },
+
+                ]}
+            />
         </>
     );
 }

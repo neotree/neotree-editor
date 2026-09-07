@@ -61,7 +61,9 @@ export function SelectDataKey({
     }, [allDataKeys, type, filterDataKeys]);
 
     const onModalOpen = useCallback((open: boolean) => {
-        if (open) getLatestDataKeys();
+        if (open) {
+            // getLatestDataKeys();
+        }
     }, [getLatestDataKeys]);
 
     return (
