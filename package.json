@@ -26,9 +26,13 @@
         "test:script-draft-publish": "tsx tests/script-draft-publish.test.ts",
         "test:script-metadata-export": "tsx tests/script-metadata-export.test.ts",
         "test:conditional-expression": "tsx tests/conditional-expression.test.ts",
+        "test:condition-exclusivity": "tsx tests/condition-exclusivity.test.ts",
+        "test:field-key-collisions": "tsx tests/field-key-collisions.test.ts",
         "scan:conditions": "tsx scripts/scan-conditional-expressions.ts",
+        "scan:duplicate-field-keys": "tsx scripts/scan-duplicate-field-keys.ts",
+        "merge:option-fields": "tsx scripts/merge-duplicate-option-fields.ts",
         "test:nuid-search-data-keys": "tsx tests/nuid-search-data-keys.test.ts",
-        "test": "tsx tests/changelog-version-authority.test.ts && tsx tests/changelog-rollback-draft-guard.test.ts && tsx tests/integrity-policy.test.ts && tsx tests/data-key-integrity.test.ts && tsx tests/integrity-draft-origin.test.ts && tsx tests/integrity-scan-scope.test.ts && tsx tests/integrity-baseline.test.ts && tsx tests/integrity-imports.test.ts && tsx tests/script-draft-publish.test.ts && tsx tests/script-metadata-export.test.ts && tsx tests/nuid-search-data-keys.test.ts && tsx tests/nuid-search-provision.test.ts && tsx tests/conditional-expression.test.ts"
+        "test": "tsx tests/changelog-version-authority.test.ts && tsx tests/changelog-rollback-draft-guard.test.ts && tsx tests/integrity-policy.test.ts && tsx tests/data-key-integrity.test.ts && tsx tests/integrity-draft-origin.test.ts && tsx tests/integrity-scan-scope.test.ts && tsx tests/integrity-baseline.test.ts && tsx tests/integrity-imports.test.ts && tsx tests/script-draft-publish.test.ts && tsx tests/script-metadata-export.test.ts && tsx tests/nuid-search-data-keys.test.ts && tsx tests/nuid-search-provision.test.ts && tsx tests/conditional-expression.test.ts && tsx tests/condition-exclusivity.test.ts && tsx tests/field-key-collisions.test.ts && tsx tests/merge-option-fields.test.ts"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.4.1",
