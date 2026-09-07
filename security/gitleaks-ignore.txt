@@ -1,0 +1,44 @@
+# Gitleaks fingerprint ignore file.
+#
+# Each entry silences ONE finding at ONE commit. A fingerprint is
+# <commit>:<path>:<rule>:<line>, so it cannot suppress a future leak: reintroducing the
+# same secret in a new commit produces a new fingerprint and fails the scan again.
+#
+# Entries are only added after the underlying credential is dead, or after the finding is
+# confirmed to be a false positive. Adding one to make CI green while a credential is
+# still live would defeat the control entirely.
+#
+# ---------------------------------------------------------------------------------------
+# ACKNOWLEDGED HISTORICAL LEAKS
+#
+# Found by a full-history scan (1,759 commits, 4.31 GB) on 2026-09-02. All of these
+# credentials were rotated well before that scan; confirmed by @KumaloWilson, 2026-09-02.
+# They remain readable in the Git history of this public repository, so the record is kept
+# here deliberately rather than by rewriting history — rewriting breaks every clone and
+# does not reach forks, while rotation is what actually removed the risk.
+# ---------------------------------------------------------------------------------------
+
+# Firebase service-account private keys, committed 2020-10-13 ("Server refactor").
+# Rotated. Included the production key.
+c9bda93c47eb1f1a770e0d660d43f4ea6dc1cdbc:dist/config/prod-firebase.config.json:private-key:5
+c9bda93c47eb1f1a770e0d660d43f4ea6dc1cdbc:dist/config/firebase.config.json:private-key:5
+00d5bd9aceb56c2f1e5bdfbccdba52bb8a67ab7f:dist/config/firebase.config.json:private-key:5
+
+# Google Cloud API keys, committed 2019-06-21 ("Web app setup"). Rotated.
+c7837d50cd11a3e9bb84587a01f0f92ab715b47b:src/config.js:gcp-api-key:2
+c7837d50cd11a3e9bb84587a01f0f92ab715b47b:src/config.js:gcp-api-key:9
+c7837d50cd11a3e9bb84587a01f0f92ab715b47b:web-app/neotree.js:gcp-api-key:39
+
+# Production configuration secret, committed 2019-09-06 ("DB conn update"). Rotated.
+b89737c4542e75c9a73e9404fe6fb7d3b6467bac:_config/config.production.json:generic-api-key:7
+b89737c4542e75c9a73e9404fe6fb7d3b6467bac:dist/_config/config.production.json:generic-api-key:7
+
+# API key in scripts/sync.json, committed 2024-08-12 ("old api"). Rotated.
+# Most recent of the real findings; re-confirm if in any doubt.
+696488a9eaad1d27423aea8e1d378b0ed34954eb:scripts/sync.json:generic-api-key:11699
+
+# ---------------------------------------------------------------------------------------
+# FALSE POSITIVE - not a credential.
+# The matched value is the test fixture string "patient_age_uuid-1".
+# ---------------------------------------------------------------------------------------
+5010996e84795e4ed1da9c9d61acb0816da73e17:tests/changelog-rollback.test.ts:generic-api-key:138

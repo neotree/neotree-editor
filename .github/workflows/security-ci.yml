@@ -1,0 +1,33 @@
+name: Security CI
+
+# Thin caller. All logic lives in neotree/security-ci, pinned by SHA.
+# Update the SHA in BOTH the `uses:` line and `security-ci-ref` together - Dependabot
+# opens a pull request for the `uses:` line, and the gate fails loudly if they disagree.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  security:
+    uses: neotree/security-ci/.github/workflows/security-ci.yml@020aa53f59f10cc9e2c3802034ae5d2f809734a6
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+    with:
+      security-ci-ref: 020aa53f59f10cc9e2c3802034ae5d2f809734a6
+      node-version: "22"
+      # Private repositories on the Free plan have no code scanning:
+      # upload-sarif: false
+      # enable-codeql: false
