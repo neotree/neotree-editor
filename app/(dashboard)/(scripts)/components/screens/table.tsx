@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Edit } from "lucide-react";
 
@@ -13,8 +14,9 @@ import { useScreensTable, UseScreensTableParams } from '../../hooks/use-screens-
 import { CopyScreensModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
 import { useConditionKeys } from "@/components/conditional-expression";
-import { findScreenFieldKeyCollisions } from "@/lib/field-key-collisions";
 import { ScriptIssueBadge, collisionIssues, conditionIssues } from "@/components/script-issues";
+import { getOutcomeProducers, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { findScreenFieldKeyCollisions } from "@/lib/field-key-collisions";
 
 type Props = UseScreensTableParams;
 
@@ -27,6 +29,7 @@ export function ScreensTable(props: Props) {
         isScriptLocked,
         scriptLockedByUserId,
         search,
+        screens,
         screensArr,
         setSearch,
         onSearch,
@@ -37,8 +40,21 @@ export function ScreensTable(props: Props) {
     } = useScreensTable(props);
 
     const { sys, viewOnly } = useAppContext();
-    const { conditionKeys } = useConditionKeys();
-    const keysReady = conditionKeys.length > 0;
+    const { conditionKeys, keysReady } = useConditionKeys();
+    const outcomeProducers = useMemo(() => getOutcomeProducers(screens.data), [screens.data]);
+    const unavailableByPosition = useMemo(() => {
+        const availability = new Map<string, Record<string, string>>();
+        screensArr.forEach((screen) => {
+            const key = `${screen?.position ?? ''}`;
+            if (availability.has(key)) return;
+            availability.set(key, getUnavailableOutcomeKeys({
+                screens: screens.data,
+                consumerPosition: screen?.position,
+                producers: outcomeProducers,
+            }));
+        });
+        return availability;
+    }, [outcomeProducers, screens.data, screensArr]);
 
     return (
         <>
@@ -123,6 +139,11 @@ export function ScreensTable(props: Props) {
                                             })),
                                     ];
                                 });
+                                const itemExpressions = ((s?.items || []) as any[]).map((item) => ({
+                                    value: item?.condition,
+                                    label: `Item "${item?.label || item?.key || ''}" condition`,
+                                    allowSelf: true,
+                                }));
                                 const keyCollisions = !s ? [] : findScreenFieldKeyCollisions(
                                     {
                                         screenId: s.screenId,
@@ -142,10 +163,12 @@ export function ScreensTable(props: Props) {
                                                     ...conditionIssues({
                                                         keys: conditionKeys,
                                                         keysReady,
+                                                        unavailableKeys: unavailableByPosition.get(`${s.position ?? ''}`) || {},
                                                         expressions: [
                                                             { value: s.condition, label: 'Condition', allowSelf: true },
                                                             { value: s.skipToCondition, label: 'Skip to screen', allowSelf: true },
                                                             ...fieldExpressions,
+                                                            ...itemExpressions,
                                                         ],
                                                     }),
                                                 ]}

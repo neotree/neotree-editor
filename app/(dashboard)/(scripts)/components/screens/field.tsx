@@ -41,7 +41,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
 import { useFieldKeyCollisions } from "@/components/field-key-collisions"
-import type { ConditionKey } from "@/lib/conditional-expression"
+import { collectNewOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
 
 type Props = {
   open: boolean
@@ -50,12 +50,15 @@ type Props = {
     index: number
     data: FieldType
   }
+  /** Persisted field used to grandfather only pre-existing key collisions. */
+  baselineField?: FieldType
   form: ReturnType<typeof useScreenForm>
   onClose: () => void
   scriptId: any
+  unavailableOutcomeKeys?: Record<string, string>
 }
 
-export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled: disabledProp, onClose }: Props & P) {
+export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
 
@@ -93,7 +96,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
     defaultValues: getDefaultValues(),
   })
   const [alias, setAlias] = useState("")
-  const { conditionKeys, keysLoading } = useConditionKeys()
+  const { conditionKeys, keysLoading, keysReady } = useConditionKeys()
   const [conditionHasErrors, setConditionHasErrors] = useState(false)
   const [calculationHasErrors, setCalculationHasErrors] = useState(false)
 
@@ -118,6 +121,13 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const valuesOptions = watch("valuesOptions")
   const editable = watch("editable")
   const printDisplayColumns = watch('printDisplayColumns');
+  const reservedKeyCollisions = useMemo(
+    () => collectNewOutcomeKeyCollisions(
+      { screens: [{ type: "form", fields: [{ fieldId: field?.fieldId, key, label, items }] }] },
+      { screens: [{ type: "form", fields: baselineField ? [baselineField] : [] }] },
+    ),
+    [baselineField, field?.fieldId, items, key, label],
+  )
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
 
@@ -299,7 +309,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
             </DialogClose>
 
             <Button
-              disabled={disabled || !type || (showForm && (conditionHasErrors || calculationHasErrors))}
+              disabled={disabled || !type || !!reservedKeyCollisions.length || (showForm && (conditionHasErrors || calculationHasErrors))}
               onClick={() => {
                 if (!showForm) {
                   setShowForm(true)
@@ -384,6 +394,8 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       keys={conditionKeys}
                       extraKeys={localConditionKeys}
                       keysLoading={keysLoading}
+                      keysReady={keysReady}
+                      unavailableKeys={unavailableOutcomeKeys}
                       disabled={disabled}
                       initialValue={field?.condition || ""}
                       onValidityChange={setConditionHasErrors}
@@ -446,6 +458,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                   />
                 </div>
               </div>
+              {!!reservedKeyCollisions.length && (
+                <p className="text-xs text-destructive">{reservedKeyCollisions[0].message}</p>
+              )}
 
               {(isTextField || isNumberField) && (
                 <div>
@@ -628,6 +643,8 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                           keys={conditionKeys}
                           extraKeys={localConditionKeys}
                           keysLoading={keysLoading}
+                          keysReady={keysReady}
+                          unavailableKeys={unavailableOutcomeKeys}
                           disabled={disabled}
                           initialValue={(field as { calculation?: string } | undefined)?.calculation || ""}
                           onValidityChange={setCalculationHasErrors}

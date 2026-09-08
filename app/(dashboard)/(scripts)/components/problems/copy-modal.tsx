@@ -34,7 +34,7 @@ export function CopyProblemsModal({
     const router = useRouter();
     const routeParams = useParams();
 
-    const { copyProblems, getScripts } = useScriptsContext();
+    const { copyProblems, getScripts, reloadKeys } = useScriptsContext();
     const { alert } = useAlertModal();
 
     const [loading, setLoading] = useState(false);
@@ -99,6 +99,8 @@ export function CopyProblemsModal({
             const res = response.data as Awaited<ReturnType<typeof copyProblems>>;
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
+
+            if (`${routeParams?.scriptId || ''}` === data.scriptId) await reloadKeys();
 
             alert({
                 variant: 'success',

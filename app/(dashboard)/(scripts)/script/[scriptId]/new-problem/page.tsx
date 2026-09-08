@@ -1,5 +1,5 @@
 import { Title } from "@/components/title";
-import { getScript } from "@/app/actions/scripts";
+import { getScript, listScreens } from "@/app/actions/scripts";
 import { Alert } from "@/components/alert";
 import { ProblemForm } from "../../../components/problems/form";
 import { PageContainer } from "../../../components/page-container";
@@ -14,8 +14,10 @@ export const dynamic = 'force-dynamic';
 export default async function NewProblemPage({ params: { scriptId, } }: Props) {
     const [
         script,
+        screens,
     ] = await Promise.all([
         getScript({ scriptId, returnDraftIfExists: true, }),
+        listScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
     ]);
 
     if (!script.data) {
@@ -36,7 +38,7 @@ export default async function NewProblemPage({ params: { scriptId, } }: Props) {
                 title="New problem"
                 backLink={`/script/${scriptId}?section=diagnoses`}
             >
-                <ProblemForm scriptId={scriptId} />
+                <ProblemForm scriptId={scriptId} script={script.data} screens={screens.data} />
             </PageContainer>
         </>
     )
