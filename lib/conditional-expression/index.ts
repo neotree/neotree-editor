@@ -43,6 +43,14 @@ export {
   type ScriptOutcomeReferencePatches,
 } from "./outcome-references";
 export {
+  compareConditions,
+  compareConditionSet,
+  exclusivityContextFrom,
+  type ConditionComparison,
+  type ExclusivityContext,
+  type ExclusivityVerdict,
+} from "./exclusivity";
+export {
   collectScriptConditionFindings,
   getScriptConditionErrorCount,
   type ScriptWithItems,

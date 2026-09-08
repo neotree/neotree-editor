@@ -9,7 +9,7 @@ import {
     useState,
     useMemo,
 } from "react";
-import axios from 'axios';
+import axios, { all } from 'axios';
 import { useQueryState } from "nuqs";
 import { useRouter } from 'next/navigation';
 
@@ -23,7 +23,7 @@ import { Pagination } from "@/types";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
 import { useAppContext } from "@/contexts/app";
 import { matchesDataKeySearch } from "@/lib/data-keys-search";
-
+import { SocketEventsListener } from "@/components/socket-events-listener";
 
 function paginateData<T>(
     data: T[],
@@ -99,6 +99,7 @@ export type GetDataKeysParams = {
     }[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    dateAfter?: string;
 };
 
 export type tDataKeysCtx = {
@@ -122,6 +123,7 @@ export type tDataKeysCtx = {
         show: boolean;
         errors: string[];
     };
+    getLatestDataKeys: () => Promise<void>;
     setUnusedDataKeys: React.Dispatch<React.SetStateAction<tDataKeysCtx['unusedDataKeys']>>;
     setCurrentPage: (page: number) => void;
     setSearchValue: (value: string) => void;
@@ -141,6 +143,11 @@ export type tDataKeysCtx = {
     extractDataKeys: (uuids: string[], opts?: {
         withNested?: boolean;
     }) => DataKey[];
+};
+
+type LoadDataKeysOpts = { 
+    silent?: boolean;
+    appendResults?: boolean; 
 };
 
 export const DataKeysCtx = createContext<tDataKeysCtx>(null!);
@@ -182,6 +189,7 @@ export function DataKeysCtxProvider({
     ******************************************************/
     const [loadingDataKeys, setLoadingDataKeys] = useState(false);
     const [allDataKeys, setAllDataKeys] = useState<DataKey[]>([]);
+    const [allDataKeysLastFetchedDate, setAllDataKeysLastFetchedDate] = useState('');
     const [errors, setErrors] = useState<string[] | undefined>();
 
     const [unusedDataKeys, setUnusedDataKeys] = useState<tDataKeysCtx['unusedDataKeys']>({ 
@@ -191,7 +199,10 @@ export function DataKeysCtxProvider({
     });
 
     // Fetch ALL data once without pagination
-    const loadDataKeys = useCallback(async (params?: GetDataKeysParams) => {
+    const loadDataKeys = useCallback(async (
+        params?: GetDataKeysParams,
+        opts?: LoadDataKeysOpts,
+    ) => {
         setLoadingDataKeys(true);
 
         try {
@@ -208,18 +219,46 @@ export function DataKeysCtxProvider({
             if (params?.dataKeysIds?.length) {
                 queryParams.set('dataKeysIds', JSON.stringify(params.dataKeysIds));
             }
+            if (params?.dateAfter) {
+                queryParams.set('dateAfter', `${params.dateAfter || ''}`);
+            }
 
             const response = await axios.get<{ data: DataKey[], errors?: string[] }>(`/api/data-keys?${queryParams.toString()}`);
+
+            const errors = response.data.errors || [];
+
+            if (errors.length) throw new Error(errors.join(', '));
 
             // Apply sorting on client side using current sort value
             const sortedData = sortDataKeys(response.data.data, sort);
 
-            setAllDataKeys(sortedData);
-            setErrors(response.data.errors);
+            setAllDataKeys(prev => {
+                if (opts?.appendResults) {
+                    let arr = prev.map(d => {
+                        return sortedData.find(d2 => d2.uuid === d.uuid) || d;
+                    });
+                    arr = [
+                        ...arr,
+                        ...sortedData.filter(d => !arr.map(d => d.uuid).includes(d.uuid)),
+                    ];
+                    return arr;
+                } else {
+                    return sortedData;
+                }
+            });
             setCurrentPage(1);
+            setAllDataKeysLastFetchedDate(new Date().toISOString());
         } catch (e: any) {
-            setAllDataKeys([]);
-            setErrors([e.message]);
+            if (!opts?.silent) {
+                setErrors([e.message]);
+                alert({
+                    variant: 'error',
+                    title: "Error",
+                    message: "Failed to load data keys: " + e.message,
+                    buttonLabel: "Try again",
+                    onClose: () => loadDataKeys(),
+                });
+            }
         } finally {
             setLoadingDataKeys(false);
         }
@@ -487,16 +526,16 @@ export function DataKeysCtxProvider({
         return keys.filter((k, i) => keys.map(k => k.uniqueKey).indexOf(k.uniqueKey) === i);
     }, [allDataKeys]);
 
-    if (errors?.length) {
-        return (
-            <Alert
-                title="Error"
-                message={"Failed to load data keys: " + errors.join(', ')}
-                buttonLabel="Try again"
-                onClose={() => loadDataKeys()}
-            />
-        );
-    }
+    const getLatestDataKeys = useCallback(async (opts?: LoadDataKeysOpts) => {
+        if (allDataKeysLastFetchedDate) {
+            loadDataKeys(
+                { dateAfter: allDataKeysLastFetchedDate },
+                { appendResults: true, ...opts },
+            );
+        }
+    }, [allDataKeysLastFetchedDate, loadDataKeys]);
+
+    if (errors?.length) return null;
 
     return (
         <>
@@ -518,6 +557,7 @@ export function DataKeysCtxProvider({
                     currentPage,
                     itemsPerPage,
                     unusedDataKeys,
+                    getLatestDataKeys,
                     setUnusedDataKeys,
                     setCurrentPage,
                     setSearchValue,
@@ -536,6 +576,24 @@ export function DataKeysCtxProvider({
             >
                 {children}
             </DataKeysCtx.Provider>
+
+            <SocketEventsListener
+                events={[
+                    {
+                        name: 'mode_changed',
+                        onEvent: { refreshRouter: true, },
+                    },
+                    {
+                        name: 'update_system',
+                        onEvent: { refreshRouter: true, },
+                    },
+                    {
+                        name: 'data_changed',
+                        onEvent: { callback: () => getLatestDataKeys({ silent: true, }), },
+                    },
+
+                ]}
+            />
         </>
     );
 }

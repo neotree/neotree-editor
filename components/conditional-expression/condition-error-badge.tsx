@@ -33,29 +33,52 @@ export interface ConditionErrorBadgeProps {
 }
 
 /**
+ * Blocking messages for a set of expressions. Shared so every surface that
+ * reports conditional-expression errors — this badge and the combined issue
+ * badge — derives them the same way.
+ */
+export function collectConditionErrorMessages({
+  expressions,
+  keys,
+  extraKeys,
+  keysReady,
+  unavailableKeys,
+}: {
+  expressions: ConditionExpressionInput[];
+  keys: ConditionKey[];
+  extraKeys?: ConditionKey[];
+  keysReady?: boolean;
+  /** Reasons known keys cannot exist at this runtime point (outcome ordering). */
+  unavailableKeys?: Record<string, string>;
+}): string[] {
+  const mergedKeys = extraKeys?.length ? mergeConditionKeys(keys, extraKeys) : keys;
+  const out: string[] = [];
+  for (const expression of expressions || []) {
+    const value = `${expression?.value ?? ""}`.trim();
+    if (!value) continue;
+    const ctx = { keys: mergedKeys, allowSelf: expression.allowSelf, unavailableKeys, skipKeyResolution: !keysReady };
+    const result =
+      expression.mode === "reference"
+        ? validateReferenceExpression(value, ctx)
+        : validateCondition(value, ctx);
+    for (const diagnostic of result.diagnostics) {
+      if (diagnostic.severity !== "error") continue;
+      out.push(expression.label ? `${expression.label}: ${diagnostic.message}` : diagnostic.message);
+    }
+  }
+  return out;
+}
+
+/**
  * A small red indicator shown when any of an item's conditional expressions
  * has a blocking error — so invalid legacy CE is visible in list/overview views
  * without opening each item. Renders nothing when everything is valid.
  */
 export function ConditionErrorBadge({ expressions, keys, extraKeys, keysReady, unavailableKeys, className }: ConditionErrorBadgeProps) {
-  const messages = useMemo(() => {
-    const mergedKeys = extraKeys?.length ? mergeConditionKeys(keys, extraKeys) : keys;
-    const out: string[] = [];
-    for (const expression of expressions) {
-      const value = `${expression?.value ?? ""}`.trim();
-      if (!value) continue;
-      const ctx = { keys: mergedKeys, allowSelf: expression.allowSelf, unavailableKeys, skipKeyResolution: !keysReady };
-      const result =
-        expression.mode === "reference"
-          ? validateReferenceExpression(value, ctx)
-          : validateCondition(value, ctx);
-      for (const diagnostic of result.diagnostics) {
-        if (diagnostic.severity !== "error") continue;
-        out.push(expression.label ? `${expression.label}: ${diagnostic.message}` : diagnostic.message);
-      }
-    }
-    return out;
-  }, [expressions, keys, extraKeys, keysReady, unavailableKeys]);
+  const messages = useMemo(
+    () => collectConditionErrorMessages({ expressions, keys, extraKeys, keysReady, unavailableKeys }),
+    [expressions, keys, extraKeys, keysReady, unavailableKeys],
+  );
 
   if (!messages.length) return null;
 

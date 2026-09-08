@@ -13,8 +13,10 @@ import { ScreensTableRowActions } from "./table-row-actions";
 import { useScreensTable, UseScreensTableParams } from '../../hooks/use-screens-table';
 import { CopyScreensModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
-import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
+import { useConditionKeys } from "@/components/conditional-expression";
+import { ScriptIssueBadge, collisionIssues, conditionIssues } from "@/components/script-issues";
 import { getOutcomeProducers, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { findScreenFieldKeyCollisions } from "@/lib/field-key-collisions";
 
 type Props = UseScreensTableParams;
 
@@ -129,6 +131,12 @@ export function ScreensTable(props: Props) {
                                     return [
                                         { value: f?.condition, label: `Field "${fieldName}" condition`, allowSelf: true },
                                         { value: f?.calculation, label: `Field "${fieldName}" reference`, mode: 'reference' as const },
+                                        ...((f?.items || []) as any[])
+                                            .filter((item) => `${item?.condition || ''}`.trim())
+                                            .map((item) => ({
+                                                value: item.condition,
+                                                label: `Field "${fieldName}" option "${item.value || item.label}"`,
+                                            })),
                                     ];
                                 });
                                 const itemExpressions = ((s?.items || []) as any[]).map((item) => ({
@@ -136,19 +144,33 @@ export function ScreensTable(props: Props) {
                                     label: `Item "${item?.label || item?.key || ''}" condition`,
                                     allowSelf: true,
                                 }));
+                                const keyCollisions = !s ? [] : findScreenFieldKeyCollisions(
+                                    {
+                                        screenId: s.screenId,
+                                        title: s.title,
+                                        repeatable: (s as { repeatable?: boolean | null }).repeatable,
+                                        fields: (s?.fields || []) as any[],
+                                    },
+                                    { keys: conditionKeys },
+                                );
                                 return (
                                     <span className="inline-flex items-center gap-x-2">
                                         <span>{s?.title}</span>
                                         {!!s && (
-                                            <ConditionErrorBadge
-                                                keys={conditionKeys}
-                                                keysReady={keysReady}
-                                                unavailableKeys={unavailableByPosition.get(`${s.position ?? ''}`) || {}}
-                                                expressions={[
-                                                    { value: s.condition, label: 'Condition', allowSelf: true },
-                                                    { value: s.skipToCondition, label: 'Skip to screen', allowSelf: true },
-                                                    ...fieldExpressions,
-                                                    ...itemExpressions,
+                                            <ScriptIssueBadge
+                                                issues={[
+                                                    ...collisionIssues(keyCollisions),
+                                                    ...conditionIssues({
+                                                        keys: conditionKeys,
+                                                        keysReady,
+                                                        unavailableKeys: unavailableByPosition.get(`${s.position ?? ''}`) || {},
+                                                        expressions: [
+                                                            { value: s.condition, label: 'Condition', allowSelf: true },
+                                                            { value: s.skipToCondition, label: 'Skip to screen', allowSelf: true },
+                                                            ...fieldExpressions,
+                                                            ...itemExpressions,
+                                                        ],
+                                                    }),
                                                 ]}
                                             />
                                         )}
