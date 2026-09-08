@@ -1,5 +1,6 @@
 import type { Node } from "./ast";
 import { parse } from "./parser";
+import { quoteTextValue } from "./quote";
 import type { ScriptConditionEntityRef, ScriptWithItems } from "./collect";
 import type { OutcomeCollectionName } from "./script-outcomes";
 
@@ -19,10 +20,11 @@ export type OutcomeReferenceRewrite = {
 type LiteralSpan = { start: number; end: number; value: string };
 
 function quoteOutcomeValue(value: string): string {
-  if (!value.includes("'")) return `'${value}'`;
-  if (!value.includes('"')) return `"${value}"`;
-  if (!value.includes("`")) return `\`${value}\``;
-  throw new Error("Cannot safely rewrite an outcome key containing single quotes, double quotes, and backticks.");
+  const quoted = quoteTextValue(value);
+  if (quoted === undefined) {
+    throw new Error("Cannot safely rewrite an outcome key containing single quotes, double quotes, and backticks.");
+  }
+  return quoted;
 }
 
 function outcomeLiteralSpans(expression: string, collection: OutcomeCollectionName): LiteralSpan[] {

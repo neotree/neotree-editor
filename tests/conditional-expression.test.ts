@@ -12,9 +12,11 @@ import {
   mergeConditionKeys,
   rewriteOutcomeValueReferences,
   toConfigurationConditionKeys,
+  quoteTextValue,
   validateCondition,
   validateReferenceExpression,
   type ConditionKey,
+  type Diagnostic,
   type ValidationContext,
 } from "../lib/conditional-expression";
 import {
@@ -756,7 +758,11 @@ assert.equal(
 );
 const badOption = errors("[$Diagnoses includes ('LBWW')]", listCtx).find((d) => d.code === "UNKNOWN_OPTION");
 assert.ok(badOption, "typo'd list option errors");
-assert.equal(badOption?.suggestion, "LBW", "suggests the closest option");
+assert.equal(
+  badOption?.suggestion,
+  "'LBW'",
+  "suggests the closest option, quoted so it can replace the literal it spans",
+);
 assert.equal(validateCondition("[$Diagnoses includes ('LBWW')]", listCtx).hasErrors, true, "bad option blocks save");
 assert.ok(
   warnings("[$Diagnoses includes ('LBW','LBW')]", listCtx).some((d) => d.code === "DUPLICATE_VALUE"),
@@ -1072,5 +1078,80 @@ assert.equal(
   1,
   "syntax errors still counted with empty key catalogue",
 );
+
+// ---- Quick fixes are applicable: applying one must clean up the expression --
+//
+// Mirrors ConditionEditor.applySuggestion exactly (a raw splice over the
+// diagnostic's own span), so a suggestion that does not fit its span fails here
+// rather than silently corrupting a user's condition.
+
+const applyFix = (input: string, d: Diagnostic) =>
+  `${input.slice(0, d.start)}${d.suggestion}${input.slice(d.end)}`;
+
+const fixFor = (input: string, code: string, c: ValidationContext = ctx): Diagnostic => {
+  const found = validateCondition(input, c).diagnostics.find((d) => d.code === code);
+  assert.ok(found, `${code} raised for ${JSON.stringify(input)}`);
+  assert.notEqual(found!.suggestion, undefined, `${code} carries an applicable suggestion`);
+  return found!;
+};
+
+for (const [code, input, expected, c] of [
+  // The span covers the quotes, so the replacement must carry its own.
+  ["UNKNOWN_OPTION", "$Sex = 'X'", "$Sex = 'M'", ctx],
+  ["UNQUOTED_VALUE", "$Name = White", "$Name = 'White'", ctx],
+  ["VALUE_WHITESPACE", "$Name = 'White '", "$Name = 'White'", ctx],
+  ["TRAILING_WHITESPACE", "$Sex = 'M' ", "$Sex = 'M'", ctx],
+  ["UNQUOTED_VALUE", "[$Diagnoses includes (LBW)]", "[$Diagnoses includes ('LBW')]", listCtx],
+  ["DUPLICATE_VALUE", "[$Diagnoses includes ('LBW','LBW')]", "[$Diagnoses includes ('LBW')]", listCtx],
+  ["MEMBERSHIP_BRACKETS", "$Diagnoses includes ('LBW')", "[$Diagnoses includes ('LBW')]", listCtx],
+] as [string, string, string, ValidationContext][]) {
+  const fixed = applyFix(input, fixFor(input, code, c));
+  assert.equal(fixed, expected, `${code}: applying the fix rewrites the span correctly`);
+  const after = validateCondition(fixed, c);
+  assert.equal(
+    after.diagnostics.length,
+    0,
+    `${code}: the fixed expression is clean, got ${after.diagnostics.map((d) => d.code).join(", ")}`,
+  );
+}
+
+// A deletion fix is the empty string — present, but falsy. The editor tests for
+// absence (`!== undefined`), so these must not be conflated.
+assert.equal(fixFor("$Sex = 'M' ", "TRAILING_WHITESPACE").suggestion, "", "trailing whitespace deletes its span");
+assert.equal(
+  fixFor("[$Diagnoses includes ('LBW','LBW')]", "DUPLICATE_VALUE", listCtx).suggestion,
+  "",
+  "duplicate value deletes its span",
+);
+
+// The duplicate's span has to swallow the separating comma, or deleting it
+// would leave "('LBW',)".
+const dupFix = fixFor("[$Diagnoses includes ('LBW', 'LBW')]", "DUPLICATE_VALUE", listCtx);
+assert.equal(
+  "[$Diagnoses includes ('LBW', 'LBW')]".slice(dupFix.start, dupFix.end),
+  ", 'LBW'",
+  "duplicate span covers the preceding comma",
+);
+
+// Suggestions are omitted (not empty) when no safe fix exists.
+assert.equal(
+  validateCondition("$Sex = 'Nowhere near an option'", ctx)
+    .diagnostics.find((d) => d.code === "UNKNOWN_OPTION")?.suggestion,
+  undefined,
+  "no close option match offers no fix",
+);
+assert.equal(
+  validateCondition("$Diagnoses includes ('LBW') and $Sex = 'M'", listCtx)
+    .diagnostics.find((d) => d.code === "MEMBERSHIP_BRACKETS" && d.severity === "error")?.suggestion,
+  undefined,
+  "a membership combined with and/or needs restructuring, so offers no fix",
+);
+
+// ---- Shared quoting helper (one implementation, two entry points) -----------
+
+assert.equal(quoteTextValue("LBW"), "'LBW'", "quoteTextValue prefers single quotes");
+assert.equal(quoteTextValue("Mother's"), '"Mother\'s"', "quoteTextValue falls back to double quotes");
+assert.equal(quoteTextValue("a'b\"c`d"), undefined, "quoteTextValue gives up when every delimiter is present");
+assert.equal(quoteValue("a'b\"c`d"), "'ab\"c`d'", "quoteValue always returns a literal, stripping ' as a last resort");
 
 console.log("conditional-expression: all assertions passed");

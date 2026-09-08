@@ -39,10 +39,7 @@ export type DiagnosticCode =
   | "EMPTY_VALUE"
   | "NULL_VALUE"
   | "VALUE_WHITESPACE"
-  | "TRAILING_WHITESPACE"
-  // Reference-expression sublanguage
-  | "UNKNOWN_FUNCTION"
-  | "FUNCTION_ARG";
+  | "TRAILING_WHITESPACE";
 
 export interface Diagnostic {
   severity: Severity;

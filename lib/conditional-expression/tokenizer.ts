@@ -1,4 +1,5 @@
 import type { Diagnostic } from "./ast";
+import { quoteTextValue } from "./quote";
 
 export type TokenKind =
   | "var"
@@ -46,13 +47,6 @@ const isDoubledQuoteBoundary = (c: string | undefined) => (
   || c === "]"
   || c === ","
 );
-
-const quoteTextValue = (value: string): string | undefined => {
-  for (const quote of ["'", '"', "`"]) {
-    if (!value.includes(quote)) return `${quote}${value}${quote}`;
-  }
-  return undefined;
-};
 
 const quoteName = (quote: string) => {
   if (quote === "'") return "single quote (')";

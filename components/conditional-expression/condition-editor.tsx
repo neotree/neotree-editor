@@ -231,14 +231,17 @@ export function ConditionEditor({
   };
 
   const applySuggestion = (diagnostic: Diagnostic) => {
-    if (!diagnostic.suggestion) return;
+    if (diagnostic.suggestion === undefined) return;
     const next = `${value.slice(0, diagnostic.start)}${diagnostic.suggestion}${value.slice(diagnostic.end)}`;
     onChange(next);
     moveCursorAfterChange(diagnostic.start + diagnostic.suggestion.length);
   };
 
+  // Codes whose suggestion is a drop-in replacement for its own span. A code
+  // may still omit the suggestion case by case (e.g. no close option match, or
+  // a membership that needs restructuring), hence the presence check.
   const canApplySuggestion = (diagnostic: Diagnostic) => (
-    !!diagnostic.suggestion
+    diagnostic.suggestion !== undefined
     && [
       "LEGACY_NEGATION",
       "LEGACY_REVERSED_COMPARISON",
@@ -247,6 +250,12 @@ export function ConditionEditor({
       "DOUBLED_QUOTED_VALUE",
       "KEY_CASE",
       "UNKNOWN_KEY",
+      "UNKNOWN_OPTION",
+      "UNQUOTED_VALUE",
+      "VALUE_WHITESPACE",
+      "TRAILING_WHITESPACE",
+      "DUPLICATE_VALUE",
+      "MEMBERSHIP_BRACKETS",
     ].includes(diagnostic.code)
   );
 
@@ -394,12 +403,17 @@ export function ConditionEditor({
 
             <div className="min-w-0 space-y-1">
               <p>{diagnostic.message}</p>
-              {!!diagnostic.suggestion && (
+              {(canApply || !!diagnostic.suggestion) && (
                 <div className="flex flex-wrap items-center gap-2 text-foreground">
                   <span className="text-muted-foreground">Suggested:</span>
-                  <code className="max-w-full overflow-x-auto rounded bg-muted px-1.5 py-0.5">
-                    {diagnostic.suggestion}
-                  </code>
+                  {diagnostic.suggestion ? (
+                    <code className="max-w-full overflow-x-auto rounded bg-muted px-1.5 py-0.5">
+                      {diagnostic.suggestion}
+                    </code>
+                  ) : (
+                    // An empty replacement is a deletion — there is nothing to preview.
+                    <span className="italic text-muted-foreground">remove</span>
+                  )}
                   {canApply && (
                     <button
                       type="button"

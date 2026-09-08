@@ -14,6 +14,7 @@ export type {
 export { validateReferenceExpression } from "./reference-expr";
 export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
+export { quoteTextValue, quoteValue } from "./quote";
 export { buildScriptConditionKeys, type BuildScriptConditionKeysInput } from "./script-keys";
 export {
   getConfigurationConditionKeySignature,
@@ -62,6 +63,7 @@ function findTrailingWhitespace(input: string): Diagnostic[] {
         message: "Remove trailing spaces.",
         start: offset + withoutTrailing.length,
         end: offset + line.length,
+        suggestion: "",
       });
     }
     offset += line.length + 1; // account for the newline
@@ -80,7 +82,7 @@ export function validateCondition(input: string, ctx: ValidationContext): Valida
   if (!src.trim()) return { diagnostics: [], hasErrors: false, ast: null };
 
   const { ast, diagnostics: syntax } = parse(src);
-  const semantic = analyze(ast, ctx);
+  const semantic = analyze(ast, ctx, src);
   const legacy = findLegacyNegationDiagnostics(ast, src);
   const whitespace = findTrailingWhitespace(src);
 

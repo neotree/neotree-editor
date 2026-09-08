@@ -1,4 +1,7 @@
-import type { ConditionKey } from "@/lib/conditional-expression";
+import { quoteValue, type ConditionKey } from "@/lib/conditional-expression";
+
+// Re-exported so callers of the autocomplete helpers keep a single import.
+export { quoteValue };
 
 export interface ConditionToken {
   token: string;
@@ -122,18 +125,6 @@ export function getValueContextAtCursor(condition: string, cursor: number): Valu
   if (!keyName) return null;
 
   return { keyName, partial, insertStart, insertEnd };
-}
-
-/**
- * Quotes a value with a delimiter it does not itself contain (the DSL has no
- * escape syntax), so values like `Mother's` don't produce broken syntax.
- */
-export function quoteValue(value: string): string {
-  if (!value.includes("'")) return `'${value}'`;
-  if (!value.includes('"')) return `"${value}"`;
-  if (!value.includes("`")) return `\`${value}\``;
-  // Contains every delimiter — strip single quotes as a last resort.
-  return `'${value.replace(/'/g, "")}'`;
 }
 
 /** Inserts a value at the value context, returning the new text + caret. */
