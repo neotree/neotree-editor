@@ -51,6 +51,8 @@ const codes = (input: string, c: ValidationContext = ctx) =>
 const validExpressions = [
   "",
   "$Sex = 'M'",
+  '$Name = "White"',
+  '$Name = "O\'Brien"',
   "$Gestation = 39",
   "$Sex = 'F' or $Gestation >= 39",
   "$Sex = 'M' or $Gestation > 39\n[$Diagnoses includes ('LBW','Sepsis')]",
@@ -601,6 +603,33 @@ assert.ok(
   "empty value flagged while keys load",
 );
 
+for (const expression of ["$Name = ''White''", '$Name = ""White""']) {
+  const result = validateCondition(expression, ctx);
+  const diagnostic = result.diagnostics.find((d) => d.code === "DOUBLED_QUOTED_VALUE");
+  assert.equal(result.hasErrors, true, "doubled quote marks remain blocking because the runtime syntax is invalid");
+  assert.equal(diagnostic?.suggestion, "'White'", "doubled quote marks receive a canonical replacement");
+  assert.equal(
+    result.diagnostics.some((d) => d.code === "EMPTY_VALUE" || d.code === "UNEXPECTED_TOKEN"),
+    false,
+    "doubled quote marks should not produce misleading secondary errors",
+  );
+}
+
+for (const [expression, suggestion] of [
+  [`$Name = "hello'`, '"hello"'],
+  [`$Name = 'hello"`, "'hello'"],
+]) {
+  const result = validateCondition(expression, ctx);
+  const diagnostic = result.diagnostics.find((d) => d.code === "MISMATCHED_QUOTED_VALUE");
+  assert.equal(result.hasErrors, true, "mismatched quote marks remain blocking because the runtime syntax is invalid");
+  assert.equal(diagnostic?.suggestion, suggestion, "mismatched quote marks receive a matching replacement");
+  assert.equal(
+    result.diagnostics.some((d) => d.code === "UNTERMINATED_STRING" || d.code === "UNEXPECTED_TOKEN"),
+    false,
+    "mismatched quote marks should not produce a misleading unterminated or unexpected-token error",
+  );
+}
+
 // ---- Semantic: the headline bug (typo'd key) --------------------------------
 
 const typo = errors("$Gestaton > 39");
@@ -1031,11 +1060,12 @@ assert.equal(
   "unknown NUID reference is counted",
 );
 
-// No keys at all -> key checks are skipped (only syntax), so no false positives.
+// No keys at all -> the script catalogue is authoritative (callers load it in
+// full), so an unknown reference is still flagged rather than skipped.
 assert.equal(
   getScriptConditionErrorCount({ dataKeys: [], screens: [{ condition: "$Anything = 'x'" }] }),
-  0,
-  "empty key catalogue does not false-flag references",
+  1,
+  "empty key catalogue still flags unknown references",
 );
 assert.equal(
   getScriptConditionErrorCount({ dataKeys: [], screens: [{ condition: "$Anything = 'x' or" }] }),

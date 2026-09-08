@@ -239,7 +239,15 @@ export function ConditionEditor({
 
   const canApplySuggestion = (diagnostic: Diagnostic) => (
     !!diagnostic.suggestion
-    && ["LEGACY_NEGATION", "LEGACY_REVERSED_COMPARISON", "SPACED_NOT_EQUAL", "KEY_CASE", "UNKNOWN_KEY"].includes(diagnostic.code)
+    && [
+      "LEGACY_NEGATION",
+      "LEGACY_REVERSED_COMPARISON",
+      "SPACED_NOT_EQUAL",
+      "MISMATCHED_QUOTED_VALUE",
+      "DOUBLED_QUOTED_VALUE",
+      "KEY_CASE",
+      "UNKNOWN_KEY",
+    ].includes(diagnostic.code)
   );
 
   return (

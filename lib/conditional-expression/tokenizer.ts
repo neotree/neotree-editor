@@ -34,6 +34,32 @@ const isIdentChar = (c: string) => /[A-Za-z0-9_]/.test(c);
 const isVarChar = (c: string) => /[A-Za-z0-9_.\-]/.test(c);
 const isDigit = (c: string) => c >= "0" && c <= "9";
 
+const isQuote = (c: string) => c === "'" || c === '"' || c === "`";
+
+const isDoubledQuoteBoundary = (c: string | undefined) => (
+  c === undefined
+  || c === "\n"
+  || c === "\r"
+  || c === " "
+  || c === "\t"
+  || c === ")"
+  || c === "]"
+  || c === ","
+);
+
+const quoteTextValue = (value: string): string | undefined => {
+  for (const quote of ["'", '"', "`"]) {
+    if (!value.includes(quote)) return `${quote}${value}${quote}`;
+  }
+  return undefined;
+};
+
+const quoteName = (quote: string) => {
+  if (quote === "'") return "single quote (')";
+  if (quote === '"') return 'double quote (")';
+  return "backtick (`)";
+};
+
 export function tokenize(input: string): { tokens: Token[]; diagnostics: Diagnostic[] } {
   const tokens: Token[] = [];
   const diagnostics: Diagnostic[] = [];
@@ -53,8 +79,34 @@ export function tokenize(input: string): { tokens: Token[]; diagnostics: Diagnos
       continue;
     }
 
+    if (isQuote(c) && input[i + 1] === c) {
+      const start = i;
+      const contentStart = i + 2;
+      const closing = input.indexOf(`${c}${c}`, contentStart);
+      const lineBreak = input.indexOf("\n", contentStart);
+      if (
+        closing > contentStart
+        && (lineBreak === -1 || closing < lineBreak)
+        && isDoubledQuoteBoundary(input[closing + 2])
+      ) {
+        const end = closing + 2;
+        const content = input.slice(contentStart, closing);
+        tokens.push({ kind: "string", value: input.slice(start, end), text: content, start, end });
+        diagnostics.push({
+          severity: "error",
+          code: "DOUBLED_QUOTED_VALUE",
+          message: "This text value uses doubled quote marks. Use one quote mark on each side.",
+          start,
+          end,
+          suggestion: quoteTextValue(content),
+        });
+        i = end;
+        continue;
+      }
+    }
+
     // String literal ('...', "...", `...`)
-    if (c === "'" || c === '"' || c === "`") {
+    if (isQuote(c)) {
       const quote = c;
       const start = i;
       i++;
@@ -71,6 +123,40 @@ export function tokenize(input: string): { tokens: Token[]; diagnostics: Diagnos
         i++;
       }
       const end = i;
+
+
+      if (!terminated) {
+        let mismatchedIndex = end - 1;
+        while (
+          mismatchedIndex > start
+          && (input[mismatchedIndex] === " " || input[mismatchedIndex] === "\t" || input[mismatchedIndex] === "\r")
+        ) {
+          mismatchedIndex--;
+        }
+        const mismatchedQuote = input[mismatchedIndex];
+        if (mismatchedIndex > start + 1 && isQuote(mismatchedQuote) && mismatchedQuote !== quote) {
+          const mismatchedEnd = mismatchedIndex + 1;
+          const mismatchedContent = input.slice(start + 1, mismatchedIndex);
+          tokens.push({
+            kind: "string",
+            value: input.slice(start, mismatchedEnd),
+            text: mismatchedContent,
+            start,
+            end: mismatchedEnd,
+          });
+          diagnostics.push({
+            severity: "error",
+            code: "MISMATCHED_QUOTED_VALUE",
+            message: `This text value starts with a ${quoteName(quote)} but ends with a ${quoteName(mismatchedQuote)}. Use the same quote mark on both sides.`,
+            start,
+            end: mismatchedEnd,
+            suggestion: `${quote}${mismatchedContent}${quote}`,
+          });
+          i = mismatchedEnd;
+          continue;
+        }
+      }
+
       tokens.push({ kind: "string", value: input.slice(start, end), text: content, start, end });
       if (!terminated) {
         diagnostics.push({
