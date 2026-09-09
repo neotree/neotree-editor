@@ -24,7 +24,6 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
   keysReady: boolean;
 } {
   const ctx = useScriptsContext();
-  const conditionCatalogueReady = ctx?.conditionCatalogueReady ?? false;
   const enabled = opts?.enabled ?? true;
 
   const { 
@@ -42,6 +41,6 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
   return {
     conditionKeys,
     keysLoading: false,
-    keysReady: conditionCatalogueReady || conditionKeys.length > 0,
+    keysReady: conditionKeys.length > 0,
   };
 }
