@@ -14,7 +14,7 @@ type Props = {
 
 export function ScriptPrintSetup(props: Props) {
     const mounted = useRef(false);
-    const { keysLoading, screensLoading, loadScreens, } = useScriptsContext();
+    const { screensLoading, loadScreens, } = useScriptsContext();
 
     useEffect(() => {
         if (!mounted.current) {
@@ -23,7 +23,7 @@ export function ScriptPrintSetup(props: Props) {
         }
     }, [loadScreens]);
 
-    if (keysLoading || screensLoading) return <Loader overlay />;
+    if (screensLoading) return <Loader overlay />;
 
     return (
         <>

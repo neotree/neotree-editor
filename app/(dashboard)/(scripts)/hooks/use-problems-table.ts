@@ -57,7 +57,7 @@ export function useProblemsTable({
   const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 
-  const { deleteProblems, saveProblems, reloadKeys } = useScriptsContext()
+  const { deleteProblems, saveProblems } = useScriptsContext()
 
   const onDelete = useCallback(
     async (problemsIds: string[]) => {
@@ -116,7 +116,6 @@ export function useProblemsTable({
             })
           } else {
             setSelected([])
-            await reloadKeys()
             router.refresh()
             alert({
               title: "Success",
@@ -135,7 +134,7 @@ export function useProblemsTable({
         },
       )
     },
-    [deleteProblems, confirm, alert, reloadKeys, router, problems],
+    [deleteProblems, confirm, alert, router, problems],
   )
 
   const onSort = useCallback(
@@ -159,11 +158,10 @@ export function useProblemsTable({
       await axios.post("/api/problems/save", { data: payload, broadcastAction: true })
 
       await loadProblems()
-      await reloadKeys()
 
       router.refresh()
     },
-    [saveProblems, loadProblems, reloadKeys, problems, router],
+    [saveProblems, loadProblems, problems, router],
   )
 
   const disabled = useMemo(() => disabledProp || viewOnly, [disabledProp, viewOnly])

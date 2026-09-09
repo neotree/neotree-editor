@@ -29,7 +29,7 @@ export function useDiagnosisForm({
 
     const [saving, setSaving] = useState(false);
 
-    const { saveDiagnoses, reloadKeys } = useScriptsContext();
+    const { saveDiagnoses } = useScriptsContext();
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
     const { viewOnly } = useAppContext();
@@ -96,7 +96,6 @@ export function useDiagnosisForm({
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 
-            await reloadKeys();
             router.refresh();
             alert({
                 variant: 'success',
