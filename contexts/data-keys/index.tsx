@@ -161,9 +161,11 @@ export const useDataKeysCtx = () => {
 export function DataKeysCtxProvider({
     children,
     prefetchDataKeys = true,
+    initialDataKeys = [],
 }: {
     children: React.ReactNode;
     prefetchDataKeys?: boolean;
+    initialDataKeys?: DataKey[];
 }) {
     const mounted = useRef(false);
     const router = useRouter();
@@ -188,8 +190,10 @@ export function DataKeysCtxProvider({
      ************ LOAD
     ******************************************************/
     const [loadingDataKeys, setLoadingDataKeys] = useState(false);
-    const [allDataKeys, setAllDataKeys] = useState<DataKey[]>([]);
-    const [allDataKeysLastFetchedDate, setAllDataKeysLastFetchedDate] = useState('');
+    const [allDataKeys, setAllDataKeys] = useState<DataKey[]>(initialDataKeys || []);
+    const [allDataKeysLastFetchedDate, setAllDataKeysLastFetchedDate] = useState(
+        initialDataKeys?.length ? new Date().toISOString() : ''
+    );
     const [errors, setErrors] = useState<string[] | undefined>();
 
     const [unusedDataKeys, setUnusedDataKeys] = useState<tDataKeysCtx['unusedDataKeys']>({ 
