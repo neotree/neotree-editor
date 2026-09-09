@@ -1086,6 +1086,7 @@ export const scripts = pgTable(
     conditionErrorReport: jsonb("condition_error_report").$type<{
       count: number
       findings: { location: string; href?: string; message?: string }[]
+      configurationSignature?: string
     } | null>(),
     reviewable: boolean("reviewable").notNull().default(false),
     reviewConfigurations: jsonb("review_configurations").default("[]").notNull(),

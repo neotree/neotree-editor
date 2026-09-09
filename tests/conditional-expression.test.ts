@@ -1,14 +1,32 @@
 import assert from "assert";
 
 import {
+  buildScriptConditionKeys,
+  buildScriptOutcomeReferencePatches,
+  collectNewOutcomeKeyCollisions,
+  collectOutcomeKeyCollisions,
+  collectScriptOutcomeReferences,
+  getConfigurationConditionKeySignature,
+  getUnavailableOutcomeKeys,
   getScriptConditionErrorCount,
   mergeConditionKeys,
+  rewriteOutcomeValueReferences,
+  toConfigurationConditionKeys,
+  quoteTextValue,
   validateCondition,
   validateReferenceExpression,
   type ConditionKey,
+  type Diagnostic,
   type ValidationContext,
 } from "../lib/conditional-expression";
-import { getValueContextAtCursor, quoteValue } from "../components/conditional-expression/autocomplete";
+import {
+  getConditionValueMatches,
+  getValueContextAtCursor,
+  insertValueAtContext,
+  quoteValue,
+  sortKeyMatches,
+} from "../components/conditional-expression/autocomplete";
+import { evaluateCondition, parseCondition } from "../app/(ops)/conditional-exp/_eval";
 
 const keys: ConditionKey[] = [
   { name: "Sex", dataType: "dropdown", options: ["M", "F"] },
@@ -35,6 +53,8 @@ const codes = (input: string, c: ValidationContext = ctx) =>
 const validExpressions = [
   "",
   "$Sex = 'M'",
+  '$Name = "White"',
+  '$Name = "O\'Brien"',
   "$Gestation = 39",
   "$Sex = 'F' or $Gestation >= 39",
   "$Sex = 'M' or $Gestation > 39\n[$Diagnoses includes ('LBW','Sepsis')]",
@@ -61,6 +81,506 @@ assert.ok(codes("$Diagnoses includes 'LBW'").includes("MEMBERSHIP_SYNTAX"), "mem
 assert.ok(codes("[]").includes("EMPTY_GROUP"), "empty group");
 assert.ok(codes("$Gestation 'x'").includes("MISSING_OPERATOR"), "missing operator between operands");
 
+// ---- Legacy negation and not-equal authoring guidance ----------------------
+
+const legacyNegation = validateCondition("!($Sex = 'M')", ctx);
+const legacyWarning = legacyNegation.diagnostics.find((d) => d.code === "LEGACY_NEGATION");
+assert.equal(legacyNegation.hasErrors, false, "legacy !(...) syntax should remain non-blocking");
+assert.equal(legacyWarning?.severity, "warning", "legacy !(...) should be a deprecation warning");
+assert.equal(legacyWarning?.suggestion, "$Sex != 'M'", "simple legacy negation should suggest !=");
+
+const directLegacyNegation = validateCondition("!$Sex = 'M'", ctx);
+const directLegacyWarning = directLegacyNegation.diagnostics.find((d) => d.code === "LEGACY_NEGATION");
+assert.equal(directLegacyNegation.hasErrors, false, "legacy !$Key comparison syntax should remain non-blocking");
+assert.equal(directLegacyWarning?.severity, "warning", "legacy !$Key comparison should be a deprecation warning");
+assert.equal(directLegacyWarning?.suggestion, "$Sex != 'M'", "legacy !$Key comparison should suggest !=");
+
+const spacedDirectLegacyNegation = validateCondition("! $Sex = 'M'", ctx);
+assert.equal(spacedDirectLegacyNegation.hasErrors, false, "whitespace after a legacy prefix ! should remain compatible");
+assert.equal(
+  spacedDirectLegacyNegation.diagnostics.find((d) => d.code === "LEGACY_NEGATION")?.suggestion,
+  "$Sex != 'M'",
+  "spaced legacy prefix negation should receive the same modern rewrite",
+);
+
+const reportedDirectLegacyNegation = validateCondition("!$NeotreeOutcome = 'BID'", {
+  keys: [{ name: "NeotreeOutcome", dataType: "text", options: ["BID"] }],
+});
+assert.equal(reportedDirectLegacyNegation.hasErrors, false, "the reported direct legacy CE should remain saveable");
+assert.equal(
+  reportedDirectLegacyNegation.diagnostics.find((d) => d.code === "LEGACY_NEGATION")?.suggestion,
+  "$NeotreeOutcome != 'BID'",
+  "the reported direct legacy CE should suggest the equivalent != expression",
+);
+assert.equal(
+  validateCondition("!true", ctx).diagnostics.some((d) => d.code === "UNEXPECTED_TOKEN"),
+  true,
+  "unbounded standalone ! usage must remain a genuine syntax error",
+);
+
+const complexLegacyNegation = validateCondition(
+  "!($Sex = 'M' or [$Diagnoses includes ('LBW')])",
+  ctx,
+);
+assert.equal(complexLegacyNegation.hasErrors, false, "valid legacy compound negation should remain non-blocking");
+assert.equal(
+  complexLegacyNegation.diagnostics.find((d) => d.code === "LEGACY_NEGATION")?.suggestion,
+  "($Sex != 'M' and [$Diagnoses excludes ('LBW')])",
+  "compound legacy negation should apply De Morgan's law in its suggestion",
+);
+
+const screenshotLegacyNegation = validateCondition(
+  "!($AdmReason = 'DU' or [$AdmReasonAdd includes ('DU')])",
+  { keys: [], skipKeyResolution: true },
+);
+assert.equal(screenshotLegacyNegation.hasErrors, false, "the reported legacy expression should remain saveable");
+assert.equal(
+  screenshotLegacyNegation.diagnostics.find((d) => d.code === "LEGACY_NEGATION")?.suggestion,
+  "($AdmReason != 'DU' and [$AdmReasonAdd excludes ('DU')])",
+  "the reported legacy expression should receive a complete modern rewrite",
+);
+assert.equal(
+  validateCondition(
+    "!($AdmReason = 'DU' or [$AdmReasonAdd includes ('DU')])\n$AdmReason != 'BBA'",
+    { keys: [], skipKeyResolution: true },
+  ).hasErrors,
+  false,
+  "the reported multiline expression should contain only the legacy warning",
+);
+
+const spacedNotEqual = validateCondition("$Sex ! = 'M'", ctx);
+const spacedNotEqualError = spacedNotEqual.diagnostics.find((d) => d.code === "SPACED_NOT_EQUAL");
+assert.equal(spacedNotEqual.hasErrors, true, "a spaced not-equal operator should block saving");
+assert.equal(spacedNotEqualError?.severity, "error", "spaced ! = should have a targeted error");
+assert.equal(spacedNotEqualError?.suggestion, "!=", "spaced ! = should suggest the valid operator");
+assert.equal(
+  spacedNotEqual.diagnostics.some((d) => d.message.includes('Unexpected character "!"')),
+  false,
+  "spaced ! = should not fall back to a generic unexpected-character error",
+);
+assert.equal(
+  validateCondition("$Sex !   = 'M'", ctx).diagnostics.find((d) => d.code === "SPACED_NOT_EQUAL")?.suggestion,
+  "!=",
+  "multiple spaces inside the operator should receive the same quick fix",
+);
+assert.equal(
+  validateCondition("$Sex !\t= 'M'", ctx).diagnostics.find((d) => d.code === "SPACED_NOT_EQUAL")?.suggestion,
+  "!=",
+  "a tab inside the operator should receive the same quick fix",
+);
+assert.equal(validateCondition("$Sex != 'M'", ctx).hasErrors, false, "the modern != operator should remain valid");
+
+const reversedLessEqual = validateCondition("$Gestation =< 10 and $Gestation > 0", ctx);
+const reversedLessEqualWarning = reversedLessEqual.diagnostics.find(
+  (diagnostic) => diagnostic.code === "LEGACY_REVERSED_COMPARISON",
+);
+assert.equal(reversedLessEqual.hasErrors, false, "legacy =< comparisons should remain non-blocking");
+assert.equal(reversedLessEqualWarning?.severity, "warning", "legacy =< should be a deprecation warning");
+assert.equal(reversedLessEqualWarning?.suggestion, "<=", "legacy =< should suggest the canonical <= operator");
+assert.equal(
+  reversedLessEqual.diagnostics.some((diagnostic) => diagnostic.code === "MISSING_OPERAND" || diagnostic.code === "UNEXPECTED_TOKEN"),
+  false,
+  "a reversed comparison should not cascade into parser errors",
+);
+
+const reversedGreaterEqual = validateCondition("$Gestation => 30", ctx);
+assert.equal(reversedGreaterEqual.hasErrors, false, "legacy => comparisons should remain non-blocking");
+assert.equal(
+  reversedGreaterEqual.diagnostics.find((diagnostic) => diagnostic.code === "LEGACY_REVERSED_COMPARISON")?.suggestion,
+  ">=",
+  "legacy => should suggest the canonical >= operator",
+);
+assert.equal(
+  validateCondition("$Gestation = < 10", ctx).diagnostics.find(
+    (diagnostic) => diagnostic.code === "LEGACY_REVERSED_COMPARISON",
+  )?.suggestion,
+  "<=",
+  "a spaced reversed comparison should receive the same canonical suggestion",
+);
+assert.equal(
+  validateCondition("$Gestation =<< 10", ctx).hasErrors,
+  true,
+  "a malformed operator chain must remain blocking",
+);
+assert.equal(validateCondition("$Gestation <= 10", ctx).hasErrors, false, "canonical <= should remain valid");
+assert.equal(validateCondition("$Gestation >= 10", ctx).hasErrors, false, "canonical >= should remain valid");
+
+// ---- Legacy Configuration keys ---------------------------------------------
+
+const rawConfigurationKeys = [
+  { key: "NoPulseOx", label: "Pulse oximeter unavailable", position: 2 },
+  { key: "Offline", label: "Offline mode only", position: 1 },
+  { key: "nopulseox", label: "Duplicate casing", position: 3 },
+];
+const configurationConditionKeys = toConfigurationConditionKeys(rawConfigurationKeys);
+assert.deepEqual(
+  configurationConditionKeys.map((key) => key.name),
+  ["Offline", "NoPulseOx"],
+  "Configuration rows should become ordered, case-insensitively deduplicated CE keys",
+);
+assert.deepEqual(
+  configurationConditionKeys.find((key) => key.name === "NoPulseOx"),
+  {
+    name: "NoPulseOx",
+    label: "NoPulseOx — legacy configuration · Pulse oximeter unavailable",
+    dataType: "boolean",
+    options: ["true", "false"],
+  },
+  "Configuration keys should retain their runtime name and boolean semantics",
+);
+
+const scriptConfigurationKeys = buildScriptConditionKeys({ configurationKeys: rawConfigurationKeys });
+assert.equal(
+  validateCondition("$NoPulseOx = false", { keys: scriptConfigurationKeys }).hasErrors,
+  false,
+  "legacy Configuration references should validate without changing the expression",
+);
+assert.equal(
+  getScriptConditionErrorCount({
+    configurationKeys: rawConfigurationKeys,
+    screens: [{ condition: "$Offline = false" }],
+  }),
+  0,
+  "publish validation should use the same Configuration catalogue as the editor",
+);
+
+const booleanContext = getValueContextAtCursor("$NoPulseOx = ", "$NoPulseOx = ".length);
+assert.ok(booleanContext, "boolean value autocomplete should find its governing Configuration key");
+assert.deepEqual(
+  getConditionValueMatches(scriptConfigurationKeys.find((key) => key.name === "NoPulseOx"), "f"),
+  [{ value: "false", label: undefined }],
+  "Configuration values should suggest true/false",
+);
+
+const overlappingOptionsKey: ConditionKey = {
+  name: "Outcome",
+  dataType: "dropdown",
+  options: ["O", "OT", "OTH", "OTHER", "OTR"],
+};
+assert.deepEqual(
+  getConditionValueMatches(overlappingOptionsKey, "O").map((option) => option.value),
+  ["OT", "OTH", "OTHER", "OTR"],
+  "an exact option should not hide its longer matching alternatives",
+);
+assert.deepEqual(
+  getConditionValueMatches(overlappingOptionsKey, "OT").map((option) => option.value),
+  ["OTH", "OTHER", "OTR"],
+  "autocomplete should continue through successive exact prefixes",
+);
+assert.deepEqual(
+  getConditionValueMatches(overlappingOptionsKey, "OTHER"),
+  [],
+  "a unique exact option should close autocomplete",
+);
+assert.deepEqual(
+  getConditionValueMatches(overlappingOptionsKey, "").map((option) => option.value),
+  overlappingOptionsKey.options,
+  "an empty search should retain configured option order",
+);
+assert.deepEqual(
+  getConditionValueMatches({ name: "Ranked", options: ["XOTHER", "OTHER"] }, "OTH").map((option) => option.value),
+  ["OTHER", "XOTHER"],
+  "prefix matches should rank ahead of contains matches",
+);
+assert.deepEqual(
+  sortKeyMatches(
+    [{ name: "O" }, { name: "OT" }, { name: "OTH" }, { name: "OTHER" }, { name: "OTR" }],
+    "OTH",
+  ).map((key) => key.name),
+  ["OTHER"],
+  "an exact key name should not hide longer matching key suggestions",
+);
+assert.deepEqual(
+  sortKeyMatches([{ name: "OTHER" }], "OTHER"),
+  [],
+  "a unique exact key name should close key autocomplete",
+);
+assert.equal(
+  insertValueAtContext("$NoPulseOx = ", "false", booleanContext!, { quote: false }).condition,
+  "$NoPulseOx = false",
+  "boolean suggestions must be inserted without quotes",
+);
+
+const shadowedConfiguration = buildScriptConditionKeys({
+  configurationKeys: [{ key: "Offline", label: "Legacy configuration" }],
+  dataKeys: [{ name: "Offline", label: "Script value", dataType: "text", options: [] }],
+}).find((key) => key.name === "Offline");
+assert.equal(shadowedConfiguration?.dataType, "text", "script data keys should win Configuration name collisions");
+assert.equal(shadowedConfiguration?.options, undefined, "Configuration boolean options must not leak through a collision");
+
+const configurationSignature = getConfigurationConditionKeySignature(rawConfigurationKeys);
+assert.equal(
+  getConfigurationConditionKeySignature([...rawConfigurationKeys].reverse()),
+  configurationSignature,
+  "Configuration cache signatures should not depend on display order",
+);
+assert.equal(
+  getConfigurationConditionKeySignature(rawConfigurationKeys.map((key) => ({ ...key, label: `Updated ${key.label}` }))),
+  configurationSignature,
+  "label-only edits should not invalidate CE reports",
+);
+assert.notEqual(
+  getConfigurationConditionKeySignature(rawConfigurationKeys.map((key) => key.key === "Offline" ? { ...key, key: "OfflineMode" } : key)),
+  configurationSignature,
+  "renaming a Configuration key should invalidate cached CE reports",
+);
+
+// ---- Script-scoped Diagnoses and Problems collections ----------------------
+
+const scriptOutcomeKeys = buildScriptConditionKeys({
+  dataKeys: [
+    {
+      name: "Diagnoses",
+      label: "Clinician diagnoses",
+      dataType: "diagnosis",
+      uniqueKey: "diagnoses-parent",
+      options: ["manual-diagnosis"],
+    },
+    {
+      name: "ManualDiagnosis",
+      label: "Clinician-entered diagnosis",
+      dataType: "option",
+      uniqueKey: "manual-diagnosis",
+      options: [],
+    },
+  ],
+  diagnoses: [
+    { key: "RDS", name: "Respiratory distress syndrome", position: 2 },
+    { key: "Sepsis", name: "Neonatal sepsis", position: 1 },
+    { key: "rds", name: "Duplicate RDS", position: 3 },
+    { key: "", name: "Missing runtime key", position: 4 },
+  ],
+  problems: [
+    { key: "Airway", name: "Airway problem", position: 2 },
+    { key: "Breathing", name: "Breathing problem", position: 1 },
+  ],
+  screens: [
+    { type: "diagnosis" },
+    { type: "problems" },
+  ],
+});
+
+const diagnosesCollection = scriptOutcomeKeys.find((key) => key.name === "Diagnoses");
+const problemsCollection = scriptOutcomeKeys.find((key) => key.name === "Problems");
+assert.deepEqual(
+  diagnosesCollection?.options,
+  ["Sepsis", "RDS"],
+  "CDS diagnoses should be position-sorted, deduplicated, and isolated from colliding raw collection options",
+);
+assert.equal(
+  diagnosesCollection?.optionLabels?.RDS,
+  "Respiratory distress syndrome",
+  "diagnosis suggestions should display the name while retaining the machine key",
+);
+assert.deepEqual(
+  problemsCollection?.options,
+  ["Breathing", "Airway"],
+  "problems should come from the current script in configured order",
+);
+assert.deepEqual(
+  buildScriptConditionKeys({ screens: [{ type: "diagnosis" }], diagnoses: [] })
+    .find((key) => key.name === "Diagnoses")?.options,
+  [],
+  "an empty diagnosis screen should still expose an empty virtual collection for targeted guidance",
+);
+assert.deepEqual(
+  getConditionValueMatches(diagnosesCollection, "resp"),
+  [{ value: "RDS", label: "Respiratory distress syndrome" }],
+  "value autocomplete should search human-readable outcome names",
+);
+assert.equal(
+  validateCondition("[$Diagnoses includes ('RDS')]", { keys: scriptOutcomeKeys }).hasErrors,
+  false,
+  "a configured diagnosis should validate as a collection member",
+);
+assert.ok(
+  validateCondition("[$Problems includes ('UnknownProblem')]", { keys: scriptOutcomeKeys }).diagnostics.some(
+    (diagnostic) => diagnostic.code === "UNKNOWN_OPTION" && diagnostic.severity === "error",
+  ),
+  "an unknown problem should be rejected against script-scoped options",
+);
+assert.ok(
+  validateCondition("[$Problem includes ('Airway')]", { keys: scriptOutcomeKeys }).diagnostics.some(
+    (diagnostic) => diagnostic.code === "UNKNOWN_KEY" && diagnostic.suggestion === "$Problems",
+  ),
+  "the singular $Problem spelling should suggest the canonical $Problems key",
+);
+
+const outcomeRuntimeEntries = [{
+  screen: { type: "diagnosis" },
+  values: [
+    { key: "Diagnoses", value: [{ key: "RDS" }] },
+    { key: "Problems", value: [{ key: "Airway" }] },
+  ],
+}];
+assert.equal(
+  evaluateCondition(parseCondition("[$Diagnoses includes ('RDS')]", outcomeRuntimeEntries)),
+  true,
+  "diagnosis suggestions should insert the key used by the runtime collection",
+);
+assert.equal(
+  evaluateCondition(parseCondition("[$Problems includes ('Airway')]", outcomeRuntimeEntries)),
+  true,
+  "problem suggestions should insert the key used by the runtime collection",
+);
+
+// ---- Runtime availability and reserved-key protection ---------------------
+
+const orderedOutcomeScreens = [
+  { screenId: "diagnosis-screen", type: "diagnosis", key: "Diagnoses", title: "Compile diagnoses", position: 2 },
+  { screenId: "problem-screen", type: "problems", key: "Problems", title: "Compile problems", position: 4 },
+];
+assert.deepEqual(
+  getUnavailableOutcomeKeys({ screens: orderedOutcomeScreens, consumerPosition: 5 }),
+  {},
+  "both outcome collections are available after their producer screens",
+);
+assert.match(
+  getUnavailableOutcomeKeys({ screens: orderedOutcomeScreens, consumerPosition: 3 }).Problems,
+  /only available after/i,
+  "Problems is unavailable before the problems screen",
+);
+assert.ok(
+  validateCondition("[$Problems includes ('Airway')]", {
+    keys: scriptOutcomeKeys,
+    unavailableKeys: getUnavailableOutcomeKeys({ screens: orderedOutcomeScreens, consumerPosition: 3 }),
+  }).diagnostics.some((diagnostic) => diagnostic.code === "OUTCOME_NOT_AVAILABLE"),
+  "editor validation explains an outcome reference used before it exists",
+);
+assert.equal(
+  validateCondition("[$Diagnoses includes ('RDS')]", {
+    keys: [],
+    skipKeyResolution: true,
+    unavailableKeys: getUnavailableOutcomeKeys({ screens: [], consumerPosition: 1 }),
+  }).diagnostics.some((diagnostic) => diagnostic.code === "OUTCOME_NOT_AVAILABLE"),
+  false,
+  "availability errors stay suppressed while the key and screen catalogues are loading",
+);
+const partiallyConfiguredOutcomes = getUnavailableOutcomeKeys({
+  screens: [{ type: "problems", key: "Problems", title: "Compile problems", position: 1 }],
+  consumerPosition: 3,
+});
+assert.match(partiallyConfiguredOutcomes.Diagnoses, /no diagnosis screen/i, "a genuinely absent producer is explained");
+assert.equal(
+  partiallyConfiguredOutcomes.Problems,
+  undefined,
+  "a valid earlier producer remains available when the other outcome screen is absent",
+);
+assert.deepEqual(
+  getUnavailableOutcomeKeys({ screens: orderedOutcomeScreens, consumerPosition: null }),
+  {},
+  "an unknown consumer position must not manufacture ordering errors",
+);
+assert.equal(
+  getUnavailableOutcomeKeys({
+    screens: [{ type: "diagnosis", key: "Diagnoses", title: "Compile diagnoses", position: null }],
+    consumerPosition: 3,
+  }).Diagnoses,
+  undefined,
+  "an imported producer with an unknown position remains non-blocking",
+);
+assert.equal(
+  getUnavailableOutcomeKeys({
+    screens: [{ type: "diagnosis", key: "ClinicalDx", title: "Compile diagnoses", position: 2 }],
+    consumerPosition: 3,
+  }).Diagnoses,
+  undefined,
+  "the producer type supplies the virtual collection key without requiring stored-key backfills",
+);
+
+const reservedCollisions = collectOutcomeKeyCollisions({
+  screens: [
+    { screenId: "allowed", type: "diagnosis", key: "Diagnoses", title: "Diagnosis" },
+    { screenId: "bad", type: "form", key: "Problems", title: "Other form", fields: [{ key: "Diagnoses", label: "Bad field" }] },
+  ],
+  diagnoses: [{ diagnosisId: "bad-dx", key: "Problems", name: "Bad diagnosis" }],
+});
+assert.equal(reservedCollisions.length, 3, "reserved collection names remain blocked outside virtual outcome producers");
+assert.equal(
+  collectNewOutcomeKeyCollisions(
+    { screens: [{ screenId: "legacy", type: "form", fields: [{ fieldId: "field-1", key: "Diagnoses", label: "Renamed label" }] }] },
+    { screens: [{ screenId: "legacy", type: "form", fields: [{ fieldId: "field-1", key: "Diagnoses", label: "Old label" }] }] },
+  ).length,
+  0,
+  "an unchanged legacy reserved key is grandfathered when unrelated content changes",
+);
+assert.equal(
+  collectNewOutcomeKeyCollisions(
+    { screens: [{ screenId: "legacy", type: "form", fields: [{ fieldId: "field-1", key: "Problems" }] }] },
+    { screens: [{ screenId: "legacy", type: "form", fields: [{ fieldId: "field-1", key: "Diagnoses" }] }] },
+  ).length,
+  1,
+  "changing one reserved legacy key into another is still a newly introduced collision",
+);
+assert.equal(
+  collectNewOutcomeKeyCollisions({
+    diagnoses: [{ diagnosisId: "new-diagnosis", key: "Problems", name: "New collision" }],
+  }).length,
+  1,
+  "new entities cannot claim a reserved outcome collection name",
+);
+assert.equal(
+  collectOutcomeKeyCollisions({ screens: [{ type: "diagnosis", key: "Problems", title: "Legacy diagnosis screen" }] }).length,
+  0,
+  "legacy stored parent keys are ignored because outcome collection identity comes from screen type",
+);
+assert.equal(
+  collectOutcomeKeyCollisions({
+    screens: [{ type: "form", key: "Safe", items: [{ key: "Diagnoses", label: "Bad item" }] }],
+    diagnoses: [{ key: "SafeDiagnosis", symptoms: [{ key: "Problems", name: "Bad symptom" }] }],
+  }).length,
+  2,
+  "nested item and symptom keys cannot shadow virtual outcome collections",
+);
+
+// ---- Outcome reference impact and safe rename rewriting -------------------
+
+const renameExpression = "[$Diagnoses includes ('RDS', \"Sepsis\")] and $Other = 'RDS'";
+const renamed = rewriteOutcomeValueReferences(renameExpression, "Diagnoses", "RDS", "RespiratoryDistress");
+assert.equal(renamed.occurrences, 1, "only collection-bound values count as rename references");
+assert.equal(
+  renamed.expression,
+  "[$Diagnoses includes ('RespiratoryDistress', \"Sepsis\")] and $Other = 'RDS'",
+  "rename preserves the original delimiter and does not rewrite unrelated literals",
+);
+
+const referenceScript = {
+  scriptId: "script-1",
+  screens: [{
+    screenId: "screen-1",
+    scriptId: "script-1",
+    title: "After diagnoses",
+    condition: "[$Diagnoses includes ('RDS')]",
+    fields: [{ key: "FieldA", label: "Field A", condition: "$Sex = 'M'" }],
+    items: [{ key: "ItemA", label: "Item A", condition: "[$Diagnoses includes ('RDS')]" }],
+  }],
+  diagnoses: [{
+    diagnosisId: "dx-1",
+    scriptId: "script-1",
+    key: "RDS",
+    expression: "$Temp > 37",
+    symptoms: [{ key: "Tachypnoea", name: "Tachypnoea", expression: "[$Diagnoses includes ('RDS')]" }],
+  }],
+  problems: [{
+    problemId: "problem-1",
+    scriptId: "script-1",
+    expression: "[$Diagnoses excludes ('RDS')]",
+    symptoms: [{ key: "WorkOfBreathing", name: "Work of breathing", expression: "[$Diagnoses includes ('RDS')]" }],
+  }],
+};
+assert.equal(
+  collectScriptOutcomeReferences(referenceScript, "Diagnoses", ["RDS"]).length,
+  5,
+  "impact preview reports top-level, item, and symptom expressions that reference an outcome value",
+);
+const referencePatches = buildScriptOutcomeReferencePatches(referenceScript, "Diagnoses", "RDS", "RDS_NEW");
+assert.equal(referencePatches.occurrences, 5, "rewrite reports the exact occurrence count");
+assert.equal(referencePatches.screens[0].condition, "[$Diagnoses includes ('RDS_NEW')]", "screen condition is patched");
+assert.equal(referencePatches.screens[0].items[0].condition, "[$Diagnoses includes ('RDS_NEW')]", "screen item condition is patched");
+assert.equal(referencePatches.diagnoses[0].symptoms[0].expression, "[$Diagnoses includes ('RDS_NEW')]", "diagnosis symptom is patched");
+assert.equal(referencePatches.problems[0].expression, "[$Diagnoses excludes ('RDS_NEW')]", "problem expression is patched");
+assert.equal(referencePatches.problems[0].symptoms[0].expression, "[$Diagnoses includes ('RDS_NEW')]", "problem symptom is patched");
+
 // ---- A key on its own (nothing after it) is rejected -----------------------
 
 assert.ok(codes("$Gestation").includes("STANDALONE_EXPRESSION"), "bare key flagged");
@@ -84,6 +604,33 @@ assert.ok(
   codes("$AnyKey = ''", { keys: [], allowSelf: true, skipKeyResolution: true }).includes("EMPTY_VALUE"),
   "empty value flagged while keys load",
 );
+
+for (const expression of ["$Name = ''White''", '$Name = ""White""']) {
+  const result = validateCondition(expression, ctx);
+  const diagnostic = result.diagnostics.find((d) => d.code === "DOUBLED_QUOTED_VALUE");
+  assert.equal(result.hasErrors, true, "doubled quote marks remain blocking because the runtime syntax is invalid");
+  assert.equal(diagnostic?.suggestion, "'White'", "doubled quote marks receive a canonical replacement");
+  assert.equal(
+    result.diagnostics.some((d) => d.code === "EMPTY_VALUE" || d.code === "UNEXPECTED_TOKEN"),
+    false,
+    "doubled quote marks should not produce misleading secondary errors",
+  );
+}
+
+for (const [expression, suggestion] of [
+  [`$Name = "hello'`, '"hello"'],
+  [`$Name = 'hello"`, "'hello'"],
+]) {
+  const result = validateCondition(expression, ctx);
+  const diagnostic = result.diagnostics.find((d) => d.code === "MISMATCHED_QUOTED_VALUE");
+  assert.equal(result.hasErrors, true, "mismatched quote marks remain blocking because the runtime syntax is invalid");
+  assert.equal(diagnostic?.suggestion, suggestion, "mismatched quote marks receive a matching replacement");
+  assert.equal(
+    result.diagnostics.some((d) => d.code === "UNTERMINATED_STRING" || d.code === "UNEXPECTED_TOKEN"),
+    false,
+    "mismatched quote marks should not produce a misleading unterminated or unexpected-token error",
+  );
+}
 
 // ---- Semantic: the headline bug (typo'd key) --------------------------------
 
@@ -211,7 +758,11 @@ assert.equal(
 );
 const badOption = errors("[$Diagnoses includes ('LBWW')]", listCtx).find((d) => d.code === "UNKNOWN_OPTION");
 assert.ok(badOption, "typo'd list option errors");
-assert.equal(badOption?.suggestion, "LBW", "suggests the closest option");
+assert.equal(
+  badOption?.suggestion,
+  "'LBW'",
+  "suggests the closest option, quoted so it can replace the literal it spans",
+);
 assert.equal(validateCondition("[$Diagnoses includes ('LBWW')]", listCtx).hasErrors, true, "bad option blocks save");
 assert.ok(
   warnings("[$Diagnoses includes ('LBW','LBW')]", listCtx).some((d) => d.code === "DUPLICATE_VALUE"),
@@ -312,12 +863,13 @@ assert.equal(collision.length, 1, "base/extra case-insensitive collision merges"
 assert.equal(collision[0].dataType, "text", "local dataType wins over persisted");
 
 const fallback = mergeConditionKeys(
-  [{ name: "A", label: "A - persisted", dataType: "number" }],
+  [{ name: "A", label: "A - persisted", dataType: "number", optionLabels: { x: "Option X" } }],
   [{ name: "A" }],
 );
 assert.equal(fallback.length, 1, "fallback merges to one");
 assert.equal(fallback[0].label, "A - persisted", "keeps persisted label when local omits it");
 assert.equal(fallback[0].dataType, "number", "keeps persisted dataType when local omits it");
+assert.deepEqual(fallback[0].optionLabels, { x: "Option X" }, "keeps persisted option labels when local omits them");
 
 assert.equal(mergeConditionKeys([{ name: "" }], [{ name: "  " }]).length, 0, "blank names dropped");
 
@@ -396,6 +948,64 @@ assert.equal(
   "clean script has no CE errors",
 );
 
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: scriptKeys,
+    screens: [{ condition: "!($Sex = 'M')" }],
+  }),
+  0,
+  "deprecated legacy negation warnings should not count as blocking script errors",
+);
+
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: [],
+    diagnoses: [{ key: "RDS", name: "Respiratory distress syndrome", position: 1 }],
+    problems: [{ key: "Airway", name: "Airway problem", position: 1 }],
+    screens: [
+      { type: "diagnosis", key: "Diagnoses", title: "Diagnoses", position: 1 },
+      { type: "problems", key: "Problems", title: "Problems", position: 2 },
+      { type: "management", key: "Plan", title: "Plan", position: 3, condition: "[$Diagnoses includes ('RDS')] and [$Problems includes ('Airway')]" },
+    ],
+  }),
+  0,
+  "publish validation should use the same script-scoped diagnosis and problem options as the editor",
+);
+
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: [],
+    diagnoses: [{ key: "RDS", name: "Respiratory distress syndrome", position: 1 }],
+    screens: [
+      { type: "diagnosis", key: "Diagnoses", title: "Diagnoses", position: 1 },
+      { type: "management", key: "Plan", title: "Plan", position: 2, condition: "[$Diagnoses includes ('NotInThisScript')]" },
+    ],
+  }),
+  1,
+  "publish validation should reject diagnosis values that are not defined by this script",
+);
+
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: [],
+    diagnoses: [{ key: "RDS", name: "Respiratory distress syndrome", position: 1 }],
+    screens: [
+      { type: "management", key: "Early", title: "Too early", position: 1, condition: "[$Diagnoses includes ('RDS')]" },
+      { type: "diagnosis", key: "Diagnoses", title: "Diagnoses", position: 2 },
+    ],
+  }),
+  1,
+  "publish validation blocks a runtime outcome reference before its producer screen",
+);
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: [{ name: "Problems", label: "Unrelated form value", dataType: "text" }],
+    screens: [{ type: "form", key: "Problems", title: "Conflicting form", position: 1 }],
+  }),
+  1,
+  "publish validation blocks real keys that shadow a reserved outcome collection",
+);
+
 // Distinct broken expressions counted once each (unknown key + missing operand).
 assert.equal(
   getScriptConditionErrorCount({
@@ -404,6 +1014,15 @@ assert.equal(
   }),
   2,
   "counts each broken expression once",
+);
+assert.equal(
+  getScriptConditionErrorCount({
+    dataKeys: scriptKeys,
+    screens: [{ title: "Items", items: [{ label: "Bad item", condition: "$MissingItemKey = 'x'" }] }],
+    diagnoses: [{ name: "Diagnosis", symptoms: [{ name: "Bad symptom", expression: "$MissingSymptomKey = 'x'" }] }],
+  }),
+  2,
+  "publish validation includes nested screen-item and CDS symptom expressions",
 );
 
 // NUID conditions resolve against the NUID fields' LINKED registry keys
@@ -447,16 +1066,92 @@ assert.equal(
   "unknown NUID reference is counted",
 );
 
-// No keys at all -> key checks are skipped (only syntax), so no false positives.
+// No keys at all -> the script catalogue is authoritative (callers load it in
+// full), so an unknown reference is still flagged rather than skipped.
 assert.equal(
   getScriptConditionErrorCount({ dataKeys: [], screens: [{ condition: "$Anything = 'x'" }] }),
-  0,
-  "empty key catalogue does not false-flag references",
+  1,
+  "empty key catalogue still flags unknown references",
 );
 assert.equal(
   getScriptConditionErrorCount({ dataKeys: [], screens: [{ condition: "$Anything = 'x' or" }] }),
   1,
   "syntax errors still counted with empty key catalogue",
 );
+
+// ---- Quick fixes are applicable: applying one must clean up the expression --
+//
+// Mirrors ConditionEditor.applySuggestion exactly (a raw splice over the
+// diagnostic's own span), so a suggestion that does not fit its span fails here
+// rather than silently corrupting a user's condition.
+
+const applyFix = (input: string, d: Diagnostic) =>
+  `${input.slice(0, d.start)}${d.suggestion}${input.slice(d.end)}`;
+
+const fixFor = (input: string, code: string, c: ValidationContext = ctx): Diagnostic => {
+  const found = validateCondition(input, c).diagnostics.find((d) => d.code === code);
+  assert.ok(found, `${code} raised for ${JSON.stringify(input)}`);
+  assert.notEqual(found!.suggestion, undefined, `${code} carries an applicable suggestion`);
+  return found!;
+};
+
+for (const [code, input, expected, c] of [
+  // The span covers the quotes, so the replacement must carry its own.
+  ["UNKNOWN_OPTION", "$Sex = 'X'", "$Sex = 'M'", ctx],
+  ["UNQUOTED_VALUE", "$Name = White", "$Name = 'White'", ctx],
+  ["VALUE_WHITESPACE", "$Name = 'White '", "$Name = 'White'", ctx],
+  ["TRAILING_WHITESPACE", "$Sex = 'M' ", "$Sex = 'M'", ctx],
+  ["UNQUOTED_VALUE", "[$Diagnoses includes (LBW)]", "[$Diagnoses includes ('LBW')]", listCtx],
+  ["DUPLICATE_VALUE", "[$Diagnoses includes ('LBW','LBW')]", "[$Diagnoses includes ('LBW')]", listCtx],
+  ["MEMBERSHIP_BRACKETS", "$Diagnoses includes ('LBW')", "[$Diagnoses includes ('LBW')]", listCtx],
+] as [string, string, string, ValidationContext][]) {
+  const fixed = applyFix(input, fixFor(input, code, c));
+  assert.equal(fixed, expected, `${code}: applying the fix rewrites the span correctly`);
+  const after = validateCondition(fixed, c);
+  assert.equal(
+    after.diagnostics.length,
+    0,
+    `${code}: the fixed expression is clean, got ${after.diagnostics.map((d) => d.code).join(", ")}`,
+  );
+}
+
+// A deletion fix is the empty string — present, but falsy. The editor tests for
+// absence (`!== undefined`), so these must not be conflated.
+assert.equal(fixFor("$Sex = 'M' ", "TRAILING_WHITESPACE").suggestion, "", "trailing whitespace deletes its span");
+assert.equal(
+  fixFor("[$Diagnoses includes ('LBW','LBW')]", "DUPLICATE_VALUE", listCtx).suggestion,
+  "",
+  "duplicate value deletes its span",
+);
+
+// The duplicate's span has to swallow the separating comma, or deleting it
+// would leave "('LBW',)".
+const dupFix = fixFor("[$Diagnoses includes ('LBW', 'LBW')]", "DUPLICATE_VALUE", listCtx);
+assert.equal(
+  "[$Diagnoses includes ('LBW', 'LBW')]".slice(dupFix.start, dupFix.end),
+  ", 'LBW'",
+  "duplicate span covers the preceding comma",
+);
+
+// Suggestions are omitted (not empty) when no safe fix exists.
+assert.equal(
+  validateCondition("$Sex = 'Nowhere near an option'", ctx)
+    .diagnostics.find((d) => d.code === "UNKNOWN_OPTION")?.suggestion,
+  undefined,
+  "no close option match offers no fix",
+);
+assert.equal(
+  validateCondition("$Diagnoses includes ('LBW') and $Sex = 'M'", listCtx)
+    .diagnostics.find((d) => d.code === "MEMBERSHIP_BRACKETS" && d.severity === "error")?.suggestion,
+  undefined,
+  "a membership combined with and/or needs restructuring, so offers no fix",
+);
+
+// ---- Shared quoting helper (one implementation, two entry points) -----------
+
+assert.equal(quoteTextValue("LBW"), "'LBW'", "quoteTextValue prefers single quotes");
+assert.equal(quoteTextValue("Mother's"), '"Mother\'s"', "quoteTextValue falls back to double quotes");
+assert.equal(quoteTextValue("a'b\"c`d"), undefined, "quoteTextValue gives up when every delimiter is present");
+assert.equal(quoteValue("a'b\"c`d"), "'ab\"c`d'", "quoteValue always returns a literal, stripping ' as a last resort");
 
 console.log("conditional-expression: all assertions passed");
