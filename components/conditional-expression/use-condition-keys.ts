@@ -37,6 +37,6 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
   return {
     conditionKeys,
     keysLoading: false,
-    keysReady: conditionKeys.length > 0,
+    keysReady: true,
   };
 }

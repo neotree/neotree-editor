@@ -31,7 +31,7 @@ export function ScriptFormCtxProvider({ children, ...props }: ScriptFormCtxProps
 }
 
 function useScriptFormCtxValue({ conditionKeys, ...props }: Omit<ScriptFormCtxProps, 'children'>) {
-    const [conditionCatalogueReady, setConditionCatalogueReady] = useState(true);
+    const [conditionCatalogueReady] = useState(true);
 
     const conditionKeysParsed = useMemo(() => {
         return {
