@@ -15,6 +15,7 @@ import { ScriptsTableSearch } from "../scripts-table-search";
 import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
 import { useScriptsContext } from "@/contexts/scripts";
 import { getOutcomeProducer, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { useScriptFormCtx } from "@/contexts/script-form";
 
 type Props = UseDiagnosesTableParams;
 
@@ -38,7 +39,7 @@ export function DiagnosesTable(props: Props) {
 
     const { sys, viewOnly } = useAppContext();
     const { conditionKeys, keysReady } = useConditionKeys();
-    const { conditionScreens, conditionCatalogueReady } = useScriptsContext();
+    const { conditionScreens, conditionCatalogueReady } = useScriptFormCtx();
     const producer = getOutcomeProducer(conditionScreens, "Diagnoses");
     const unavailableOutcomeKeys = getUnavailableOutcomeKeys({
         screens: conditionScreens,
