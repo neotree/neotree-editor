@@ -14,14 +14,14 @@ type Props = {
 
 export function ScriptPrintSetup(props: Props) {
     const mounted = useRef(false);
-    const { keysLoading, screensLoading, loadScreens, loadKeys, } = useScriptsContext();
+    const { keysLoading, screensLoading, loadScreens, } = useScriptsContext();
 
     useEffect(() => {
         if (!mounted.current) {
+            mounted.current = true;
             loadScreens();
-            loadKeys();
         }
-    }, [loadScreens, loadKeys]);
+    }, [loadScreens]);
 
     if (keysLoading || screensLoading) return <Loader overlay />;
 
