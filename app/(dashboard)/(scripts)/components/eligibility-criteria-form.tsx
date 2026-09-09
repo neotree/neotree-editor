@@ -1,11 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { PlusIcon } from "lucide-react"
 
 import type { EligibilityCriteria } from "@/types"
-import type { ConditionKey } from "@/lib/conditional-expression"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,10 +13,13 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTi
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { ReactSelect } from "@/components/react-select"
-import { ConditionEditor } from "@/components/conditional-expression"
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
 import { useScriptsContext } from "@/contexts/scripts"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { FieldItems } from "./screens/field-items"
+import { getPreScriptUnavailableOutcomeKeys } from "@/lib/conditional-expression"
+
+const preScriptUnavailableOutcomeKeys = getPreScriptUnavailableOutcomeKeys()
 
 type Props = {
   disabled: boolean
@@ -48,7 +50,8 @@ const yesNoItems: NonNullable<EligibilityCriteria["items"]> = [
 
 export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }: Props) {
   const [open, setOpen] = useState(false)
-  const { keys, loadKeys, keysLoading } = useScriptsContext()
+  const { keys, keysLoading } = useScriptsContext()
+  const { conditionKeys, keysReady: conditionKeysReady } = useConditionKeys({ enabled: open })
   const safeKeys = useMemo(() => {
     try {
       return { options: getKeyOptions(keys), error: "" }
@@ -61,10 +64,6 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
   }, [keys])
 
   const hasCriteria = !!value?.criteria_type && !!value?.criteria_label
-
-  useEffect(() => {
-    if (open) loadKeys()
-  }, [loadKeys, open])
 
   return (
     <>
@@ -81,6 +80,8 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
         <Form
           value={value || null}
           keyOptions={safeKeys.options}
+          conditionKeys={conditionKeys}
+          conditionKeysReady={conditionKeysReady}
           keyOptionsError={safeKeys.error}
           keysLoading={keysLoading}
           onClose={() => setOpen(false)}
@@ -97,6 +98,8 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
 function Form({
   value,
   keyOptions,
+  conditionKeys,
+  conditionKeysReady,
   keyOptionsError,
   keysLoading,
   onClose,
@@ -104,6 +107,8 @@ function Form({
 }: {
   value: EligibilityCriteria | null
   keyOptions: KeyOption[]
+  conditionKeys: ReturnType<typeof useConditionKeys>["conditionKeys"]
+  conditionKeysReady: boolean
   keyOptionsError: string
   keysLoading: boolean
   onClose: () => void
@@ -255,10 +260,6 @@ function Form({
       !!currentPayload.alternative_criteria_type &&
       !!currentPayload.alternative_criteria_label &&
       !!currentPayload.alternative_criteria_condition)
-  const conditionKeys = useMemo<ConditionKey[]>(
-    () => keyOptions.map((option) => ({ name: option.value, label: option.label, dataType: option.dataType })),
-    [keyOptions],
-  )
   const initialCriteriaCondition = value?.criteria_condition || ""
   const initialAlternativeCondition = value?.alternative_criteria_condition || ""
   const hasChanged = JSON.stringify(currentPayload) !== JSON.stringify(originalPayload)
@@ -383,6 +384,8 @@ function Form({
                   onChange={(next) => onChange(next)}
                   keys={conditionKeys}
                   keysLoading={keysLoading}
+                  keysReady={conditionKeysReady}
+                  unavailableKeys={preScriptUnavailableOutcomeKeys}
                   allowSelf
                   selfDataType={criteriaType}
                   initialValue={initialCriteriaCondition}
@@ -563,6 +566,8 @@ function Form({
                         onChange={(next) => onChange(next)}
                         keys={conditionKeys}
                         keysLoading={keysLoading}
+                        keysReady={conditionKeysReady}
+                        unavailableKeys={preScriptUnavailableOutcomeKeys}
                         allowSelf
                         selfDataType={alternativeCriteriaType}
                         initialValue={initialAlternativeCondition}

@@ -1,6 +1,7 @@
 import type { Diagnostic, ValidationContext, ValidationResult } from "./ast";
 import { parse } from "./parser";
 import { analyze } from "./semantics";
+import { findLegacyNegationDiagnostics } from "./legacy";
 
 export type {
   ConditionKey,
@@ -13,6 +14,34 @@ export type {
 export { validateReferenceExpression } from "./reference-expr";
 export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
+export { quoteTextValue, quoteValue } from "./quote";
+export { buildScriptConditionKeys, type BuildScriptConditionKeysInput } from "./script-keys";
+export {
+  getConfigurationConditionKeySignature,
+  toConfigurationConditionKeys,
+  type ConfigurationConditionKeySource,
+} from "./configuration-keys";
+export {
+  OUTCOME_COLLECTIONS,
+  collectNewOutcomeKeyCollisions,
+  collectOutcomeKeyCollisions,
+  getOutcomeCollectionForScreenType,
+  getOutcomeProducer,
+  getOutcomeProducers,
+  getPreScriptUnavailableOutcomeKeys,
+  getUnavailableOutcomeKeys,
+  isOutcomeCollectionName,
+  type OutcomeCollectionName,
+  type OutcomeKeyCollision,
+  type OutcomeProducers,
+} from "./script-outcomes";
+export {
+  buildScriptOutcomeReferencePatches,
+  collectScriptOutcomeReferences,
+  rewriteOutcomeValueReferences,
+  type OutcomeReferenceFinding,
+  type ScriptOutcomeReferencePatches,
+} from "./outcome-references";
 export {
   compareConditions,
   compareConditionSet,
@@ -42,6 +71,7 @@ function findTrailingWhitespace(input: string): Diagnostic[] {
         message: "Remove trailing spaces.",
         start: offset + withoutTrailing.length,
         end: offset + line.length,
+        suggestion: "",
       });
     }
     offset += line.length + 1; // account for the newline
@@ -60,10 +90,11 @@ export function validateCondition(input: string, ctx: ValidationContext): Valida
   if (!src.trim()) return { diagnostics: [], hasErrors: false, ast: null };
 
   const { ast, diagnostics: syntax } = parse(src);
-  const semantic = analyze(ast, ctx);
+  const semantic = analyze(ast, ctx, src);
+  const legacy = findLegacyNegationDiagnostics(ast, src);
   const whitespace = findTrailingWhitespace(src);
 
-  const diagnostics: Diagnostic[] = [...syntax, ...semantic, ...whitespace].sort(
+  const diagnostics: Diagnostic[] = [...syntax, ...legacy, ...semantic, ...whitespace].sort(
     (a, b) => a.start - b.start || (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1),
   );
 

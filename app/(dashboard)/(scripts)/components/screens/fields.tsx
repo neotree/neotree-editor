@@ -20,25 +20,29 @@ import { Field } from "./field";
 import { useConditionKeys } from "@/components/conditional-expression";
 import { useFieldKeyCollisions } from "@/components/field-key-collisions";
 import { ScriptIssueBadge, collisionIssues, conditionIssues } from "@/components/script-issues";
+import type { ScriptField } from "@/types";
 
 type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
     scriptId? : string;
+    unavailableOutcomeKeys?: Record<string, string>;
+    persistedFields?: ScriptField[];
 };
 
 export function Fields({
     form,
     disabled,
-    scriptId
+    scriptId,
+    unavailableOutcomeKeys,
+    persistedFields = [],
 }: Props) {
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const [manualOnly, setManualOnly] = useState(false);
     const [missingManualLabelOnly, setMissingManualLabelOnly] = useState(false);
     const { confirm } = useConfirmModal();
-    const { conditionKeys } = useConditionKeys();
-    const keysReady = conditionKeys.length > 0;
+    const { conditionKeys, keysReady } = useConditionKeys();
 
     const fields = form.watch('fields');
     const repeatable = form.watch('repeatable');
@@ -180,6 +184,9 @@ export function Fields({
     const resolvedFieldIndex = activeFieldIndex >= 0
         ? activeFieldIndex
         : (isNumericQueryValue(currentField) ? Number(currentField) : parsedCurrentFieldIndex);
+    const baselineField = activeField?.fieldId
+        ? persistedFields.find((field) => field?.fieldId === activeField.fieldId)
+        : (resolvedFieldIndex !== null && resolvedFieldIndex >= 0 ? persistedFields[resolvedFieldIndex] : undefined);
 
     return (
         <>
@@ -191,6 +198,8 @@ export function Fields({
                     onClose={closeFieldEditor}
                     form={form}
                     scriptId={scriptId}
+                    unavailableOutcomeKeys={unavailableOutcomeKeys}
+                    baselineField={baselineField}
                     disabled={disabled}
                     field={!activeField || resolvedFieldIndex === null || resolvedFieldIndex < 0 ? undefined : {
                         data: activeField,
@@ -280,6 +289,7 @@ export function Fields({
                                                     keys: conditionKeys,
                                                     extraKeys: siblingConditionKeys,
                                                     keysReady,
+                                                    unavailableKeys: unavailableOutcomeKeys,
                                                     expressions: [
                                                         { value: field.condition, label: 'Condition', allowSelf: true },
                                                         { value: (field as { calculation?: string }).calculation, label: 'Reference expression', mode: 'reference' },

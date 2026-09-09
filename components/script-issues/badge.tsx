@@ -31,6 +31,8 @@ export function conditionIssues(params: {
   keys: ConditionKey[];
   extraKeys?: ConditionKey[];
   keysReady?: boolean;
+  /** Reasons known keys cannot exist at this runtime point (outcome ordering). */
+  unavailableKeys?: Record<string, string>;
   href?: string;
 }): ScriptIssue[] {
   return collectConditionErrorMessages(params).map((message) => ({
