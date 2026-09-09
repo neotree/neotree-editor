@@ -30,6 +30,7 @@ type AppContextProviderProps = Omit<typeof opsActions, 'setMode' | 'getMode'> &
     Awaited<ReturnType<typeof getAuthenticatedUserWithRoles>> &
     {
         sys: Awaited<ReturnType<typeof sysActions.getSys>>;
+        sites: Awaited<ReturnType<typeof getSitesWithoutConfidentialData>>['data'];
         getSites: typeof getSitesWithoutConfidentialData;
     };
 
