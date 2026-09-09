@@ -1,4 +1,4 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/mdm/sync/route.ts
+// File: /home/wilson/development/neotree/neotree-editor/app/api/mdm/sync/route.ts
 import * as entry from '../../../../../../app/api/mdm/sync/route.js'
 import type { NextRequest } from 'next/server.js'
 
