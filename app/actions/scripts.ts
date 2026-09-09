@@ -1847,6 +1847,14 @@ async function saveScriptScreens({
         if (script.errors?.length) throw new Error(script.errors.join(', '));
         if (!script.data) throw new Error('Script not found');
 
+        const images: { data: string; }[] = [];
+
+        screens.forEach(s => {
+            if (s.image1) images.push(s.image1);
+            if (s.image2) images.push(s.image2);
+            if (s.image3) images.push(s.image3);
+        });
+
         for (const screen of screens) {
             const {
                 id,
