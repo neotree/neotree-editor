@@ -29,7 +29,7 @@ export function useProblemForm({
 
     const [saving, setSaving] = useState(false);
 
-    const { saveProblems, reloadKeys } = useScriptsContext();
+    const { saveProblems } = useScriptsContext();
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
     const { viewOnly } = useAppContext();
@@ -96,7 +96,6 @@ export function useProblemForm({
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 
-            await reloadKeys();
             router.refresh();
             alert({
                 variant: 'success',
