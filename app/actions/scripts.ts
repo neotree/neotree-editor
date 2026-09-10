@@ -555,29 +555,25 @@ async function getScriptConditionInputStamps(scriptIds: string[]): Promise<Map<s
     if (!scriptIds.length) return stamps;
 
     try {
-        const [rows, draftRows] = await Promise.all([
-            db
-                .select({
-                    scriptId: scriptsTable.scriptId,
-                    nuidSearchFields: scriptsTable.nuidSearchFields,
-                    eligibilityCriteria: scriptsTable.eligibilityCriteria,
-                })
-                .from(scriptsTable)
-                .where(inArray(scriptsTable.scriptId, scriptIds)),
-            db
-                .select({ scriptId: scriptsDrafts.scriptId, data: scriptsDrafts.data })
-                .from(scriptsDrafts)
-                .where(inArray(scriptsDrafts.scriptId, scriptIds)),
-        ]);
+        // One join rather than a published read plus a drafts read: this runs on
+        // every cached-report check, so the extra round trip showed up on every
+        // scripts-list load.
+        const rows = await db
+            .select({
+                scriptId: scriptsTable.scriptId,
+                nuidSearchFields: scriptsTable.nuidSearchFields,
+                eligibilityCriteria: scriptsTable.eligibilityCriteria,
+                draftData: scriptsDrafts.data,
+            })
+            .from(scriptsTable)
+            .leftJoin(scriptsDrafts, eq(scriptsDrafts.scriptId, scriptsTable.scriptId))
+            .where(inArray(scriptsTable.scriptId, scriptIds));
 
         for (const row of rows) {
             const id = `${row.scriptId || ''}`;
-            if (id) stamps.set(id, getScriptConditionInputsStamp(row as any));
-        }
-        // A draft supersedes its published row, matching the draft-inclusive report.
-        for (const row of draftRows) {
-            const id = `${row.scriptId || ''}`;
-            if (id) stamps.set(id, getScriptConditionInputsStamp((row.data || {}) as any));
+            if (!id) continue;
+            // A draft supersedes its published row, matching the draft-inclusive report.
+            stamps.set(id, getScriptConditionInputsStamp((row.draftData || row) as any));
         }
     } catch (e: any) {
         logger.error('getScriptConditionInputStamps ERROR', e?.message);
