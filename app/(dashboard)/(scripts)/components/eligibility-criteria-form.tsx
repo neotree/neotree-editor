@@ -18,6 +18,7 @@ import { useScriptsContext } from "@/contexts/scripts"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { FieldItems } from "./screens/field-items"
 import { getPreScriptUnavailableOutcomeKeys } from "@/lib/conditional-expression"
+import { useScriptFormCtx } from "@/contexts/script-form"
 
 const preScriptUnavailableOutcomeKeys = getPreScriptUnavailableOutcomeKeys()
 
@@ -50,7 +51,7 @@ const yesNoItems: NonNullable<EligibilityCriteria["items"]> = [
 
 export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }: Props) {
   const [open, setOpen] = useState(false)
-  const { keys, keysLoading } = useScriptsContext()
+  const { keys } = useScriptFormCtx()
   const { conditionKeys, keysReady: conditionKeysReady } = useConditionKeys({ enabled: open })
   const safeKeys = useMemo(() => {
     try {
@@ -83,7 +84,7 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
           conditionKeys={conditionKeys}
           conditionKeysReady={conditionKeysReady}
           keyOptionsError={safeKeys.error}
-          keysLoading={keysLoading}
+          keysLoading={false}
           onClose={() => setOpen(false)}
           onChange={async (nextValue) => {
             const saved = await onChange(nextValue)

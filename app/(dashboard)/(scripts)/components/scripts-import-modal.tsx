@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/modal";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useSites } from "@/hooks/use-sites";
+import { useAppContext } from "@/contexts/app";
 import { ErrorCard } from "@/components/error-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -57,11 +57,11 @@ export function ScriptsImportModal({
 
     const [loading, setLoading] = useState(false);
     const [importReview, setImportReview] = useState<NonNullable<Awaited<ReturnType<typeof copyScripts>>['integrityImportReview']> | null>(null);
-    const { sites, loading: sitesLoading, } = useSites({
-        onLoadSitesError: () => onOpenChange(false),
-    });
+    
+    const { sites: _sites } = useAppContext();
+    const sites = _sites.filter(s => s.type === 'webeditor');
 
-    const isLoading = sitesLoading || loading;
+    const isLoading = loading;
     const disabled = isLoading;
     const isOverwriteImport = !!overWriteScriptWithId;
 

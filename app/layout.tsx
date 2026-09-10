@@ -51,10 +51,12 @@ export default async function RootLayout({
         editorDetails,
         authenticatedUser,
         sys,
+        sites,
     ] = await Promise.all([
         opsActions.getEditorDetails(),
         getAuthenticatedUserWithRoles(),
         getSys(),
+        getSitesWithoutConfidentialData()
     ]);
 
     return (
@@ -74,6 +76,7 @@ export default async function RootLayout({
                                 {...editorDetails}
                                 {...authenticatedUser}
                                 {...dataKeysActions}
+                                sites={sites.data || []}
                                 sys={sys}
                                 getSites={getSitesWithoutConfidentialData}
                             >
