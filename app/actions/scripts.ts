@@ -583,28 +583,50 @@ async function getScriptConditionInputStamps(scriptIds: string[]): Promise<Map<s
 }
 
 
+type ConditionReportStamps = {
+    contentStamps: Map<string, string>;
+    inputStamps: Map<string, string>;
+};
+
+/**
+ * The stamp reads, which depend on nothing but the script ids.
+ *
+ * Separated from signature assembly so a caller can start them alongside its
+ * own reads — the Configuration keys and the cached reports — instead of
+ * waiting for those first. Only the final hash needs the Configuration
+ * signature, and by then everything is already in hand.
+ */
+async function fetchConditionReportStamps(ids: string[]): Promise<ConditionReportStamps> {
+    const [contentStamps, inputStamps] = await Promise.all([
+        getScriptContentStamps(ids),
+        getScriptConditionInputStamps(ids),
+    ]);
+    return { contentStamps, inputStamps };
+}
+
+function buildConditionReportSignatures(
+    ids: string[],
+    configurationSignature: string,
+    stamps: ConditionReportStamps,
+): Map<string, string> {
+    const expected = new Map<string, string>();
+    for (const id of ids) {
+        expected.set(id, buildConditionReportSignature({
+            configuration: configurationSignature,
+            inputs: stamps.inputStamps.get(id) || '',
+            content: stamps.contentStamps.get(id) || '',
+        }));
+    }
+    return expected;
+}
+
 async function resolveConditionReportSignatures(
     scriptIds: (string | null | undefined)[],
     configurationSignature: string,
 ): Promise<Map<string, string>> {
     const ids = Array.from(new Set((scriptIds || []).map((id) => `${id || ''}`).filter(Boolean)));
-    const expected = new Map<string, string>();
-    if (!ids.length) return expected;
-
-    const [contentStamps, inputStamps] = await Promise.all([
-        getScriptContentStamps(ids),
-        getScriptConditionInputStamps(ids),
-    ]);
-
-    for (const id of ids) {
-        expected.set(id, buildConditionReportSignature({
-            configuration: configurationSignature,
-            inputs: inputStamps.get(id) || '',
-            content: contentStamps.get(id) || '',
-        }));
-    }
-
-    return expected;
+    if (!ids.length) return new Map<string, string>();
+    return buildConditionReportSignatures(ids, configurationSignature, await fetchConditionReportStamps(ids));
 }
 
 function hrefForConditionEntity(scriptId: string, entity?: ScriptConditionEntityRef): string {
@@ -1478,23 +1500,26 @@ export async function getScriptsConditionErrors(
         const scriptIds = (scripts || []).map((s) => `${s?.scriptId || ''}`).filter(Boolean);
         if (!scriptIds.length) return { data: {}, errors: [] };
 
-        const configurationKeysRes = await _getConfigKeys({ returnDraftsIfExist: true });
+        // None of these three reads depends on the others, so they run together:
+        // run serially they made this call about twice as slow as it needed to be.
+        const [configurationKeysRes, reportRows, stamps] = await Promise.all([
+            _getConfigKeys({ returnDraftsIfExist: true }),
+            db
+                .select({ scriptId: scriptsTable.scriptId, report: scriptsTable.conditionErrorReport })
+                .from(scriptsTable)
+                .where(inArray(scriptsTable.scriptId, scriptIds))
+                // Column not migrated yet — fall through to computing everything lean.
+                .catch(() => [] as { scriptId: string; report: unknown }[]),
+            fetchConditionReportStamps(scriptIds),
+        ]);
         if (configurationKeysRes.errors?.length) throw new Error(configurationKeysRes.errors.join(", "));
         const configurationKeys = configurationKeysRes.data || [];
         const configurationSignature = getConfigurationConditionKeySignature(configurationKeys);
 
         const persisted = new Map<string, ScriptConditionReport | null>();
-        try {
-            const rows = await db
-                .select({ scriptId: scriptsTable.scriptId, report: scriptsTable.conditionErrorReport })
-                .from(scriptsTable)
-                .where(inArray(scriptsTable.scriptId, scriptIds));
-            for (const row of rows) persisted.set(`${row.scriptId}`, (row.report as ScriptConditionReport | null) || null);
-        } catch {
-            // Column not migrated yet — fall through to computing everything lean.
-        }
+        for (const row of reportRows) persisted.set(`${row.scriptId}`, (row.report as ScriptConditionReport | null) || null);
 
-        const signatures = await resolveConditionReportSignatures(scriptIds, configurationSignature);
+        const signatures = buildConditionReportSignatures(scriptIds, configurationSignature, stamps);
 
         const result: Record<string, ScriptConditionReport> = {};
         const missing: ScriptConditionErrorInput[] = [];
