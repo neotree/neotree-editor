@@ -18,6 +18,7 @@ export {
   CONDITION_REPORT_SIGNATURE_VERSION,
   buildConditionReportSignature,
   getScriptConditionInputsStamp,
+  isConditionCatalogueReady,
   type ConditionReportSignatureParts,
 } from "./report-signature";
 export { quoteTextValue, quoteValue } from "./quote";

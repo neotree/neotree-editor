@@ -33,7 +33,7 @@ export default async function ScriptPageLayout({ children, params: { scriptId, }
 
     return (
         <ScriptFormCtxProvider
-            conditionKeys={conditionKeys.data}
+            conditionKeys={conditionKeys.errors?.length ? undefined : conditionKeys.data}
             hospitals={hospitals.data}
             formData={formData}
         >

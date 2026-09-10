@@ -40,6 +40,7 @@ import {
 } from "@/lib/conditional-expression";
 import { buildScriptConditionKeys } from "@/lib/conditional-expression/script-keys";
 import { findScriptFieldKeyCollisions, type FieldKeyCollision } from "@/lib/field-key-collisions";
+import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
@@ -1323,7 +1324,9 @@ export async function getScriptsConditionKeys(
             db.select({ problemId: problemsDrafts.problemId, data: problemsDrafts.data })
                 .from(problemsDrafts)
                 .where(draftMatch(problemsDrafts.scriptId, problemsDrafts.scriptDraftId)),
-            _getDataKeys({ returnDraftsIfExist: true }),
+            // Shared with the group layout's prefetch for this request, so the
+            // registry is loaded once per page render rather than twice.
+            getConditionKeyRegistry(),
             _getConfigKeys({ returnDraftsIfExist: true }),
         ]);
 

@@ -9,7 +9,7 @@ import { canAccessPage } from "@/app/actions/is-allowed";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataKeysCtxProvider } from '@/contexts/data-keys';
-import { getDataKeys } from "@/app/actions/data-keys";
+import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 
 export default async function ScriptsLayout({ children }: {
     children: React.ReactNode;
@@ -35,7 +35,7 @@ export default async function ScriptsLayout({ children }: {
         dataKeys,
     ] = await Promise.all([
         getHospitals(),
-        getDataKeys(),
+        getConditionKeyRegistry(),
     ]);
 
     return (
