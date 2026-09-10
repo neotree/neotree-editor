@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { Loader } from '@/components/loader';
 import * as scriptsActions from '@/app/actions/scripts';
 import { ScreensTable } from './table';
-import logger from "@/lib/logger"
 
 type Props = {
     scriptId: string;
@@ -16,6 +15,7 @@ type Props = {
 };
 
 export default function Screens({ scriptId, disabled, isScriptLocked, scriptLockedByUserId, }: Props) {
+    const mounted = useRef(false);
     const [loading, setLoading] = useState(false);
     const [screens, setScreens] = useState<Awaited<ReturnType<typeof scriptsActions.getScreens>>>({ data: [], });
 
@@ -36,7 +36,12 @@ export default function Screens({ scriptId, disabled, isScriptLocked, scriptLock
         }
     }, [scriptId, alert]);
 
-    useEffect(() => { loadScreens(); }, [loadScreens]);
+    useEffect(() => {
+        if (!mounted.current) {
+            mounted.current = true;
+            loadScreens();
+        }
+    }, [loadScreens]);
 
     return (
         <>

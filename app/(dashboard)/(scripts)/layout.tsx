@@ -9,6 +9,7 @@ import { canAccessPage } from "@/app/actions/is-allowed";
 import { Content } from "@/components/content";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataKeysCtxProvider } from '@/contexts/data-keys';
+import { getDataKeys } from "@/app/actions/data-keys";
 
 export default async function ScriptsLayout({ children }: {
     children: React.ReactNode;
@@ -29,15 +30,22 @@ export default async function ScriptsLayout({ children }: {
         );
     }
 
-    const [hospitals] = await Promise.all([
+    const [
+        hospitals,
+        dataKeys,
+    ] = await Promise.all([
         getHospitals(),
+        getDataKeys(),
     ]);
 
     return (
         <>
             <Title>Scripts</Title>
 
-            <DataKeysCtxProvider>
+            <DataKeysCtxProvider
+                initialDataKeys={dataKeys.data || []}
+                prefetchDataKeys={false}
+            >
                 <ScriptsContextProvider
                     {...serverActions}
                     {...filesActions}

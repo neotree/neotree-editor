@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader } from "@/components/loader";
 import { ReactSelect } from "@/components/react-select";
 import { useScriptForm } from "../../hooks/use-script-form";
+import { useScriptFormCtx } from '@/contexts/script-form';
 
 type Props = {
     disabled?: boolean;
@@ -190,7 +191,7 @@ function HeaderPrintField({
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState(field || null);
 
-    const { keys, } = useScriptsContext();
+    const { keys, } = useScriptFormCtx();
 
     useEffect(() => { setSelected(field || null); }, [field]);
 

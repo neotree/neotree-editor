@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
-import { useScriptsContext } from "@/contexts/scripts";
 import { toConditionKeys, type ConditionKey } from "@/lib/conditional-expression";
+import { useScriptFormCtx } from "@/contexts/script-form";
 
 // Re-exported for existing importers (the shared implementation lives in lib).
 export { toConditionKeys };
@@ -22,17 +22,10 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
   /** True after the authoritative script catalogue has loaded, even if empty. */
   keysReady: boolean;
 } {
-  const ctx = useScriptsContext();
-  const keys = ctx?.keys;
-  const contextConditionKeys = ctx?.conditionKeys;
-  const keysLoading = ctx?.keysLoading ?? false;
-  const conditionCatalogueReady = ctx?.conditionCatalogueReady ?? false;
-  const loadKeys = ctx?.loadKeys;
-  const enabled = opts?.enabled ?? true;
-
-  useEffect(() => {
-    if (enabled && loadKeys) loadKeys();
-  }, [enabled, loadKeys]);
+  const { 
+    keys, 
+    conditionKeys: contextConditionKeys, 
+  } = useScriptFormCtx();
 
   const conditionKeys = useMemo<ConditionKey[]>(
     () => contextConditionKeys?.length
@@ -43,7 +36,7 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
 
   return {
     conditionKeys,
-    keysLoading,
-    keysReady: conditionCatalogueReady || conditionKeys.length > 0,
+    keysLoading: false,
+    keysReady: true,
   };
 }

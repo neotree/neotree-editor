@@ -1,47 +1,33 @@
-import { getHospitals } from "@/app/actions/hospitals";
-import { getScript } from "@/app/actions/scripts";
+'use client';
+
 import { Title } from "@/components/title";
-import { Alert } from "@/components/alert";
 import { EntityHistoryButton } from "@/app/(dashboard)/components/entity-history";
 import { ScriptForm } from "../../components/script-form";
 import { PageContainer } from "../../components/page-container";
+import { useScriptFormCtx } from "@/contexts/script-form";
 
-type Props = {
-    params: { scriptId: string; };
-    searchParams: { [key: string]: string; };
-};
+// export const dynamic = 'force-dynamic';
 
-export const dynamic = 'force-dynamic';
-
-export default async function Scripts({ params: { scriptId }, searchParams: { section } }: Props) {
-    const [hospitals, { data: formData }] = await Promise.all([
-        getHospitals(),
-        getScript({ scriptId, returnDraftIfExists: true, }),
-    ]);
-
-    if (!formData) {
-        return (
-            <Alert 
-                title="Not found"
-                message="Script was not found or it might have been deleted!"
-                redirectTo="/"
-            />
-        );
-    }
-
+export default async function ScriptEditPage() {
+    const { formData: fd, } = useScriptFormCtx();
+    const formData = fd!;
+    
     return (
         <>
-            <Title>{'Edit script - ' + formData.title}</Title>
+            <Title>{'Edit script - ' + formData?.title}</Title>
 
             <PageContainer
                 title="Edit script"
                 backLink="/"
-                actions={<EntityHistoryButton entityType="script" entityId={scriptId} entityName={formData.title} />}
+                actions={(
+                    <EntityHistoryButton 
+                        entityType="script" 
+                        entityId={formData.scriptId!} 
+                        entityName={formData.title} 
+                    />
+                )}
             >
-                <ScriptForm 
-                    hospitals={hospitals.data}
-                    formData={formData} 
-                />
+                <ScriptForm />
             </PageContainer>
         </>
     )

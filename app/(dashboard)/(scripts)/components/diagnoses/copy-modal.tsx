@@ -34,7 +34,7 @@ export function CopyDiagnosesModal({
     const router = useRouter();
     const routeParams = useParams();
 
-    const { copyDiagnoses, getScripts, reloadKeys } = useScriptsContext();
+    const { copyDiagnoses, getScripts } = useScriptsContext();
     const { alert } = useAlertModal();
 
     const [loading, setLoading] = useState(false);
@@ -99,8 +99,6 @@ export function CopyDiagnosesModal({
             const res = response.data as Awaited<ReturnType<typeof copyDiagnoses>>;
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
-
-            if (`${routeParams?.scriptId || ''}` === data.scriptId) await reloadKeys();
 
             alert({
                 variant: 'success',
