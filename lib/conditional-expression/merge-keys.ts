@@ -1,7 +1,13 @@
 import type { ConditionKey } from "./ast";
 
 /**
- * Merge condition-key lists, de-duplicating case-insensitively by name.
+ * Merge condition-key lists, de-duplicating by name.
+ *
+ * Names are compared exactly (after trimming), not case-insensitively. Two
+ * fields keyed `RESUS` and `Resus` are two different keys: each writes its own
+ * value and exports its own column, so collapsing them into one entry loses a
+ * real key — and made the validator reject valid references to whichever one
+ * lost, against the other one's options.
  *
  * `extra` (keys from the current, not-yet-saved form) takes precedence: where
  * it provides a label/dataType/options those win over possibly-stale persisted
@@ -19,20 +25,19 @@ export function mergeConditionKeys(
     const name = `${key?.name || ""}`.trim();
     if (!name) return;
 
-    const id = name.toLowerCase();
-    const existing = byName.get(id);
+    const existing = byName.get(name);
 
     if (!existing) {
-      byName.set(id, { ...key, name });
+      byName.set(name, { ...key, name });
       return;
     }
 
     const primary = preferIncoming ? key : existing;
     const secondary = preferIncoming ? existing : key;
 
-    byName.set(id, {
+    byName.set(name, {
       // Always store the trimmed canonical name, never the raw incoming one.
-      name: `${primary.name || secondary.name || ""}`.trim() || name,
+      name,
       label: primary.label ?? secondary.label,
       dataType: primary.dataType ?? secondary.dataType,
       options: primary.options ?? secondary.options,

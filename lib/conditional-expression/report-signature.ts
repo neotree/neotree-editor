@@ -20,7 +20,44 @@
  * report in the background.
  */
 
-export const CONDITION_REPORT_SIGNATURE_VERSION = "r1";
+export const CONDITION_REPORT_SIGNATURE_VERSION = "r2";
+
+/**
+ * Versions a stored report may still carry from an earlier deploy.
+ *
+ * Bump `CONDITION_REPORT_SIGNATURE_VERSION` and list the old value here
+ * whenever a validation rule changes in a way that would alter existing
+ * findings — reports written under the old rules are wrong, but nothing about
+ * the scripts themselves changed.
+ *
+ * Such a report is deliberately NOT treated as stale. A stale report is
+ * recomputed inline on the page load that needs it, so expiring every script at
+ * once would put a whole library's recompute on one reader's page load (the
+ * same ~18s cost that keeps the data key library out of the signature). Matching
+ * one of these versions means the inputs are unchanged and only the rules moved,
+ * so the old report is served immediately and refreshed in the background.
+ *
+ * r1 -> r2: case-variant keys (`$RESUS` / `$Resus`) stopped being reported as
+ * wrong-casing errors with bogus unknown-option errors behind them.
+ */
+export const SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS = ["r1"] as const;
+
+/**
+ * True when a stored signature is this exact signature from an earlier rule set —
+ * same inputs, older rules.
+ */
+export function isSupersededConditionReportSignature(
+  reportSignature: string | null | undefined,
+  expected: string | null | undefined,
+): boolean {
+  if (!reportSignature || !expected) return false;
+  const separator = expected.indexOf(":");
+  if (separator < 0) return false;
+  const digest = expected.slice(separator + 1);
+  return SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS.some(
+    (version) => reportSignature === `${version}:${digest}`,
+  );
+}
 
 /** FNV-1a: deterministic, dependency-free, and short enough to store inline. */
 function hash(input: string): string {

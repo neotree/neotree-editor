@@ -30,6 +30,7 @@ import {
     collectScriptConditionFindings,
     collectScriptOutcomeReferences,
     buildConditionReportSignature,
+    isSupersededConditionReportSignature,
     getConfigurationConditionKeySignature,
     getScriptConditionInputsStamp,
     getOutcomeCollectionForScreenType,
@@ -39,7 +40,12 @@ import {
     type ScriptConditionEntityRef,
 } from "@/lib/conditional-expression";
 import { buildScriptConditionKeys } from "@/lib/conditional-expression/script-keys";
-import { findScriptFieldKeyCollisions, type FieldKeyCollision } from "@/lib/field-key-collisions";
+import {
+    findScriptFieldKeyCollisions,
+    type FieldKeyCollision,
+    type FieldKeyCollisionKind,
+    type FieldKeyCollisionSeverity,
+} from "@/lib/field-key-collisions";
 import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 
@@ -1524,7 +1530,7 @@ export async function getScriptsConditionErrors(
         const result: Record<string, ScriptConditionReport> = {};
         const missing: ScriptConditionErrorInput[] = [];
         const stale: ScriptConditionErrorInput[] = [];
-        const unsigned: ScriptConditionErrorInput[] = [];
+        const refreshInBackground: ScriptConditionErrorInput[] = [];
         for (const s of scripts) {
             const id = `${s?.scriptId || ''}`;
             if (!id) continue;
@@ -1537,10 +1543,15 @@ export async function getScriptsConditionErrors(
             } else if (report && !report.inputsSignature && report.configurationSignature === configurationSignature) {
                 // Written before signatures existed. It still passes the check
                 // that was in force when it was written, so serve it and re-sign
-                // out of band — a whole library's worth of re-signing must not
-                // land on somebody's page load.
+                // out of band.
                 result[id] = report;
-                unsigned.push(s);
+                refreshInBackground.push(s);
+            } else if (report && isSupersededConditionReportSignature(report.inputsSignature, expected)) {
+                // The script is unchanged; only the validation rules moved on.
+                // Every script hits this at once after such a deploy, so it is
+                // explicitly not the inline `stale` path.
+                result[id] = report;
+                refreshInBackground.push(s);
             } else if (report) {
                 stale.push(s);
             } else {
@@ -1548,13 +1559,13 @@ export async function getScriptsConditionErrors(
             }
         }
 
-        if (unsigned.length) {
+        if (refreshInBackground.length) {
             void (async () => {
                 try {
-                    const computed = await computeConditionReportsCoalesced(unsigned, configurationKeys, { signatures });
+                    const computed = await computeConditionReportsCoalesced(refreshInBackground, configurationKeys, { signatures });
                     await persistConditionReports(computed);
                 } catch (e: any) {
-                    logger.error('getScriptsConditionErrors re-sign ERROR', e?.message);
+                    logger.error('getScriptsConditionErrors background refresh ERROR', e?.message);
                 }
             })();
         }
@@ -1817,7 +1828,18 @@ export type ScriptFieldKeyCollisionReport = {
     title: string;
     blocking: number;
     warnings: number;
-    examples: { location: string; message: string; href?: string }[];
+    /** How many of each rule fired, so a summary can name them individually. */
+    byKind: Partial<Record<FieldKeyCollisionKind, number>>;
+    examples: {
+        /** Which rule fired, so a reader can name it from FIELD_KEY_COLLISION_RULES. */
+        kind: FieldKeyCollisionKind;
+        severity: FieldKeyCollisionSeverity;
+        /** The key as the author spelled it, for a badge that has room for one detail. */
+        displayKey: string;
+        location: string;
+        message: string;
+        href?: string;
+    }[];
 };
 
 /**
@@ -1833,8 +1855,15 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
     scripts: ScriptFieldKeyCollisionReport[];
     totalBlocking: number;
     totalWarnings: number;
+    /** Per-rule totals across the whole scope, for the publish summary headline. */
+    totalsByKind: Partial<Record<FieldKeyCollisionKind, number>>;
 }> {
-    const empty = { scripts: [] as ScriptFieldKeyCollisionReport[], totalBlocking: 0, totalWarnings: 0 };
+    const empty = {
+        scripts: [] as ScriptFieldKeyCollisionReport[],
+        totalBlocking: 0,
+        totalWarnings: 0,
+        totalsByKind: {} as Partial<Record<FieldKeyCollisionKind, number>>,
+    };
     try {
         const scopeIds = opts?.scriptIds;
         if (scopeIds && !scopeIds.length) return empty;
@@ -1897,6 +1926,7 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
         const scripts: ScriptFieldKeyCollisionReport[] = [];
         let totalBlocking = 0;
         let totalWarnings = 0;
+        const totalsByKind: Partial<Record<FieldKeyCollisionKind, number>> = {};
 
         for (const script of scriptRows) {
             const scriptId = `${script?.scriptId || ''}`;
@@ -1911,12 +1941,23 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
             totalBlocking += blocking.length;
             totalWarnings += warnings;
 
+            // Counted off the collisions already in hand — no extra scan.
+            const byKind: Partial<Record<FieldKeyCollisionKind, number>> = {};
+            for (const c of collisions) {
+                byKind[c.kind] = (byKind[c.kind] || 0) + 1;
+                totalsByKind[c.kind] = (totalsByKind[c.kind] || 0) + 1;
+            }
+
             scripts.push({
                 scriptId,
                 title: `${script?.title || 'Untitled script'}`,
                 blocking: blocking.length,
                 warnings,
+                byKind,
                 examples: (blocking.length ? blocking : collisions).slice(0, 5).map((c) => ({
+                    kind: c.kind,
+                    severity: c.severity,
+                    displayKey: c.displayKey,
                     location: c.location,
                     message: c.message,
                     href: c.screenId ? `/script/${scriptId}/screen/${c.screenId}` : `/script/${scriptId}?section=screens`,
@@ -1926,7 +1967,7 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
 
         // Worst offenders first.
         scripts.sort((a, b) => (b.blocking - a.blocking) || (b.warnings - a.warnings));
-        return { scripts, totalBlocking, totalWarnings };
+        return { scripts, totalBlocking, totalWarnings, totalsByKind };
     } catch (e: any) {
         logger.error('getScriptsWithFieldKeyCollisions ERROR', e?.message);
         return empty;

@@ -15,6 +15,7 @@ import {
     type ScriptFieldKeyCollisionReport,
 } from "@/app/actions/scripts";
 import { ScriptIssueBadge, type ScriptIssue } from "@/components/script-issues";
+import { getFieldKeyCollisionRule } from "@/lib/field-key-collisions";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
@@ -299,10 +300,13 @@ export function ScriptsTable(props: Props) {
                                 const keyReport = s ? keyCollisions[s.scriptId] : undefined;
 
                                 const issues: ScriptIssue[] = [
+                                    // Each example names its own rule and severity. Deriving
+                                    // either from the script-wide blocking count labelled every
+                                    // warning as a same-screen duplicate.
                                     ...(keyReport?.examples || []).map((example) => ({
-                                        severity: (keyReport?.blocking ? 'error' : 'warning') as ScriptIssue['severity'],
-                                        group: keyReport?.blocking ? 'Duplicate field key' : 'Shared field key',
-                                        message: example.location,
+                                        severity: (example.severity === 'blocking' ? 'error' : 'warning') as ScriptIssue['severity'],
+                                        group: getFieldKeyCollisionRule(example.kind)?.label || 'Duplicate field key',
+                                        message: example.displayKey ? `${example.location} [${example.displayKey}]` : example.location,
                                         href: example.href,
                                     })),
                                     ...(report?.findings || []).map((finding) => ({
