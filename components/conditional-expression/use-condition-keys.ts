@@ -8,23 +8,15 @@ import { useScriptFormCtx } from "@/contexts/script-form";
 // Re-exported for existing importers (the shared implementation lives in lib).
 export { toConditionKeys };
 
-/**
- * Loads the authoritative condition-key catalogue scoped to the current script,
- * including its virtual Diagnoses and Problems outcome collections. This keeps
- * editor validation aligned with publish validation and runtime values.
- *
- * Safe to call outside a ScriptsContextProvider — it degrades to an empty key
- * list (which suppresses key-dependent checks) instead of throwing.
- */
-export function useConditionKeys(opts?: { enabled?: boolean }): {
+export function useConditionKeys(_opts?: { enabled?: boolean }): {
   conditionKeys: ConditionKey[];
   keysLoading: boolean;
-  /** True after the authoritative script catalogue has loaded, even if empty. */
   keysReady: boolean;
 } {
   const { 
     keys, 
     conditionKeys: contextConditionKeys, 
+    conditionCatalogueReady,
   } = useScriptFormCtx();
 
   const conditionKeys = useMemo<ConditionKey[]>(
@@ -37,6 +29,6 @@ export function useConditionKeys(opts?: { enabled?: boolean }): {
   return {
     conditionKeys,
     keysLoading: false,
-    keysReady: true,
+    keysReady: conditionCatalogueReady || conditionKeys.length > 0,
   };
 }
