@@ -84,19 +84,28 @@ interface WalkEnv {
 
 export function analyze(ast: ProgramNode, ctx: ValidationContext, source = ""): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const keyByName = new Map<string, ConditionKey>();
-  const exactNames = new Set<string>();
-  const canonicalByLower = new Map<string, string>();
+  // Keyed both ways. `RESUS` and `Resus` are two different keys with their own
+  // types and options, so a reference resolves to its own key first; the
+  // case-insensitive map is only a fallback, for naming the intended key when a
+  // reference matches nothing exactly.
+  const keyByExactName = new Map<string, ConditionKey>();
+  const keyByLowerName = new Map<string, ConditionKey>();
+  // Every name in the catalogue, for "did you mean" suggestions. Built once
+  // here rather than per unknown key.
+  const allNames: string[] = [];
   for (const key of ctx.keys) {
-    keyByName.set(key.name.toLowerCase(), key);
-    exactNames.add(key.name);
-    canonicalByLower.set(key.name.toLowerCase(), key.name);
+    keyByExactName.set(key.name, key);
+    allNames.push(key.name);
+    // First one wins, so a suggestion is stable rather than depending on order.
+    const lower = key.name.toLowerCase();
+    if (!keyByLowerName.has(lower)) keyByLowerName.set(lower, key);
   }
 
   const describeVar = (node: VarNode): KeyDesc | null => {
-    const name = node.name.toLowerCase();
-    if (name === "self") return { dataType: ctx.selfDataType, options: ctx.selfOptions };
-    const key = keyByName.get(name);
+    if (node.name.toLowerCase() === "self") {
+      return { dataType: ctx.selfDataType, options: ctx.selfOptions };
+    }
+    const key = keyByExactName.get(node.name) || keyByLowerName.get(node.name.toLowerCase());
     return key ? { dataType: key.dataType, options: key.options } : null;
   };
 
@@ -135,10 +144,11 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext, source = ""): 
     }
 
     // Exact (case-sensitive) match is required.
-    if (exactNames.has(node.name)) return;
+    if (keyByExactName.has(node.name)) return;
 
-    // The key exists but with different casing — flag the exact spelling.
-    const canonical = canonicalByLower.get(name);
+    // No key spelled this way, but one differs only by case — so this is a
+    // casing mistake, not an unknown key.
+    const canonical = keyByLowerName.get(name)?.name;
     if (canonical) {
       diagnostics.push({
         severity: "error",
@@ -151,7 +161,7 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext, source = ""): 
       return;
     }
 
-    const suggestion = suggestClosest(node.name, ctx.keys.map((k) => k.name));
+    const suggestion = suggestClosest(node.name, allNames);
     diagnostics.push({
       severity: "error",
       code: "UNKNOWN_KEY",

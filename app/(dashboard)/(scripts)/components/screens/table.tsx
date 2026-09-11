@@ -16,7 +16,7 @@ import { ScriptsTableSearch } from "../scripts-table-search";
 import { useConditionKeys } from "@/components/conditional-expression";
 import { ScriptIssueBadge, collisionIssues, conditionIssues } from "@/components/script-issues";
 import { getOutcomeProducers, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
-import { findScreenFieldKeyCollisions } from "@/lib/field-key-collisions";
+import { findScriptFieldKeyCollisions, type FieldKeyCollision } from "@/lib/field-key-collisions";
 
 type Props = UseScreensTableParams;
 
@@ -58,20 +58,27 @@ export function ScreensTable(props: Props) {
 
     // Collisions per screen, computed once per data change rather than inside
     // the cell renderer, which re-ran for every row on every render.
+    //
+    // One script-level pass rather than a findScreenFieldKeyCollisions call per
+    // screen: it already runs that loop internally.
     const collisionsByScreen = useMemo(() => {
-        const map = new Map<string, ReturnType<typeof findScreenFieldKeyCollisions>>();
+        const map = new Map<string, FieldKeyCollision[]>();
+        const scriptScreens = [];
         for (const screen of screensArr) {
             if (!screen?.screenId) continue;
-            map.set(`${screen.screenId}`, findScreenFieldKeyCollisions(
-                {
-                    screenId: screen.screenId,
-                    title: screen.title,
-                    repeatable: (screen as { repeatable?: boolean | null }).repeatable,
-                    fields: (screen?.fields || []) as any[],
-                },
-                { keys: conditionKeys },
-            ));
+            map.set(`${screen.screenId}`, []);
+            scriptScreens.push({
+                screenId: screen.screenId,
+                title: screen.title,
+                repeatable: (screen as { repeatable?: boolean | null }).repeatable,
+                fields: (screen?.fields || []) as any[],
+            });
         }
+
+        for (const collision of findScriptFieldKeyCollisions({ screens: scriptScreens, dataKeys: conditionKeys })) {
+            if (collision.screenId) map.get(collision.screenId)?.push(collision);
+        }
+
         return map;
     }, [screensArr, conditionKeys]);
 
