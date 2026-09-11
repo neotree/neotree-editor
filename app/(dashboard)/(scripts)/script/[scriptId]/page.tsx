@@ -8,7 +8,7 @@ import { useScriptFormCtx } from "@/contexts/script-form";
 
 // export const dynamic = 'force-dynamic';
 
-export default async function ScriptEditPage() {
+export default function ScriptEditPage() {
     const { formData: fd, } = useScriptFormCtx();
     const formData = fd!;
     

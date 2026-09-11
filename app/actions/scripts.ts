@@ -2,7 +2,7 @@
 
 import { v4 } from "uuid";
 import queryString from "query-string";
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { screens, diagnoses, problems, screensDrafts, diagnosesDrafts, problemsDrafts, pendingDeletion, scripts as scriptsTable, scriptsDrafts } from "@/databases/pg/schema";
@@ -29,7 +29,9 @@ import {
     collectNewOutcomeKeyCollisions,
     collectScriptConditionFindings,
     collectScriptOutcomeReferences,
+    buildConditionReportSignature,
     getConfigurationConditionKeySignature,
+    getScriptConditionInputsStamp,
     getOutcomeCollectionForScreenType,
     isOutcomeCollectionName,
     type OutcomeCollectionName,
@@ -38,6 +40,7 @@ import {
 } from "@/lib/conditional-expression";
 import { buildScriptConditionKeys } from "@/lib/conditional-expression/script-keys";
 import { findScriptFieldKeyCollisions, type FieldKeyCollision } from "@/lib/field-key-collisions";
+import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 
 export const getScriptsMetadata = queries._getScriptsMetadata;
@@ -501,7 +504,130 @@ export type ScriptConditionReport = {
     findings: { location: string; href?: string; message?: string }[];
     /** Invalidates cached reports when the effective Configuration keys change. */
     configurationSignature?: string;
+    /**
+     * Covers the per-script inputs the validation reads: Configuration keys,
+     * the script's own NUID/eligibility expressions, and its screens, diagnoses
+     * and problems. Readers refresh any report that no longer matches, so a
+     * missed write-site recompute self-corrects instead of leaving a
+     * permanently wrong badge. Data key library changes are swept separately —
+     * they affect every script, so they must not expire reports one read at a time.
+     */
+    inputsSignature?: string;
 };
+
+async function getScriptContentStamps(scriptIds: string[]): Promise<Map<string, string>> {
+    const stamps = new Map<string, string>();
+    if (!scriptIds.length) return stamps;
+
+    try {
+        const rows = await db.execute<{ scriptId: string; source: string; count: string; updated: string | null }>(sql`
+            select script_id as "scriptId", source, count(*)::text as count, max(updated_at)::text as updated
+            from (
+                select script_id, 'sc' as source, updated_at from nt_screens where deleted_at is null
+                union all select script_id, 'scd' as source, updated_at from nt_screens_drafts
+                union all select script_id, 'dg' as source, updated_at from nt_diagnoses where deleted_at is null
+                union all select script_id, 'dgd' as source, updated_at from nt_diagnoses_drafts
+                union all select script_id, 'pr' as source, updated_at from nt_problems where deleted_at is null
+                union all select script_id, 'prd' as source, updated_at from nt_problems_drafts
+            ) entities
+            where script_id in (${sql.join(scriptIds.map((id) => sql`${id}`), sql`, `)})
+            group by script_id, source
+        `);
+
+        const byScript = new Map<string, string[]>();
+        for (const row of rows as any[] as { scriptId: string; source: string; count: string; updated: string | null }[]) {
+            const id = `${row.scriptId || ''}`;
+            if (!id) continue;
+            const list = byScript.get(id) || [];
+            list.push(`${row.source}:${row.count || 0}:${row.updated || ''}`);
+            byScript.set(id, list);
+        }
+        byScript.forEach((parts, id) => stamps.set(id, parts.sort((a, b) => a.localeCompare(b)).join('|')));
+    } catch (e: any) {
+        logger.error('getScriptContentStamps ERROR', e?.message);
+    }
+
+    return stamps;
+}
+
+async function getScriptConditionInputStamps(scriptIds: string[]): Promise<Map<string, string>> {
+    const stamps = new Map<string, string>();
+    if (!scriptIds.length) return stamps;
+
+    try {
+        // One join rather than a published read plus a drafts read: this runs on
+        // every cached-report check, so the extra round trip showed up on every
+        // scripts-list load.
+        const rows = await db
+            .select({
+                scriptId: scriptsTable.scriptId,
+                nuidSearchFields: scriptsTable.nuidSearchFields,
+                eligibilityCriteria: scriptsTable.eligibilityCriteria,
+                draftData: scriptsDrafts.data,
+            })
+            .from(scriptsTable)
+            .leftJoin(scriptsDrafts, eq(scriptsDrafts.scriptId, scriptsTable.scriptId))
+            .where(inArray(scriptsTable.scriptId, scriptIds));
+
+        for (const row of rows) {
+            const id = `${row.scriptId || ''}`;
+            if (!id) continue;
+            // A draft supersedes its published row, matching the draft-inclusive report.
+            stamps.set(id, getScriptConditionInputsStamp((row.draftData || row) as any));
+        }
+    } catch (e: any) {
+        logger.error('getScriptConditionInputStamps ERROR', e?.message);
+    }
+
+    return stamps;
+}
+
+
+type ConditionReportStamps = {
+    contentStamps: Map<string, string>;
+    inputStamps: Map<string, string>;
+};
+
+/**
+ * The stamp reads, which depend on nothing but the script ids.
+ *
+ * Separated from signature assembly so a caller can start them alongside its
+ * own reads — the Configuration keys and the cached reports — instead of
+ * waiting for those first. Only the final hash needs the Configuration
+ * signature, and by then everything is already in hand.
+ */
+async function fetchConditionReportStamps(ids: string[]): Promise<ConditionReportStamps> {
+    const [contentStamps, inputStamps] = await Promise.all([
+        getScriptContentStamps(ids),
+        getScriptConditionInputStamps(ids),
+    ]);
+    return { contentStamps, inputStamps };
+}
+
+function buildConditionReportSignatures(
+    ids: string[],
+    configurationSignature: string,
+    stamps: ConditionReportStamps,
+): Map<string, string> {
+    const expected = new Map<string, string>();
+    for (const id of ids) {
+        expected.set(id, buildConditionReportSignature({
+            configuration: configurationSignature,
+            inputs: stamps.inputStamps.get(id) || '',
+            content: stamps.contentStamps.get(id) || '',
+        }));
+    }
+    return expected;
+}
+
+async function resolveConditionReportSignatures(
+    scriptIds: (string | null | undefined)[],
+    configurationSignature: string,
+): Promise<Map<string, string>> {
+    const ids = Array.from(new Set((scriptIds || []).map((id) => `${id || ''}`).filter(Boolean)));
+    if (!ids.length) return new Map<string, string>();
+    return buildConditionReportSignatures(ids, configurationSignature, await fetchConditionReportStamps(ids));
+}
 
 function hrefForConditionEntity(scriptId: string, entity?: ScriptConditionEntityRef): string {
     if (!entity) return `/script/${scriptId}`;
@@ -517,11 +643,12 @@ function hrefForConditionEntity(scriptId: string, entity?: ScriptConditionEntity
     }
 }
 
-function buildConditionReport(scriptId: string, script: any): ScriptConditionReport {
+function buildConditionReport(scriptId: string, script: any, inputsSignature?: string): ScriptConditionReport {
     const findings = collectScriptConditionFindings(script);
     return {
         count: findings.length,
         configurationSignature: getConfigurationConditionKeySignature(script?.configurationKeys || []),
+        inputsSignature,
         findings: findings.slice(0, 100).map((f) => ({
             location: f.location,
             href: hrefForConditionEntity(scriptId, f.entity),
@@ -753,6 +880,7 @@ async function saveOutcomeEntityWithReferenceRewrite(
 async function computeConditionReportsLean(
     inputs: ScriptConditionErrorInput[],
     configurationKeys: any[],
+    opts?: { signatures?: Map<string, string> },
 ): Promise<Record<string, ScriptConditionReport>> {
     const scriptIds = inputs.map((s) => `${s?.scriptId || ''}`).filter(Boolean);
     if (!scriptIds.length) return {};
@@ -845,6 +973,8 @@ async function computeConditionReportsLean(
     for (const d of drugItemsRes.data || []) if (d?.key) drugItemsByKey.set(`${d.key}`, d);
 
     const reports: Record<string, ScriptConditionReport> = {};
+    const signatures = opts?.signatures
+        ?? await resolveConditionReportSignatures(scriptIds, getConfigurationConditionKeySignature(configurationKeys));
 
     await runWithConcurrency(inputs, 6, async (s) => {
         const scriptId = `${s?.scriptId || ''}`;
@@ -877,7 +1007,7 @@ async function computeConditionReportsLean(
             nuidDataKeys: resolveNuidLibraryKeys(nuidSearchFields, dataKeyIndex),
             eligibilityCriteria: s?.eligibilityCriteria,
             configurationKeys,
-        });
+        }, signatures.get(scriptId));
     });
 
     return reports;
@@ -892,7 +1022,7 @@ async function computeConditionReportsLean(
 async function computeConditionReportsDraftInclusive(
     inputs: ScriptConditionErrorInput[],
     configurationKeys: any[],
-    opts?: { dataKeys?: any[]; dataKeyIndex?: Map<string, any> },
+    opts?: { dataKeys?: any[]; dataKeyIndex?: Map<string, any>; signatures?: Map<string, string> },
 ): Promise<Record<string, ScriptConditionReport>> {
     const scriptIds = inputs.map((input) => `${input?.scriptId || ''}`).filter(Boolean);
     if (!scriptIds.length) return {};
@@ -1107,6 +1237,8 @@ async function computeConditionReportsDraftInclusive(
     }
 
     const reports: Record<string, ScriptConditionReport> = {};
+    const signatures = opts?.signatures
+        ?? await resolveConditionReportSignatures(scriptIds, getConfigurationConditionKeySignature(configurationKeys));
     await runWithConcurrency(Array.from(effectiveById.entries()), 6, async ([scriptId, effective]) => {
         const drugKeys = collectDrugKeysFromScreens(effective.screens);
         const drugsLibrary = Array.from(drugKeys).map((key) => drugItemsByKey.get(key)).filter(Boolean);
@@ -1132,7 +1264,7 @@ async function computeConditionReportsDraftInclusive(
             eligibilityCriteria: effective.script?.eligibilityCriteria !== undefined
                 ? effective.script.eligibilityCriteria
                 : effective.input?.eligibilityCriteria,
-        });
+        }, signatures.get(scriptId));
     });
     return reports;
 }
@@ -1210,7 +1342,9 @@ export async function getScriptsConditionKeys(
             db.select({ problemId: problemsDrafts.problemId, data: problemsDrafts.data })
                 .from(problemsDrafts)
                 .where(draftMatch(problemsDrafts.scriptId, problemsDrafts.scriptDraftId)),
-            _getDataKeys({ returnDraftsIfExist: true }),
+            // Shared with the group layout's prefetch for this request, so the
+            // registry is loaded once per page render rather than twice.
+            getConditionKeyRegistry(),
             _getConfigKeys({ returnDraftsIfExist: true }),
         ]);
 
@@ -1276,6 +1410,89 @@ export async function getScriptsConditionKeys(
  * Configuration-key signature makes old cache entries self-expire during a
  * normal read, with no migration or backfill job.
  */
+/**
+ * Coalesces reader-side refreshes so concurrent page loads that both notice the
+ * same stale script compute it once.
+ *
+ * `recomputeInFlight` only guards the recompute entry points; readers call the
+ * batch computation directly and would otherwise duplicate the work — and the
+ * persist that follows is fire-and-forget, so a second read arriving before the
+ * write lands would start again from scratch.
+ *
+ * Ids already being computed are awaited; the rest are computed as one batch,
+ * so batching survives the guard.
+ */
+const readerComputeInFlight = new Map<string, Promise<Record<string, ScriptConditionReport>>>();
+
+async function computeConditionReportsCoalesced(
+    inputs: ScriptConditionErrorInput[],
+    configurationKeys: any[],
+    opts?: { dataKeys?: any[]; dataKeyIndex?: Map<string, any>; signatures?: Map<string, string> },
+): Promise<Record<string, ScriptConditionReport>> {
+    const result: Record<string, ScriptConditionReport> = {};
+    const waits: Promise<void>[] = [];
+    const todo: ScriptConditionErrorInput[] = [];
+
+    for (const input of inputs) {
+        const id = `${input?.scriptId || ''}`;
+        if (!id) continue;
+        const existing = readerComputeInFlight.get(id);
+        if (existing) {
+            waits.push(existing.then((reports) => {
+                if (reports[id]) result[id] = reports[id];
+            }).catch(() => { /* the owning call logs it */ }));
+        } else {
+            todo.push(input);
+        }
+    }
+
+    if (todo.length) {
+        const promise = computeConditionReportsDraftInclusive(todo, configurationKeys, opts);
+        const ids = todo.map((input) => `${input?.scriptId || ''}`).filter(Boolean);
+        ids.forEach((id) => readerComputeInFlight.set(id, promise));
+        try {
+            Object.assign(result, await promise);
+        } finally {
+            ids.forEach((id) => {
+                if (readerComputeInFlight.get(id) === promise) readerComputeInFlight.delete(id);
+            });
+        }
+    }
+
+    await Promise.all(waits);
+    return result;
+}
+
+/**
+ * Forces one script's CE report to be recomputed and returns the fresh count.
+ *
+ * The signature check should keep reports honest on its own; this is the manual
+ * way out when a badge still looks wrong, so nobody has to wait on a fix to
+ * clear a stale indicator.
+ */
+export async function recheckScriptConditionErrors(scriptId: string): Promise<{
+    count: number;
+    errors?: string[];
+}> {
+    try {
+        await isAllowed();
+        const id = `${scriptId || ''}`;
+        if (!id) return { count: 0, errors: ['A script id is required'] };
+
+        await recomputeScriptConditionErrors(id);
+
+        const [row] = await db
+            .select({ report: scriptsTable.conditionErrorReport })
+            .from(scriptsTable)
+            .where(eq(scriptsTable.scriptId, id));
+
+        return { count: (row?.report as ScriptConditionReport | null)?.count || 0 };
+    } catch (e: any) {
+        logger.error('recheckScriptConditionErrors ERROR', e.message);
+        return { count: 0, errors: [e.message] };
+    }
+}
+
 export async function getScriptsConditionErrors(
     scripts: ScriptConditionErrorInput[],
 ): Promise<{ data: Record<string, ScriptConditionReport>; errors: string[] }> {
@@ -1283,41 +1500,72 @@ export async function getScriptsConditionErrors(
         const scriptIds = (scripts || []).map((s) => `${s?.scriptId || ''}`).filter(Boolean);
         if (!scriptIds.length) return { data: {}, errors: [] };
 
-        const configurationKeysRes = await _getConfigKeys({ returnDraftsIfExist: true });
+        // None of these three reads depends on the others, so they run together:
+        // run serially they made this call about twice as slow as it needed to be.
+        const [configurationKeysRes, reportRows, stamps] = await Promise.all([
+            _getConfigKeys({ returnDraftsIfExist: true }),
+            db
+                .select({ scriptId: scriptsTable.scriptId, report: scriptsTable.conditionErrorReport })
+                .from(scriptsTable)
+                .where(inArray(scriptsTable.scriptId, scriptIds))
+                // Column not migrated yet — fall through to computing everything lean.
+                .catch(() => [] as { scriptId: string; report: unknown }[]),
+            fetchConditionReportStamps(scriptIds),
+        ]);
         if (configurationKeysRes.errors?.length) throw new Error(configurationKeysRes.errors.join(", "));
         const configurationKeys = configurationKeysRes.data || [];
         const configurationSignature = getConfigurationConditionKeySignature(configurationKeys);
 
         const persisted = new Map<string, ScriptConditionReport | null>();
-        try {
-            const rows = await db
-                .select({ scriptId: scriptsTable.scriptId, report: scriptsTable.conditionErrorReport })
-                .from(scriptsTable)
-                .where(inArray(scriptsTable.scriptId, scriptIds));
-            for (const row of rows) persisted.set(`${row.scriptId}`, (row.report as ScriptConditionReport | null) || null);
-        } catch {
-            // Column not migrated yet — fall through to computing everything lean.
-        }
+        for (const row of reportRows) persisted.set(`${row.scriptId}`, (row.report as ScriptConditionReport | null) || null);
+
+        const signatures = buildConditionReportSignatures(scriptIds, configurationSignature, stamps);
 
         const result: Record<string, ScriptConditionReport> = {};
         const missing: ScriptConditionErrorInput[] = [];
         const stale: ScriptConditionErrorInput[] = [];
+        const unsigned: ScriptConditionErrorInput[] = [];
         for (const s of scripts) {
             const id = `${s?.scriptId || ''}`;
             if (!id) continue;
             const report = persisted.get(id);
-            if (report?.configurationSignature === configurationSignature) result[id] = report;
-            else if (report) stale.push(s);
-            else missing.push(s);
+            const expected = signatures.get(id);
+            // A report is only trusted while the inputs it was computed from are
+            // unchanged.
+            if (report && !!expected && report.inputsSignature === expected) {
+                result[id] = report;
+            } else if (report && !report.inputsSignature && report.configurationSignature === configurationSignature) {
+                // Written before signatures existed. It still passes the check
+                // that was in force when it was written, so serve it and re-sign
+                // out of band — a whole library's worth of re-signing must not
+                // land on somebody's page load.
+                result[id] = report;
+                unsigned.push(s);
+            } else if (report) {
+                stale.push(s);
+            } else {
+                missing.push(s);
+            }
+        }
+
+        if (unsigned.length) {
+            void (async () => {
+                try {
+                    const computed = await computeConditionReportsCoalesced(unsigned, configurationKeys, { signatures });
+                    await persistConditionReports(computed);
+                } catch (e: any) {
+                    logger.error('getScriptsConditionErrors re-sign ERROR', e?.message);
+                }
+            })();
         }
 
         if (missing.length) {
-            const computed = await computeConditionReportsDraftInclusive(missing, configurationKeys);
+            const computed = await computeConditionReportsCoalesced(missing, configurationKeys, { signatures });
             Object.assign(result, computed);
             void persistConditionReports(computed);
         }
         if (stale.length) {
-            const computed = await computeConditionReportsDraftInclusive(stale, configurationKeys);
+            const computed = await computeConditionReportsCoalesced(stale, configurationKeys, { signatures });
             Object.assign(result, computed);
             void persistConditionReports(computed);
         }
@@ -1336,7 +1584,12 @@ export async function getScriptsConditionErrors(
 /** Does the actual per-script CE report computation + persist. Never throws. */
 async function doRecomputeScriptConditionErrors(
     id: string,
-    opts?: { dataKeys?: any[]; dataKeyIndex?: Map<string, any>; configurationKeys?: any[] },
+    opts?: {
+        dataKeys?: any[];
+        dataKeyIndex?: Map<string, any>;
+        configurationKeys?: any[];
+        signatures?: Map<string, string>;
+    },
 ): Promise<void> {
     try {
         let configurationKeys = opts?.configurationKeys;
@@ -1348,15 +1601,19 @@ async function doRecomputeScriptConditionErrors(
             }
             configurationKeys = configurationKeysRes.data || [];
         }
+        const configurationSignature = getConfigurationConditionKeySignature(configurationKeys);
+        const signatures = opts?.signatures
+            ?? await resolveConditionReportSignatures([id], configurationSignature);
         const reports = await computeConditionReportsDraftInclusive(
             [{ scriptId: id }],
             configurationKeys,
-            { dataKeys: opts?.dataKeys, dataKeyIndex: opts?.dataKeyIndex },
+            { dataKeys: opts?.dataKeys, dataKeyIndex: opts?.dataKeyIndex, signatures },
         );
         const report = reports[id] ?? {
                 count: 0,
                 findings: [],
-                configurationSignature: getConfigurationConditionKeySignature(configurationKeys),
+                configurationSignature,
+                inputsSignature: signatures.get(id),
             };
         await db.update(scriptsTable).set({ conditionErrorReport: report }).where(eq(scriptsTable.scriptId, id));
     } catch (e: any) {
@@ -1376,7 +1633,12 @@ const recomputeInFlight = new Map<string, { dirty: boolean; promise: Promise<voi
  */
 export async function recomputeScriptConditionErrors(
     scriptId: string,
-    opts?: { dataKeys?: any[]; dataKeyIndex?: Map<string, any>; configurationKeys?: any[] },
+    opts?: {
+        dataKeys?: any[];
+        dataKeyIndex?: Map<string, any>;
+        configurationKeys?: any[];
+        signatures?: Map<string, string>;
+    },
 ): Promise<void> {
     const id = `${scriptId || ''}`;
     if (!id) return;
@@ -1481,11 +1743,19 @@ export async function recomputeScriptsConditionErrors(scriptIds: (string | null 
             while (ownedStates.some((state) => state.dirty)) {
                 const dirtyStates = ownedStates.filter((state) => state.dirty);
                 dirtyStates.forEach((state) => { state.dirty = false; });
+                // These scripts changed after the batch resolved, so their
+                // signatures have to be re-read — once for the set, not once
+                // per script.
+                const signatures = await resolveConditionReportSignatures(
+                    dirtyStates.map(({ id }) => id),
+                    getConfigurationConditionKeySignature(resolvedConfigurationKeys),
+                );
                 await runWithConcurrency(dirtyStates, 6, async (state) => {
                     await doRecomputeScriptConditionErrors(state.id, {
                         dataKeys,
                         dataKeyIndex,
                         configurationKeys: resolvedConfigurationKeys,
+                        signatures,
                     });
                 });
             }
@@ -1499,10 +1769,22 @@ export async function recomputeScriptsConditionErrors(scriptIds: (string | null 
     })();
     for (const state of ownedStates) state.promise = batchPromise;
 
+    const inFlightSignatures = alreadyInFlight.length
+        ? await resolveConditionReportSignatures(
+            alreadyInFlight,
+            getConfigurationConditionKeySignature(resolvedConfigurationKeys),
+        )
+        : undefined;
+
     await Promise.all([
         batchPromise,
         runWithConcurrency(alreadyInFlight, 6, (id) =>
-            recomputeScriptConditionErrors(id, { dataKeys, dataKeyIndex, configurationKeys: resolvedConfigurationKeys }),
+            recomputeScriptConditionErrors(id, {
+                dataKeys,
+                dataKeyIndex,
+                configurationKeys: resolvedConfigurationKeys,
+                signatures: inFlightSignatures,
+            }),
         ),
     ]);
 }
@@ -1760,6 +2042,11 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
         const stale: ScriptConditionErrorInput[] = [];
         const refresh: ScriptConditionErrorInput[] = [];
 
+        const signatures = await resolveConditionReportSignatures(
+            Array.from(effectiveById.keys()),
+            configurationSignature,
+        );
+
         for (const row of effectiveById.values()) {
             const id = row.scriptId;
             titleById.set(id, row.title);
@@ -1768,9 +2055,10 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
                 nuidSearchFields: row.nuidSearchFields,
                 eligibilityCriteria: row.eligibilityCriteria,
             };
+            const expected = signatures.get(id);
             if (opts?.forceRefresh) {
                 refresh.push(input);
-            } else if (row.report?.configurationSignature === configurationSignature) {
+            } else if (row.report && !!expected && row.report.inputsSignature === expected) {
                 const report = row.report;
                 counts.set(id, report.count || 0);
             } else if (row.report || row.hasDraft) {
@@ -1783,7 +2071,7 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
         }
 
         if (refresh.length) {
-            const computed = await computeConditionReportsDraftInclusive(refresh, configurationKeys);
+            const computed = await computeConditionReportsCoalesced(refresh, configurationKeys, { signatures });
             for (const [id, report] of Object.entries(computed)) {
                 counts.set(id, report?.count || 0);
             }
@@ -1792,14 +2080,14 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
         // Lazily fill in never-computed scripts (also self-heals the column
         // for next time — computeConditionReportsLean is a bounded bulk query).
         if (missing.length) {
-            const computed = await computeConditionReportsLean(missing, configurationKeys);
+            const computed = await computeConditionReportsLean(missing, configurationKeys, { signatures });
             for (const [id, report] of Object.entries(computed)) {
                 counts.set(id, report?.count || 0);
             }
             void persistConditionReports(computed);
         }
         if (stale.length) {
-            const computed = await computeConditionReportsDraftInclusive(stale, configurationKeys);
+            const computed = await computeConditionReportsCoalesced(stale, configurationKeys, { signatures });
             for (const [id, report] of Object.entries(computed)) {
                 counts.set(id, report?.count || 0);
             }
