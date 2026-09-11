@@ -14,6 +14,13 @@ export type {
 export { validateReferenceExpression } from "./reference-expr";
 export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
+export {
+  CONDITION_REPORT_SIGNATURE_VERSION,
+  buildConditionReportSignature,
+  getScriptConditionInputsStamp,
+  isConditionCatalogueReady,
+  type ConditionReportSignatureParts,
+} from "./report-signature";
 export { quoteTextValue, quoteValue } from "./quote";
 export { buildScriptConditionKeys, type BuildScriptConditionKeysInput } from "./script-keys";
 export {

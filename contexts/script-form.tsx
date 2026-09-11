@@ -1,9 +1,9 @@
 "use client"
 
-import { createContext, useContext, useMemo, useState } from "react"
+import { createContext, useContext, useMemo } from "react"
 
 import { getScriptsConditionKeys, getScriptsWithItems } from "@/app/actions/scripts"
-import type { ConditionKey } from "@/lib/conditional-expression";
+import { isConditionCatalogueReady, type ConditionKey } from "@/lib/conditional-expression";
 import { useScriptsContext, ScriptFormDataType, IScriptsContext } from "@/contexts/scripts";
 
 const ScriptFormCtx = createContext<null | ReturnType<typeof useScriptFormCtxValue>>(null);
@@ -31,7 +31,7 @@ export function ScriptFormCtxProvider({ children, ...props }: ScriptFormCtxProps
 }
 
 function useScriptFormCtxValue({ conditionKeys, ...props }: Omit<ScriptFormCtxProps, 'children'>) {
-    const [conditionCatalogueReady] = useState(true);
+    const conditionCatalogueReady = isConditionCatalogueReady(conditionKeys);
 
     const conditionKeysParsed = useMemo(() => {
         return {
