@@ -56,6 +56,25 @@ export function ScreensTable(props: Props) {
         return availability;
     }, [outcomeProducers, screens.data, screensArr]);
 
+    // Collisions per screen, computed once per data change rather than inside
+    // the cell renderer, which re-ran for every row on every render.
+    const collisionsByScreen = useMemo(() => {
+        const map = new Map<string, ReturnType<typeof findScreenFieldKeyCollisions>>();
+        for (const screen of screensArr) {
+            if (!screen?.screenId) continue;
+            map.set(`${screen.screenId}`, findScreenFieldKeyCollisions(
+                {
+                    screenId: screen.screenId,
+                    title: screen.title,
+                    repeatable: (screen as { repeatable?: boolean | null }).repeatable,
+                    fields: (screen?.fields || []) as any[],
+                },
+                { keys: conditionKeys },
+            ));
+        }
+        return map;
+    }, [screensArr, conditionKeys]);
+
     return (
         <>
             {loading && <Loader overlay />}
@@ -144,15 +163,7 @@ export function ScreensTable(props: Props) {
                                     label: `Item "${item?.label || item?.key || ''}" condition`,
                                     allowSelf: true,
                                 }));
-                                const keyCollisions = !s ? [] : findScreenFieldKeyCollisions(
-                                    {
-                                        screenId: s.screenId,
-                                        title: s.title,
-                                        repeatable: (s as { repeatable?: boolean | null }).repeatable,
-                                        fields: (s?.fields || []) as any[],
-                                    },
-                                    { keys: conditionKeys },
-                                );
+                                const keyCollisions = collisionsByScreen.get(`${s?.screenId || ''}`) || [];
                                 return (
                                     <span className="inline-flex items-center gap-x-2">
                                         <span>{s?.title}</span>

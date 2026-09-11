@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
@@ -9,6 +9,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/data-table";
 import {
     getScriptsConditionErrors,
+    recheckScriptConditionErrors,
     getScriptsWithFieldKeyCollisions,
     type ScriptConditionReport,
     type ScriptFieldKeyCollisionReport,
@@ -56,8 +57,8 @@ export function ScriptsTable(props: Props) {
             .join(','),
         [props.scripts],
     );
-    useEffect(() => {
-        let cancelled = false;
+    const loadIssues = useCallback(async (opts?: { cancelled?: () => boolean }) => {
+        const isCancelled = () => !!opts?.cancelled?.();
         const input = (props.scripts?.data || []).map((s: any) => ({
             scriptId: s?.scriptId,
             nuidSearchFields: s?.nuidSearchFields,
@@ -68,19 +69,32 @@ export function ScriptsTable(props: Props) {
             setKeyCollisions({});
             return;
         }
-        getScriptsConditionErrors(input)
-            .then((res) => { if (!cancelled) setConditionErrors(res?.data || {}); })
-            .catch(() => { /* badges are best-effort; ignore failures */ });
-        getScriptsWithFieldKeyCollisions({ scriptIds: input.map((s) => s.scriptId).filter(Boolean) })
-            .then((res) => {
-                if (cancelled) return;
-                const byScript: Record<string, ScriptFieldKeyCollisionReport> = {};
-                for (const report of res?.scripts || []) byScript[report.scriptId] = report;
-                setKeyCollisions(byScript);
-            })
-            .catch(() => { /* badges are best-effort; ignore failures */ });
-        return () => { cancelled = true; };
+        await Promise.all([
+            getScriptsConditionErrors(input)
+                .then((res) => { if (!isCancelled()) setConditionErrors(res?.data || {}); })
+                .catch(() => { /* badges are best-effort; ignore failures */ }),
+            getScriptsWithFieldKeyCollisions({ scriptIds: input.map((s) => s.scriptId).filter(Boolean) })
+                .then((res) => {
+                    if (isCancelled()) return;
+                    const byScript: Record<string, ScriptFieldKeyCollisionReport> = {};
+                    for (const report of res?.scripts || []) byScript[report.scriptId] = report;
+                    setKeyCollisions(byScript);
+                })
+                .catch(() => { /* badges are best-effort; ignore failures */ }),
+        ]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scriptsSignature]);
+
+    useEffect(() => {
+        let cancelled = false;
+        void loadIssues({ cancelled: () => cancelled });
+        return () => { cancelled = true; };
+    }, [loadIssues]);
+
+    const onRecheckIssues = useCallback(async (scriptId: string) => {
+        await recheckScriptConditionErrors(scriptId);
+        await loadIssues();
+    }, [loadIssues]);
 
     const displayLoader = loading;
 
@@ -287,15 +301,13 @@ export function ScriptsTable(props: Props) {
                                 const issues: ScriptIssue[] = [
                                     ...(keyReport?.examples || []).map((example) => ({
                                         severity: (keyReport?.blocking ? 'error' : 'warning') as ScriptIssue['severity'],
-                                        group: keyReport?.blocking
-                                            ? `${keyReport.blocking} duplicate field key${keyReport.blocking === 1 ? '' : 's'}`
-                                            : `${keyReport?.warnings} shared field key${keyReport?.warnings === 1 ? '' : 's'}`,
+                                        group: keyReport?.blocking ? 'Duplicate field key' : 'Shared field key',
                                         message: example.location,
                                         href: example.href,
                                     })),
                                     ...(report?.findings || []).map((finding) => ({
                                         severity: 'error' as ScriptIssue['severity'],
-                                        group: `${report?.count} conditional expression error${report?.count === 1 ? '' : 's'}`,
+                                        group: 'Conditional expression',
                                         message: finding.location,
                                         href: finding.href,
                                     })),
@@ -351,6 +363,7 @@ export function ScriptsTable(props: Props) {
                                     <ScriptsTableActions 
                                         item={s}
                                         disabled={disabled}
+                                        onRecheckIssues={() => onRecheckIssues(s.scriptId)}
                                         setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
                                         onDelete={() => onDelete([s.scriptId])}
                                         onDuplicate={() => onDuplicate([s.scriptId])}

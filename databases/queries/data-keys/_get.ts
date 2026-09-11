@@ -144,7 +144,9 @@ export async function _getDataKeys(
             });
         }
 
-        dataKeysIds = dataKeysIds.filter(id => !drafts.map(d => d.uuid).includes(id));
+        // Set lookup rather than rebuilding the draft uuid array per id.
+        const draftUuids = new Set(drafts.map(d => d.uuid));
+        dataKeysIds = dataKeysIds.filter(id => !draftUuids.has(id));
 
         // published dataKeys conditions
         const whereDataKeys = [
@@ -189,11 +191,6 @@ export async function _getDataKeys(
 
         const published = publishedRes.map(s => s.dataKey);
 
-        const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
-            where: inArray(pendingDeletion.dataKeyId, published.map(s => s.uuid)),
-            columns: { dataKeyId: true, },
-        });
-
         const allData = [
             ...published.map(s => ({
                 ...s,
@@ -213,8 +210,7 @@ export async function _getDataKeys(
                 if(a.label < b.label) returnVal = -1;
                 if(a.label > b.label) returnVal = 1;
                 return returnVal;
-            })
-            .filter(s => !inPendingDeletion.map(s => s.dataKeyId).includes(s.uuid));
+            });
 
         // Apply pagination if requested
         if (paginationParam) {
