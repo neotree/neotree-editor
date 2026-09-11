@@ -58,14 +58,56 @@ export function dataKeyToJSON(key: KeyWithoutOptions, opts?: {
     return json;
 }
 
-export function removeDuplicateDataKeys(keys: KeyWithoutOptions[]) {
-    return keys
-        .filter((k, i) => keys.map(k => dataKeyToJSON(k)).indexOf(dataKeyToJSON(k)) === i);
+/**
+ * Drops keys that serialise identically, keeping the first of each.
+ *
+ * This used to re-serialise the whole list once per element — quadratic, and on
+ * a large script the single biggest cost in scrapping it. One pass with a set
+ * gives the same result.
+ */
+export function removeDuplicateDataKeys<T extends KeyWithoutOptions>(keys: T[]): T[] {
+    const seen = new Set<string>();
+    const unique: T[] = [];
+    for (const key of keys) {
+        const json = dataKeyToJSON(key);
+        if (seen.has(json)) continue;
+        seen.add(json);
+        unique.push(key);
+    }
+    return unique;
+}
+
+/**
+ * JSON -> key index for a candidate list, cached against the array itself.
+ *
+ * Every lookup used to be a linear scan that re-serialised each candidate, so
+ * scrapping one script against a 3000-key library ran into millions of
+ * JSON.stringify calls — measured at 2.7s for a 144-screen script, which was
+ * the bulk of every CE recompute. Serialising each candidate once turns that
+ * into a hash lookup.
+ *
+ * The cache is keyed on the array reference and invalidated when its length
+ * changes, so callers that build a fresh array (or grow one) get a fresh index.
+ * First match wins, matching the Array.find it replaces.
+ */
+const dataKeyJSONIndexCache = new WeakMap<object, { size: number; index: Map<string, any> }>();
+
+export function indexDataKeysByJSON<T extends KeyWithoutOptions>(keys: T[]): Map<string, T> {
+    const cached = dataKeyJSONIndexCache.get(keys);
+    if (cached && cached.size === keys.length) return cached.index as Map<string, T>;
+
+    const index = new Map<string, T>();
+    for (const key of keys) {
+        const json = dataKeyToJSON(key);
+        if (!index.has(json)) index.set(json, key);
+    }
+    dataKeyJSONIndexCache.set(keys, { size: keys.length, index });
+    return index;
 }
 
 export function pickDataKey(keys: (KeyWithoutOptions & { options: string[]; })[], key: KeyWithoutOptions) {
-    const found = keys.find(k => dataKeyToJSON(k) === dataKeyToJSON(key));
-    return found;
+    if (!keys?.length) return undefined;
+    return indexDataKeysByJSON(keys).get(dataKeyToJSON(key));
 }
 
 type ScrapDataKeysParams = {
@@ -205,6 +247,8 @@ export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKey
         };
     });
 
+    const scrappedIndex = indexDataKeysByJSON(scrappedKeys);
+
     return scrappedKeys.map(k => {
         const imported = pickDataKey(importedDataKeys, k) as DataKey;
 
@@ -212,7 +256,7 @@ export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKey
 
         const options = imported?.options || k.options
             .map(o => {
-                const { uniqueKey, uuid, } = { ...scrappedKeys.find(k => dataKeyToJSON(k) === dataKeyToJSON(o)), };
+                const { uniqueKey, uuid, } = { ...scrappedIndex.get(dataKeyToJSON(o)), };
                 return uniqueKey || uuid!;
             })
             .filter(o => o);
@@ -419,31 +463,47 @@ export async function parseImportedDataKeys({
 }
 
 export function mergeScrappedKeys(...scrappedKeys: Scrapped[][]): KeyWithOptions[] {
-    const _scrapped = scrappedKeys.reduce((acc, keys) => [...acc, ...keys], [] as Scrapped[]);
+    // Flat pushes rather than spread-accumulating reduces: the same three
+    // levels, without copying the whole accumulator once per element.
+    const _scrapped: Scrapped[] = [];
+    for (const keys of scrappedKeys) for (const key of keys) _scrapped.push(key);
 
-    let scrapped = [
-        ..._scrapped.reduce((acc, k) => [...acc, k.key], [] as typeof _scrapped[0]['key'][]).filter(k => isDataKeyValid(k)),
-        ..._scrapped.reduce((acc, k) => [...acc, ...k.key.children], [] as typeof _scrapped[0]['key']['children']).filter(k => isDataKeyValid(k)),
-        ..._scrapped.reduce((acc, k) => [
-            ...acc, 
-            ...k.key.children.reduce((acc, k) => [...acc, ...k.children || []], [] as typeof k.key.children[0]['children']),
-        ], [] as typeof _scrapped[0]['key']['children'][0]['children']).filter(k => isDataKeyValid(k)),
-    ] as unknown as (KeyWithoutOptions & {
+    const parents: any[] = [];
+    const children: any[] = [];
+    const grandChildren: any[] = [];
+    for (const entry of _scrapped) {
+        if (isDataKeyValid(entry.key)) parents.push(entry.key);
+        for (const child of entry.key.children || []) {
+            if (isDataKeyValid(child)) children.push(child);
+            for (const grandChild of child.children || []) {
+                if (isDataKeyValid(grandChild)) grandChildren.push(grandChild);
+            }
+        }
+    }
+
+    let scrapped = [...parents, ...children, ...grandChildren] as unknown as (KeyWithoutOptions & {
         children: KeyWithoutOptions[];
     })[];
 
+    // Every entry's options are the children of every entry that serialises the
+    // same way. Grouping once replaces a full scan (with a serialisation on both
+    // sides) per entry — the second-largest cost in scrapping a script.
+    const childrenByJSON = new Map<string, KeyWithoutOptions[]>();
+    const jsonByIndex: string[] = [];
+    scrapped.forEach((k, index) => {
+        const json = dataKeyToJSON(k);
+        jsonByIndex[index] = json;
+        const list = childrenByJSON.get(json);
+        if (list) list.push(...(k.children || []));
+        else childrenByJSON.set(json, [...(k.children || [])]);
+    });
+
     const merged: (KeyWithoutOptions & {
         options: KeyWithoutOptions[];
-    })[] = scrapped.map(k => {
-        return {
-            ...k,
-            options: removeDuplicateDataKeys(
-                scrapped
-                    .filter(k2 => dataKeyToJSON(k2) === dataKeyToJSON(k))
-                    .reduce((acc, k2) => [...acc, ...k2.children || []], [] as KeyWithoutOptions[]),
-            ),
-        };
-    });
+    })[] = scrapped.map((k, index) => ({
+        ...k,
+        options: removeDuplicateDataKeys(childrenByJSON.get(jsonByIndex[index]) || []),
+    }));
 
     return merged;
 }
