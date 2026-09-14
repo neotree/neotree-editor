@@ -617,6 +617,10 @@ export function parseScriptsSearchResults({
         }
     });
 
+    // A problem carries the same authored text as a diagnosis — description,
+    // expressionMeaning, text1-3 and symptoms — so it is searched the same way.
+    // Searching only name/key/expression left the rest unreachable, and
+    // therefore un-replaceable.
     problems.forEach(s => {
         const matches: ScriptsSearchResultsItem['matches'] = [];
 
@@ -624,6 +628,27 @@ export function parseScriptsSearchResults({
             matches.push({
                 field: 'name',
                 fieldValue: s.name!,
+            });
+        }
+
+        if (`${s.text1 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text1',
+                fieldValue: s.text1,
+            });
+        }
+
+        if (`${s.text2 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text2',
+                fieldValue: s.text2,
+            });
+        }
+
+        if (`${s.text3 || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'text3',
+                fieldValue: s.text3,
             });
         }
 
@@ -640,6 +665,46 @@ export function parseScriptsSearchResults({
                 fieldValue: s.expression!,
             });
         }
+
+        if (`${s.description || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'description',
+                fieldValue: s.description!,
+            });
+        }
+
+        if (`${s.expressionMeaning || ''}`.match(searchRegex)) {
+            matches.push({
+                field: 'expressionMeaning',
+                fieldValue: s.expressionMeaning!,
+            });
+        }
+
+        (s.symptoms || []).forEach((f, i) => {
+            if (`${f.key || ''}`.match(searchRegex)) {
+                matches.push({
+                    field: 'problem_symptom_key',
+                    fieldIndex: i,
+                    fieldValue: f.key!,
+                });
+            }
+
+            if (`${f.name || ''}`.match(searchRegex)) {
+                matches.push({
+                    field: 'problem_symptom_name',
+                    fieldIndex: i,
+                    fieldValue: f.name,
+                });
+            }
+
+            if (`${f.expression || ''}`.match(searchRegex)) {
+                matches.push({
+                    field: 'problem_symptom_expression',
+                    fieldIndex: i,
+                    fieldValue: f.expression,
+                });
+            }
+        });
 
         if (matches.length) {
             resultsMap[s.scriptId] = resultsMap[s.scriptId] || {
@@ -660,7 +725,12 @@ export function parseScriptsSearchResults({
                 matches,
                 problemId: s.problemId,
                 isDraft: s.isDraft,
-                fields: [],
+                fields: [
+                    ...(s.symptoms || []).map(f => ({
+                        label: f.name,
+                        type: 'problem_symptom',
+                    })),
+                ],
             });
         }
     });
@@ -818,6 +888,15 @@ const matchedFieldFilterMap: Record<string, string> = {
     hcwDiagnosesInstructions: 'hcwDiagnosesInstructions',
     hcwProblemsInstructions: 'hcwProblemsInstructions',
     infoText: 'infoText',
+
+    // Symptom matches carry a list prefix, so without these they mapped to
+    // nothing and were dropped by every filter except "All matches".
+    diagnosis_symptom_key: 'data_key',
+    diagnosis_symptom_name: 'label',
+    diagnosis_symptom_expression: 'expression',
+    problem_symptom_key: 'data_key',
+    problem_symptom_name: 'label',
+    problem_symptom_expression: 'expression',
 };
 
 export function filterScriptsSearchResults({ searchValue, filter, results, }: {
