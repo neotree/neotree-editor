@@ -168,9 +168,19 @@ export async function _searchScripts({
             isNull(schema.pendingDeletion),
             isNull(schema.problems.deletedAt),
             !problemsDrafts.length ? undefined : notInArray(schema.problems.problemId, problemsDrafts.map(d => d.problemDraftId)),
+            // A problem carries the same authored text as a diagnosis, so it is
+            // prefiltered on the same columns. Matching only name/expression/key
+            // left a problem whose hit is in its description, body text or
+            // symptoms unfetched — invisible to search, and so un-replaceable.
             or(
                 sql`lower(${schema.problems.name}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.problems.description}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.problems.text1}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.problems.text2}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.problems.text3}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.problems.expression}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.problems.expressionMeaning}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.problems.symptoms}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.problems.key}::text) like ${`%${searchTerm}%`}`,
             ),
         ));

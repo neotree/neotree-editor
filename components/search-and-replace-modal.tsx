@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Modal } from '@/components/modal';
 import type { ScriptsSearchResultsItem, } from "@/lib/scripts-search"
+import { buildSavePayload, getReplaceItems, type ReplaceItem, } from "@/lib/search-replace-payload"
 import ucFirst from '@/lib/ucFirst';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, } from '@/components/ui/tooltip';
 import { DialogClose, DialogTrigger, } from '@/components/ui/dialog';
@@ -34,88 +35,9 @@ type Props = {
     scriptsSearchResults?: ScriptsSearchResultsItem[];
 };
 
-type ReplaceItem = {
-    type: 'script' | 'screen' | 'diagnosis';
-    id: string;
-    title: string;
-    parent?: {
-        id: string;
-        title: string;
-        type: 'script';
-    };
-    matches: (ScriptsSearchResultsItem['matches'][0] & {
-        newValue: string;
-        exclude: boolean;
-    })[];
-};
-
 function regExpEsc(s: string) {
     // @ts-ignore
     return RegExp.escape(s);
-}
-
-function getReplaceItems({
-    scriptsSearchResults = [],
-}: Props) {
-    const items: ReplaceItem[] = [];
-
-    scriptsSearchResults
-        .sort((a, b) => a.position - b.position)
-        .forEach(script => {
-            items.push({
-                type: 'script',
-                title: script.title,
-                id: script.scriptId,
-                matches: script.matches.map(m => ({
-                    ...m,
-                    newValue: '',
-                    exclude: false,
-                })),
-            });
-
-            script.diagnoses.forEach(diagnosis => {
-                items.push({
-                    type: 'diagnosis',
-                    title: diagnosis.title,
-                    parent: {
-                        id: script.scriptId,
-                        title: script.title,
-                        type: 'script',
-                    },
-                    id: diagnosis.diagnosisId,
-                    matches: diagnosis.matches.map(m => ({
-                        ...m,
-                        newValue: '',
-                        exclude: false,
-                    })),
-                });
-            });
-
-            script.screens.forEach(screen => {
-                items.push({
-                    type: 'screen',
-                    title: screen.title,
-                    parent: {
-                        id: script.scriptId,
-                        title: script.title,
-                        type: 'script',
-                    },
-                    id: screen.screenId,
-                    matches: screen.matches.map(m => ({
-                        ...m,
-                        newValue: '',
-                        exclude: false,
-                    })),
-                });
-            });
-        });
-
-    return items
-        .map(item => ({
-            ...item,
-            matches: item.matches.filter(match => !['key', 'id', 'field_key', 'field_id', 'item_id', 'item_key', 'field_item_key', 'field_item_id'].includes(match.field)),
-        }))
-        .filter(item => !!item.matches.length);
 }
 
 function sanitizeSearchValue(searchValue = '') {
@@ -155,6 +77,10 @@ const filterOptions = [
     {
         label: 'Diagnoses only',
         value: 'diagnoses',
+    },
+    {
+        label: 'Problems only',
+        value: 'problems',
     },
 ];
 
@@ -204,7 +130,7 @@ export function SearchAndReplaceModal(props: Props) {
     const onModalOpenChange = useCallback(() => {
         setFilter(filterOptions[0].value);
         setSearchValue(searchValue)
-        setReplaceItems(getReplaceItems(props));
+        setReplaceItems(getReplaceItems(props.scriptsSearchResults));
         setReplaceWith('');
         replaceWithRef.current = '';
         setCaseSensitive(false);
@@ -215,7 +141,7 @@ export function SearchAndReplaceModal(props: Props) {
     const onFilterChange = useCallback((val: string) => {
         replaceWithRef.current = '';
         setFilter(val);
-        setReplaceItems(getReplaceItems(props).filter(item => {
+        setReplaceItems(getReplaceItems(props.scriptsSearchResults).filter(item => {
             switch(val) {
                 case 'scripts':
                     return item.type === 'script';
@@ -223,6 +149,8 @@ export function SearchAndReplaceModal(props: Props) {
                     return item.type === 'screen';
                 case 'diagnoses':
                     return item.type === 'diagnosis';
+                case 'problems':
+                    return item.type === 'problem';
                 default:
                     return true;
             }
@@ -239,104 +167,9 @@ export function SearchAndReplaceModal(props: Props) {
             }))
             .filter(item => item.matches.length);
 
-            const response = await axios.post("/api/save", { 
+            const response = await axios.post("/api/save", {
                 broadcastAction: true,
-
-                scripts: items
-                    .filter(s => s.type === 'script')
-                    .map(s => ({
-                        scriptId: s.id,
-                        data: s.matches.reduce((acc, m) => ({
-                            ...acc,
-                            [m.field]: m.newValue,
-                        }), {} as Record<string, any>)
-                    })),
-
-                screens: items
-                    .filter(s => s.type === 'screen')
-                    .map(s => ({
-                        screenId: s.id,
-                        data: {
-                            ...s.matches
-                            .reduce((acc, m) => {
-                                const _fields: Record<string, any>[] = acc['_fields'] || [];
-                                const _items: Record<string, any>[] = acc['_items'] || [];
-
-                                if (m.fieldIndex === undefined) {
-                                    acc[m.field] = m.newValue;
-                                } else {
-                                    if (m.field.includes('field_item_')) {
-                                        let index = _fields.map(f => f.index).indexOf(m.fieldIndex);
-                                        if (index === -1) index = _fields.length;
-                                        _fields[index] = {
-                                            index: m.fieldIndex,
-                                            data: {
-                                                ..._fields[index],
-                                                [m.field.substring(11)]: m.newValue,
-                                            },
-                                        };
-                                    } else if (m.field.includes('field_')) {
-                                        let index = _fields.map(f => f.index).indexOf(m.fieldIndex);
-                                        if (index === -1) index = _fields.length;
-                                        _fields[index] = {
-                                            index: m.fieldIndex,
-                                            data: {
-                                                ..._fields[index],
-                                                [m.field.substring(6)]: m.newValue,
-                                            },
-                                        };
-                                    } else {
-                                        let index = _items.map(f => f.index).indexOf(m.fieldIndex);
-                                        if (index === -1) index = _items.length;
-                                        _items[index] = {
-                                            index: m.fieldIndex,
-                                            data: {
-                                                ..._items[index],
-                                                [m.field.substring(5)]: m.newValue,
-                                            },
-                                        };
-                                    }
-                                }
-
-                                return {
-                                    ...acc,
-                                    _fields,
-                                    _items,
-                                };
-                            }, {} as Record<string, any>),
-                        }
-                    })),
-
-                diagnoses: items
-                    .filter(s => s.type === 'diagnosis')
-                    .map(s => ({
-                        diagnosisId: s.id,
-                        data: {
-                            ...s.matches
-                            .reduce((acc, m) => {
-                                const _fields: Record<string, any>[] = acc['_fields'] || [];
-
-                                if (m.fieldIndex === undefined) {
-                                    acc[m.field] = m.newValue;
-                                } else {
-                                    let index = _fields.map(f => f.index).indexOf(m.fieldIndex);
-                                    if (index === -1) index = _fields.length;
-                                    _fields[index] = {
-                                        index: m.fieldIndex,
-                                        data: {
-                                            ..._fields[index],
-                                            [m.field]: m.newValue,
-                                        },
-                                    };
-                                }
-
-                                return {
-                                    ...acc,
-                                    _fields,
-                                };
-                            }, {} as Record<string, any>),
-                        }
-                    })),
+                ...buildSavePayload(items),
             });
 
             const res = response.data as { success: boolean; errors?: string[]; };
