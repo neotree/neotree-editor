@@ -7,6 +7,7 @@ import { _saveScripts } from '@/databases/mutations/scripts/_scripts_save';
 import { _saveScreens } from '@/databases/mutations/scripts/_screens_save';
 import { _saveDiagnoses } from '@/databases/mutations/scripts/_diagnoses_save';
 import { _saveProblems } from '@/databases/mutations/scripts/_problems_save';
+import { applyIndexedPatches, type IndexedPatch } from '@/lib/search-replace-payload';
 
 export type SavePartialParams = {
     broadcastAction?: boolean;
@@ -18,32 +19,20 @@ export type SavePartialParams = {
     screens?: {
         screenId: string;
         data: Partial<(typeof schema.screens.$inferSelect & {
-            _fields?: {
-                index: number;
-                data: any;
-            }[];
-            _items?: {
-                index: number;
-                data: any;
-            }[];
+            _fields?: IndexedPatch[];
+            _items?: IndexedPatch[];
         })>;
     }[];
     diagnoses?: {
         diagnosisId: string;
         data: Partial<(typeof schema.diagnoses.$inferSelect & {
-            _fields?: {
-                index: number;
-                data: any;
-            }[];
+            _symptoms?: IndexedPatch[];
         })>;
     }[];
     problems?: {
         problemId: string;
         data: Partial<(typeof schema.problems.$inferSelect & {
-            _fields?: {
-                index: number;
-                data: any;
-            }[];
+            _symptoms?: IndexedPatch[];
         })>;
     }[];
 };
@@ -110,22 +99,11 @@ export async function savePartial({
                         _items: NonNullable<SavePartialParams['screens']>[0]['data']['_items'];
                     });
 
-                    let fields = s.fields;
-                    let items = s.items;
-
-                    _fields.forEach(f => {
-                        if (fields[f.index]) fields[f.index] = { ...fields[f.index], ...f.data, };
-                    });
-
-                    _items.forEach(f => {
-                        if (items[f.index]) items[f.index] = { ...items[f.index], ...f.data, };
-                    });
-
                     return {
                         ...s,
                         ...partialData,
-                        fields,
-                        items,
+                        fields: applyIndexedPatches(s.fields, _fields),
+                        items: applyIndexedPatches(s.items, _items),
                     };
                 }),
             });
@@ -141,15 +119,16 @@ export async function savePartial({
                 broadcastAction,
                 data: diagnoses.data.map(d => {
                     const {
-                        _fields = [],
+                        _symptoms = [],
                         ...partialData
                     } = diagnosesParam.find(diagnosis => diagnosis.diagnosisId === d.diagnosisId)?.data as (typeof d & {
-                        _fields: NonNullable<SavePartialParams['diagnoses']>[0]['data']['_fields']; // TODO: diagnoses symptoms???
+                        _symptoms: NonNullable<SavePartialParams['diagnoses']>[0]['data']['_symptoms'];
                     });
 
                     return {
                         ...d,
                         ...partialData,
+                        symptoms: applyIndexedPatches(d.symptoms, _symptoms),
                     };
                 }),
             });
@@ -165,15 +144,16 @@ export async function savePartial({
                 broadcastAction,
                 data: problems.data.map(d => {
                     const {
-                        _fields = [],
+                        _symptoms = [],
                         ...partialData
                     } = problemsParam.find(problem => problem.problemId === d.problemId)?.data as (typeof d & {
-                        _fields: NonNullable<SavePartialParams['problems']>[0]['data']['_fields']; // TODO: problems symptoms???
+                        _symptoms: NonNullable<SavePartialParams['problems']>[0]['data']['_symptoms'];
                     });
 
                     return {
                         ...d,
                         ...partialData,
+                        symptoms: applyIndexedPatches(d.symptoms, _symptoms),
                     };
                 }),
             });
