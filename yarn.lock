@@ -5305,10 +5305,10 @@ nodemailer-plugin-inline-base64@^2.1.1:
   resolved "https://registry.yarnpkg.com/nodemailer-plugin-inline-base64/-/nodemailer-plugin-inline-base64-2.1.1.tgz#249cbc87ccf5ed26efb9a4023e4b6dc881e8d9b2"
   integrity sha512-/cTnVq9vxZBDh5FjCOkPG5ioTs4o7flRuaqfDGLUfa5yeSMR21OW8hgWJIGuCHgcXmN5QHbR8IeujJeeOzi7uQ==
 
-nodemailer@^6.9.14:
-  version "6.10.1"
-  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.10.1.tgz#cbc434c54238f83a51c07eabd04e2b3e832da623"
-  integrity sha512-Z+iLaBGVaSjbIzQ4pX6XV41HrooLsQ10ZWPUehGmuantvzWoDVBnmsdUcOIDM1t+yPor5pDhVlDESgOMEGxhHA==
+nodemailer@^9.1.1:
+  version "9.1.1"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-9.1.1.tgz#fb991992723657f34dbe1d829139aa66be008e96"
+  integrity sha512-izw9mVKFix6YSnC9eLgV6g1opl9DUlRio9ZNcq+Wu9Ujn2UwF+8Nl0B8nz22kEC+CTZCvinkxwJ0DeFbb6NwcQ==
 
 nopt@^5.0.0:
   version "5.0.0"
