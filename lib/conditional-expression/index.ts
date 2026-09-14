@@ -16,7 +16,9 @@ export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
 export {
   CONDITION_REPORT_SIGNATURE_VERSION,
+  SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS,
   buildConditionReportSignature,
+  isSupersededConditionReportSignature,
   getScriptConditionInputsStamp,
   isConditionCatalogueReady,
   type ConditionReportSignatureParts,

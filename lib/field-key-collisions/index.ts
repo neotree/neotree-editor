@@ -12,6 +12,7 @@ import {
 
 export {
   FIELD_KEY_COLLISION_RULES,
+  describeFieldKeyCollisionCounts,
   getFieldKeyCollisionRule,
   type FieldKeyCollisionKind,
   type FieldKeyCollisionRule,
