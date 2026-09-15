@@ -49,7 +49,9 @@ import {
 import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 
-export const getScriptsMetadata = queries._getScriptsMetadata;
+export const getScriptsMetadata: typeof queries._getScriptsMetadata = (...args) => {
+    return queries._getScriptsMetadata(...args);
+};
 
 // DIAGNOSES
 export const countScreens: typeof queries._countScreens = async (...args) => {
