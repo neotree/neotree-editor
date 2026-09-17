@@ -1,4 +1,4 @@
-'use client';
+// 'use client';
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
 import { ErrorCard } from "@/components/error-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { OverlayInfoCard } from "@/components/overlay-info-card";
 
 const getDefaultFormFields = (overWriteScriptWithId?: string) => ({
     siteId: '',
@@ -233,6 +234,8 @@ export function ScriptsImportModal({
     return (
         <>
             {isLoading && <Loader overlay />}
+
+            <ImportInfo show={loading} />
 
             <Modal
                 open={open}
@@ -460,6 +463,18 @@ export function ScriptsImportModal({
                     </div>
                 )}
             </Modal>
+        </>
+    );
+}
+
+function ImportInfo({ show }: {
+    show: boolean;
+}) {
+    return (
+        <>
+            <OverlayInfoCard show={show}>
+
+            </OverlayInfoCard>
         </>
     );
 }
