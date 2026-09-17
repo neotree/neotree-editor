@@ -4,16 +4,16 @@ import { useMeasure } from "react-use";
 import queryString from "query-string";
 
 import { Button } from "@/components/ui/button";
-import { ScriptImage } from "@/types";
+import { FileReference } from "@/types";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Image } from "@/components/image";
 import { useFiles } from "@/hooks/use-files";
 import { SocketEventsListener } from "@/components/socket-events-listener";
 
 export type ImageFieldProps = {
-    image: null | ScriptImage;
+    image: null | FileReference;
     disabled?: boolean;
-    onChange: (image: null | ScriptImage) => void;
+    onChange: (image: null | FileReference) => void;
 };
 
 export function ImageField({ image, disabled, onChange }: ImageFieldProps) {
