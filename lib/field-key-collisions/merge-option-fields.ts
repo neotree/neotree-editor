@@ -31,6 +31,7 @@ export interface OptionMergeField {
   condition?: string;
   keyId?: string;
   confidential?: boolean;
+  confidentialLabelOnly?: boolean;
   optional?: boolean;
   items?: OptionMergeItem[];
   [key: string]: any;
@@ -129,6 +130,7 @@ function describeMismatch(fields: OptionMergeField[]): string | null {
     if (normalizeType(field.type) !== normalizeType(first.type)) return "the fields are not all the same type";
     if (trim(field.keyId) !== trim(first.keyId)) return "the fields link to different data keys";
     if (!!field.confidential !== !!first.confidential) return "the fields disagree on confidentiality";
+    if (!!field.confidentialLabelOnly !== !!first.confidentialLabelOnly) return "the fields disagree on label-only confidentiality";
     if (!!field.optional !== !!first.optional) return "the fields disagree on whether an answer is required";
   }
   return null;

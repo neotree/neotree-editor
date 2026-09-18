@@ -179,6 +179,7 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
             // order: s.order,
             metadata: {
                 confidential: s.confidential,
+                confidentialLabelOnly: s.confidentialLabelOnly,
                 dataType: s.dataType,
                 key: s.key,
                 label: s.label,
@@ -248,6 +249,7 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
                 calculation: f.calculation,
                 condition: f.condition,
                 confidential: f.confidential,
+                confidentialLabelOnly: f.confidentialLabelOnly,
                 dataType: f.dataType,
                 defaultValue: f.defaultValue,
                 format: f.format,

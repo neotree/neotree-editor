@@ -109,6 +109,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
   const printable = watch("printable")
   const ips = watch("ips")
   const confidential = watch("confidential")
+  const confidentialLabelOnly = watch("confidentialLabelOnly")
   const maxDate = watch("maxDate")
   const minDate = watch("minDate")
   const maxTime = watch("maxTime")
@@ -280,11 +281,21 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
     return !!dataKey?.confidential
   }, [dataKey?.confidential])
 
+  const inheritedConfidentialLabelOnly = useMemo(() => {
+    return !!dataKey?.confidentialLabelOnly
+  }, [dataKey?.confidentialLabelOnly])
+
   useEffect(() => {
     if (confidential !== inheritedConfidential) {
       setValue("confidential", inheritedConfidential, { shouldDirty: true })
     }
   }, [confidential, inheritedConfidential, setValue]);
+
+  useEffect(() => {
+    if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+      setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: true })
+    }
+  }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
 
   const isKeyDisabled = disabled || !!field;
 
@@ -429,6 +440,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                       setValue("keyId", item?.uniqueKey, { shouldDirty: true })
                       setValue("label", item?.label, { shouldDirty: true })
                       setValue("confidential", !!item?.confidential, { shouldDirty: true })
+                      setValue("confidentialLabelOnly", !!item?.confidentialLabelOnly, { shouldDirty: true })
                     }}
                   />
 
@@ -576,6 +588,42 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                   <Label htmlFor="optional">Optional</Label>
                 </div>
               </div>
+
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                      onClick={() =>
+                        alert({
+                          title: "Confidentiality is managed in Data Keys",
+                          message: "Change this in the Data Key. Fields inherit confidential status automatically.",
+                          variant: "info",
+                        })
+                      }
+                    >
+                      <Switch id="confidentialLabelOnly" disabled checked={inheritedConfidentialLabelOnly} />
+                      <Label htmlFor="confidentialLabelOnly">Confidential (label only)</Label>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="flex flex-col gap-y-1">
+                      <span>Change confidentiality in the Data Key library.</span>
+                      {!!keyId && (
+                        <Link
+                          href={`/data-keys/edit/${keyId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          Open Data Key
+                        </Link>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
               {(isDropdownField || isMultiSelectField) && (
                 <>

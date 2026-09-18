@@ -758,6 +758,7 @@ export const screens = pgTable(
     printable: boolean("printable"),
     skippable: boolean("skippable").notNull().default(false),
     confidential: boolean("confidential").notNull().default(false),
+    confidentialLabelOnly: boolean("confidential_label_only").notNull().default(false),
     prePopulate: jsonb("pre_populate").default("[]").$type<string[]>().notNull(),
     fields: jsonb("fields").default("[]").$type<ScriptField[]>().notNull(),
     items: jsonb("items").default("[]").$type<ScriptItem[]>().notNull(),
