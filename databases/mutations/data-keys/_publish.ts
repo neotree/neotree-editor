@@ -161,6 +161,21 @@ export async function _publishDataKeys(opts?: {
           continue
         }
 
+        if (!opts?.allowConfidentialDowngrade && current?.confidentialLabelOnly === true && payload.confidentialLabelOnly === false) {
+          errors.push(
+            `Cannot downgrade confidential-label-only data key "${current.name || dataKeyId}" during publish. ` +
+              `Set allowConfidentialDowngrade=true for an explicit downgrade.`,
+          )
+          continue
+        }
+
+        if (payload.confidential === true && payload.confidentialLabelOnly === true) {
+          errors.push(
+            `Data key "${current?.name || dataKeyId}" cannot be both Confidential and Confidential (label only).`,
+          )
+          continue
+        }
+
         const nextData = {
           ...payload,
           publishDate: new Date(),

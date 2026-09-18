@@ -1073,6 +1073,7 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
                     label: matchedDataKey.label || '',
                     dataType: matchedDataKey.dataType || '',
                     confidential: !!matchedDataKey.confidential,
+                    confidentialLabelOnly: !!matchedDataKey.confidentialLabelOnly,
                     isDraft: !!matchedDataKey.isDraft,
                     isDeleted: !!matchedDataKey.isDeleted,
                     optionsCount: Array.isArray(matchedDataKey.options) ? matchedDataKey.options.length : 0,
@@ -1168,6 +1169,7 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
                     label: matchedDataKey.label || '',
                     dataType: matchedDataKey.dataType || '',
                     confidential: !!matchedDataKey.confidential,
+                    confidentialLabelOnly: !!matchedDataKey.confidentialLabelOnly,
                     isDraft: !!matchedDataKey.isDraft,
                     isDeleted: !!matchedDataKey.isDeleted,
                     optionsCount: Array.isArray(matchedDataKey.options) ? matchedDataKey.options.length : 0,
@@ -1239,6 +1241,7 @@ function normalizeUsageExportRows(rows: unknown[]): DataKeysUsageExportRow[] {
             DataKey?: unknown;
             ScriptTitle?: unknown;
             Confidential?: unknown;
+            ConfidentialLabelOnly?: unknown;
         };
 
         const dataKeyUniqueKey = `${r.DataKeyUniqueKey ?? ''}`.trim();
@@ -1246,6 +1249,7 @@ function normalizeUsageExportRows(rows: unknown[]): DataKeysUsageExportRow[] {
         const dataKeyLabel = `${r.DataKeyLabel ?? ''}`.trim();
         const scriptTitle = `${r.ScriptTitle ?? ''}`.trim();
         const confidential = `${r.Confidential ?? 'false'}`.toLowerCase() === 'true' ? 'true' : 'false';
+        const confidentialLabelOnly = `${r.ConfidentialLabelOnly ?? 'false'}`.toLowerCase() === 'true' ? 'true' : 'false';
 
         return {
             DataKeyUniqueKey: dataKeyUniqueKey,
@@ -1253,6 +1257,7 @@ function normalizeUsageExportRows(rows: unknown[]): DataKeysUsageExportRow[] {
             DataKeyLabel: dataKeyLabel,
             ScriptTitle: scriptTitle,
             Confidential: confidential,
+            ConfidentialLabelOnly: confidentialLabelOnly,
         };
     });
 }
@@ -1362,6 +1367,7 @@ export const getDataKeysUsageExportRows = async (params?: {
             name: string;
             label: string;
             confidential: boolean;
+            confidentialLabelOnly: boolean;
             metadata: Record<string, any>;
         }>();
         const namesMap = new Map<string, Set<string>>();
@@ -1373,6 +1379,7 @@ export const getDataKeysUsageExportRows = async (params?: {
                 name: dataKey.name,
                 label: dataKey.label || '',
                 confidential: !!dataKey.confidential,
+                confidentialLabelOnly: !!dataKey.confidentialLabelOnly,
                 metadata: dataKey.metadata || {},
             });
             if (dataKey.name) {
@@ -1412,6 +1419,7 @@ export const getDataKeysUsageExportRows = async (params?: {
             const dataKey = resolveDataKey(keyId, keyName);
             if (!dataKey) return;
             const confidentialValue = !!dataKey.confidential;
+            const confidentialLabelOnlyValue = !!dataKey.confidentialLabelOnly;
 
             const row: DataKeysUsageExportRow = {
                 DataKeyUniqueKey: dataKey.uniqueKey || keyId || '',
@@ -1419,9 +1427,10 @@ export const getDataKeysUsageExportRows = async (params?: {
                 DataKeyLabel: dataKey.label || '',
                 ScriptTitle: scriptTitle || '',
                 Confidential: confidentialValue ? 'true' : 'false',
+                ConfidentialLabelOnly: confidentialLabelOnlyValue ? 'true' : 'false',
             };
 
-            const mapKey = `${row.DataKeyUniqueKey}|||${row.DataKeyKey}|||${row.DataKeyLabel}|||${row.ScriptTitle}|||${row.Confidential}`;
+            const mapKey = `${row.DataKeyUniqueKey}|||${row.DataKeyKey}|||${row.DataKeyLabel}|||${row.ScriptTitle}|||${row.Confidential}|||${row.ConfidentialLabelOnly}`;
             rowsMap.set(mapKey, row);
         };
 
