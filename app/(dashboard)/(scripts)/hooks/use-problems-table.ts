@@ -15,6 +15,7 @@ import {
   filterScriptsSearchResults,
   parseScriptsSearchResults,
 } from "@/lib/scripts-search"
+import { fetchOutcomeReferenceImpact, formatOutcomeImpactMessage } from "@/components/conditional-expression/outcome-impact"
 
 export type UseProblemsTableParams = {
   disabled?: boolean
@@ -60,10 +61,38 @@ export function useProblemsTable({
 
   const onDelete = useCallback(
     async (problemsIds: string[]) => {
+      const problemsToDelete = problems.data.filter((s) => s.problemId && problemsIds.includes(s.problemId))
+      const scriptId = `${problemsToDelete[0]?.scriptId || ""}`
+      const values = problemsToDelete.map((problem) => `${problem?.key || ""}`.trim()).filter(Boolean)
+      if (scriptId && values.length) {
+        try {
+          setLoading(true)
+          const impact = await fetchOutcomeReferenceImpact({
+            scriptId,
+            collection: "Problems",
+            values,
+            excludeProblemIds: problemsIds,
+          })
+          if (impact?.count) {
+            alert({
+              title: "Problem is still referenced",
+              message: formatOutcomeImpactMessage(impact, "delete"),
+              variant: "info",
+              buttonLabel: "Close",
+            })
+            return
+          }
+        } catch (e: any) {
+          alert({ title: "Could not inspect references", message: e.message, variant: "error" })
+          return
+        } finally {
+          setLoading(false)
+        }
+      }
+
       confirm(
         async () => {
           const _problems = { ...problems }
-          const problemsToDelete = problems.data.filter((s) => s.problemId && problemsIds.includes(s.problemId))
 
           setProblems((prev) => ({ ...prev, data: prev.data.filter((s) => !problemsIds.includes(s.problemId)) }))
           setSelected([])

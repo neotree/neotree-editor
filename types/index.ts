@@ -117,6 +117,12 @@ export type ScriptField = {
         enterValueManually?: boolean;
         enterValueManuallyLabel?: string;
         keyId?: string;
+        /**
+         * Boolean expression deciding whether this option is offered. Empty
+         * means "always". Lets one field carry every option and show the subset
+         * that applies, instead of cloning the field per subset.
+         */
+        condition?: string;
     }[];
 };
 

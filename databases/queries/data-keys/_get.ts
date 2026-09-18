@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
@@ -26,7 +26,8 @@ export type GetDataKeysParams = {
     pagination?: {
         limit: number;
         page: number;
-    }
+    };
+    dateAfter?: string;
 };
 
 export type GetDataKeysResults = {
@@ -75,16 +76,31 @@ export async function _getDataKeys(
             uniqueKeys: uniqueKeysParam = [],
             returnDraftsIfExist = true, 
             pagination: paginationParam,
+            dateAfter: _dateAfter = null,
         } = { ...params };
 
         let dataKeysIds = _dataKeysIds || [];
         const names = namesParam.map(n => `${n || ''}`.toLowerCase()).filter(n => n);
         const uniqueKeys = uniqueKeysParam.filter(n => n);
 
+        const dateAfter = !_dateAfter ? null : new Date(_dateAfter);
+
+        const whereDraftsDateAfter = !dateAfter ? undefined : or(
+            gt(dataKeysDrafts.createdAt, dateAfter),
+            gt(dataKeysDrafts.updatedAt, dateAfter)
+        );
+
+        const wherePublishedDateAfter = !dateAfter ? undefined : or(
+            gt(dataKeys.createdAt, dateAfter),
+            gt(dataKeys.updatedAt, dateAfter)
+        );
+
         let drafts: typeof dataKeysDrafts.$inferSelect[] = [];
 
         if (keys.length) {
-            drafts = await db.query.dataKeysDrafts.findMany();
+            drafts = await db.query.dataKeysDrafts.findMany({
+                where: whereDraftsDateAfter,
+            });
 
             drafts = drafts
                 .filter(d => !dataKeysIds.length ? true : dataKeysIds.includes(d.uuid))
@@ -105,6 +121,8 @@ export async function _getDataKeys(
         } else {
             // unpublished dataKeys conditions
             const whereDataKeysDrafts = [
+                whereDraftsDateAfter,
+
                 !dataKeysIds?.length ? 
                     undefined 
                     : 
@@ -122,14 +140,17 @@ export async function _getDataKeys(
             ].filter(q => q);
 
             drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
-                where:!whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
+                where: !whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
             });
         }
 
-        dataKeysIds = dataKeysIds.filter(id => !drafts.map(d => d.uuid).includes(id));
+        // Set lookup rather than rebuilding the draft uuid array per id.
+        const draftUuids = new Set(drafts.map(d => d.uuid));
+        dataKeysIds = dataKeysIds.filter(id => !draftUuids.has(id));
 
         // published dataKeys conditions
         const whereDataKeys = [
+            wherePublishedDateAfter,
             isNull(dataKeys.deletedAt),
             isNull(pendingDeletion),
 
@@ -170,11 +191,6 @@ export async function _getDataKeys(
 
         const published = publishedRes.map(s => s.dataKey);
 
-        const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
-            where: inArray(pendingDeletion.dataKeyId, published.map(s => s.uuid)),
-            columns: { dataKeyId: true, },
-        });
-
         const allData = [
             ...published.map(s => ({
                 ...s,
@@ -194,8 +210,7 @@ export async function _getDataKeys(
                 if(a.label < b.label) returnVal = -1;
                 if(a.label > b.label) returnVal = 1;
                 return returnVal;
-            })
-            .filter(s => !inPendingDeletion.map(s => s.dataKeyId).includes(s.uuid));
+            });
 
         // Apply pagination if requested
         if (paginationParam) {

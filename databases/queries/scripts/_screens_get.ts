@@ -304,6 +304,7 @@ export type ListScreensResults = {
         type: typeof screens.$inferSelect['type'];
         refId: typeof screens.$inferSelect['refId'];
         title: typeof screens.$inferSelect['title'];
+        key: typeof screens.$inferSelect['key'];
         screenId: typeof screens.$inferSelect['screenId'];
         oldScreenId: typeof screens.$inferSelect['oldScreenId'];
         position: typeof screens.$inferSelect['position'];
@@ -367,6 +368,7 @@ export async function _listScreens(
             .select({
                 screen: {
                     title: screens.title,
+                    key: screens.key,
                     screenId: screens.screenId,
                     oldScreenId: screens.oldScreenId,
                     position: screens.position,

@@ -8,6 +8,7 @@ import type {
   ValidationContext,
   VarNode,
 } from "./ast";
+import { quoteValue } from "./quote";
 import { suggestClosest } from "./suggest";
 
 // Data-type families (compared case-insensitively).
@@ -43,6 +44,27 @@ function isMultiValueType(dataType: string): boolean {
   return dataType.startsWith("set<") || dataType === "set";
 }
 
+/**
+ * Span covering a list value plus the comma separating it from a neighbour, so
+ * deleting the span leaves a well-formed list. Returns null when no separator
+ * sits next to the value (a single-value list), where deletion is not safe.
+ */
+function spanWithSeparator(
+  source: string,
+  start: number,
+  end: number,
+): { start: number; end: number } | null {
+  let before = start - 1;
+  while (before >= 0 && /\s/.test(source[before])) before--;
+  if (source[before] === ",") return { start: before, end };
+
+  let after = end;
+  while (after < source.length && /\s/.test(source[after])) after++;
+  if (source[after] === ",") return { start, end: after + 1 };
+
+  return null;
+}
+
 interface KeyDesc {
   dataType?: string;
   options?: string[];
@@ -60,21 +82,30 @@ interface WalkEnv {
   combinedInScope: boolean;
 }
 
-export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] {
+export function analyze(ast: ProgramNode, ctx: ValidationContext, source = ""): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const keyByName = new Map<string, ConditionKey>();
-  const exactNames = new Set<string>();
-  const canonicalByLower = new Map<string, string>();
+  // Keyed both ways. `RESUS` and `Resus` are two different keys with their own
+  // types and options, so a reference resolves to its own key first; the
+  // case-insensitive map is only a fallback, for naming the intended key when a
+  // reference matches nothing exactly.
+  const keyByExactName = new Map<string, ConditionKey>();
+  const keyByLowerName = new Map<string, ConditionKey>();
+  // Every name in the catalogue, for "did you mean" suggestions. Built once
+  // here rather than per unknown key.
+  const allNames: string[] = [];
   for (const key of ctx.keys) {
-    keyByName.set(key.name.toLowerCase(), key);
-    exactNames.add(key.name);
-    canonicalByLower.set(key.name.toLowerCase(), key.name);
+    keyByExactName.set(key.name, key);
+    allNames.push(key.name);
+    // First one wins, so a suggestion is stable rather than depending on order.
+    const lower = key.name.toLowerCase();
+    if (!keyByLowerName.has(lower)) keyByLowerName.set(lower, key);
   }
 
   const describeVar = (node: VarNode): KeyDesc | null => {
-    const name = node.name.toLowerCase();
-    if (name === "self") return { dataType: ctx.selfDataType, options: ctx.selfOptions };
-    const key = keyByName.get(name);
+    if (node.name.toLowerCase() === "self") {
+      return { dataType: ctx.selfDataType, options: ctx.selfOptions };
+    }
+    const key = keyByExactName.get(node.name) || keyByLowerName.get(node.name.toLowerCase());
     return key ? { dataType: key.dataType, options: key.options } : null;
   };
 
@@ -95,13 +126,29 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
       return;
     }
 
+    // A partially loaded catalogue must never emit key-dependent errors,
+    // including availability errors derived from not-yet-loaded screens.
     if (ctx.skipKeyResolution) return;
 
-    // Exact (case-sensitive) match is required.
-    if (exactNames.has(node.name)) return;
+    const unavailable = Object.entries(ctx.unavailableKeys || {})
+      .find(([key]) => key.toLowerCase() === name)?.[1];
+    if (unavailable) {
+      diagnostics.push({
+        severity: "error",
+        code: "OUTCOME_NOT_AVAILABLE",
+        message: unavailable,
+        start: node.start,
+        end: node.end,
+      });
+      return;
+    }
 
-    // The key exists but with different casing — flag the exact spelling.
-    const canonical = canonicalByLower.get(name);
+    // Exact (case-sensitive) match is required.
+    if (keyByExactName.has(node.name)) return;
+
+    // No key spelled this way, but one differs only by case — so this is a
+    // casing mistake, not an unknown key.
+    const canonical = keyByLowerName.get(name)?.name;
     if (canonical) {
       diagnostics.push({
         severity: "error",
@@ -114,7 +161,7 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
       return;
     }
 
-    const suggestion = suggestClosest(node.name, ctx.keys.map((k) => k.name));
+    const suggestion = suggestClosest(node.name, allNames);
     diagnostics.push({
       severity: "error",
       code: "UNKNOWN_KEY",
@@ -167,6 +214,7 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
         message: `Value has leading or trailing spaces — did you mean '${trimmed}'?`,
         start: value.start,
         end: value.end,
+        suggestion: quoteValue(trimmed),
       });
     }
   };
@@ -187,7 +235,7 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
         message: `"${value.value}" is not a valid option for "$${keyName}".${suggestion ? ` Did you mean "${suggestion}"?` : ""}`,
         start: value.start,
         end: value.end,
-        suggestion,
+        suggestion: suggestion === undefined ? undefined : quoteValue(suggestion),
       });
     }
   };
@@ -222,6 +270,7 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
         message: `Text values should be wrapped in quotes: '${right.value}'.`,
         start: right.start,
         end: right.end,
+        suggestion: quoteValue(String(right.value)),
       });
       return;
     }
@@ -280,12 +329,14 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
     } else if (env.bracketDepth === 0) {
       // Standalone but unbracketed — works, but should be bracketed for clarity
       // and to stay safe if combined later.
+      const text = source.slice(node.start, node.end);
       diagnostics.push({
         severity: "warning",
         code: "MEMBERSHIP_BRACKETS",
         message: `Wrap "${node.op}" in [ ], e.g. ${example}.`,
         start: node.start,
         end: node.end,
+        suggestion: text ? `[${text}]` : undefined,
       });
     }
 
@@ -311,6 +362,7 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
           message: `List values should be quoted, e.g. '${value.value}'.`,
           start: value.start,
           end: value.end,
+          suggestion: quoteValue(String(value.value)),
         });
       }
     });
@@ -321,12 +373,14 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
       if (value.type !== "Literal") return;
       const id = String(value.value).toLowerCase();
       if (seen.has(id)) {
+        const deletable = source ? spanWithSeparator(source, value.start, value.end) : null;
         diagnostics.push({
           severity: "warning",
           code: "DUPLICATE_VALUE",
           message: `"${value.value}" is listed more than once.`,
-          start: value.start,
-          end: value.end,
+          start: deletable?.start ?? value.start,
+          end: deletable?.end ?? value.end,
+          suggestion: deletable ? "" : undefined,
         });
       }
       seen.add(id);
@@ -372,6 +426,9 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext): Diagnostic[] 
             ? { bracketDepth: env.bracketDepth + 1, combinedInScope: false }
             : env,
         );
+        break;
+      case "Not":
+        walk(node.expr, env);
         break;
       case "Comparison":
         checkComparison(node);

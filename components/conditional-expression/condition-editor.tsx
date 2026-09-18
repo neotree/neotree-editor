@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertCircleIcon, AlertTriangleIcon, Wand2Icon } from "lucide-react";
 
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { mergeConditionKeys, type ConditionKey } from "@/lib/conditional-expression";
+import { mergeConditionKeys, type ConditionKey, type Diagnostic } from "@/lib/conditional-expression";
 import {
+  getConditionValueMatches,
   getTokenAtCursor,
   getValueContextAtCursor,
   insertKeyAtCursor,
@@ -33,7 +34,10 @@ export interface ConditionEditorProps {
   allowSelf?: boolean;
   selfDataType?: string;
   selfOptions?: string[];
+  unavailableKeys?: Record<string, string>;
   keysLoading?: boolean;
+  /** Authoritative catalogue readiness; unlike key count, loaded-empty is ready. */
+  keysReady?: boolean;
   disabled?: boolean;
   rows?: number;
   placeholder?: string;
@@ -63,6 +67,8 @@ export function ConditionEditor({
   allowSelf,
   selfDataType,
   selfOptions,
+  unavailableKeys,
+  keysReady: keysReadyProp,
   disabled,
   rows = 4,
   placeholder,
@@ -71,16 +77,26 @@ export function ConditionEditor({
   onValidityChange,
 }: ConditionEditorProps) {
   const [cursor, setCursor] = useState(value.length);
+  const [selectedSuggestion, setSelectedSuggestion] = useState(0);
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<string | null>(null);
+  const [acceptedSuggestion, setAcceptedSuggestion] = useState<{ value: string; cursor: number } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingCursorRef = useRef<number | null>(null);
+  const listboxId = useId();
 
   const mergedKeys = useMemo(
     () => (extraKeys?.length ? mergeConditionKeys(keys, extraKeys) : keys),
     [keys, extraKeys],
   );
+  // Availability controls validation, not discovery. Keeping unavailable keys
+  // in autocomplete lets authors inspect configured CDS values while the
+  // targeted diagnostic still prevents an invalid before-producer reference.
+  const autocompleteKeys = mergedKeys;
 
-  // Readiness is based on *having* keys, not the transient loading flag —
-  // otherwise a background refetch (keysLoading -> true) would momentarily
-  // blank out key-dependent diagnostics. Keys persist once loaded.
-  const keysReady = keys.length > 0;
+  // Prefer the authoritative loaded signal: an empty-but-loaded catalogue must
+  // still validate, while a background refetch must not blank diagnostics.
+  // Standalone callers retain the non-empty-list fallback.
+  const keysReady = keysReadyProp ?? (keys.length > 0);
 
   const { diagnostics, hasErrors } = useConditionValidation({
     value,
@@ -89,6 +105,7 @@ export function ConditionEditor({
     allowSelf,
     selfDataType,
     selfOptions,
+    unavailableKeys,
     keysReady,
   });
 
@@ -112,13 +129,11 @@ export function ConditionEditor({
   const activeToken = useMemo(() => getTokenAtCursor(value, cursor), [value, cursor]);
 
   const matches = useMemo(() => {
-    if (!activeToken || !mergedKeys.length) return [];
+    if (!activeToken || !autocompleteKeys.length) return [];
     const token = activeToken.token;
     if (token.toLowerCase() === "self") return [];
-    // Hide once the token already exactly matches a known key.
-    if (token.length > 2 && mergedKeys.some((k) => k.name.toLowerCase() === token.toLowerCase())) return [];
-    return sortKeyMatches(mergedKeys, token);
-  }, [activeToken, mergedKeys]);
+    return sortKeyMatches(autocompleteKeys, token);
+  }, [activeToken, autocompleteKeys]);
 
   // Value autocomplete: when typing a value, suggest the governing key's
   // options (its child keys). Only when not already completing a $key.
@@ -129,18 +144,125 @@ export function ConditionEditor({
 
   const valueMatches = useMemo(() => {
     if (!valueContext) return [];
-    const key = mergedKeys.find((k) => k.name.toLowerCase() === valueContext.keyName.toLowerCase());
-    if (!key?.options?.length) return [];
-    const partial = valueContext.partial.toLowerCase();
-    if (partial && key.options.some((o) => o.toLowerCase() === partial)) return []; // already an exact option
-    return key.options
-      .filter((o) => !partial || o.toLowerCase().includes(partial))
-      .map((o) => ({ value: o, label: key.optionLabels?.[o] }));
-  }, [valueContext, mergedKeys]);
+    const key = autocompleteKeys.find((k) => k.name.toLowerCase() === valueContext.keyName.toLowerCase());
+    return getConditionValueMatches(key, valueContext.partial);
+  }, [valueContext, autocompleteKeys]);
+
+  const keySuggestions = matches.slice(0, MAX_SUGGESTIONS);
+  const valueSuggestions = !matches.length ? valueMatches.slice(0, MAX_SUGGESTIONS) : [];
+  const suggestionsSignature = activeToken && keySuggestions.length
+    ? `key:${activeToken.start}:${activeToken.end}:${activeToken.token}`
+    : valueContext && valueSuggestions.length
+      ? `value:${valueContext.insertStart}:${valueContext.insertEnd}:${valueContext.partial}`
+      : null;
+  const acceptedSuggestionStillCurrent = !!acceptedSuggestion
+    && acceptedSuggestion.value === value
+    && acceptedSuggestion.cursor === cursor;
+  const suggestionsOpen = !!suggestionsSignature
+    && dismissedSuggestions !== suggestionsSignature
+    && !acceptedSuggestionStillCurrent;
+  const visibleKeySuggestions = suggestionsOpen ? keySuggestions : [];
+  const visibleValueSuggestions = suggestionsOpen ? valueSuggestions : [];
+  const suggestionCount = visibleKeySuggestions.length || visibleValueSuggestions.length;
+  const valueKey = valueContext
+    ? mergedKeys.find((key) => key.name.toLowerCase() === valueContext.keyName.toLowerCase())
+    : undefined;
+  const exactValueMatch = valueContext
+    ? valueKey?.options?.find((option) => option.toLowerCase() === valueContext.partial.trim().toLowerCase())
+    : undefined;
+  const emptyOutcomeCollections = useMemo(() => {
+    const referenced = mergedKeys.filter((key) => (
+      (key.name === "Diagnoses" || key.name === "Problems")
+      && Array.isArray(key.options)
+      && key.options.length === 0
+      && new RegExp(`\\$${key.name}\\b`, "i").test(value)
+    ));
+    if (
+      valueKey
+      && (valueKey.name === "Diagnoses" || valueKey.name === "Problems")
+      && Array.isArray(valueKey.options)
+      && valueKey.options.length === 0
+      && !referenced.some((key) => key.name === valueKey.name)
+    ) {
+      referenced.push(valueKey);
+    }
+    return referenced;
+  }, [mergedKeys, value, valueKey]);
+
+  useEffect(() => {
+    setSelectedSuggestion(0);
+  }, [suggestionsSignature]);
+
+  useEffect(() => {
+    const pending = pendingCursorRef.current;
+    if (pending === null) return;
+    pendingCursorRef.current = null;
+    textareaRef.current?.focus();
+    textareaRef.current?.setSelectionRange(pending, pending);
+  }, [value]);
+
+  const moveCursorAfterChange = (
+    nextCursor: number,
+    opts?: { acceptedValue?: string },
+  ) => {
+    pendingCursorRef.current = nextCursor;
+    setCursor(nextCursor);
+    setDismissedSuggestions(opts?.acceptedValue === undefined ? null : suggestionsSignature);
+    setAcceptedSuggestion(opts?.acceptedValue === undefined
+      ? null
+      : { value: opts.acceptedValue, cursor: nextCursor });
+  };
+
+  const applyKeySuggestion = (name: string) => {
+    const next = insertKeyAtCursor(value, name, activeToken);
+    onChange(next.condition);
+    moveCursorAfterChange(next.cursor, { acceptedValue: next.condition });
+  };
+
+  const applyValueSuggestion = (optionValue: string) => {
+    if (!valueContext) return;
+    const next = insertValueAtContext(value, optionValue, valueContext, {
+      // Configuration and other boolean keys must remain real runtime booleans;
+      // quoted "true"/"false" values do not have equivalent runtime semantics.
+      quote: valueKey?.dataType?.toLowerCase() !== "boolean",
+    });
+    onChange(next.condition);
+    moveCursorAfterChange(next.cursor, { acceptedValue: next.condition });
+  };
+
+  const applySuggestion = (diagnostic: Diagnostic) => {
+    if (diagnostic.suggestion === undefined) return;
+    const next = `${value.slice(0, diagnostic.start)}${diagnostic.suggestion}${value.slice(diagnostic.end)}`;
+    onChange(next);
+    moveCursorAfterChange(diagnostic.start + diagnostic.suggestion.length);
+  };
+
+  // Codes whose suggestion is a drop-in replacement for its own span. A code
+  // may still omit the suggestion case by case (e.g. no close option match, or
+  // a membership that needs restructuring), hence the presence check.
+  const canApplySuggestion = (diagnostic: Diagnostic) => (
+    diagnostic.suggestion !== undefined
+    && [
+      "LEGACY_NEGATION",
+      "LEGACY_REVERSED_COMPARISON",
+      "SPACED_NOT_EQUAL",
+      "MISMATCHED_QUOTED_VALUE",
+      "DOUBLED_QUOTED_VALUE",
+      "KEY_CASE",
+      "UNKNOWN_KEY",
+      "UNKNOWN_OPTION",
+      "UNQUOTED_VALUE",
+      "VALUE_WHITESPACE",
+      "TRAILING_WHITESPACE",
+      "DUPLICATE_VALUE",
+      "MEMBERSHIP_BRACKETS",
+    ].includes(diagnostic.code)
+  );
 
   return (
     <div className="space-y-2">
       <Textarea
+        ref={textareaRef}
         id={id}
         rows={rows}
         noRing={false}
@@ -148,26 +270,66 @@ export function ConditionEditor({
         placeholder={placeholder}
         value={value}
         onChange={(event) => {
+          setAcceptedSuggestion(null);
           onChange(event.target.value);
           setCursor(event.target.selectionStart ?? event.target.value.length);
         }}
-        onClick={(event) => setCursor(event.currentTarget.selectionStart ?? 0)}
-        onKeyUp={(event) => setCursor(event.currentTarget.selectionStart ?? 0)}
+        onClick={(event) => {
+          setAcceptedSuggestion(null);
+          setCursor(event.currentTarget.selectionStart ?? 0);
+        }}
+        onKeyDown={(event) => {
+          if (!suggestionCount) return;
+          // Conditions are intentionally multiline. Keep the standard Enter
+          // shortcut for accepting a suggestion, while Shift+Enter always
+          // remains available for inserting a newline mid-token.
+          if (event.key === "Enter" && event.shiftKey) return;
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const direction = event.key === "ArrowDown" ? 1 : -1;
+            setSelectedSuggestion((current) => (current + direction + suggestionCount) % suggestionCount);
+            return;
+          }
+          if (event.key === "Enter") {
+            event.preventDefault();
+            const keyOption = visibleKeySuggestions[selectedSuggestion];
+            const valueOption = visibleValueSuggestions[selectedSuggestion];
+            if (keyOption) applyKeySuggestion(keyOption.name);
+            else if (valueOption) applyValueSuggestion(valueOption.value);
+            return;
+          }
+          if (event.key === "Escape" && suggestionsSignature) {
+            event.preventDefault();
+            setDismissedSuggestions(suggestionsSignature);
+          }
+        }}
+        onKeyUp={(event) => {
+          if (event.key === "Enter" && event.shiftKey) {
+            setCursor(event.currentTarget.selectionStart ?? 0);
+            return;
+          }
+          if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(event.key) && suggestionCount) return;
+          setCursor(event.currentTarget.selectionStart ?? 0);
+        }}
+        aria-autocomplete="list"
+        aria-expanded={suggestionsOpen}
+        aria-controls={suggestionsOpen ? listboxId : undefined}
+        aria-activedescendant={suggestionsOpen ? `${listboxId}-option-${selectedSuggestion}` : undefined}
       />
 
-      {!!matches.length && (
-        <div className="max-h-56 overflow-y-auto rounded-md border border-border">
-          {matches.slice(0, MAX_SUGGESTIONS).map((option) => (
+      {!!visibleKeySuggestions.length && (
+        <div id={listboxId} role="listbox" className="max-h-56 overflow-y-auto rounded-md border border-border">
+          {visibleKeySuggestions.map((option, index) => (
             <button
               type="button"
               key={option.name}
-              className="flex w-full items-center px-3 py-2 text-left text-sm hover:bg-accent"
+              id={`${listboxId}-option-${index}`}
+              role="option"
+              aria-selected={index === selectedSuggestion}
+              className={cn("flex w-full items-center px-3 py-2 text-left text-sm hover:bg-accent", index === selectedSuggestion && "bg-accent")}
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                const next = insertKeyAtCursor(value, option.name, activeToken);
-                onChange(next.condition);
-                setCursor(next.cursor);
-              }}
+              onMouseEnter={() => setSelectedSuggestion(index)}
+              onClick={() => applyKeySuggestion(option.name)}
             >
               <Wand2Icon className="mr-2 h-3.5 w-3.5 shrink-0 opacity-60" />
               {option.label || option.name}
@@ -178,22 +340,28 @@ export function ConditionEditor({
               +{matches.length - MAX_SUGGESTIONS} more — keep typing to narrow…
             </p>
           )}
+          <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">↑↓ navigate · Enter apply · Shift+Enter newline · Esc close</p>
         </div>
       )}
 
-      {!matches.length && !!valueMatches.length && !!valueContext && (
-        <div className="max-h-56 overflow-y-auto rounded-md border border-border">
-          {valueMatches.slice(0, MAX_SUGGESTIONS).map((option) => (
+      {!!visibleValueSuggestions.length && !!valueContext && (
+        <div id={listboxId} role="listbox" className="max-h-56 overflow-y-auto rounded-md border border-border">
+          {exactValueMatch && (
+            <p className="border-b bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{exactValueMatch}</span> is valid. Additional matches are available below.
+            </p>
+          )}
+          {visibleValueSuggestions.map((option, index) => (
             <button
               type="button"
               key={option.value}
-              className="flex w-full items-center px-3 py-2 text-left text-sm hover:bg-accent"
+              id={`${listboxId}-option-${index}`}
+              role="option"
+              aria-selected={index === selectedSuggestion}
+              className={cn("flex w-full items-center px-3 py-2 text-left text-sm hover:bg-accent", index === selectedSuggestion && "bg-accent")}
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                const next = insertValueAtContext(value, option.value, valueContext);
-                onChange(next.condition);
-                setCursor(next.cursor);
-              }}
+              onMouseEnter={() => setSelectedSuggestion(index)}
+              onClick={() => applyValueSuggestion(option.value)}
             >
               <Wand2Icon className="mr-2 h-3.5 w-3.5 shrink-0 opacity-60" />
               {option.label ? `${option.value} - ${option.label}` : option.value}
@@ -204,25 +372,64 @@ export function ConditionEditor({
               +{valueMatches.length - MAX_SUGGESTIONS} more — keep typing to narrow…
             </p>
           )}
+          <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">↑↓ navigate · Enter apply · Shift+Enter newline · Esc close</p>
         </div>
       )}
 
-      {diagnostics.map((diagnostic, index) => (
-        <p
-          key={`${diagnostic.code}-${diagnostic.start}-${index}`}
-          className={cn(
-            "flex items-start gap-1.5 text-xs",
-            diagnostic.severity === "error" ? "text-destructive" : "text-yellow-600 dark:text-yellow-500",
-          )}
-        >
-          {diagnostic.severity === "error" ? (
-            <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          ) : (
-            <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          )}
-          <span>{diagnostic.message}</span>
-        </p>
+      {emptyOutcomeCollections.map((collection) => (
+        <div key={collection.name} className="flex items-start gap-1.5 rounded-md border border-yellow-500/40 bg-yellow-500/5 px-3 py-2 text-xs text-yellow-700 dark:text-yellow-400">
+          <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            No {collection.name.toLowerCase()} are configured in this script yet. Add them in the script&apos;s {collection.name} section before using this collection.
+          </span>
+        </div>
       ))}
+
+      {diagnostics.map((diagnostic, index) => {
+        const canApply = canApplySuggestion(diagnostic);
+        return (
+          <div
+            key={`${diagnostic.code}-${diagnostic.start}-${index}`}
+            className={cn(
+              "flex items-start gap-1.5 text-xs",
+              diagnostic.severity === "error" ? "text-destructive" : "text-yellow-600 dark:text-yellow-500",
+            )}
+          >
+            {diagnostic.severity === "error" ? (
+              <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            )}
+
+            <div className="min-w-0 space-y-1">
+              <p>{diagnostic.message}</p>
+              {(canApply || !!diagnostic.suggestion) && (
+                <div className="flex flex-wrap items-center gap-2 text-foreground">
+                  <span className="text-muted-foreground">Suggested:</span>
+                  {diagnostic.suggestion ? (
+                    <code className="max-w-full overflow-x-auto rounded bg-muted px-1.5 py-0.5">
+                      {diagnostic.suggestion}
+                    </code>
+                  ) : (
+                    // An empty replacement is a deletion — there is nothing to preview.
+                    <span className="italic text-muted-foreground">remove</span>
+                  )}
+                  {canApply && (
+                    <button
+                      type="button"
+                      className="font-medium text-primary underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={disabled}
+                      onClick={() => applySuggestion(diagnostic)}
+                    >
+                      Apply suggestion
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

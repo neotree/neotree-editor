@@ -7,9 +7,14 @@ export type Severity = "error" | "warning";
 export type DiagnosticCode =
   // Syntactic (from the parser/tokenizer)
   | "UNEXPECTED_TOKEN"
+  | "SPACED_NOT_EQUAL"
+  | "LEGACY_REVERSED_COMPARISON"
+  | "LEGACY_NEGATION"
   | "UNBALANCED_PAREN"
   | "UNBALANCED_BRACKET"
   | "UNTERMINATED_STRING"
+  | "MISMATCHED_QUOTED_VALUE"
+  | "DOUBLED_QUOTED_VALUE"
   | "MISSING_OPERATOR"
   | "MISSING_OPERAND"
   | "DANGLING_OPERATOR"
@@ -22,6 +27,8 @@ export type DiagnosticCode =
   // Semantic (needs the script key context)
   | "UNKNOWN_KEY"
   | "KEY_CASE"
+  | "OUTCOME_NOT_AVAILABLE"
+  | "RESERVED_KEY_COLLISION"
   | "SELF_NOT_ALLOWED"
   | "TYPE_MISMATCH"
   | "VALUE_TYPE"
@@ -32,10 +39,7 @@ export type DiagnosticCode =
   | "EMPTY_VALUE"
   | "NULL_VALUE"
   | "VALUE_WHITESPACE"
-  | "TRAILING_WHITESPACE"
-  // Reference-expression sublanguage
-  | "UNKNOWN_FUNCTION"
-  | "FUNCTION_ARG";
+  | "TRAILING_WHITESPACE";
 
 export interface Diagnostic {
   severity: Severity;
@@ -74,6 +78,11 @@ export interface LogicalNode extends Span {
 export interface GroupNode extends Span {
   type: "Group";
   bracket: "paren" | "bracket";
+  expr: Node;
+}
+
+export interface NotNode extends Span {
+  type: "Not";
   expr: Node;
 }
 
@@ -118,6 +127,7 @@ export type Node =
   | ProgramNode
   | LogicalNode
   | GroupNode
+  | NotNode
   | ComparisonNode
   | MembershipNode
   | VarNode
@@ -142,6 +152,8 @@ export interface ValidationContext {
   allowSelf?: boolean;
   selfDataType?: string;
   selfOptions?: string[];
+  /** Targeted reasons why otherwise-known keys cannot exist at this runtime point. */
+  unavailableKeys?: Record<string, string>;
   /**
    * Skip key-dependent semantic checks (unknown key, type, options).
    * Set while keys are still loading so we never false-flag every key.

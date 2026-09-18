@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader } from "@/components/loader";
-import { useScriptsContext, ScriptFormDataType, IScriptsContext } from "@/contexts/scripts";
+import { useScriptsContext } from "@/contexts/scripts";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -33,23 +33,19 @@ import Screens from './screens';
 import Problems from './problems';
 import Diagnoses from './diagnoses';
 import { ScriptPrintSetup } from './print';
-import { Separator } from "@/components/ui/separator";
 import { ScreenReviewConfig } from "./screen-review-config";
 import { LockStatus } from '@/components/lock-status';
 import { EligibilityCriteriaForm } from "./eligibility-criteria-form";
+import { useScriptFormCtx } from '@/contexts/script-form';
 
-type Props = {
-    formData?: ScriptFormDataType;
-    hospitals: Awaited<ReturnType<IScriptsContext['getHospitals']>>['data'];
-};
-
-export function ScriptForm(props: Props) {
+export function ScriptForm() {
     const searchParams = useSearchParams();
     const section = searchParams.get('section');
 
+    const scriptFormCtx = useScriptFormCtx();
     const { onCancelScriptForm } = useScriptsContext();
 
-    const form = useScriptForm(props);
+    const form = useScriptForm(scriptFormCtx);
     const {
         formData,
         hospitals,
@@ -87,7 +83,7 @@ export function ScriptForm(props: Props) {
 
             <ScriptItemsFab
                 disabled={disabled}
-                scriptId={props.formData?.scriptId}
+                scriptId={scriptFormCtx.formData?.scriptId}
                 resetForm={() => resetForm(getDefaultFormValues())}
             />
 
@@ -233,7 +229,7 @@ export function ScriptForm(props: Props) {
                     <div className="pt-4">
                         <EligibilityCriteriaForm
                             disabled={disabled}
-                            scriptId={props.formData?.scriptId}
+                            scriptId={scriptFormCtx.formData?.scriptId}
                             value={eligibilityCriteria || null}
                             onChange={async (data) => {
                                 setValue('eligibilityCriteria', data, { shouldDirty: true, });
@@ -267,7 +263,7 @@ export function ScriptForm(props: Props) {
                         />
                     </div>
 
-                    {!!props?.formData?.scriptId && ( 
+                    {!!scriptFormCtx?.formData?.scriptId && ( 
                         <>
                         <Title className="mt-5">Screens Review Configuration</Title>
 
@@ -285,7 +281,7 @@ export function ScriptForm(props: Props) {
                         />
                         <Label secondary htmlFor="reviewable">Enable Screen Review</Label>      
                         <ScreenReviewConfig
-                           scriptId={props?.formData?.scriptId||''}
+                           scriptId={scriptFormCtx?.formData?.scriptId||''}
                             disabled={disabled}
                             form={form}
                         />
@@ -316,7 +312,7 @@ export function ScriptForm(props: Props) {
                 </div>
             </div>
 
-            {!!props.formData && (
+            {!!scriptFormCtx.formData && (
                 <div
                     className={clsx(
                         'flex flex-col gap-y-4 mt-10',
@@ -329,7 +325,7 @@ export function ScriptForm(props: Props) {
 
                     {(!section || (section === 'screens')) && (
                         <Screens
-                            scriptId={props.formData.scriptId!}
+                            scriptId={scriptFormCtx.formData.scriptId!}
                             isScriptLocked={isLocked}
                             scriptLockedByUserId={lockedByUserId}
                         />
@@ -338,7 +334,7 @@ export function ScriptForm(props: Props) {
                     {section === 'diagnoses' && (
                         <>
                             <Diagnoses
-                                scriptId={props.formData.scriptId!}
+                                scriptId={scriptFormCtx.formData.scriptId!}
                                 isScriptLocked={isLocked}
                                 scriptLockedByUserId={lockedByUserId}
                             />
@@ -346,7 +342,7 @@ export function ScriptForm(props: Props) {
                             <br /><br />
 
                             <Problems
-                                scriptId={props.formData.scriptId!}
+                                scriptId={scriptFormCtx.formData.scriptId!}
                                 isScriptLocked={isLocked}
                                 scriptLockedByUserId={lockedByUserId}
                             />

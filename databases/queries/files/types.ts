@@ -33,6 +33,7 @@ export type GetFilesParams = {
     archived?: boolean;
     uploadDateGTE?: string | Date;
     uploadDateLTE?: string | Date;
+    withData?: boolean;
 };
 
 export type GetFilesResults = {

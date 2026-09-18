@@ -59,7 +59,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
-import type { ConditionKey } from "@/lib/conditional-expression";
+import { collectNewOutcomeKeyCollisions, getOutcomeCollectionForScreenType, getUnavailableOutcomeKeys, type ConditionKey } from "@/lib/conditional-expression";
 
 type Props = {
     scriptId: string;
@@ -101,7 +101,7 @@ export function ScreenForm(props: Props) {
         save,
     } = form;
     const [alias, setAlias] = useState('');
-    const { conditionKeys, keysLoading } = useConditionKeys();
+    const { conditionKeys, keysLoading, keysReady } = useConditionKeys();
     const [conditionHasErrors, setConditionHasErrors] = useState(false);
     const [skipToConditionHasErrors, setSkipToConditionHasErrors] = useState(false);
     const type = watch('type');
@@ -122,7 +122,50 @@ export function ScreenForm(props: Props) {
     const listStyle = form.watch('listStyle');
     const printDisplayColumns = form.watch('printDisplayColumns');
     const screenFields = watch('fields');
+    const screenItems = watch('items');
     const screenLabel = watch('label');
+    const screenTitle = watch('title');
+    const parsedPosition = formData?.position === null || formData?.position === undefined
+        ? Number.NaN
+        : Number(formData.position);
+    const currentPosition = Number.isFinite(parsedPosition)
+        ? parsedPosition
+        : Math.max(0, ...screens.map(screen => Number(screen?.position) || 0)) + 1;
+    const screensForValidation = useMemo(() => {
+        const current = {
+            screenId: formData?.screenId,
+            title: screenTitle,
+            type,
+            key,
+            position: currentPosition,
+            fields: screenFields,
+            items: screenItems,
+        };
+        const currentId = `${formData?.screenId || ''}`;
+        return [
+            ...screens.filter(screen => !currentId || `${screen?.screenId || ''}` !== currentId),
+            current,
+        ];
+    }, [currentPosition, formData?.screenId, key, screenFields, screenItems, screenTitle, screens, type]);
+    const unavailableOutcomeKeys = useMemo(
+        () => getUnavailableOutcomeKeys({ screens: screensForValidation, consumerPosition: currentPosition }),
+        [currentPosition, screensForValidation],
+    );
+    const reservedKeyCollisions = useMemo(
+        () => collectNewOutcomeKeyCollisions({
+            screens: [{
+                screenId: formData?.screenId,
+                title: screenTitle,
+                type,
+                key,
+                fields: screenFields,
+                items: screenItems,
+            }],
+        }, {
+            screens: formData ? [formData as any] : [],
+        }),
+        [formData, key, screenFields, screenItems, screenTitle, type],
+    );
     // Keys defined on this (possibly unsaved) screen, so conditions can
     // reference sibling fields before the first save. Use the screen `type`
     // (e.g. multi_select) rather than its stored dataType (e.g. set<id>) so
@@ -275,6 +318,7 @@ export function ScreenForm(props: Props) {
 
     const isDiagnosisScreen = type === 'diagnosis';
     const isProblemsScreen = type === 'problems';
+    const outcomeCollection = getOutcomeCollectionForScreenType(type);
     const isProgressScreen = type === 'progress';
     const isFormScreen = type === 'form';
     const isChecklistScreen = type === 'checklist';
@@ -462,6 +506,8 @@ export function ScreenForm(props: Props) {
                                 keys={conditionKeys}
                                 extraKeys={localConditionKeys}
                                 keysLoading={keysLoading}
+                                keysReady={keysReady}
+                                unavailableKeys={unavailableOutcomeKeys}
                                 disabled={disabled}
                                 initialValue={formData?.condition || ''}
                                 onValidityChange={setConditionHasErrors}
@@ -486,6 +532,8 @@ export function ScreenForm(props: Props) {
                                     keys={conditionKeys}
                                     extraKeys={localConditionKeys}
                                     keysLoading={keysLoading}
+                                    keysReady={keysReady}
+                                    unavailableKeys={unavailableOutcomeKeys}
                                     disabled={disabled}
                                     initialValue={formData?.skipToCondition || ''}
                                     onValidityChange={setSkipToConditionHasErrors}
@@ -530,6 +578,14 @@ export function ScreenForm(props: Props) {
                 </div>
 
                 <Title>Properties</Title>
+
+                {!!reservedKeyCollisions.length && (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        {reservedKeyCollisions.map((collision, index) => (
+                            <p key={`${collision.location}-${index}`}>{collision.message}</p>
+                        ))}
+                    </div>
+                )}
 
                 <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
                     <div>
@@ -588,6 +644,19 @@ export function ScreenForm(props: Props) {
 
                 {(isDiagnosisScreen || isProblemsScreen) && (
                     <>
+                        <div>
+                            <Label secondary htmlFor="outcomeCollection">Conditional-expression collection</Label>
+                            <Input
+                                id="outcomeCollection"
+                                value={`$${outcomeCollection}`}
+                                readOnly
+                                noRing={false}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                This virtual collection is assigned automatically. Its suggested values come from the script&apos;s Problems &amp; Diagnoses section.
+                            </span>
+                        </div>
+
                         <div>
                             <Label secondary htmlFor="title2">Title 2 *</Label>
                             <Input
@@ -1209,7 +1278,7 @@ export function ScreenForm(props: Props) {
                 >Cancel</Button>
 
                 <Button
-                    disabled={disabled || conditionHasErrors || skipToConditionHasErrors}
+                    disabled={disabled || conditionHasErrors || skipToConditionHasErrors || !!reservedKeyCollisions.length}
                     onClick={() => save()}
                 >
                     Save Draft
@@ -1243,6 +1312,8 @@ export function ScreenForm(props: Props) {
                         form={form}
                         disabled={disabled}
                         scriptId={scriptId}
+                        unavailableOutcomeKeys={unavailableOutcomeKeys}
+                        persistedFields={(formData?.fields || []) as ScriptField[]}
                     />
                     
                     {repeatable && (

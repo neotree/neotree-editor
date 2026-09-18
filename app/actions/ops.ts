@@ -21,7 +21,9 @@ import * as dataKeysQueries from "@/databases/queries/data-keys"
 import { _getEditorInfo, type GetEditorInfoResults } from "@/databases/queries/editor-info"
 import { _saveChangeLog } from "@/databases/mutations/changelogs/_save-change-log"
 import { buildReleasePublishChangeLog } from "@/databases/mutations/changelogs"
-import { getScriptsWithConditionErrors, recomputeScriptsConditionErrors } from "./scripts"
+import { getScriptsWithConditionErrors, getScriptsWithFieldKeyCollisions, recomputeScriptsConditionErrors } from "./scripts"
+import { describeFieldKeyCollisionCounts } from "@/lib/field-key-collisions"
+import type { PublishDataResponse } from "@/lib/publish-data"
 import db from "@/databases/pg/drizzle"
 import {
   configKeysDrafts,
@@ -1348,8 +1350,8 @@ export const countAllDrafts = async () => {
   }
 }
 
-export async function publishData({ scope }: { scope: number }) {
-  const results: { success: boolean; errors?: string[]; warnings?: string[]; blockingDetails?: any } = { success: true }
+export async function publishData({ scope }: { scope: number }): Promise<PublishDataResponse> {
+  const results: PublishDataResponse = { success: true }
   try {
     const session = await isAllowed([
       "create_config_keys",
@@ -1377,17 +1379,27 @@ export async function publishData({ scope }: { scope: number }) {
     const publishScriptIds = new Set<string>()
     try {
       const draftRows = await Promise.all([
-        db.select({ scriptId: scriptsDrafts.scriptId }).from(scriptsDrafts).where(draftScopeFilter(scriptsDrafts.createdByUserId)),
-        db.select({ scriptId: screensDrafts.scriptId }).from(screensDrafts).where(draftScopeFilter(screensDrafts.createdByUserId)),
-        db.select({ scriptId: diagnosesDrafts.scriptId }).from(diagnosesDrafts).where(draftScopeFilter(diagnosesDrafts.createdByUserId)),
-        db.select({ scriptId: problemsDrafts.scriptId }).from(problemsDrafts).where(draftScopeFilter(problemsDrafts.createdByUserId)),
+        db.select({ scriptId: scriptsDrafts.scriptId, scriptDraftId: scriptsDrafts.scriptDraftId }).from(scriptsDrafts).where(draftScopeFilter(scriptsDrafts.createdByUserId)),
+        db.select({ scriptId: screensDrafts.scriptId, scriptDraftId: screensDrafts.scriptDraftId }).from(screensDrafts).where(draftScopeFilter(screensDrafts.createdByUserId)),
+        db.select({ scriptId: diagnosesDrafts.scriptId, scriptDraftId: diagnosesDrafts.scriptDraftId }).from(diagnosesDrafts).where(draftScopeFilter(diagnosesDrafts.createdByUserId)),
+        db.select({ scriptId: problemsDrafts.scriptId, scriptDraftId: problemsDrafts.scriptDraftId }).from(problemsDrafts).where(draftScopeFilter(problemsDrafts.createdByUserId)),
       ])
-      for (const rows of draftRows) for (const r of rows) if (r?.scriptId) publishScriptIds.add(`${r.scriptId}`)
+      for (const rows of draftRows) {
+        for (const row of rows) {
+          const scriptId = row?.scriptId || row?.scriptDraftId
+          if (scriptId) publishScriptIds.add(`${scriptId}`)
+        }
+      }
     } catch (e: any) {
       logger.error("publishData scope-scripts lookup ERROR", e.message)
     }
 
-    const ceGate = await getScriptsWithConditionErrors({ scriptIds: Array.from(publishScriptIds) })
+    const publishScope = Array.from(publishScriptIds)
+
+    const ceGate = await getScriptsWithConditionErrors({
+      scriptIds: publishScope,
+      forceRefresh: true,
+    })
     if (ceGate.scripts.length) {
       const top = ceGate.scripts.slice(0, 10)
       const lines = top.map((s) => `• ${s.title} (${s.count} issue${s.count === 1 ? "" : "s"})`)
@@ -1397,7 +1409,24 @@ export async function publishData({ scope }: { scope: number }) {
         `${ceGate.scripts.length} script${ceGate.scripts.length === 1 ? "" : "s"} being published contain ${ceGate.totalFindings} conditional-expression issue${ceGate.totalFindings === 1 ? "" : "s"}. These will reach the mobile app as-is:`,
         ...lines,
       ]
-      results.blockingDetails = { conditionErrors: ceGate }
+    }
+
+    // Duplicate field keys break a screen in the app before conditions are even
+    // evaluated: one field is dropped and both answers land on the same key.
+    const keyGate = await getScriptsWithFieldKeyCollisions({ scriptIds: publishScope })
+    if (keyGate.scripts.length) {
+      const affected = keyGate.scripts.filter((s) => s.blocking > 0)
+      const top = (affected.length ? affected : keyGate.scripts).slice(0, 10)
+      const lines = top.map((s) => `• ${s.title} (${describeFieldKeyCollisionCounts(s.byKind).join(", ")})`)
+      const more = (affected.length ? affected : keyGate.scripts).length - top.length
+      if (more > 0) lines.push(`• …and ${more} more script${more === 1 ? "" : "s"}`)
+
+      const headline = keyGate.totalBlocking
+        ? `${keyGate.totalBlocking} field${keyGate.totalBlocking === 1 ? " uses a key that is" : "s use keys that are"} used more than once on the same screen. The app drops one field per duplicate and writes both answers to the same key:`
+        : `${describeFieldKeyCollisionCounts(keyGate.totalsByKind).join(", ")}. Review before this reaches the app:`
+
+      results.warnings = [...(results.warnings || []), headline, ...lines]
+      results.blockingDetails = { ...(results.blockingDetails || {}), fieldKeyCollisions: keyGate }
     }
 
     await db.transaction(async (tx) => {

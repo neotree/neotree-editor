@@ -16,6 +16,7 @@ import {
     syncScreenEntityReference,
     syncScreenReference,
 } from "@/databases/mutations/data-keys/_update_data_keys_refs.helpers";
+import { getOutcomeCollectionForScreenType } from "@/lib/conditional-expression/script-outcomes";
 
 export type DataKeyIntegrityStatus =
     | "resolved"
@@ -629,6 +630,7 @@ export function scanDataKeyIntegrity({
     };
 
     for (const screen of screens) {
+        const outcomeCollection = getOutcomeCollectionForScreenType(screen.type);
         const screenBase = {
             scriptId: screen.scriptId,
             scriptTitle: screen.scriptTitle || undefined,
@@ -636,7 +638,7 @@ export function scanDataKeyIntegrity({
             location: screen.title || screen.label || screen.refId || screen.screenId,
         };
 
-        if (hasReferenceIdentity([screen.keyId, screen.key])) {
+        if (!outcomeCollection && hasReferenceIdentity([screen.keyId, screen.key])) {
             pushEntry(evaluateReference({
                 currentUniqueKey: screen.keyId || undefined,
                 currentKey: screen.key || undefined,
@@ -654,7 +656,7 @@ export function scanDataKeyIntegrity({
             }));
         }
 
-        const screenDataKey = screen.keyId ? byUniqueKey.get(screen.keyId) : undefined;
+        const screenDataKey = !outcomeCollection && screen.keyId ? byUniqueKey.get(screen.keyId) : undefined;
         const screenOwnedOptions = resolveOwnedOptions(screenDataKey, byUniqueKey);
         const screenOwnedOptionKeys = new Set(screenOwnedOptions.map((option) => option.uniqueKey));
         const ownsScreenOptionCollection = shouldSyncScreenOwnedOptions({
@@ -1036,8 +1038,9 @@ export function repairDataKeyIntegrityReferences<TScript extends NuidSearchSourc
 
     const repairedScreens = screens.map((screen) => {
         let changed = false;
+        const outcomeCollection = getOutcomeCollectionForScreenType(screen.type);
 
-        const screenDataKey = resolveDataKeyMatch({
+        const screenDataKey = outcomeCollection ? undefined : resolveDataKeyMatch({
             currentUniqueKey: screen.keyId || undefined,
             currentKey: screen.key || undefined,
             currentLabel: screen.label || undefined,
@@ -1149,7 +1152,9 @@ export function repairDataKeyIntegrityReferences<TScript extends NuidSearchSourc
             };
         });
 
-        const syncedScreen = syncScreenEntityReference(screen, screenDataKey);
+        const syncedScreen = outcomeCollection
+            ? { value: screen, changed: false }
+            : syncScreenEntityReference(screen, screenDataKey);
         if (syncedScreen.changed) changed = true;
 
         return {
@@ -1284,6 +1289,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
 
     const repairedScreens = screens.map((screen) => {
         let changed = false;
+        const outcomeCollection = getOutcomeCollectionForScreenType(screen.type);
         const screenBase = {
             scriptId: screen.scriptId,
             screenId: screen.screenId,
@@ -1292,7 +1298,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
 
         let nextScreen = screen;
 
-        if (matchesIntegrityEntry(entry, { ...screenBase, kind: "screen" })) {
+        if (!outcomeCollection && matchesIntegrityEntry(entry, { ...screenBase, kind: "screen" })) {
             const screenDataKey = overrideTarget || resolveDataKeyMatch({
                 currentUniqueKey: screen.keyId || undefined,
                 currentKey: screen.key || undefined,

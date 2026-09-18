@@ -225,7 +225,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                             ...item,
                         } as typeof draft.data;
                         
-                        const q = db
+                        const q = executor
                             .update(screensDrafts)
                             .set({
                                 data,

@@ -4,6 +4,7 @@ import { getScriptsWithItems } from "@/app/actions/scripts";
 import { collectScriptConditionFindings } from "@/lib/conditional-expression";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 import { _getDataKeys } from "@/databases/queries/data-keys";
+import { _getConfigKeys } from "@/databases/queries/config-keys";
 
 async function main() {
   const scriptIdArg = process.argv[2];
@@ -17,7 +18,14 @@ async function main() {
     process.exit(2);
   }
 
-  const registry = await _getDataKeys({ returnDraftsIfExist: true });
+  const [registry, configurationKeys] = await Promise.all([
+    _getDataKeys({ returnDraftsIfExist: true }),
+    _getConfigKeys({ returnDraftsIfExist: true }),
+  ]);
+  if (configurationKeys.errors?.length) {
+    console.error("Failed to load Configuration keys:", configurationKeys.errors.join(", "));
+    process.exit(2);
+  }
   const dataKeyIndex = indexDataKeysById((registry.data || []) as any);
 
   type Row = { scriptTitle: string; scriptId: string; location: string; field: string; expression: string; messages: string[] };
@@ -29,6 +37,7 @@ async function main() {
     const scriptTitle = `${script?.title || script?.name || scriptId}`;
     const findings = collectScriptConditionFindings({
       ...script,
+      configurationKeys: configurationKeys.data || [],
       nuidDataKeys: resolveNuidLibraryKeys(script?.nuidSearchFields || [], dataKeyIndex),
     });
     for (const finding of findings) {

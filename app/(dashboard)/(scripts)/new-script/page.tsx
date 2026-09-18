@@ -20,7 +20,7 @@ export default async function NewScriptPage({}: Props) {
                 title="New script"
                 backLink="/"
             >
-                <ScriptForm hospitals={hospitals.data} />
+                <ScriptForm />
             </PageContainer>
         </>
     )

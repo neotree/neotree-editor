@@ -1,14 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { Edit, ExternalLink, AlertCircleIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DataTable } from "@/components/data-table";
-import { getScriptsConditionErrors, type ScriptConditionReport } from "@/app/actions/scripts";
+import {
+    getScriptsConditionErrors,
+    recheckScriptConditionErrors,
+    getScriptsWithFieldKeyCollisions,
+    type ScriptConditionReport,
+    type ScriptFieldKeyCollisionReport,
+} from "@/app/actions/scripts";
+import { ScriptIssueBadge, type ScriptIssue } from "@/components/script-issues";
+import { getFieldKeyCollisionRule } from "@/lib/field-key-collisions";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
@@ -44,14 +51,15 @@ export function ScriptsTable(props: Props) {
     const { hospitals, } = useScriptsContext();
 
     const [conditionErrors, setConditionErrors] = useState<Record<string, ScriptConditionReport>>({});
+    const [keyCollisions, setKeyCollisions] = useState<Record<string, ScriptFieldKeyCollisionReport>>({});
     const scriptsSignature = useMemo(
         () => (props.scripts?.data || [])
             .map((s: any) => `${s?.scriptId}:${s?.version}:${s?.isDraft ? 1 : 0}:${s?.hasChangedItems ? 1 : 0}`)
             .join(','),
         [props.scripts],
     );
-    useEffect(() => {
-        let cancelled = false;
+    const loadIssues = useCallback(async (opts?: { cancelled?: () => boolean }) => {
+        const isCancelled = () => !!opts?.cancelled?.();
         const input = (props.scripts?.data || []).map((s: any) => ({
             scriptId: s?.scriptId,
             nuidSearchFields: s?.nuidSearchFields,
@@ -59,13 +67,35 @@ export function ScriptsTable(props: Props) {
         }));
         if (!input.length) {
             setConditionErrors({});
+            setKeyCollisions({});
             return;
         }
-        getScriptsConditionErrors(input)
-            .then((res) => { if (!cancelled) setConditionErrors(res?.data || {}); })
-            .catch(() => { /* badges are best-effort; ignore failures */ });
-        return () => { cancelled = true; };
+        await Promise.all([
+            getScriptsConditionErrors(input)
+                .then((res) => { if (!isCancelled()) setConditionErrors(res?.data || {}); })
+                .catch(() => { /* badges are best-effort; ignore failures */ }),
+            getScriptsWithFieldKeyCollisions({ scriptIds: input.map((s) => s.scriptId).filter(Boolean) })
+                .then((res) => {
+                    if (isCancelled()) return;
+                    const byScript: Record<string, ScriptFieldKeyCollisionReport> = {};
+                    for (const report of res?.scripts || []) byScript[report.scriptId] = report;
+                    setKeyCollisions(byScript);
+                })
+                .catch(() => { /* badges are best-effort; ignore failures */ }),
+        ]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scriptsSignature]);
+
+    useEffect(() => {
+        let cancelled = false;
+        void loadIssues({ cancelled: () => cancelled });
+        return () => { cancelled = true; };
+    }, [loadIssues]);
+
+    const onRecheckIssues = useCallback(async (scriptId: string) => {
+        await recheckScriptConditionErrors(scriptId);
+        await loadIssues();
+    }, [loadIssues]);
 
     const displayLoader = loading;
 
@@ -267,46 +297,30 @@ export function ScriptsTable(props: Props) {
                             cellRenderer({ rowIndex }) {
                                 const s = scriptsArr[rowIndex];
                                 const report = s ? conditionErrors[s.scriptId] : undefined;
-                                const count = report?.count || 0;
+                                const keyReport = s ? keyCollisions[s.scriptId] : undefined;
+
+                                const issues: ScriptIssue[] = [
+                                    // Each example names its own rule and severity. Deriving
+                                    // either from the script-wide blocking count labelled every
+                                    // warning as a same-screen duplicate.
+                                    ...(keyReport?.examples || []).map((example) => ({
+                                        severity: (example.severity === 'blocking' ? 'error' : 'warning') as ScriptIssue['severity'],
+                                        group: getFieldKeyCollisionRule(example.kind)?.label || 'Duplicate field key',
+                                        message: example.displayKey ? `${example.location} [${example.displayKey}]` : example.location,
+                                        href: example.href,
+                                    })),
+                                    ...(report?.findings || []).map((finding) => ({
+                                        severity: 'error' as ScriptIssue['severity'],
+                                        group: 'Conditional expression',
+                                        message: finding.location,
+                                        href: finding.href,
+                                    })),
+                                ];
+
                                 return (
                                     <span className="inline-flex items-center gap-x-2">
                                         <span>{s?.title || ''}</span>
-                                        {!!count && (
-                                            <TooltipProvider delayDuration={0}>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <span
-                                                            className="inline-flex shrink-0 items-center text-destructive"
-                                                            aria-label="Has conditional expression errors"
-                                                        >
-                                                            <AlertCircleIcon className="h-4 w-4" />
-                                                        </span>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="max-w-sm">
-                                                        <div className="flex flex-col gap-1 text-xs">
-                                                            <span className="font-medium">
-                                                                {count} conditional expression error{count === 1 ? '' : 's'}
-                                                            </span>
-                                                            {(report?.findings || []).slice(0, 8).map((f, i) => (
-                                                                f.href ? (
-                                                                    <Link
-                                                                        key={i}
-                                                                        href={f.href}
-                                                                        className="underline hover:text-primary"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                    >
-                                                                        • {f.location}
-                                                                    </Link>
-                                                                ) : (
-                                                                    <span key={i}>• {f.location}</span>
-                                                                )
-                                                            ))}
-                                                            {count > 8 && <span className="opacity-70">…and {count - 8} more</span>}
-                                                        </div>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        )}
+                                        <ScriptIssueBadge issues={issues} />
                                     </span>
                                 );
                             },
@@ -353,6 +367,7 @@ export function ScriptsTable(props: Props) {
                                     <ScriptsTableActions 
                                         item={s}
                                         disabled={disabled}
+                                        onRecheckIssues={() => onRecheckIssues(s.scriptId)}
                                         setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
                                         onDelete={() => onDelete([s.scriptId])}
                                         onDuplicate={() => onDuplicate([s.scriptId])}
