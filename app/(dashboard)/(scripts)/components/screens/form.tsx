@@ -108,6 +108,7 @@ export function ScreenForm(props: Props) {
     const skippable = watch('skippable');
     const printable = watch('printable');
     const confidential = watch('confidential');
+    const confidentialLabelOnly = watch('confidentialLabelOnly');
     const keyId = watch('keyId');
     const prePopulate = watch('prePopulate');
     const image1 = watch('image1');
@@ -190,6 +191,7 @@ export function ScreenForm(props: Props) {
         return dataKey;
     }, [extractDataKeys, keyId]);
     const inheritedConfidential = !!selectedDataKey?.confidential;
+    const inheritedConfidentialLabelOnly = !!selectedDataKey?.confidentialLabelOnly;
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -215,6 +217,12 @@ export function ScreenForm(props: Props) {
             setValue('confidential', inheritedConfidential, { shouldDirty: true, });
         }
     }, [confidential, inheritedConfidential, setValue]);
+
+    useEffect(() => {
+        if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+            setValue('confidentialLabelOnly', inheritedConfidentialLabelOnly, { shouldDirty: true, });
+        }
+    }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
 
     const lockStatus = !(isLocked || isScriptLocked) ? null : (
         <div>
@@ -358,6 +366,7 @@ export function ScreenForm(props: Props) {
                     setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
                     setValue('confidential', !!dataKey?.confidential, { shouldDirty: true, });
+                    setValue('confidentialLabelOnly', !!dataKey?.confidentialLabelOnly, { shouldDirty: true, });
                     if (hasItems) setValue('items', [], { shouldDirty: true, });
                     if (hasFields) setValue('fields', [], { shouldDirty: true, });
 
@@ -967,6 +976,46 @@ export function ScreenForm(props: Props) {
                                             disabled
                                         />
                                         <Label secondary htmlFor="confidential">Confidential</Label>
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <div className="flex flex-col gap-y-1">
+                                        <span>Change confidentiality in the Data Key library.</span>
+                                        {!!keyId && (
+                                            <Link
+                                                href={`/data-keys/edit/${keyId}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="underline"
+                                            >
+                                                Open Data Key
+                                            </Link>
+                                        )}
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+
+                        <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="flex-1 flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                                        onClick={() =>
+                                            alert({
+                                                title: "Confidentiality is managed in Data Keys",
+                                                message: "Change this in the Data Key. Screens inherit confidential status automatically.",
+                                                variant: "info",
+                                            })
+                                        }
+                                    >
+                                        <Switch
+                                            id="confidentialLabelOnly"
+                                            checked={!!confidentialLabelOnly}
+                                            disabled
+                                        />
+                                        <Label secondary htmlFor="confidentialLabelOnly">Confidential (label only)</Label>
                                     </button>
                                 </TooltipTrigger>
                                 <TooltipContent>

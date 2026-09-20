@@ -31,6 +31,10 @@ app.prepare().then(() => {
         socket.on('update_system', (...args) => onEvent('update_system', ...args));
         socket.on('file_uploaded', (...args) => onEvent('file_uploaded', ...args));
         socket.on('files_deleted', (...args) => onEvent('files_deleted', ...args));
+        socket.on('in_progress', (...args) => {
+            const [requestKey, action, loading] = args;
+            onEvent(requestKey, action, loading);
+        });
     });
 
     httpServer

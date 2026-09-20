@@ -104,7 +104,7 @@ export type DiagnosisSymptom = {
     printable: boolean;
 };
 
-export type ScriptImage = {
+export type FileReference = {
     data: string;
     fileId?: string;
     filename?: string;

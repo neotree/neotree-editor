@@ -92,6 +92,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
       skippable: isEmpty(formData?.skippable) ? false : formData?.skippable,
       confidential: isEmpty(formData?.confidential) ? false : formData?.confidential,
+      confidentialLabelOnly: isEmpty(formData?.confidentialLabelOnly) ? false : formData?.confidentialLabelOnly,
       printable: (isEmpty(formData?.printable) ? null : formData?.printable!) as boolean,
       prePopulate: formData?.prePopulate || [],
       fields: formData?.fields || [],

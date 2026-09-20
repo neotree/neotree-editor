@@ -107,6 +107,7 @@ function Form({
             refId: dataKey?.refId || '',
             dataType: dataKey?.dataType || prefill.dataType || '',
             confidential: dataKey ? !!dataKey.confidential : true,
+            confidentialLabelOnly: dataKey ? !!dataKey.confidentialLabelOnly : false,
             label: dataKey?.label || prefill.label || '',
             options: dataKey?.options || [],
             metadata: dataKey?.metadata || {},
@@ -121,6 +122,7 @@ function Form({
     const nameValue = watch('name');
     const labelValue = watch('label');
     const confidential = !!watch('confidential');
+    const confidentialLabelOnly = !!watch('confidentialLabelOnly');
     const optionsSignature = useMemo(() => JSON.stringify(options || []), [options]);
     const savedOptionsSignature = useMemo(() => JSON.stringify(dataKey?.options || []), [dataKey?.options]);
     const deletedUniqueKeys = watch('deletedUniqueKeys');
@@ -141,6 +143,7 @@ function Form({
             label: values.label || '',
             dataType: values.dataType || '',
             confidential: !!values.confidential,
+            confidentialLabelOnly: !!values.confidentialLabelOnly,
             refId: values.refId || '',
             options: values.options || [],
             metadata: values.metadata || {},
@@ -178,6 +181,7 @@ function Form({
             `${uniqueKeyValue || ''}` !== `${dataKey.uniqueKey || ''}` ||
             `${dataType || ''}` !== `${dataKey.dataType || ''}` ||
             !!confidential !== !!dataKey.confidential ||
+            !!confidentialLabelOnly !== !!dataKey.confidentialLabelOnly ||
             optionsSignature !== savedOptionsSignature
         );
         if (!changed) {
@@ -198,6 +202,7 @@ function Form({
         uniqueKeyValue,
         dataType,
         confidential,
+        confidentialLabelOnly,
         optionsSignature,
         savedOptionsSignature,
         loadImpactPreview,
@@ -543,11 +548,46 @@ function Form({
                                         }
 
                                         setValue('confidential', checked, { shouldDirty: true });
+                                        if (checked && confidentialLabelOnly) {
+                                            setValue('confidentialLabelOnly', false, { shouldDirty: true });
+                                        }
                                     }}
                                 />
                                 <Label htmlFor="dataKeyConfidential">Confidential</Label>
                             </div>
-            
+                            <span className="text-xs text-muted-foreground">
+                                Hides this Data Key&apos;s value and label everywhere it is used.
+                            </span>
+                        </div>
+
+                        <div className="px-4">
+                            <div className="flex items-center space-x-2">
+                                <Switch
+                                    id="dataKeyConfidentialLabelOnly"
+                                    checked={confidentialLabelOnly}
+                                    disabled={isFormDisabled || confidential}
+                                    onCheckedChange={checked => {
+                                        if (!checked && confidentialLabelOnly) {
+                                            confirm(
+                                                () => setValue('confidentialLabelOnly', false, { shouldDirty: true }),
+                                                {
+                                                    title: 'Disable label-only confidentiality?',
+                                                    message: 'You are about to mark this Data Key\'s label as non-confidential. This can expose sensitive labels (e.g. names) in exports. Only continue if you fully understand the impact.',
+                                                    danger: true,
+                                                },
+                                            );
+                                            return;
+                                        }
+
+                                        setValue('confidentialLabelOnly', checked, { shouldDirty: true });
+                                    }}
+                                />
+                                <Label htmlFor="dataKeyConfidentialLabelOnly">Confidential (label only)</Label>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                Hides only this Data Key&apos;s label (e.g. a healthcare worker&apos;s name) from exports, while
+                                keeping its value exportable. Disabled while &quot;Confidential&quot; is on above.
+                            </span>
                         </div>
 
                         <Controller

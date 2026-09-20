@@ -12,7 +12,10 @@ export async function POST(req: NextRequest) {
             
         const body = await req.json();
         
-        const data = await copyScripts(body);
+        const data = await copyScripts({
+            requestKey: isAuthorised.user?.userId,
+            ...body,
+        });
 
         return NextResponse.json(data);
     } catch(e: any) {
