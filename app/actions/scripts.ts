@@ -2807,7 +2807,7 @@ export async function copyScripts(params?: {
             if (res.success) response.info.dffItems = dffItemsToSave.length;
             markTiming('save_drugs_library_items', saveDrugsStartedAt);
 
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, true);
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
         }
 
         if (dataKeysToSave.length) {
@@ -2828,7 +2828,7 @@ export async function copyScripts(params?: {
             }
             markTiming('save_data_keys', saveDataKeysStartedAt);
 
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, true);
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
         }
 
         if (
