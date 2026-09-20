@@ -41,8 +41,8 @@ export function OverlayInfoCardProvider() {
         <>
             {!show ? null : (
                 <div
+                    style={{ zIndex: 99999999999999999999999999999999999999, }}
                     className={cn(`
-                        z-[99999999999999999999999999999999999999]
                         fixed bottom-10 left-10    
                     `)}
                 >
