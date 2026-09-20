@@ -61,6 +61,7 @@ export type GetScriptsMetadataResponse = {
                 valueLabel?: null | string;
                 optional?: boolean;
                 confidential: boolean;
+                confidentialLabelOnly: boolean;
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
                 condition?: string | null;
@@ -111,6 +112,7 @@ export type GetScriptsMetadataResponse = {
                 valueLabel?: null | string;
                     optional?: boolean;
                     confidential: boolean;
+                    confidentialLabelOnly: boolean;
                     minValue?: string | number | null;
                     maxValue?: string | number | null;
                     condition?: string | null;
@@ -148,6 +150,7 @@ export type GetScriptsMetadataResponse = {
             valueLabel?: null | string;
                 optional?: boolean;
                 confidential: boolean;
+                confidentialLabelOnly: boolean;
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
                 condition?: string | null;
@@ -419,6 +422,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         valueLabel: null,
                                         optional: screen.skippable,
                                         confidential: screen.confidential,
+                                        confidentialLabelOnly: screen.confidentialLabelOnly,
                                         minValue: screen.minValue,
                                         maxValue: screen.maxValue,
                                         condition: screen.condition || '',
@@ -444,6 +448,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'boolean',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: [
                                     {
@@ -466,6 +471,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'diagnosis',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
                             }];
@@ -479,6 +485,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: null,
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
                             }];
@@ -564,6 +571,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         dataType,
                                         optional: f.optional,
                                         confidential: f.confidential,
+                                        confidentialLabelOnly: f.confidentialLabelOnly,
                                         condition: f.condition || '',
                                         options,
                                     }];
@@ -578,6 +586,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     valueLabel: null,
                                     optional: f.optional,
                                     confidential: f.confidential,
+                                    confidentialLabelOnly: f.confidentialLabelOnly,
                                     minValue: f.minValue ?? f.minDate ?? f.minTime,
                                     maxValue: f.maxValue ?? f.maxDate ?? f.maxTime,
                                     condition: f.condition || '',
@@ -596,6 +605,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'single_select_option',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
                             }];
@@ -609,6 +619,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'multi_select_option',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
                             }];

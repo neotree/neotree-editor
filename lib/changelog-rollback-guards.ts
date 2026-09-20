@@ -13,6 +13,7 @@ const DATA_KEY_DERIVED_FIELDS = new Set([
   "label",
   "name",
   "confidential",
+  "confidentialLabelOnly",
   "optional",
   "dataType",
   "refId",

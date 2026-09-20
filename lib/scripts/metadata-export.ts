@@ -14,6 +14,7 @@ export type ScriptScreenMetadataRow = {
     Value: string;
     "Value Label": string;
     Confidential: string;
+    "Confidential (Label Only)": string;
     Optional: string;
     "Field Condition": string;
     "Field Options": string;
@@ -51,6 +52,7 @@ export function buildScriptScreenMetadataRows(script: ScriptMetadata): ScriptScr
                 Value: "",
                 "Value Label": "",
                 Confidential: "",
+                "Confidential (Label Only)": "",
                 Optional: "",
                 "Field Condition": "",
                 "Field Options": "",
@@ -91,6 +93,7 @@ export function buildScriptScreenMetadataRows(script: ScriptMetadata): ScriptScr
                     Value: cellValue(option.value),
                     "Value Label": cellValue(option.valueLabel),
                     Confidential: field.confidential ? "Yes" : "No",
+                    "Confidential (Label Only)": field.confidentialLabelOnly ? "Yes" : "No",
                     Optional: field.optional ? "Yes" : "No",
                     "Field Condition": field.condition || "",
                     "Field Options": fieldOptions,

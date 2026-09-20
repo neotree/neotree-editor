@@ -31,6 +31,7 @@ const DATA_KEY_DERIVED_FIELDS = new Set([
   "value",
   "id",
   "confidential",
+  "confidentialLabelOnly",
   "optional",
   "dataType",
   "refId",
@@ -169,6 +170,9 @@ function applyTargetDataKeyFallback(record: Record<string, unknown>, targetDataK
   if (name && Object.prototype.hasOwnProperty.call(next, "id")) next.id = name
   if (Object.prototype.hasOwnProperty.call(next, "confidential") && typeof targetDataKey.confidential === "boolean") {
     next.confidential = targetDataKey.confidential
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "confidentialLabelOnly") && typeof targetDataKey.confidentialLabelOnly === "boolean") {
+    next.confidentialLabelOnly = targetDataKey.confidentialLabelOnly
   }
   if (Object.prototype.hasOwnProperty.call(next, "dataType") && typeof targetDataKey.dataType === "string") {
     next.dataType = targetDataKey.dataType
