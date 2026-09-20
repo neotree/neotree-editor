@@ -485,10 +485,6 @@ export function ScriptsImportModal({
     );
 }
 
-const actionsInProgress = [
-
-];
-
 function ImportInfo({ 
     requestKey,
     show: showProp, 
@@ -521,15 +517,15 @@ function ImportInfo({
                 label: 'Saving scripts', 
             },
 
-            ...(!overwriteDrugsLibraryItems ? [] : [{ 
+            { 
                 key: BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, 
                 label: 'Saving drugs & fluids', 
-            }]),
+            },
 
-            ...(!overwriteDataKeys ? [] : [{ 
+            { 
                 key: BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, 
                 label: 'Saving data keys', 
-            }]),
+            },
         ];
     }, [
         site,
