@@ -10,6 +10,8 @@ import { ConfirmModal } from "@/components/modals/confirm";
 import { AlertModal } from "@/components/modals/alert";
 import { FilesModal } from "@/components/modals/files";
 import { AppContextProvider } from "@/contexts/app";
+import { SocketEventsListener } from "@/components/socket-events-listener";
+import { OverlayInfoCardProvider } from "@/components/overlay-info-card";
 import { getSys } from "@/app/actions/sys";
 import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
 import { getAuthenticatedUserWithRoles, } from "@/app/actions/get-authenticated-user";
@@ -18,7 +20,6 @@ import * as sysActions from "@/app/actions/sys";
 import * as dataKeysActions from '@/app/actions/data-keys';
 
 import "@/app/globals.css";
-import { SocketEventsListener } from "@/components/socket-events-listener";
 
 const roboto = Roboto({
     subsets: ['latin'],
@@ -104,6 +105,7 @@ export default async function RootLayout({
                             <ConfirmModal />
                             <AlertModal />
                             <FilesModal />
+                            <OverlayInfoCardProvider />
                         </ThemeProvider>
                     </AuthContextProvider>
                 </NuqsAdapter>

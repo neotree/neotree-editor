@@ -48,8 +48,12 @@ import {
 } from "@/lib/field-key-collisions";
 import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
+import { parseFileReferences } from "@/lib/file-references";
+import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastActionInProgress } from "@/lib/in-progress";
 
-export const getScriptsMetadata = queries._getScriptsMetadata;
+export const getScriptsMetadata: typeof queries._getScriptsMetadata = (...args) => {
+    return queries._getScriptsMetadata(...args);
+};
 
 // DIAGNOSES
 export const countScreens: typeof queries._countScreens = async (...args) => {
@@ -2614,6 +2618,7 @@ export async function saveScriptsWithItems({ data, }: {
 }
 
 export async function copyScripts(params?: {
+    requestKey?: string;
     scriptsIds?: string[];
     confirmCopyAll?: boolean;
     toRemoteSiteId?: string;
@@ -2641,6 +2646,7 @@ export async function copyScripts(params?: {
     };
 
     const {
+        requestKey,
         scriptsIds = [],
         confirmCopyAll,
         toRemoteSiteId,
@@ -2650,6 +2656,10 @@ export async function copyScripts(params?: {
         overwriteDataKeys,
         overwriteDrugsLibraryItems,
     } = { ...params };
+
+    const broadcastActionInProgress = (action: string, loading: boolean) => {
+        return _broadcastActionInProgress(requestKey!, action, loading);
+    };
 
     try {
         const session = await isAllowed();
@@ -2666,9 +2676,15 @@ export async function copyScripts(params?: {
 
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
+        let siteUrl: undefined | string = undefined;
+
         if (fromRemoteSiteId) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_data, true);
+
             const remoteFetchStartedAt = Date.now();
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
+
+            siteUrl = axiosClient.defaults.baseURL;
 
             const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys?' + queryString.stringify({
                 returnDraftsIfExist: false,
@@ -2689,52 +2705,9 @@ export async function copyScripts(params?: {
             markTiming('remote_fetch', remoteFetchStartedAt);
 
 
-            scripts.data.forEach(({ screens, diagnoses, problems, dataKeys, drugsLibrary }, i) => {
-                const getImageUrl = (suffix: string) => {
-                    let host = res.config.baseURL || '';
-                    if (host.substring(host.length - 1, host.length) === '/') host = host.substring(0, host.length - 1);
-                    if (suffix[0] === '/') suffix = suffix.substring(1, suffix.length);
-                    return [host, suffix].filter(s => s).join('/');
-                };
-
+            scripts.data.forEach(({ dataKeys, drugsLibrary }, i) => {
                 scrappedDataKeys = [...scrappedDataKeys, ...dataKeys];
                 dffItemsToSave = [...dffItemsToSave, ...drugsLibrary];
-
-                screens.forEach((d, j) => {
-                    if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
-                        scripts.data[i].screens[j].image1!.data = getImageUrl(d.image1.data);
-                    }
-                    if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
-                        scripts.data[i].screens[j].image2!.data = getImageUrl(d.image2.data);
-                    }
-                    if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
-                        scripts.data[i].screens[j].image3!.data = getImageUrl(d.image3.data);
-                    }
-                });
-
-                diagnoses.forEach((d, j) => {
-                    if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
-                        scripts.data[i].diagnoses[j].image1!.data = getImageUrl(d.image1.data);
-                    }
-                    if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
-                        scripts.data[i].diagnoses[j].image2!.data = getImageUrl(d.image2.data);
-                    }
-                    if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
-                        scripts.data[i].diagnoses[j].image3!.data = getImageUrl(d.image3.data);
-                    }
-                });
-
-                problems.forEach((p, j) => {
-                    if (p.image1?.data && p.image1?.fileId && !isValidUrl(p.image1.data)) {
-                        scripts.data[i].problems[j].image1!.data = getImageUrl(p.image1.data);
-                    }
-                    if (p.image2?.data && p.image2?.fileId && !isValidUrl(p.image2.data)) {
-                        scripts.data[i].problems[j].image2!.data = getImageUrl(p.image2.data);
-                    }
-                    if (p.image3?.data && p.image3?.fileId && !isValidUrl(p.image3.data)) {
-                        scripts.data[i].problems[j].image3!.data = getImageUrl(p.image3.data);
-                    }
-                });
             });
 
             let index = -1;
@@ -2761,7 +2734,10 @@ export async function copyScripts(params?: {
                     return overwriteDataKeys || k.isNew;
                 });
             }
+
             markTiming('parse_imported_data_keys', parseImportedStartedAt);
+
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_data, false);
         }
 
         let response: Awaited<ReturnType<typeof saveScriptsWithItems>> & {
@@ -2776,6 +2752,8 @@ export async function copyScripts(params?: {
         } = { success: true, info, };
 
         if (scripts.data.length) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, true);
+
             if (toRemoteSiteId) {
                 const remoteSaveStartedAt = Date.now();
                 const axiosClient = await getSiteAxiosClient(toRemoteSiteId);
@@ -2791,6 +2769,13 @@ export async function copyScripts(params?: {
                 response = res.data as Awaited<ReturnType<typeof saveScriptsWithItems>>;
                 markTiming('remote_save', remoteSaveStartedAt);
             } else {
+                const { files, scripts: scriptsWithParsedFiles, } = parseFileReferences({ 
+                    siteUrl, 
+                    scripts: scripts.data, 
+                });
+
+                scripts.data = scriptsWithParsedFiles as typeof scripts.data;
+
                 const saveScriptsStartedAt = Date.now();
                 response = await saveScriptsWithItems({
                     data: scripts.data.map(s => ({
@@ -2803,6 +2788,8 @@ export async function copyScripts(params?: {
                 });
                 markTiming('save_scripts_with_items', saveScriptsStartedAt);
             }
+
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
         }
 
         if (!response.success || response.errors?.length) {
@@ -2810,6 +2797,8 @@ export async function copyScripts(params?: {
         }
 
         if (dffItemsToSave.length) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, true);
+
             const saveDrugsStartedAt = Date.now();
             const res = overwriteDrugsLibraryItems ? 
                 await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId: session.user?.userId, })
@@ -2817,9 +2806,13 @@ export async function copyScripts(params?: {
                 await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId: session.user?.userId, });
             if (res.success) response.info.dffItems = dffItemsToSave.length;
             markTiming('save_drugs_library_items', saveDrugsStartedAt);
+
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
         }
 
         if (dataKeysToSave.length) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, true);
+
             const saveDataKeysStartedAt = Date.now();
             const res = await _saveDataKeys({
                 data: dataKeysToSave,
@@ -2834,6 +2827,8 @@ export async function copyScripts(params?: {
                     .filter((value): value is string => !!value);
             }
             markTiming('save_data_keys', saveDataKeysStartedAt);
+
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
         }
 
         if (

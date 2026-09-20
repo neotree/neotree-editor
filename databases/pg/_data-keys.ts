@@ -25,6 +25,7 @@ export const dataKeys = pgTable(
         refId: text('ref_id'),
         dataType: text('data_type').notNull(),
         confidential: boolean('confidential').notNull().default(true),
+        confidentialLabelOnly: boolean('confidential_label_only').notNull().default(false),
         options: jsonb('options').default([]).$type<string[]>().notNull(),
         metadata: jsonb('metadata').default({}).$type<Record<string, any>>().notNull(),
         version: integer('version').notNull(),

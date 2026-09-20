@@ -62,6 +62,7 @@ const buildTrackableSnapshot = (dataKey?: Partial<DataKey>) => {
         refId: dataKey.refId || '',
         dataType: dataKey.dataType || '',
         confidential: !!dataKey.confidential,
+        confidentialLabelOnly: !!dataKey.confidentialLabelOnly,
         label: dataKey.label || '',
         options: Array.isArray(dataKey.options) ? dataKey.options : [],
         metadata: dataKey.metadata || {},
@@ -76,6 +77,7 @@ export type DataKeyFormData = {
     refId: DataKey['refId'];
     dataType: DataKey['dataType'];
     confidential: DataKey['confidential'];
+    confidentialLabelOnly: DataKey['confidentialLabelOnly'];
     label: DataKey['label'];
     options: DataKey['options'];
     metadata: DataKey['metadata'];

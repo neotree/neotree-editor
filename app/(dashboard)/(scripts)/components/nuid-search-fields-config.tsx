@@ -572,6 +572,7 @@ export function Field({
     const values = watch('values');
     const optional = watch('optional');
     const confidential = watch('confidential');
+    const confidentialLabelOnly = watch('confidentialLabelOnly');
 
     const hasOptions = useMemo(() => ['dropdown', 'multi_select'].includes(type), [type]);
 
@@ -630,12 +631,19 @@ export function Field({
     const options = dataKeyOptions.length ? dataKeyOptions : storedOptions;
 
     const inheritedConfidential = useMemo(() => !!dataKey?.confidential, [dataKey?.confidential]);
+    const inheritedConfidentialLabelOnly = useMemo(() => !!dataKey?.confidentialLabelOnly, [dataKey?.confidentialLabelOnly]);
 
     useEffect(() => {
         if (confidential !== inheritedConfidential) {
             setValue('confidential', inheritedConfidential, { shouldDirty: true, });
         }
     }, [confidential, inheritedConfidential, setValue]);
+
+    useEffect(() => {
+        if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+            setValue('confidentialLabelOnly', inheritedConfidentialLabelOnly, { shouldDirty: true, });
+        }
+    }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
 
     const isKeyDisabled = !!disabled || isNuidManagedDataKey(dataKey as any);
 
@@ -695,6 +703,7 @@ export function Field({
                                         setValue('keyId', item.uniqueKey, { shouldDirty: true, });
                                         setValue('label', item.label || item.name, { shouldDirty: true, });
                                         setValue('confidential', !!item.confidential, { shouldDirty: true, });
+                                        setValue('confidentialLabelOnly', !!item.confidentialLabelOnly, { shouldDirty: true, });
                                     }}
                                 />
                             )}
@@ -793,6 +802,20 @@ export function Field({
                                 checked={inheritedConfidential}
                             />
                             <Label htmlFor="confidential">Confidential</Label>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                            Inherited from the data key. Change it in the Data Key library.
+                        </span>
+                    </div>
+
+                    <div>
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id="confidentialLabelOnly"
+                                disabled
+                                checked={inheritedConfidentialLabelOnly}
+                            />
+                            <Label htmlFor="confidentialLabelOnly">Confidential (label only)</Label>
                         </div>
                         <span className="text-xs text-muted-foreground">
                             Inherited from the data key. Change it in the Data Key library.

@@ -51,6 +51,7 @@ export type ScriptItem = {
     exclusiveGroup?: string;
     forbidWith?: string[];
     confidential: boolean;
+    confidentialLabelOnly: boolean;
     checked: boolean;
     enterValueManually?: boolean;
     enterValueManuallyLabel?: string;
@@ -100,6 +101,7 @@ export type ScriptField = {
         optionLabel: string;
     }[];
     confidential: boolean;
+    confidentialLabelOnly: boolean;
     optional: boolean;
     printable: boolean;
     printDisplayColumns?: 1 | 2;
@@ -167,7 +169,7 @@ export type DiagnosisSymptom = {
     printable: boolean;
 };
 
-export type ScriptImage = {
+export type FileReference = {
     data: string;
     fileId?: string;
     filename?: string;
