@@ -10,10 +10,12 @@ import {
     CardHeader, 
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { XIcon } from "lucide-react";
 
 type OverlayInfoCardProps = {
     children?: React.ReactNode;
     show?: boolean;
+    onClose?: () => void;
 };
 
 type OverlayInfoCardState = {
@@ -33,7 +35,7 @@ const useOverlayInfoCardState = create<OverlayInfoCardState>(set => {
 export function OverlayInfoCardProvider() {
     const { props } = useOverlayInfoCardState();
 
-    const { show, children, } = props;
+    const { show, children, onClose, } = props;
 
     return (
         <>
@@ -44,11 +46,18 @@ export function OverlayInfoCardProvider() {
                         fixed bottom-10 left-10    
                     `)}
                 >
-                    <Card>
-                        <CardContent>
-                            <CardHeader />
+                    <Card className="relative">
+                        <CardContent className="p-4">
                             {children}
-                            <CardFooter />
+                            {!!onClose && (
+                                <div 
+                                    role="button"
+                                    className="absolute top-[1px] right-[1px] cursor-pointer"
+                                    onClick={onClose}
+                                >
+                                    <XIcon className="size-4" />
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -63,6 +72,10 @@ export function OverlayInfoCard(props: OverlayInfoCardProps) {
     useEffect(() => {
         setProps(props);
     }, [props]);
+
+    useEffect(() => () => {
+        setProps({});
+    }, []);
 
     return null;
 }

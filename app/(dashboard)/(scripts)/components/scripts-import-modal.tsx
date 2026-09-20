@@ -1,9 +1,10 @@
 // 'use client';
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import axios from "axios";
+import { CheckIcon, XIcon, EllipsisIcon } from "lucide-react";
 
 import {
     Select,
@@ -28,6 +29,8 @@ import { useAppContext } from "@/contexts/app";
 import { ErrorCard } from "@/components/error-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { OverlayInfoCard } from "@/components/overlay-info-card";
+import { BROADCAST_ACTIONS_IN_PROGRESS } from "@/lib/in-progress";
+import { SocketEventsListener } from "@/components/socket-events-listener";
 
 const getDefaultFormFields = (overWriteScriptWithId?: string) => ({
     siteId: '',
@@ -48,6 +51,8 @@ export function ScriptsImportModal({
     onOpenChange: (open: boolean) => void;
     onImportSuccess?: () => void;
 }) {
+    const [requestKey] = useState(Math.random().toString(12).substring(2));
+
     const router = useRouter();
     const routeParams = useParams();
 
@@ -98,6 +103,7 @@ export function ScriptsImportModal({
 
             // TODO: Replace this with server action
             const response = await axios.post('/api/scripts/copy', { 
+                requestKey,
                 fromRemoteSiteId: data.siteId, 
                 overwriteDrugsLibraryItems: data.overwriteDrugsLibraryItems, 
                 overwriteDataKeys: data.overwriteDataKeys, 
@@ -231,11 +237,23 @@ export function ScriptsImportModal({
         }
     };
 
+    const siteId = watch('siteId');
+
+    const selectedSite = useMemo(() => sites.find(s => s.siteId === siteId), [siteId]);
+
     return (
         <>
             {isLoading && <Loader overlay />}
 
-            <ImportInfo show={loading} />
+            {open && (
+                <ImportInfo 
+                    show={loading} 
+                    site={selectedSite}
+                    overwriteDataKeys={overwriteDataKeys}
+                    overwriteDrugsLibraryItems={overwriteDrugsLibraryItems}
+                    requestKey={requestKey}
+                />
+            )}
 
             <Modal
                 open={open}
@@ -467,13 +485,106 @@ export function ScriptsImportModal({
     );
 }
 
-function ImportInfo({ show }: {
+const actionsInProgress = [
+
+];
+
+function ImportInfo({ 
+    requestKey,
+    show: showProp, 
+    site, 
+    overwriteDataKeys,
+    overwriteDrugsLibraryItems,
+}: {
     show: boolean;
+    site?: ReturnType<typeof useAppContext>['sites'][0];
+    overwriteDataKeys?: boolean;
+    overwriteDrugsLibraryItems?: boolean;
+    requestKey: string;
 }) {
+    const [show, setShow] = useState(false);
+
+    useEffect(() => { if (showProp) setShow(true); }, [showProp]);
+
+    const actionsInProgress = useMemo(() => {
+        return [
+            ...(!site ? [{ 
+                key: BROADCAST_ACTIONS_IN_PROGRESS.loading_local_data, 
+                label: 'Loading data', 
+            }] : [{ 
+                key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_data, 
+                label: 'Loading data from ' + site.name, 
+            }]),
+
+            { 
+                key: BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, 
+                label: 'Saving scripts', 
+            },
+
+            ...(!overwriteDrugsLibraryItems ? [] : [{ 
+                key: BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, 
+                label: 'Saving drugs & fluids', 
+            }]),
+
+            ...(!overwriteDataKeys ? [] : [{ 
+                key: BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, 
+                label: 'Saving data keys', 
+            }]),
+        ];
+    }, [
+        site,
+        overwriteDataKeys,
+        overwriteDrugsLibraryItems,
+    ]);
+
+    const [completed, setCompleted] = useState<string[]>([]);
+
+    useEffect(() => {
+        setCompleted([actionsInProgress[0].key + '__true']);
+    }, [actionsInProgress]);
+
+    const current = completed[completed.length - 1];
+
     return (
         <>
-            <OverlayInfoCard show={show}>
+            <SocketEventsListener
+                events={[
+                    {
+                        name: requestKey,
+                        onEvent: {
+                            callback: (...args) => setCompleted(prev => [...prev, args.join('__')]),
+                        },
+                    },
+                ]}
+            />
 
+            <OverlayInfoCard 
+                show={show}
+                // onClose={() => setShow(false)}
+            >
+                <div className="flex flex-col gap-y-1">
+                    {actionsInProgress.map(a => {
+                        const inProgress = current === `${a.key}__true`;
+                        const isCompleted = completed.includes(`${a.key}__false`);
+
+                        let className = 'opacity-50';
+
+                        if (inProgress) className = 'opacity-100';
+
+                        if (isCompleted) className = 'opacity-100 text-green-400';
+
+                        let Icon = isCompleted ? CheckIcon : XIcon;
+
+                        if (inProgress) Icon = EllipsisIcon;
+
+                        return (
+                            <div key={a.key} className="text-xs flex items-center gap-x-2">
+                                <Icon className={cn(className, 'size-3')} />
+                                <span className={cn(className)}>{a.label}</span>
+                            </div>
+                        )
+                    })}
+                </div>
             </OverlayInfoCard>
         </>
     );
