@@ -2788,9 +2788,9 @@ export async function copyScripts(params?: {
                 });
                 markTiming('save_scripts_with_items', saveScriptsStartedAt);
             }
-
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
         }
+
+        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
 
         if (!response.success || response.errors?.length) {
             return response;
@@ -2806,9 +2806,9 @@ export async function copyScripts(params?: {
                 await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId: session.user?.userId, });
             if (res.success) response.info.dffItems = dffItemsToSave.length;
             markTiming('save_drugs_library_items', saveDrugsStartedAt);
-
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
         }
+
+        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
 
         if (dataKeysToSave.length) {
             await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, true);
@@ -2827,9 +2827,9 @@ export async function copyScripts(params?: {
                     .filter((value): value is string => !!value);
             }
             markTiming('save_data_keys', saveDataKeysStartedAt);
-
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
         }
+
+        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
 
         if (
             fromRemoteSiteId &&
