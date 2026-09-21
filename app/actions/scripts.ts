@@ -1,7 +1,6 @@
 'use server';
 
 import { v4 } from "uuid";
-import queryString from "query-string";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
@@ -15,12 +14,11 @@ import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
-import { isValidUrl } from "@/lib/urls";
 import { processImage } from "@/lib/process-image";
-import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
+import { _getDataKeys } from "@/databases/queries/data-keys";
 import { _getConfigKeys } from "@/databases/queries/config-keys";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
-import { dataKeyToJSON, parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
+import { parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
 import { getIntegrityPolicyState } from "@/lib/integrity-policy";
 import { createIntegrityImportSnapshot } from "./integrity-imports";
@@ -48,8 +46,8 @@ import {
 } from "@/lib/field-key-collisions";
 import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
-import { parseFileReferences } from "@/lib/file-references";
 import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastActionInProgress } from "@/lib/in-progress";
+import { loadRemoteDataKeys, loadRemoteScriptsWithItems } from "./remote";
 
 export const getScriptsMetadata: typeof queries._getScriptsMetadata = (...args) => {
     return queries._getScriptsMetadata(...args);
@@ -2679,29 +2677,46 @@ export async function copyScripts(params?: {
         let siteUrl: undefined | string = undefined;
 
         if (fromRemoteSiteId) {
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_data, true);
-
             const remoteFetchStartedAt = Date.now();
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
             siteUrl = axiosClient.defaults.baseURL;
 
-            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys?' + queryString.stringify({
-                returnDraftsIfExist: false,
-            }));
+            const importedDataKeysRes = await loadRemoteDataKeys({
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+                axiosClient,
+            });
             importedDataKeys = importedDataKeysRes.data;
 
-            const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
-                scriptsIds: JSON.stringify(scriptsIds),
-                data: JSON.stringify({
-                    returnDraftsIfExist: false,
-                }),
-            }));
-            const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
+            const res = await loadRemoteScriptsWithItems({
+                dataKeys: importedDataKeys,
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+                axiosClient,
+                scriptsIds,
+            });
 
-            if (resData.errors) return { success: false, errors: resData.errors, info, };
+            if (res.errors?.length) return { success: false, errors: res.errors, info, };
 
-            scripts = resData;
+            scripts = res;
+
+            // const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys?' + queryString.stringify({
+            //     returnDraftsIfExist: false,
+            // }));
+            // importedDataKeys = importedDataKeysRes.data;
+
+            // const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
+            //     scriptsIds: JSON.stringify(scriptsIds),
+            //     data: JSON.stringify({
+            //         returnDraftsIfExist: false,
+            //     }),
+            // }));
+            // const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
+
+            // if (resData.errors) return { success: false, errors: resData.errors, info, };
+
+            // scripts = resData;
             markTiming('remote_fetch', remoteFetchStartedAt);
 
 
@@ -2736,8 +2751,6 @@ export async function copyScripts(params?: {
             }
 
             markTiming('parse_imported_data_keys', parseImportedStartedAt);
-
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_data, false);
         }
 
         let response: Awaited<ReturnType<typeof saveScriptsWithItems>> & {
@@ -2769,13 +2782,6 @@ export async function copyScripts(params?: {
                 response = res.data as Awaited<ReturnType<typeof saveScriptsWithItems>>;
                 markTiming('remote_save', remoteSaveStartedAt);
             } else {
-                const { files, scripts: scriptsWithParsedFiles, } = parseFileReferences({ 
-                    siteUrl, 
-                    scripts: scripts.data, 
-                });
-
-                scripts.data = scriptsWithParsedFiles as typeof scripts.data;
-
                 const saveScriptsStartedAt = Date.now();
                 response = await saveScriptsWithItems({
                     data: scripts.data.map(s => ({
