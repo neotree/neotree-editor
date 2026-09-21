@@ -1,3 +1,5 @@
+import { evaluateExpression } from '@/lib/conditional-expression/safe-eval';
+
 export type ScreenEntryValue = {
   value?: any;
   value2?: any;
@@ -46,7 +48,11 @@ export type ScreenEntry = {
 export function evaluateCondition(condition: string, defaultEval = false) {
     let conditionMet = defaultEval;
     try {
-        conditionMet = eval(condition);
+        // Restricted evaluator rather than a raw JavaScript `eval`: the grammar covers exactly what
+        // parseCondition() emits and cannot reach a variable, global or function.
+        // Anything outside it throws, and we fall back to defaultEval, which is how
+        // a malformed condition already behaved.
+        conditionMet = evaluateExpression(condition);
     } catch (e) {
         // do nothing
     }

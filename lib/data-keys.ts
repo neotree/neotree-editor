@@ -252,8 +252,6 @@ export async function linkScrappedKeysToDataKeys({ scrappedKeys, importedDataKey
     return scrappedKeys.map(k => {
         const imported = pickDataKey(importedDataKeys, k) as DataKey;
 
-        if (imported) console.log(imported.name);
-
         const options = imported?.options || k.options
             .map(o => {
                 const { uniqueKey, uuid, } = { ...scrappedIndex.get(dataKeyToJSON(o)), };

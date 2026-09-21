@@ -1,0 +1,3 @@
+# Intentionally empty: keeping an explicit root file prevents Semgrep's upstream
+# default ignore template from changing this repository's scan scope over time.
+# Add narrow exclusions only through security review.

@@ -1,0 +1,15 @@
+# CI-owned files must be LF: the runner executes these directly, and a CRLF shebang
+# line makes a shell script fail with a confusing "bad interpreter" error.
+*.sh  text eol=lf
+*.py  text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# NOTE: a repository-wide `* text=auto` is deliberately NOT set here.
+# Several tracked files currently hold CRLF in the index. Enabling `text=auto`
+# would make Git normalise them on checkout, so `git diff` would be dirty on a
+# clean CI checkout and run_project_checks.py's tracked-file mutation guard would
+# fail every build. To adopt it later, do it as its own isolated commit:
+#     printf '* text=auto\n' >> .gitattributes
+#     git add --renormalize .
+#     git commit -m "Normalise line endings"

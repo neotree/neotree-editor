@@ -1,10 +1,11 @@
 import nodemailer from 'nodemailer';
+import type { SentMessageInfo, Transporter } from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 import { getActiveMailerSettings, getMailerSettings } from "@/app/actions/mailer";
 import logger from '@/lib/logger';
 
-export type SendMailOptions = Parameters<nodemailer.Transporter['sendMail']>[0] & {
+export type SendMailOptions = Parameters<Transporter['sendMail']>[0] & {
     
 };
 
@@ -17,7 +18,7 @@ export async function sendMail(
     const response: { 
         errors?: string[]; 
         success: boolean;
-        info: null | nodemailer.SentMessageInfo;
+        info: null | SentMessageInfo;
     } = { success: false, info: null, };
 
     try {
