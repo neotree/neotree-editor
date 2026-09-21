@@ -2677,7 +2677,6 @@ export async function copyScripts(params?: {
         let siteUrl: undefined | string = undefined;
 
         if (fromRemoteSiteId) {
-            const remoteFetchStartedAt = Date.now();
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
             siteUrl = axiosClient.defaults.baseURL;
@@ -2701,26 +2700,9 @@ export async function copyScripts(params?: {
 
             scripts = res;
 
-            // const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys?' + queryString.stringify({
-            //     returnDraftsIfExist: false,
-            // }));
-            // importedDataKeys = importedDataKeysRes.data;
+            timings['remote_fetch'] = importedDataKeysRes.time + res.time;
 
-            // const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
-            //     scriptsIds: JSON.stringify(scriptsIds),
-            //     data: JSON.stringify({
-            //         returnDraftsIfExist: false,
-            //     }),
-            // }));
-            // const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
-
-            // if (resData.errors) return { success: false, errors: resData.errors, info, };
-
-            // scripts = resData;
-            markTiming('remote_fetch', remoteFetchStartedAt);
-
-
-            scripts.data.forEach(({ dataKeys, drugsLibrary }, i) => {
+            scripts.data.forEach(({ dataKeys, drugsLibrary }) => {
                 scrappedDataKeys = [...scrappedDataKeys, ...dataKeys];
                 dffItemsToSave = [...dffItemsToSave, ...drugsLibrary];
             });
