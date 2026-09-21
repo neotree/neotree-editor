@@ -1077,6 +1077,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                                 <>
                                     <div><span className="font-medium">New linked unique key:</span> {repairPreview.targetDataKey.uniqueKey}</div>
                                     <div><span className="font-medium">Confidential:</span> {repairPreview.targetDataKey.confidential ? "Yes" : "No"}</div>
+                                    <div><span className="font-medium">Confidential (label only):</span> {repairPreview.targetDataKey.confidentialLabelOnly ? "Yes" : "No"}</div>
                                     <div><span className="font-medium">Library state:</span> {repairPreview.targetDataKey.isDraft ? "Draft exists" : "Published only"}</div>
                                     {!!Object.keys(repairPreview.targetDataKey.metadata || {}).length && (
                                         <div className="space-y-1">

@@ -116,6 +116,21 @@ export async function _saveDataKeys({
             return true;
         };
 
+        const resolveConfidentialLabelOnly = ({
+            incoming,
+            existing,
+            fallback,
+        }: {
+            incoming: SaveDataKeysData;
+            existing?: Partial<typeof dataKeys.$inferSelect> | null;
+            fallback?: boolean | null;
+        }) => {
+            if (typeof incoming.confidentialLabelOnly === 'boolean') return incoming.confidentialLabelOnly;
+            if (typeof existing?.confidentialLabelOnly === 'boolean') return existing.confidentialLabelOnly;
+            if (typeof fallback === 'boolean') return fallback;
+            return false;
+        };
+
         const data = dataParam.map(item => {
             return {
                 ...item,
@@ -206,6 +221,7 @@ export async function _saveDataKeys({
                             where: eq(dataKeys.uuid, draft.dataKeyId),
                             columns: {
                                 confidential: true,
+                                confidentialLabelOnly: true,
                                 name: true,
                             },
                         });
@@ -219,7 +235,19 @@ export async function _saveDataKeys({
                             existing: draft.data,
                             fallback: publishedForDraft?.confidential,
                         });
+                        const resolvedConfidentialLabelOnly = resolveConfidentialLabelOnly({
+                            incoming: normalizedItem,
+                            existing: draft.data,
+                            fallback: publishedForDraft?.confidentialLabelOnly,
+                        });
+                        if (resolvedConfidential && resolvedConfidentialLabelOnly) {
+                            errors.push(
+                                `Data key "${data.name || dataKeyUuid}" cannot be both Confidential and Confidential (label only).`,
+                            );
+                            continue;
+                        }
                         data.confidential = resolvedConfidential;
+                        data.confidentialLabelOnly = resolvedConfidentialLabelOnly;
 
                         // A NUID-managed key's `name` and `dataType` are immutable — force
                         // them back to the stored draft values and keep the managed flag.
@@ -258,7 +286,15 @@ export async function _saveDataKeys({
                             version: published?.version ? (published.version + 1) : 1,
                         } as typeof dataKeys.$inferSelect;
                         const resolvedConfidential = resolveConfidential({ incoming: normalizedItem, existing: published });
+                        const resolvedConfidentialLabelOnly = resolveConfidentialLabelOnly({ incoming: normalizedItem, existing: published });
+                        if (resolvedConfidential && resolvedConfidentialLabelOnly) {
+                            errors.push(
+                                `Data key "${data.name || dataKeyUuid}" cannot be both Confidential and Confidential (label only).`,
+                            );
+                            continue;
+                        }
                         data.confidential = resolvedConfidential;
+                        data.confidentialLabelOnly = resolvedConfidentialLabelOnly;
 
                         if (isNuidManagedDataKey(published as any)) {
                             data.name = published?.name ?? data.name;

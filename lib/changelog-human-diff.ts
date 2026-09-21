@@ -32,6 +32,7 @@ const friendlyFieldLabels: Record<string, string> = {
   position: "Display order",
   required: "Required",
   confidential: "Confidential",
+  confidentialLabelOnly: "Confidential (label only)",
   checked: "Checked",
   summary: "Summary",
   text1: "Text 1",

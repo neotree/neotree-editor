@@ -9,6 +9,7 @@ type OptionDataKey = {
     name: string;
     label: string;
     confidential?: boolean | null;
+    confidentialLabelOnly?: boolean | null;
     dataType?: string | null;
 };
 
@@ -152,6 +153,7 @@ export function syncScreenReference(current: ExistingScreenItem, dataKey?: DataK
         keyId: item.uniqueKey,
         label: item.label,
         confidential: !!item.confidential,
+        confidentialLabelOnly: !!item.confidentialLabelOnly,
         ...(!(`${existing.key || ""}`.length) ? {} : { key: item.name }),
         ...(!(`${existing.id || ""}`.length) ? {} : { id: item.name }),
     }));
@@ -163,11 +165,12 @@ export function syncFieldReference(current: ScriptField, dataKey?: DataKey) {
         key: item.name,
         label: item.label,
         confidential: !!item.confidential,
+        confidentialLabelOnly: !!item.confidentialLabelOnly,
         optional: !!(item.metadata as Record<string, unknown> | undefined)?.optional,
     }));
 }
 
-export function syncScreenEntityReference<T extends { key?: string; keyId?: string; label?: string; confidential?: boolean }>(
+export function syncScreenEntityReference<T extends { key?: string; keyId?: string; label?: string; confidential?: boolean; confidentialLabelOnly?: boolean }>(
     current: T,
     dataKey?: DataKey,
 ) {
@@ -176,6 +179,7 @@ export function syncScreenEntityReference<T extends { key?: string; keyId?: stri
         key: item.name,
         label: item.label,
         confidential: !!item.confidential,
+        confidentialLabelOnly: !!item.confidentialLabelOnly,
     } as SyncPatch<T>));
 }
 
@@ -261,6 +265,7 @@ export function rebuildScreenItemsFromDataKeyOptions({
             label: item.label,
             keyId: item.uniqueKey,
             confidential: !!item.confidential,
+            confidentialLabelOnly: !!item.confidentialLabelOnly,
             position: index + 1,
             subType: `${existing?.subType || ""}`,
             type: `${existing?.type || screenType || ""}`,
