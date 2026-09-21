@@ -88,29 +88,41 @@ export function parseFileReferences({
             image3: parseFileReference(s.image3),
         })),
 
-        scripts: scripts.map(s => ({
-            ...s,
+        scripts: scripts.map(s => {
+            const { 
+                screens: _screens, 
+                diagnoses: _diagnoses, 
+                problems: _problems, 
+            } = s as typeof s & {
+                screens: typeof screens;
+                diagnoses: typeof diagnoses;
+                problems: typeof diagnoses;
+            };
 
-            screens: screens.map(s => ({
+            return {
                 ...s,
-                image1: parseFileReference(s.image1),
-                image2: parseFileReference(s.image2),
-                image3: parseFileReference(s.image3),
-            })),
 
-            diagnoses: diagnoses.map(s => ({
-                ...s,
-                image1: parseFileReference(s.image1),
-                image2: parseFileReference(s.image2),
-                image3: parseFileReference(s.image3),
-            })),
+                screens: _screens.map(s => ({
+                    ...s,
+                    image1: parseFileReference(s.image1),
+                    image2: parseFileReference(s.image2),
+                    image3: parseFileReference(s.image3),
+                })),
 
-            problems: problems.map(s => ({
-                ...s,
-                image1: parseFileReference(s.image1),
-                image2: parseFileReference(s.image2),
-                image3: parseFileReference(s.image3),
-            })),
-        })),
+                diagnoses: _diagnoses.map(s => ({
+                    ...s,
+                    image1: parseFileReference(s.image1),
+                    image2: parseFileReference(s.image2),
+                    image3: parseFileReference(s.image3),
+                })),
+
+                problems: _problems.map(s => ({
+                    ...s,
+                    image1: parseFileReference(s.image1),
+                    image2: parseFileReference(s.image2),
+                    image3: parseFileReference(s.image3),
+                })),
+            };
+        }),
     };
 }
