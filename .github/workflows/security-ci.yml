@@ -28,6 +28,13 @@ jobs:
     with:
       security-ci-ref: 020aa53f59f10cc9e2c3802034ae5d2f809734a6
       node-version: "22"
-      # Private repositories on the Free plan have no code scanning:
-      # upload-sarif: false
-      # enable-codeql: false
+      # CodeQL runs from GitHub's Code Scanning *default setup* on this repository and has
+      # been uploading results on every push, pull request and schedule. Default setup
+      # rejects SARIF produced by an advanced configuration, so this pipeline's own CodeQL
+      # jobs could not upload and failed. Disabling them here leaves default setup as the
+      # single CodeQL source instead of two configurations fighting; scanning coverage is
+      # unchanged. To move CodeQL into this pipeline instead, turn off default setup under
+      # Settings > Security > Code scanning (needs repo admin) and delete this line.
+      enable-codeql: false
+      # upload-sarif stays enabled: this repository is public, so the OSV and Semgrep
+      # SARIF uploads work normally.
