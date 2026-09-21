@@ -3,7 +3,8 @@ import assert from "assert"
 import { ConditionSyntaxError, evaluateExpression } from "../lib/conditional-expression/safe-eval"
 import { evaluateCondition } from "../app/(ops)/conditional-exp/_eval"
 
-// Shapes parseCondition() actually emits, with the results eval() produced for them.
+// Shapes parseCondition() actually emits, with the results the old eval-based
+// evaluator produced for them.
 const sameAsBefore: [string, any][] = [
   ['(["rds"].includes("rds"))', true],
   ['(["airway"].includes("airway"))', true],
@@ -55,7 +56,7 @@ assert.strictEqual(evaluateExpression('(1 + 2 * 3 == 7)'), true, "* binds tighte
 assert.strictEqual(evaluateExpression('((1 + 2) * 3 == 9)'), true, "parentheses group arithmetic")
 
 // The point of the exercise: an expression cannot reach the runtime. Each of these was
-// executable under eval().
+// executable under the old eval-based evaluator.
 const mustReject = [
   'process.exit(1)',
   'globalThis',
