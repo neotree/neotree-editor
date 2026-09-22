@@ -43,7 +43,7 @@ type Props = {
 
 const scopeOptions = [
   { label: "my changes only", value: "0" },
-  // { label: "everything", value: "1" },
+  { label: "everything", value: "1" },
 ]
 
 const DETAILED_SCRIPT_THRESHOLD = 3
