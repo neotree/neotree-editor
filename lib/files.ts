@@ -1,6 +1,11 @@
-import type { DiagnosisType, ProblemType, ScreenType, ScriptType, } from "@/databases/queries/scripts"
+import axios, { AxiosInstance } from "axios";
+
+import { getSiteAxiosClient } from '@/lib/axios';
+import { UploadFileFromSiteResponse } from "@/app/actions/files";
 import { FileReference } from "@/types";
-import { getUploadUrl, isValidUrl } from "@/lib/urls";
+import { isValidUrl, getUploadUrl } from "@/lib/urls";
+import { _getSites } from "@/databases/queries/sites";
+import type { DiagnosisType, ProblemType, ScreenType, ScriptType, } from "@/databases/queries/scripts";
 
 export function parseFileReferences({
     siteUrl,
@@ -53,13 +58,15 @@ export function parseFileReferences({
     };
 
     scriptItems.forEach(s => {
-        const img1 = parseFileReference(s.image1);
-        const img2 = parseFileReference(s.image2);
-        const img3 = parseFileReference(s.image3);
+        const file1 = parseFileReference(s.image1);
+        const file2 = parseFileReference(s.image2);
+        const file3 = parseFileReference(s.image3);
+        const file4 = parseFileReference((s as ScreenType).contentTextImage || null)
 
-        if (img1) fileRefs[img1.fileId || img1.data] = img1;
-        if (img2) fileRefs[img2.fileId || img2.data] = img2;
-        if (img3) fileRefs[img3.fileId || img3.data] = img3;
+        if (file1) fileRefs[file1.fileId || file1.data] = file1;
+        if (file2) fileRefs[file2.fileId || file2.data] = file2;
+        if (file3) fileRefs[file3.fileId || file3.data] = file3;
+        if (file4) fileRefs[file4.fileId || file4.data] = file4;
     });
 
     const files = Object.values(fileRefs);
@@ -72,6 +79,7 @@ export function parseFileReferences({
             image1: parseFileReference(s.image1),
             image2: parseFileReference(s.image2),
             image3: parseFileReference(s.image3),
+            contentTextImage: parseFileReference(s.contentTextImage),
         })),
 
         diagnoses: diagnoses.map(s => ({
@@ -107,6 +115,7 @@ export function parseFileReferences({
                     image1: parseFileReference(s.image1),
                     image2: parseFileReference(s.image2),
                     image3: parseFileReference(s.image3),
+                    contentTextImage: parseFileReference(s.contentTextImage),
                 })),
 
                 diagnoses: _diagnoses.map(s => ({
@@ -126,3 +135,45 @@ export function parseFileReferences({
         }),
     };
 }
+
+export async function uploadReferencedFileIfMissing(file: FileReference, siteUrl?: string) {
+    let axiosClient = axios.create({
+        baseURL: process.env.NEXT_PUBLIC_APP_URL,
+    });
+
+    if (siteUrl) {
+        const { data, errors, } = await _getSites({ links: [siteUrl], });
+        if (errors?.length) throw new Error(errors.join(', '));
+        if (!data[0]) throw new Error(`Failed to download images. Site (${siteUrl}) not found.`);
+        axiosClient = await getSiteAxiosClient({
+            baseURL: siteUrl,
+            apiKey: data[0].apiKey,
+        });
+    }
+
+    siteUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    let fileSiteURL = file.data.split('/').filter((_, i) => i < 3).join('/');
+
+    let _errors: string[] = [];
+    let uploaded = false;
+
+    if ((fileSiteURL !== siteUrl) && isValidUrl(fileSiteURL) && file.fileId) {
+        const res = await axiosClient.post<UploadFileFromSiteResponse>('/api/files/upload/from-site', {
+            siteURL: fileSiteURL,
+            fileId: file.fileId,
+        });
+
+        const { errors, data } = res.data;
+
+        if (errors?.length) {
+            _errors = errors;
+        }
+
+        if (data) {
+            file.data = data.fileURL;
+            uploaded = true;
+        }
+    }
+    return { file, uploaded, errors: _errors };
+};

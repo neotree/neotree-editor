@@ -549,6 +549,7 @@ export const files = pgTable("nt_files", {
 })
 
 export const filesRelations = relations(files, ({ many, one }) => ({
+  aliases: many(filesAliases),
   owner: one(users, {
     fields: [files.ownerId],
     references: [users.userId],
@@ -969,6 +970,13 @@ export const appUpdatePoliciesDraftsRelations = relations(appUpdatePoliciesDraft
   createdBy: one(users, {
     fields: [appUpdatePoliciesDrafts.createdByUserId],
     references: [users.userId],
+  }),
+}))
+
+export const filesAliasesRelations = relations(filesAliases, ({ one }) => ({
+  owner: one(files, {
+    fields: [filesAliases.fileId],
+    references: [files.fileId],
   }),
 }))
 
