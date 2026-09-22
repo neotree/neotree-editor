@@ -31,6 +31,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { OverlayInfoCard } from "@/components/overlay-info-card";
 import { BROADCAST_ACTIONS_IN_PROGRESS } from "@/lib/in-progress";
 import { SocketEventsListener } from "@/components/socket-events-listener";
+import socket  from '@/lib/socket';
 
 const getDefaultFormFields = (overWriteScriptWithId?: string) => ({
     siteId: '',
@@ -507,10 +508,36 @@ function ImportInfo({
             ...(!site ? [{ 
                 key: BROADCAST_ACTIONS_IN_PROGRESS.loading_local_data, 
                 label: 'Loading data', 
-            }] : [{ 
-                key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_data, 
-                label: 'Loading data from ' + site.name, 
-            }]),
+            }] : [
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_datakeys, 
+                    label: 'Loading data keys from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_scripts, 
+                    label: 'Loading scripts from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_screens, 
+                    label: 'Loading screens from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_diagnoses, 
+                    label: 'Loading diagnoses from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_problems, 
+                    label: 'Loading problems from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_dff, 
+                    label: 'Loading drugs library from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.uploading_remote_files, 
+                    label: 'Uploading files from ' + site.name, 
+                },
+            ]),
 
             { 
                 key: BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, 
@@ -533,35 +560,29 @@ function ImportInfo({
         overwriteDrugsLibraryItems,
     ]);
 
-    const [completed, setCompleted] = useState<string[]>([]);
+    const [events, setEvents] = useState<Record<string, boolean>>({});
+    const [latestEvent, setLatestEvent] = useState('');
 
     useEffect(() => {
-        setCompleted([actionsInProgress[0].key + '__true']);
-    }, [actionsInProgress]);
-
-    const current = completed[completed.length - 1];
+        socket.on(requestKey, (key: string, value: boolean) => {
+            setLatestEvent(key);
+            setEvents(prev => ({
+                ...prev,
+                [key]: value,
+            }));
+        });
+    }, [requestKey]);
 
     return (
         <>
-            <SocketEventsListener
-                events={[
-                    {
-                        name: requestKey,
-                        onEvent: {
-                            callback: (...args) => setCompleted(prev => [...prev, args.join('__')]),
-                        },
-                    },
-                ]}
-            />
-
             <OverlayInfoCard 
                 show={show}
                 // onClose={() => setShow(false)}
             >
                 <div className="flex flex-col gap-y-1">
                     {actionsInProgress.map(a => {
-                        const inProgress = current === `${a.key}__true`;
-                        const isCompleted = completed.includes(`${a.key}__false`);
+                        const inProgress = latestEvent === a.key;
+                        const isCompleted = events[a.key] === false;
 
                         let className = 'opacity-50';
 

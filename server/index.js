@@ -14,7 +14,11 @@ const handler = app.getRequestHandler();
 app.prepare().then(() => {
     const httpServer = createServer(handler);
 
-    const io = new Server(httpServer);
+    const io = new Server(httpServer, {
+        cors: '*',
+        maxHttpBufferSize: 1e7,
+        pingTimeout: 60000,
+    });
 
     io.on("connection", (socket) => {
         console.log('Client connected');
