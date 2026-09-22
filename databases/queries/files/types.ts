@@ -1,4 +1,6 @@
-import { files } from "@/databases/pg/schema";
+import { files, filesAliases } from "@/databases/pg/schema";
+
+export type FileAlias = typeof filesAliases.$inferSelect;
 
 export type FullFile = typeof files.$inferSelect & {
     url: string;
@@ -12,6 +14,8 @@ export type FileDetails = {
     metadata: { [key: string]: any; };
     contentType: typeof files.$inferSelect['contentType'];
     createdAt: typeof files.$inferSelect['createdAt'];
+    aliases?: FileAlias[];
+    data?: FullFile['data'];
 };
 
 export type GetFileDetailsResponse = {
@@ -34,6 +38,7 @@ export type GetFilesParams = {
     uploadDateGTE?: string | Date;
     uploadDateLTE?: string | Date;
     withData?: boolean;
+    withAliases?: boolean;
 };
 
 export type GetFilesResults = {

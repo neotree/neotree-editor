@@ -14,7 +14,6 @@ import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
-import { processImage } from "@/lib/process-image";
 import { _getDataKeys } from "@/databases/queries/data-keys";
 import { _getConfigKeys } from "@/databases/queries/config-keys";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
@@ -47,7 +46,8 @@ import {
 import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastActionInProgress } from "@/lib/in-progress";
-import { loadRemoteDataKeys, loadRemoteScriptsWithItems } from "./remote";
+import { loadRemoteDataKeys, loadRemoteScriptsWithItems, uploadRemoteFiles } from "./remote";
+import { uploadReferencedFileIfMissing } from "@/lib/files";
 
 export const getScriptsMetadata: typeof queries._getScriptsMetadata = (...args) => {
     return queries._getScriptsMetadata(...args);
@@ -2160,11 +2160,13 @@ async function saveScriptScreens({
     scriptId,
     preserveScreensIds,
     draftOrigin,
+    uploadedFiles = {},
 }: {
     preserveScreensIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2177,14 +2179,6 @@ async function saveScriptScreens({
         const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
         if (script.errors?.length) throw new Error(script.errors.join(', '));
         if (!script.data) throw new Error('Script not found');
-
-        const images: { data: string; }[] = [];
-
-        screens.forEach(s => {
-            if (s.image1) images.push(s.image1);
-            if (s.image2) images.push(s.image2);
-            if (s.image3) images.push(s.image3);
-        });
 
         for (const screen of screens) {
             const {
@@ -2212,16 +2206,36 @@ async function saveScriptScreens({
 
             try {
                 if (s.image1) {
-                    const res = await processImage(s.image1);
-                    s.image1 = res.image;
+                    if (uploadedFiles[s.image1.fileId || s.image1.data]) {
+                        s.image1 = uploadedFiles[s.image1.fileId || s.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image1);
+                        s.image1 = res.file;
+                    }
                 }
                 if (s.image2) {
-                    const res = await processImage(s.image2);
-                    s.image2 = res.image;
+                    if (uploadedFiles[s.image2.fileId || s.image2.data]) {
+                        s.image2 = uploadedFiles[s.image2.fileId || s.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image2);
+                        s.image2 = res.file;
+                    }
                 }
                 if (s.image3) {
-                    const res = await processImage(s.image3);
-                    s.image3 = res.image;
+                    if (uploadedFiles[s.image3.fileId || s.image3.data]) {
+                        s.image3 = uploadedFiles[s.image3.fileId || s.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image3);
+                        s.image3 = res.file;
+                    }
+                }
+                if (s.contentTextImage) {
+                    if (uploadedFiles[s.contentTextImage.fileId || s.contentTextImage.data]) {
+                        s.contentTextImage = uploadedFiles[s.contentTextImage.fileId || s.contentTextImage.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.contentTextImage);
+                        s.contentTextImage = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
@@ -2261,11 +2275,13 @@ async function saveScriptDiagnoses({
     scriptId,
     preserveDiagnosesIds,
     draftOrigin,
+    uploadedFiles = {},
 }: {
     preserveDiagnosesIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2304,16 +2320,28 @@ async function saveScriptDiagnoses({
 
             try {
                 if (d.image1) {
-                    const res = await processImage(d.image1);
-                    d.image1 = res.image;
+                    if (uploadedFiles[d.image1.fileId || d.image1.data]) {
+                        d.image1 = uploadedFiles[d.image1.fileId || d.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image1);
+                        d.image1 = res.file;
+                    }
                 }
                 if (d.image2) {
-                    const res = await processImage(d.image2);
-                    d.image2 = res.image;
+                    if (uploadedFiles[d.image2.fileId || d.image2.data]) {
+                        d.image2 = uploadedFiles[d.image2.fileId || d.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image2);
+                        d.image2 = res.file;
+                    }
                 }
                 if (d.image3) {
-                    const res = await processImage(d.image3);
-                    d.image3 = res.image;
+                    if (uploadedFiles[d.image3.fileId || d.image3.data]) {
+                        d.image3 = uploadedFiles[d.image3.fileId || d.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image3);
+                        d.image3 = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
@@ -2351,11 +2379,13 @@ async function saveScriptProblems({
     scriptId,
     preserveProblemsIds,
     draftOrigin,
+    uploadedFiles = {},
 }: {
     preserveProblemsIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     problems: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['problems'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2393,16 +2423,28 @@ async function saveScriptProblems({
 
             try {
                 if (d.image1) {
-                    const res = await processImage(d.image1);
-                    d.image1 = res.image;
+                    if (uploadedFiles[d.image1.fileId || d.image1.data]) {
+                        d.image1 = uploadedFiles[d.image1.fileId || d.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image1);
+                        d.image1 = res.file;
+                    }
                 }
                 if (d.image2) {
-                    const res = await processImage(d.image2);
-                    d.image2 = res.image;
+                    if (uploadedFiles[d.image2.fileId || d.image2.data]) {
+                        d.image2 = uploadedFiles[d.image2.fileId || d.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image2);
+                        d.image2 = res.file;
+                    }
                 }
                 if (d.image3) {
-                    const res = await processImage(d.image3);
-                    d.image3 = res.image;
+                    if (uploadedFiles[d.image3.fileId || d.image3.data]) {
+                        d.image3 = uploadedFiles[d.image3.fileId || d.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image3);
+                        d.image3 = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
@@ -2472,7 +2514,8 @@ const saveScriptsWithItemsInfo = {
     dataKeys: 0,
 };
 
-export async function saveScriptsWithItems({ data, }: {
+export async function saveScriptsWithItems({ data, uploadedFiles, }: {
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
         draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
@@ -2587,15 +2630,33 @@ export async function saveScriptsWithItems({ data, }: {
             res.errors?.forEach(e => errors.push(e));
             if (errors.length) continue;
 
-            const saveScreens = await saveScriptScreens({ preserveScreensIds: true, scriptId, screens, draftOrigin });
+            const saveScreens = await saveScriptScreens({ 
+                preserveScreensIds: true, 
+                scriptId, 
+                screens, 
+                draftOrigin,
+                uploadedFiles, 
+            });
             saveScreens.errors?.forEach(e => errors.push(e));
             info.screens += saveScreens.saved;
 
-            const saveDiagnoses = await saveScriptDiagnoses({ preserveDiagnosesIds: true, scriptId, diagnoses, draftOrigin });
+            const saveDiagnoses = await saveScriptDiagnoses({ 
+                preserveDiagnosesIds: true, 
+                scriptId, 
+                diagnoses, 
+                draftOrigin,
+                uploadedFiles, 
+            });
             saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
 
-            const saveProblems = await saveScriptProblems({ preserveProblemsIds: true, scriptId, problems, draftOrigin });
+            const saveProblems = await saveScriptProblems({ 
+                preserveProblemsIds: true, 
+                scriptId, 
+                problems, 
+                draftOrigin,
+                uploadedFiles, 
+            });
             saveProblems.errors?.forEach(e => errors.push(e));
             info.problems += saveProblems.saved;
 
@@ -2665,6 +2726,7 @@ export async function copyScripts(params?: {
         let importedDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
         let scrappedDataKeys: Awaited<ReturnType<typeof scrapDataKeys>> = [];
         let importedDataKeyAffectedScriptIds: string[] = [];
+        let importedFiles: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'] = {};
 
         if (!scriptsIds.length && !confirmCopyAll) throw new Error('You&apos;re about copy all the scripts, please confirm this action!');
 
@@ -2699,6 +2761,14 @@ export async function copyScripts(params?: {
             if (res.errors?.length) return { success: false, errors: res.errors, info, };
 
             scripts = res;
+
+            const uploadRes = await uploadRemoteFiles({ 
+                files: res.files, 
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+            });
+
+            importedFiles = uploadRes.data;
 
             timings['remote_fetch'] = importedDataKeysRes.time + res.time;
 
@@ -2766,6 +2836,7 @@ export async function copyScripts(params?: {
             } else {
                 const saveScriptsStartedAt = Date.now();
                 response = await saveScriptsWithItems({
+                    uploadedFiles: importedFiles,
                     data: scripts.data.map(s => ({
                         ...s,
                         overWriteScriptWithId,

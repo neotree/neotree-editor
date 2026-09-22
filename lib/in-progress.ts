@@ -8,9 +8,10 @@ export const BROADCAST_ACTIONS_IN_PROGRESS = {
     loading_remote_diagnoses: '5',
     loading_remote_problems: '6',
     loading_remote_dff: '7',
-    saving_scripts: '8',
-    saving_dff: '9',
-    saving_data_keys: '10',
+    uploading_remote_files: '8',
+    saving_scripts: '9',
+    saving_dff: '10',
+    saving_data_keys: '11',
 } as const;
 
 export async function broadcastActionInProgress(

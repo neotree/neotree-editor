@@ -21,8 +21,13 @@ import {
     type GetProblemsResults,
     type GetProblemsParams,
 }from '@/databases/queries/scripts';
+import {
+    _getFiles,
+} from '@/databases/queries/files';
 import { scrapDataKeys } from '@/lib/data-keys';
-import { parseFileReferences } from '@/lib/file-references';
+import { parseFileReferences, uploadReferencedFileIfMissing } from '@/lib/files';
+import { FileReference } from '@/types';
+import { GetFilesResults } from '@/databases/queries/files/types';
 
 async function broadcastActionInProgress (
     requestKey: string | undefined, 
@@ -328,6 +333,7 @@ export const loadRemoteScriptsWithItems = async ({
 }): Promise<{
     time: number;
     errors: GetScriptsResults['errors'];
+    files: FileReference[];
     data: (GetScriptsResults['data'][0] & {
         screens: GetScreensResults['data'];
         problems: GetProblemsResults['data'];
@@ -461,13 +467,100 @@ export const loadRemoteScriptsWithItems = async ({
 
         if (!errors.length) errors = undefined;
 
+        const { files, } = parseFileReferences({ scripts: data, });
+
         return { 
             time,
             errors,
             data,
+            files,
         };
     } catch(e: any) {
         if (throwError) throw e;
-        return { data: [], errors: [e.message], time, };
+        return { data: [], files: [], errors: [e.message], time, };
+    }
+};
+
+type UploadRemoteFilesResults = { 
+    data: Record<string, FileReference & {
+        uploaded?: boolean;
+    }>; 
+    errors?: string[];
+} & LoadRemoteResultsExtra;
+
+export const uploadRemoteFiles = async ({
+    remoteSiteId,
+    requestKey,
+    logTime = true,
+    throwError,
+    axiosClient,
+    files: filesParam,
+}: { 
+    files: FileReference[]; 
+} & LoadFnParams): Promise<UploadRemoteFilesResults> => {
+    let time = 0;
+
+    try {
+        await broadcastActionInProgress(requestKey, BROADCAST_ACTIONS_IN_PROGRESS.uploading_remote_files, true);
+        
+        const startedAt = Date.now();
+
+        const filesIds = filesParam.filter(f => f.fileId).map(f => f.fileId!);
+
+        let localFiles: Record<string, GetFilesResults['data'][0]> = {};
+
+        if (filesIds.length) {
+            const res = await _getFiles({
+                filesIds,
+                withAliases: true,
+            });
+            
+            res.data.forEach(({ aliases = [], ...f }) => {
+                localFiles[f.fileId] = f;
+                aliases.forEach(a => {
+                    localFiles[a.alias] = f;
+                });
+            });
+        }
+
+        filesParam = filesParam.filter(f => f.fileId && !localFiles[f.fileId]);
+
+        axiosClient = axiosClient || await getSiteAxiosClient(remoteSiteId);
+
+        const data: Record<string, UploadRemoteFilesResults['data'][0]> = {};
+        let errors: string[] = [];
+
+        Object.keys(localFiles).map(fileId => {
+            const f = localFiles[fileId];
+            data[fileId] = {
+                ...f,
+                data: f.url,
+                uploaded: false,
+            };
+        });
+
+        for (const f of filesParam) {
+            const res = await uploadReferencedFileIfMissing(f);
+            if (res.errors?.length) errors = [...errors, ...res.errors];
+            if (res.file) {
+                data[f.fileId || f.data] = {
+                    ...res.file,
+                    uploaded: res.uploaded,
+                };
+            }
+        }
+
+        time = Date.now() - startedAt;
+
+        if (logTime) logger.log('uploadRemoteFiles TIMINGS', { totalMs: time, });
+
+        await broadcastActionInProgress(requestKey, BROADCAST_ACTIONS_IN_PROGRESS.uploading_remote_files, false);
+
+        if (throwError && errors?.length) throw new Error(errors .join(', '));
+
+        return { data, time, };
+    } catch(e: any) {
+        if (throwError) throw e;
+        return { data: {}, errors: [e.message], time, };
     }
 };

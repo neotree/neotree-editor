@@ -533,6 +533,10 @@ function ImportInfo({
                     key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_dff, 
                     label: 'Loading drugs library from ' + site.name, 
                 },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.uploading_remote_files, 
+                    label: 'Uploading files from ' + site.name, 
+                },
             ]),
 
             { 
