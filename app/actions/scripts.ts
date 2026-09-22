@@ -1,7 +1,6 @@
 'use server';
 
 import { v4 } from "uuid";
-import queryString from "query-string";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
@@ -15,12 +14,10 @@ import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
-import { isValidUrl } from "@/lib/urls";
-import { processImage } from "@/lib/process-image";
-import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
+import { _getDataKeys } from "@/databases/queries/data-keys";
 import { _getConfigKeys } from "@/databases/queries/config-keys";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
-import { dataKeyToJSON, parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
+import { parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
 import { getIntegrityPolicyState } from "@/lib/integrity-policy";
 import { createIntegrityImportSnapshot } from "./integrity-imports";
@@ -30,6 +27,7 @@ import {
     collectScriptConditionFindings,
     collectScriptOutcomeReferences,
     buildConditionReportSignature,
+    isSupersededConditionReportSignature,
     getConfigurationConditionKeySignature,
     getScriptConditionInputsStamp,
     getOutcomeCollectionForScreenType,
@@ -39,11 +37,21 @@ import {
     type ScriptConditionEntityRef,
 } from "@/lib/conditional-expression";
 import { buildScriptConditionKeys } from "@/lib/conditional-expression/script-keys";
-import { findScriptFieldKeyCollisions, type FieldKeyCollision } from "@/lib/field-key-collisions";
+import {
+    findScriptFieldKeyCollisions,
+    type FieldKeyCollision,
+    type FieldKeyCollisionKind,
+    type FieldKeyCollisionSeverity,
+} from "@/lib/field-key-collisions";
 import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
+import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastActionInProgress } from "@/lib/in-progress";
+import { loadRemoteDataKeys, loadRemoteScriptsWithItems, uploadRemoteFiles } from "./remote";
+import { uploadReferencedFileIfMissing } from "@/lib/files";
 
-export const getScriptsMetadata = queries._getScriptsMetadata;
+export const getScriptsMetadata: typeof queries._getScriptsMetadata = (...args) => {
+    return queries._getScriptsMetadata(...args);
+};
 
 // DIAGNOSES
 export const countScreens: typeof queries._countScreens = async (...args) => {
@@ -1524,7 +1532,7 @@ export async function getScriptsConditionErrors(
         const result: Record<string, ScriptConditionReport> = {};
         const missing: ScriptConditionErrorInput[] = [];
         const stale: ScriptConditionErrorInput[] = [];
-        const unsigned: ScriptConditionErrorInput[] = [];
+        const refreshInBackground: ScriptConditionErrorInput[] = [];
         for (const s of scripts) {
             const id = `${s?.scriptId || ''}`;
             if (!id) continue;
@@ -1537,10 +1545,15 @@ export async function getScriptsConditionErrors(
             } else if (report && !report.inputsSignature && report.configurationSignature === configurationSignature) {
                 // Written before signatures existed. It still passes the check
                 // that was in force when it was written, so serve it and re-sign
-                // out of band — a whole library's worth of re-signing must not
-                // land on somebody's page load.
+                // out of band.
                 result[id] = report;
-                unsigned.push(s);
+                refreshInBackground.push(s);
+            } else if (report && isSupersededConditionReportSignature(report.inputsSignature, expected)) {
+                // The script is unchanged; only the validation rules moved on.
+                // Every script hits this at once after such a deploy, so it is
+                // explicitly not the inline `stale` path.
+                result[id] = report;
+                refreshInBackground.push(s);
             } else if (report) {
                 stale.push(s);
             } else {
@@ -1548,13 +1561,13 @@ export async function getScriptsConditionErrors(
             }
         }
 
-        if (unsigned.length) {
+        if (refreshInBackground.length) {
             void (async () => {
                 try {
-                    const computed = await computeConditionReportsCoalesced(unsigned, configurationKeys, { signatures });
+                    const computed = await computeConditionReportsCoalesced(refreshInBackground, configurationKeys, { signatures });
                     await persistConditionReports(computed);
                 } catch (e: any) {
-                    logger.error('getScriptsConditionErrors re-sign ERROR', e?.message);
+                    logger.error('getScriptsConditionErrors background refresh ERROR', e?.message);
                 }
             })();
         }
@@ -1817,7 +1830,18 @@ export type ScriptFieldKeyCollisionReport = {
     title: string;
     blocking: number;
     warnings: number;
-    examples: { location: string; message: string; href?: string }[];
+    /** How many of each rule fired, so a summary can name them individually. */
+    byKind: Partial<Record<FieldKeyCollisionKind, number>>;
+    examples: {
+        /** Which rule fired, so a reader can name it from FIELD_KEY_COLLISION_RULES. */
+        kind: FieldKeyCollisionKind;
+        severity: FieldKeyCollisionSeverity;
+        /** The key as the author spelled it, for a badge that has room for one detail. */
+        displayKey: string;
+        location: string;
+        message: string;
+        href?: string;
+    }[];
 };
 
 /**
@@ -1833,8 +1857,15 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
     scripts: ScriptFieldKeyCollisionReport[];
     totalBlocking: number;
     totalWarnings: number;
+    /** Per-rule totals across the whole scope, for the publish summary headline. */
+    totalsByKind: Partial<Record<FieldKeyCollisionKind, number>>;
 }> {
-    const empty = { scripts: [] as ScriptFieldKeyCollisionReport[], totalBlocking: 0, totalWarnings: 0 };
+    const empty = {
+        scripts: [] as ScriptFieldKeyCollisionReport[],
+        totalBlocking: 0,
+        totalWarnings: 0,
+        totalsByKind: {} as Partial<Record<FieldKeyCollisionKind, number>>,
+    };
     try {
         const scopeIds = opts?.scriptIds;
         if (scopeIds && !scopeIds.length) return empty;
@@ -1897,6 +1928,7 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
         const scripts: ScriptFieldKeyCollisionReport[] = [];
         let totalBlocking = 0;
         let totalWarnings = 0;
+        const totalsByKind: Partial<Record<FieldKeyCollisionKind, number>> = {};
 
         for (const script of scriptRows) {
             const scriptId = `${script?.scriptId || ''}`;
@@ -1911,12 +1943,23 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
             totalBlocking += blocking.length;
             totalWarnings += warnings;
 
+            // Counted off the collisions already in hand — no extra scan.
+            const byKind: Partial<Record<FieldKeyCollisionKind, number>> = {};
+            for (const c of collisions) {
+                byKind[c.kind] = (byKind[c.kind] || 0) + 1;
+                totalsByKind[c.kind] = (totalsByKind[c.kind] || 0) + 1;
+            }
+
             scripts.push({
                 scriptId,
                 title: `${script?.title || 'Untitled script'}`,
                 blocking: blocking.length,
                 warnings,
+                byKind,
                 examples: (blocking.length ? blocking : collisions).slice(0, 5).map((c) => ({
+                    kind: c.kind,
+                    severity: c.severity,
+                    displayKey: c.displayKey,
                     location: c.location,
                     message: c.message,
                     href: c.screenId ? `/script/${scriptId}/screen/${c.screenId}` : `/script/${scriptId}?section=screens`,
@@ -1926,7 +1969,7 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
 
         // Worst offenders first.
         scripts.sort((a, b) => (b.blocking - a.blocking) || (b.warnings - a.warnings));
-        return { scripts, totalBlocking, totalWarnings };
+        return { scripts, totalBlocking, totalWarnings, totalsByKind };
     } catch (e: any) {
         logger.error('getScriptsWithFieldKeyCollisions ERROR', e?.message);
         return empty;
@@ -2117,11 +2160,13 @@ async function saveScriptScreens({
     scriptId,
     preserveScreensIds,
     draftOrigin,
+    uploadedFiles = {},
 }: {
     preserveScreensIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2134,14 +2179,6 @@ async function saveScriptScreens({
         const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
         if (script.errors?.length) throw new Error(script.errors.join(', '));
         if (!script.data) throw new Error('Script not found');
-
-        const images: { data: string; }[] = [];
-
-        screens.forEach(s => {
-            if (s.image1) images.push(s.image1);
-            if (s.image2) images.push(s.image2);
-            if (s.image3) images.push(s.image3);
-        });
 
         for (const screen of screens) {
             const {
@@ -2169,16 +2206,36 @@ async function saveScriptScreens({
 
             try {
                 if (s.image1) {
-                    const res = await processImage(s.image1);
-                    s.image1 = res.image;
+                    if (uploadedFiles[s.image1.fileId || s.image1.data]) {
+                        s.image1 = uploadedFiles[s.image1.fileId || s.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image1);
+                        s.image1 = res.file;
+                    }
                 }
                 if (s.image2) {
-                    const res = await processImage(s.image2);
-                    s.image2 = res.image;
+                    if (uploadedFiles[s.image2.fileId || s.image2.data]) {
+                        s.image2 = uploadedFiles[s.image2.fileId || s.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image2);
+                        s.image2 = res.file;
+                    }
                 }
                 if (s.image3) {
-                    const res = await processImage(s.image3);
-                    s.image3 = res.image;
+                    if (uploadedFiles[s.image3.fileId || s.image3.data]) {
+                        s.image3 = uploadedFiles[s.image3.fileId || s.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image3);
+                        s.image3 = res.file;
+                    }
+                }
+                if (s.contentTextImage) {
+                    if (uploadedFiles[s.contentTextImage.fileId || s.contentTextImage.data]) {
+                        s.contentTextImage = uploadedFiles[s.contentTextImage.fileId || s.contentTextImage.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.contentTextImage);
+                        s.contentTextImage = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
@@ -2218,11 +2275,13 @@ async function saveScriptDiagnoses({
     scriptId,
     preserveDiagnosesIds,
     draftOrigin,
+    uploadedFiles = {},
 }: {
     preserveDiagnosesIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2261,16 +2320,28 @@ async function saveScriptDiagnoses({
 
             try {
                 if (d.image1) {
-                    const res = await processImage(d.image1);
-                    d.image1 = res.image;
+                    if (uploadedFiles[d.image1.fileId || d.image1.data]) {
+                        d.image1 = uploadedFiles[d.image1.fileId || d.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image1);
+                        d.image1 = res.file;
+                    }
                 }
                 if (d.image2) {
-                    const res = await processImage(d.image2);
-                    d.image2 = res.image;
+                    if (uploadedFiles[d.image2.fileId || d.image2.data]) {
+                        d.image2 = uploadedFiles[d.image2.fileId || d.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image2);
+                        d.image2 = res.file;
+                    }
                 }
                 if (d.image3) {
-                    const res = await processImage(d.image3);
-                    d.image3 = res.image;
+                    if (uploadedFiles[d.image3.fileId || d.image3.data]) {
+                        d.image3 = uploadedFiles[d.image3.fileId || d.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image3);
+                        d.image3 = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
@@ -2308,11 +2379,13 @@ async function saveScriptProblems({
     scriptId,
     preserveProblemsIds,
     draftOrigin,
+    uploadedFiles = {},
 }: {
     preserveProblemsIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     problems: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['problems'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2350,16 +2423,28 @@ async function saveScriptProblems({
 
             try {
                 if (d.image1) {
-                    const res = await processImage(d.image1);
-                    d.image1 = res.image;
+                    if (uploadedFiles[d.image1.fileId || d.image1.data]) {
+                        d.image1 = uploadedFiles[d.image1.fileId || d.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image1);
+                        d.image1 = res.file;
+                    }
                 }
                 if (d.image2) {
-                    const res = await processImage(d.image2);
-                    d.image2 = res.image;
+                    if (uploadedFiles[d.image2.fileId || d.image2.data]) {
+                        d.image2 = uploadedFiles[d.image2.fileId || d.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image2);
+                        d.image2 = res.file;
+                    }
                 }
                 if (d.image3) {
-                    const res = await processImage(d.image3);
-                    d.image3 = res.image;
+                    if (uploadedFiles[d.image3.fileId || d.image3.data]) {
+                        d.image3 = uploadedFiles[d.image3.fileId || d.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image3);
+                        d.image3 = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
@@ -2429,7 +2514,8 @@ const saveScriptsWithItemsInfo = {
     dataKeys: 0,
 };
 
-export async function saveScriptsWithItems({ data, }: {
+export async function saveScriptsWithItems({ data, uploadedFiles, }: {
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
         draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
@@ -2544,15 +2630,33 @@ export async function saveScriptsWithItems({ data, }: {
             res.errors?.forEach(e => errors.push(e));
             if (errors.length) continue;
 
-            const saveScreens = await saveScriptScreens({ preserveScreensIds: true, scriptId, screens, draftOrigin });
+            const saveScreens = await saveScriptScreens({ 
+                preserveScreensIds: true, 
+                scriptId, 
+                screens, 
+                draftOrigin,
+                uploadedFiles, 
+            });
             saveScreens.errors?.forEach(e => errors.push(e));
             info.screens += saveScreens.saved;
 
-            const saveDiagnoses = await saveScriptDiagnoses({ preserveDiagnosesIds: true, scriptId, diagnoses, draftOrigin });
+            const saveDiagnoses = await saveScriptDiagnoses({ 
+                preserveDiagnosesIds: true, 
+                scriptId, 
+                diagnoses, 
+                draftOrigin,
+                uploadedFiles, 
+            });
             saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
 
-            const saveProblems = await saveScriptProblems({ preserveProblemsIds: true, scriptId, problems, draftOrigin });
+            const saveProblems = await saveScriptProblems({ 
+                preserveProblemsIds: true, 
+                scriptId, 
+                problems, 
+                draftOrigin,
+                uploadedFiles, 
+            });
             saveProblems.errors?.forEach(e => errors.push(e));
             info.problems += saveProblems.saved;
 
@@ -2573,6 +2677,7 @@ export async function saveScriptsWithItems({ data, }: {
 }
 
 export async function copyScripts(params?: {
+    requestKey?: string;
     scriptsIds?: string[];
     confirmCopyAll?: boolean;
     toRemoteSiteId?: string;
@@ -2600,6 +2705,7 @@ export async function copyScripts(params?: {
     };
 
     const {
+        requestKey,
         scriptsIds = [],
         confirmCopyAll,
         toRemoteSiteId,
@@ -2610,12 +2716,17 @@ export async function copyScripts(params?: {
         overwriteDrugsLibraryItems,
     } = { ...params };
 
+    const broadcastActionInProgress = (action: string, loading: boolean) => {
+        return _broadcastActionInProgress(requestKey!, action, loading);
+    };
+
     try {
         const session = await isAllowed();
 
         let importedDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
         let scrappedDataKeys: Awaited<ReturnType<typeof scrapDataKeys>> = [];
         let importedDataKeyAffectedScriptIds: string[] = [];
+        let importedFiles: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'] = {};
 
         if (!scriptsIds.length && !confirmCopyAll) throw new Error('You&apos;re about copy all the scripts, please confirm this action!');
 
@@ -2625,75 +2736,45 @@ export async function copyScripts(params?: {
 
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
+        let siteUrl: undefined | string = undefined;
+
         if (fromRemoteSiteId) {
-            const remoteFetchStartedAt = Date.now();
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
-            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys?' + queryString.stringify({
-                returnDraftsIfExist: false,
-            }));
+            siteUrl = axiosClient.defaults.baseURL;
+
+            const importedDataKeysRes = await loadRemoteDataKeys({
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+                axiosClient,
+            });
             importedDataKeys = importedDataKeysRes.data;
 
-            const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
-                scriptsIds: JSON.stringify(scriptsIds),
-                data: JSON.stringify({
-                    returnDraftsIfExist: false,
-                }),
-            }));
-            const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
+            const res = await loadRemoteScriptsWithItems({
+                dataKeys: importedDataKeys,
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+                axiosClient,
+                scriptsIds,
+            });
 
-            if (resData.errors) return { success: false, errors: resData.errors, info, };
+            if (res.errors?.length) return { success: false, errors: res.errors, info, };
 
-            scripts = resData;
-            markTiming('remote_fetch', remoteFetchStartedAt);
+            scripts = res;
 
+            const uploadRes = await uploadRemoteFiles({ 
+                files: res.files, 
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+            });
 
-            scripts.data.forEach(({ screens, diagnoses, problems, dataKeys, drugsLibrary }, i) => {
-                const getImageUrl = (suffix: string) => {
-                    let host = res.config.baseURL || '';
-                    if (host.substring(host.length - 1, host.length) === '/') host = host.substring(0, host.length - 1);
-                    if (suffix[0] === '/') suffix = suffix.substring(1, suffix.length);
-                    return [host, suffix].filter(s => s).join('/');
-                };
+            importedFiles = uploadRes.data;
 
+            timings['remote_fetch'] = importedDataKeysRes.time + res.time;
+
+            scripts.data.forEach(({ dataKeys, drugsLibrary }) => {
                 scrappedDataKeys = [...scrappedDataKeys, ...dataKeys];
                 dffItemsToSave = [...dffItemsToSave, ...drugsLibrary];
-
-                screens.forEach((d, j) => {
-                    if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
-                        scripts.data[i].screens[j].image1!.data = getImageUrl(d.image1.data);
-                    }
-                    if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
-                        scripts.data[i].screens[j].image2!.data = getImageUrl(d.image2.data);
-                    }
-                    if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
-                        scripts.data[i].screens[j].image3!.data = getImageUrl(d.image3.data);
-                    }
-                });
-
-                diagnoses.forEach((d, j) => {
-                    if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
-                        scripts.data[i].diagnoses[j].image1!.data = getImageUrl(d.image1.data);
-                    }
-                    if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
-                        scripts.data[i].diagnoses[j].image2!.data = getImageUrl(d.image2.data);
-                    }
-                    if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
-                        scripts.data[i].diagnoses[j].image3!.data = getImageUrl(d.image3.data);
-                    }
-                });
-
-                problems.forEach((p, j) => {
-                    if (p.image1?.data && p.image1?.fileId && !isValidUrl(p.image1.data)) {
-                        scripts.data[i].problems[j].image1!.data = getImageUrl(p.image1.data);
-                    }
-                    if (p.image2?.data && p.image2?.fileId && !isValidUrl(p.image2.data)) {
-                        scripts.data[i].problems[j].image2!.data = getImageUrl(p.image2.data);
-                    }
-                    if (p.image3?.data && p.image3?.fileId && !isValidUrl(p.image3.data)) {
-                        scripts.data[i].problems[j].image3!.data = getImageUrl(p.image3.data);
-                    }
-                });
             });
 
             let index = -1;
@@ -2720,6 +2801,7 @@ export async function copyScripts(params?: {
                     return overwriteDataKeys || k.isNew;
                 });
             }
+
             markTiming('parse_imported_data_keys', parseImportedStartedAt);
         }
 
@@ -2735,6 +2817,8 @@ export async function copyScripts(params?: {
         } = { success: true, info, };
 
         if (scripts.data.length) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, true);
+
             if (toRemoteSiteId) {
                 const remoteSaveStartedAt = Date.now();
                 const axiosClient = await getSiteAxiosClient(toRemoteSiteId);
@@ -2752,6 +2836,7 @@ export async function copyScripts(params?: {
             } else {
                 const saveScriptsStartedAt = Date.now();
                 response = await saveScriptsWithItems({
+                    uploadedFiles: importedFiles,
                     data: scripts.data.map(s => ({
                         ...s,
                         overWriteScriptWithId,
@@ -2764,11 +2849,15 @@ export async function copyScripts(params?: {
             }
         }
 
+        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
+
         if (!response.success || response.errors?.length) {
             return response;
         }
 
         if (dffItemsToSave.length) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, true);
+
             const saveDrugsStartedAt = Date.now();
             const res = overwriteDrugsLibraryItems ? 
                 await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId: session.user?.userId, })
@@ -2778,7 +2867,11 @@ export async function copyScripts(params?: {
             markTiming('save_drugs_library_items', saveDrugsStartedAt);
         }
 
+        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
+
         if (dataKeysToSave.length) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, true);
+
             const saveDataKeysStartedAt = Date.now();
             const res = await _saveDataKeys({
                 data: dataKeysToSave,
@@ -2794,6 +2887,8 @@ export async function copyScripts(params?: {
             }
             markTiming('save_data_keys', saveDataKeysStartedAt);
         }
+
+        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
 
         if (
             fromRemoteSiteId &&

@@ -2,8 +2,10 @@ import assert from "assert";
 
 import {
   CONDITION_REPORT_SIGNATURE_VERSION,
+  SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS,
   buildConditionReportSignature,
   getScriptConditionInputsStamp,
+  isSupersededConditionReportSignature,
 } from "../lib/conditional-expression";
 
 const base = { configuration: "c1", inputs: "i1", content: "n1" };
@@ -37,6 +39,37 @@ assert.equal(
   false,
   "the signature must stay per-script",
 );
+
+// ── A rule change expires reports without a page load paying for it ──────────
+
+assert.equal(
+  SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS.includes(CONDITION_REPORT_SIGNATURE_VERSION as never),
+  false,
+  "the current version is not one of the superseded ones",
+);
+
+const digest = signature.slice(signature.indexOf(":") + 1);
+for (const version of SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS) {
+  assert.equal(
+    isSupersededConditionReportSignature(`${version}:${digest}`, signature),
+    true,
+    `a report written under ${version} from these same inputs is servable while it refreshes`,
+  );
+}
+
+// Only the version may differ. A different digest means the script itself
+// changed, which must stay on the inline recompute path.
+assert.equal(
+  isSupersededConditionReportSignature(
+    `${SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS[0]}:different`,
+    signature,
+  ),
+  false,
+  "changed inputs are stale, not superseded",
+);
+assert.equal(isSupersededConditionReportSignature(signature, signature), false, "a current signature is not superseded");
+assert.equal(isSupersededConditionReportSignature(undefined, signature), false, "an unsigned report is not superseded");
+assert.equal(isSupersededConditionReportSignature(signature, undefined), false, "no expectation means no match");
 
 // ── The script's own CE inputs ───────────────────────────────────────────────
 

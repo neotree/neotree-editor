@@ -7,7 +7,11 @@ export type FieldKeyCollisionSeverity = "blocking" | "warning";
 export type FieldKeyCollisionRule = {
   id: FieldKeyCollisionKind;
   label: string;
+  /** Counted phrase for the publish summary, e.g. "1 duplicate field key". */
   publishLabel: string;
+  /** Spelled out rather than derived: no suffix rule turns "field key spelled
+   *  two ways" into "field keys spelled two ways". */
+  publishLabelPlural: string;
   appliesTo: string;
   detectedWhen: string;
   whyItMatters: string;
@@ -21,6 +25,7 @@ export const FIELD_KEY_COLLISION_RULES = [
     id: "duplicate_key_same_screen",
     label: "Duplicate field key",
     publishLabel: "duplicate field key",
+    publishLabelPlural: "duplicate field keys",
     appliesTo: "Two or more fields on one screen",
     detectedWhen: "Two fields on the same screen use the same key (compared without case).",
     whyItMatters:
@@ -32,6 +37,7 @@ export const FIELD_KEY_COLLISION_RULES = [
     id: "duplicate_key_repeatable",
     label: "Shared key in a collection",
     publishLabel: "shared field key in a collection",
+    publishLabelPlural: "shared field keys in a collection",
     appliesTo: "Two or more fields on one repeatable screen",
     detectedWhen: "Two fields on a repeatable screen use the same key.",
     whyItMatters:
@@ -47,4 +53,22 @@ const rulesById = new Map<string, FieldKeyCollisionRule>(
 
 export function getFieldKeyCollisionRule(kind: FieldKeyCollisionKind): FieldKeyCollisionRule | undefined {
   return rulesById.get(kind);
+}
+
+/**
+ * "2 duplicate field keys, 1 field key spelled two ways" — one phrase per kind
+ * that actually occurred, in catalogue order (worst first), so the publish
+ * summary names what it found instead of lumping every non-blocking kind
+ * together as a "shared key".
+ */
+export function describeFieldKeyCollisionCounts(
+  counts: Partial<Record<FieldKeyCollisionKind, number>> | null | undefined,
+): string[] {
+  const phrases: string[] = [];
+  for (const rule of FIELD_KEY_COLLISION_RULES as readonly FieldKeyCollisionRule[]) {
+    const count = counts?.[rule.id] || 0;
+    if (!count) continue;
+    phrases.push(`${count} ${count === 1 ? rule.publishLabel : rule.publishLabelPlural}`);
+  }
+  return phrases;
 }

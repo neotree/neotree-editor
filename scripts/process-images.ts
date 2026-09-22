@@ -7,7 +7,7 @@ import * as schema from '@/databases/pg/schema';
 import { getSiteAxiosClient } from '@/lib/axios';
 import { _getDiagnoses, _getScreens } from '@/databases/queries/scripts';
 import { eq } from 'drizzle-orm';
-import { ScriptImage } from '@/types';
+import { FileReference } from '@/types';
 import { isValidUrl } from '@/lib/urls';
 import { UploadFileFromSiteResponse } from '@/app/actions/files';
 
@@ -52,7 +52,7 @@ async function main() {
             let screenIndex = 0;
             let diagnosisIndex = 0;
 
-            const processImage = async (img: ScriptImage) => {
+            const processImage = async (img: FileReference) => {
                 let siteURL = img.data.split('/').filter((_, i) => i < 3).join('/');
                 let _errors: string[] = [];
                 let updated = false;

@@ -848,19 +848,41 @@ assert.equal(
 
 // ---- mergeConditionKeys -----------------------------------------------------
 
-const dupExtras = mergeConditionKeys([], [
-  { name: "Field1", dataType: "text" },
-  { name: "field1", dataType: "number" },
+// `RESUS` and `Resus` are two different keys — two fields, two stored values,
+// two export columns — so the catalogue keeps both and each validates against
+// its own type and options.
+const caseVariants = mergeConditionKeys([], [
+  { name: "RESUS", dataType: "dropdown", options: ["Yes", "No"] },
+  { name: "Resus", dataType: "multi_select", options: ["CPR"] },
 ]);
-assert.equal(dupExtras.length, 1, "duplicate extras collapse to one");
-assert.equal(dupExtras[0].dataType, "number", "later duplicate extra wins");
+assert.equal(caseVariants.length, 2, "keys differing only by case are kept apart");
+assert.deepEqual(caseVariants.map((k) => k.name), ["RESUS", "Resus"], "both spellings survive");
 
-const collision = mergeConditionKeys(
-  [{ name: "Sex", dataType: "dropdown", label: "Sex - persisted" }],
-  [{ name: "sex", dataType: "text" }],
+const variantCtx: ValidationContext = { keys: caseVariants };
+assert.equal(errors("$RESUS = 'Yes'", variantCtx).length, 0, "each key resolves to itself");
+assert.equal(errors("$Resus = 'CPR'", variantCtx).length, 0, "and so does the other one");
+// The whole original bug: the reference resolved to the other key's options.
+assert.ok(
+  errors("$RESUS = 'CPR'", variantCtx).some((d) => d.code === "UNKNOWN_OPTION"),
+  "options are checked against the key actually referenced",
 );
-assert.equal(collision.length, 1, "base/extra case-insensitive collision merges");
-assert.equal(collision[0].dataType, "text", "local dataType wins over persisted");
+assert.equal(
+  errors("$RESUS = 'Yes'", variantCtx).filter((d) => d.code === "KEY_CASE").length,
+  0,
+  "a real key is never reported as a casing mistake",
+);
+
+// A spelling that matches no key is still a casing mistake, not an unknown key.
+const oneSpelling: ValidationContext = { keys: [{ name: "ADM", dataType: "text" }] };
+assert.equal(errors("$adm = 'x'", oneSpelling)[0]?.code, "KEY_CASE", "a genuine casing typo still reports");
+
+const sameSpelling = mergeConditionKeys(
+  [{ name: "Sex", dataType: "dropdown", label: "Sex - persisted" }],
+  [{ name: "Sex", dataType: "text" }],
+);
+assert.equal(sameSpelling.length, 1, "the same key from both sources merges to one");
+assert.equal(sameSpelling[0].dataType, "text", "local dataType wins over persisted");
+assert.equal(sameSpelling[0].label, "Sex - persisted", "keeps persisted label when local omits it");
 
 const fallback = mergeConditionKeys(
   [{ name: "A", label: "A - persisted", dataType: "number", optionLabels: { x: "Option X" } }],
@@ -873,9 +895,13 @@ assert.deepEqual(fallback[0].optionLabels, { x: "Option X" }, "keeps persisted o
 
 assert.equal(mergeConditionKeys([{ name: "" }], [{ name: "  " }]).length, 0, "blank names dropped");
 
+const wsTrimmed = mergeConditionKeys([{ name: "Sex", dataType: "dropdown" }], [{ name: " Sex " }]);
+assert.equal(wsTrimmed.length, 1, "a padded repeat of the same name merges to one");
+assert.equal(wsTrimmed[0].name, "Sex", "the merged key stores the trimmed name");
+
 const wsCollision = mergeConditionKeys([{ name: "Sex", dataType: "dropdown" }], [{ name: " sex " }]);
-assert.equal(wsCollision.length, 1, "whitespace collision merges to one");
-assert.equal(wsCollision[0].name, "sex", "collision stores the trimmed name");
+assert.equal(wsCollision.length, 2, "a different case is a different key, even after trimming");
+assert.equal(wsCollision[1].name, "sex", "the trimmed name is stored");
 assert.equal(
   validateCondition("$sex = 'M'", { keys: wsCollision }).diagnostics.filter((d) => d.severity === "error").length,
   0,

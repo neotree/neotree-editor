@@ -104,6 +104,28 @@ function getConfidentialDataKeyIds(screen: SaveScreensData) {
     return Array.from(ids).filter(Boolean);
 }
 
+function getConfidentialLabelOnlyDataKeyIds(screen: SaveScreensData) {
+    const ids = new Set<string>();
+
+    if (screen.confidentialLabelOnly && screen.keyId) {
+        ids.add(screen.keyId);
+    }
+
+    for (const field of screen.fields || []) {
+        if (field?.confidentialLabelOnly && field?.keyId) {
+            ids.add(field.keyId);
+        }
+    }
+
+    for (const item of screen.items || []) {
+        if (item?.confidentialLabelOnly && item?.keyId) {
+            ids.add(item.keyId);
+        }
+    }
+
+    return Array.from(ids).filter(Boolean);
+}
+
 async function resolveScriptReference(
     executor: DbOrTransaction,
     scriptId: string,
@@ -147,6 +169,7 @@ async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: stri
             uuid: key.uuid,
             uniqueKey: key.uniqueKey,
             confidential: true,
+            confidentialLabelOnly: false,
         }));
 
     if (!updates.length) return;
@@ -163,6 +186,40 @@ async function promoteDataKeysAsConfidential(uniqueKeys: string[], userId?: stri
     }
 }
 
+async function promoteDataKeysAsConfidentialLabelOnly(uniqueKeys: string[], userId?: string) {
+    const ids = Array.from(new Set(uniqueKeys.filter(Boolean)));
+    if (!ids.length) return;
+
+    const { _getDataKeys } = await import('@/databases/queries/data-keys');
+    const { _saveDataKeys } = await import('@/databases/mutations/data-keys');
+
+    const dataKeysRes = await _getDataKeys({ uniqueKeys: ids, returnDraftsIfExist: true });
+    if (dataKeysRes.errors?.length) {
+        throw new Error(dataKeysRes.errors.join(', '));
+    }
+
+    const updates = dataKeysRes.data
+        .filter((key) => !key?.confidentialLabelOnly && !key?.confidential)
+        .map((key) => ({
+            uuid: key.uuid,
+            uniqueKey: key.uniqueKey,
+            confidentialLabelOnly: true,
+        }));
+
+    if (!updates.length) return;
+
+    const saveRes = await _saveDataKeys({
+        data: updates,
+        userId,
+        updateRefs: false,
+        broadcastAction: false,
+    });
+
+    if (saveRes.errors?.length || !saveRes.success) {
+        throw new Error(saveRes.errors?.join(', ') || 'Failed to promote confidential-label-only data keys');
+    }
+}
+
 export async function _saveScreens({ data, broadcastAction, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveScreensData[],
     broadcastAction?: boolean;
@@ -176,6 +233,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
     const warnings: string[] = [];
     const info: SaveScreensResponse['info'] = {};
     const confidentialDataKeyIds = new Set<string>();
+    const confidentialLabelOnlyDataKeyIds = new Set<string>();
     const executor = client || db;
     
     try {
@@ -207,6 +265,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                 }
 
                 getConfidentialDataKeyIds(normalizedItem).forEach((id) => confidentialDataKeyIds.add(id));
+                getConfidentialLabelOnlyDataKeyIds(normalizedItem).forEach((id) => confidentialLabelOnlyDataKeyIds.add(id));
 
                 if (!errors.length) {
                     const draft = !itemScreenId ? null : await executor.query.screensDrafts.findFirst({
@@ -298,6 +357,9 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
         } else {
             if (confidentialDataKeyIds.size) {
                 await promoteDataKeysAsConfidential(Array.from(confidentialDataKeyIds), userId);
+            }
+            if (confidentialLabelOnlyDataKeyIds.size) {
+                await promoteDataKeysAsConfidentialLabelOnly(Array.from(confidentialLabelOnlyDataKeyIds), userId);
             }
             response.success = true;
         }

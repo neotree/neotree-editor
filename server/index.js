@@ -14,7 +14,11 @@ const handler = app.getRequestHandler();
 app.prepare().then(() => {
     const httpServer = createServer(handler);
 
-    const io = new Server(httpServer);
+    const io = new Server(httpServer, {
+        cors: '*',
+        maxHttpBufferSize: 1e7,
+        pingTimeout: 60000,
+    });
 
     io.on("connection", (socket) => {
         console.log('Client connected');
@@ -31,6 +35,10 @@ app.prepare().then(() => {
         socket.on('update_system', (...args) => onEvent('update_system', ...args));
         socket.on('file_uploaded', (...args) => onEvent('file_uploaded', ...args));
         socket.on('files_deleted', (...args) => onEvent('files_deleted', ...args));
+        socket.on('in_progress', (...args) => {
+            const [requestKey, action, loading] = args;
+            onEvent(requestKey, action, loading);
+        });
     });
 
     httpServer

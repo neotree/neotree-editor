@@ -153,10 +153,23 @@ export async function _publishDataKeys(opts?: {
 
         const { uuid: __uuid, id, createdAt, updatedAt, deletedAt, ...payload } = c
 
-        if (!opts?.allowConfidentialDowngrade && current?.confidential === true && payload.confidential === false) {
+        // Confidential and confidential-label-only are two tiers of the same protection, so
+        // moving between them (in either direction) is always allowed. Only leaving both tiers
+        // entirely (going fully non-confidential) counts as a downgrade that needs explicit opt-in.
+        const wasConfidential = current?.confidential === true || current?.confidentialLabelOnly === true
+        const becomesNonConfidential = payload.confidential === false && payload.confidentialLabelOnly === false
+
+        if (!opts?.allowConfidentialDowngrade && wasConfidential && becomesNonConfidential) {
           errors.push(
-            `Cannot downgrade confidential data key "${current.name || dataKeyId}" during publish. ` +
+            `Cannot remove confidentiality from data key "${current?.name || dataKeyId}" during publish. ` +
               `Set allowConfidentialDowngrade=true for an explicit downgrade.`,
+          )
+          continue
+        }
+
+        if (payload.confidential === true && payload.confidentialLabelOnly === true) {
+          errors.push(
+            `Data key "${current?.name || dataKeyId}" cannot be both Confidential and Confidential (label only).`,
           )
           continue
         }
