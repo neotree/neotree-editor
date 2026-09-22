@@ -2241,34 +2241,19 @@ async function saveScriptScreens({
                 logger.error('process image', e.message);
             }
 
-            // const incomingScreen = {
-            //     ...s,
-            //     scriptId,
-            //     oldScriptId: script.data.oldScriptId,
-            //     screenId,
-            //     version: 1,
-            // };
-            // const res = await saveScreensInternal(
-            //     { data: [incomingScreen], draftOrigin },
-            //     // Rebase the trusted source onto the minted id so unchanged
-            //     // legacy collisions retain the same stable path identity.
-            //     { screens: [{ ...screen, scriptId, screenId }] },
-            // );
-
-            // res.errors?.forEach(e => errors.push(`(screenId=${_ignoreScreenId}) ${e || ''}`));
-
-            // if (!res.errors?.length) saved++;
-
-            const res = await saveScreens({
-                data: [{
-                    ...s,
-                    scriptId,
-                    oldScriptId: script.data.oldScriptId,
-                    screenId,
-                    version: 1,
-                }],
-                draftOrigin,
-            });
+            const incomingScreen = {
+                ...s,
+                scriptId,
+                oldScriptId: script.data.oldScriptId,
+                screenId,
+                version: 1,
+            };
+            const res = await saveScreensInternal(
+                { data: [incomingScreen], draftOrigin },
+                // Rebase the trusted source onto the minted id so unchanged
+                // legacy collisions retain the same stable path identity.
+                { screens: [{ ...screen, scriptId, screenId }] },
+            );
 
             res.errors?.forEach(e => errors.push(`(screenId=${_ignoreScreenId}) ${e || ''}`));
 
@@ -2277,7 +2262,7 @@ async function saveScriptScreens({
 
         if (errors.length) return { errors, saved, success: false, };
 
-        // void recomputeScriptConditionErrors(scriptId);
+        void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptScreens ERROR', e.message);
@@ -2362,32 +2347,17 @@ async function saveScriptDiagnoses({
                 logger.error('process image', e.message);
             }
 
-            // const incomingDiagnosis = {
-            //     ...d,
-            //     scriptId,
-            //     oldScriptId: script.data.oldScriptId,
-            //     diagnosisId,
-            //     version: 1,
-            // };
-            // const res = await saveDiagnosesInternal(
-            //     { data: [incomingDiagnosis], draftOrigin },
-            //     { diagnoses: [{ ...diagnosis, scriptId, diagnosisId }] },
-            // );
-
-            // res.errors?.forEach(e => errors.push(`(diagnosisId=${_ignoreDiagnosisId}) ${e || ''}`));
-
-            // if (!res.errors?.length) saved++;
-
-            const res = await saveDiagnoses({
-                data: [{
-                    ...d,
-                    scriptId,
-                    oldScriptId: script.data.oldScriptId,
-                    diagnosisId,
-                    version: 1,
-                }],
-                draftOrigin,
-            });
+            const incomingDiagnosis = {
+                ...d,
+                scriptId,
+                oldScriptId: script.data.oldScriptId,
+                diagnosisId,
+                version: 1,
+            };
+            const res = await saveDiagnosesInternal(
+                { data: [incomingDiagnosis], draftOrigin },
+                { diagnoses: [{ ...diagnosis, scriptId, diagnosisId }] },
+            );
 
             res.errors?.forEach(e => errors.push(`(diagnosisId=${_ignoreDiagnosisId}) ${e || ''}`));
 
@@ -2396,7 +2366,7 @@ async function saveScriptDiagnoses({
 
         if (errors.length) return { errors, saved, success: false, };
 
-        // void recomputeScriptConditionErrors(scriptId);
+        void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptDiagnoses ERROR', e.message);
@@ -2480,32 +2450,17 @@ async function saveScriptProblems({
                 logger.error('process image', e.message);
             }
 
-            // const incomingProblem = {
-            //     ...d,
-            //     scriptId,
-            //     oldScriptId: script.data.oldScriptId,
-            //     problemId,
-            //     version: 1,
-            // };
-            // const res = await saveProblemsInternal(
-            //     { data: [incomingProblem], draftOrigin },
-            //     { problems: [{ ...problem, scriptId, problemId }] },
-            // );
-
-            // res.errors?.forEach(e => errors.push(`(problemId=${_ignoreProblemId}) ${e || ''}`));
-
-            // if (!res.errors?.length) saved++;
-
-            const res = await saveProblems({
-                data: [{
-                    ...d,
-                    scriptId,
-                    oldScriptId: script.data.oldScriptId,
-                    problemId,
-                    version: 1,
-                }],
-                draftOrigin,
-            });
+            const incomingProblem = {
+                ...d,
+                scriptId,
+                oldScriptId: script.data.oldScriptId,
+                problemId,
+                version: 1,
+            };
+            const res = await saveProblemsInternal(
+                { data: [incomingProblem], draftOrigin },
+                { problems: [{ ...problem, scriptId, problemId }] },
+            );
 
             res.errors?.forEach(e => errors.push(`(problemId=${_ignoreProblemId}) ${e || ''}`));
 
@@ -2514,7 +2469,7 @@ async function saveScriptProblems({
 
         if (errors.length) return { errors, saved, success: false, };
 
-        // void recomputeScriptConditionErrors(scriptId);
+        void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptProblems ERROR', e.message);
