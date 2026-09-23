@@ -29,6 +29,20 @@ import { parseFileReferences, uploadReferencedFileIfMissing } from '@/lib/files'
 import { FileReference } from '@/types';
 import { GetFilesResults } from '@/databases/queries/files/types';
 
+const UPLOAD_FILES_CONCURRENCY = 6;
+
+/** Runs tasks with a bounded concurrency so a large file list doesn't fire all requests at once. */
+async function runWithConcurrency<T>(items: T[], limit: number, task: (item: T) => Promise<void>): Promise<void> {
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+            const item = items[nextIndex++];
+            await task(item);
+        }
+    });
+    await Promise.all(workers);
+}
+
 async function broadcastActionInProgress (
     requestKey: string | undefined, 
     action: string, 
@@ -539,7 +553,9 @@ export const uploadRemoteFiles = async ({
             };
         });
 
-        for (const f of filesParam) {
+        // Each file is a distinct, already-deduplicated fileId, so these are
+        // independent network round trips — safe to run concurrently.
+        await runWithConcurrency(filesParam, UPLOAD_FILES_CONCURRENCY, async (f) => {
             const res = await uploadReferencedFileIfMissing(f);
             if (res.errors?.length) errors = [...errors, ...res.errors];
             if (res.file) {
@@ -548,7 +564,7 @@ export const uploadRemoteFiles = async ({
                     uploaded: res.uploaded,
                 };
             }
-        }
+        });
 
         time = Date.now() - startedAt;
 

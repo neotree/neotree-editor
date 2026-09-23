@@ -4,6 +4,7 @@ import { v4 } from "uuid";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { screens, diagnoses, problems, screensDrafts, diagnosesDrafts, problemsDrafts, pendingDeletion, scripts as scriptsTable, scriptsDrafts } from "@/databases/pg/schema";
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
@@ -198,7 +199,10 @@ async function saveScreensInternal(
             ...params,
             userId: session.user?.userId,
         });
-        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        // Skip when running inside a caller-managed transaction (params.client):
+        // the write isn't committed yet, so a recompute here would read stale
+        // data. The caller is responsible for recomputing once it commits.
+        if (res?.success !== false && !params?.client) void recomputeScriptsConditionErrors(affectedScriptIds);
         return res;
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
@@ -332,7 +336,8 @@ async function saveDiagnosesInternal(
         }
         if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
         const res = await saveOutcomeEntityWithReferenceRewrite("diagnosis", params, session.user?.userId);
-        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        // See saveScreensInternal: skip while inside a caller-managed transaction.
+        if (res?.success !== false && !params?.client) void recomputeScriptsConditionErrors(affectedScriptIds);
         return res;
     } catch (e: any) {
         logger.error('saveDiagnoses ERROR', e.message);
@@ -368,7 +373,8 @@ async function saveProblemsInternal(
         }
         if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
         const res = await saveOutcomeEntityWithReferenceRewrite("problem", params, session.user?.userId);
-        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        // See saveScreensInternal: skip while inside a caller-managed transaction.
+        if (res?.success !== false && !params?.client) void recomputeScriptsConditionErrors(affectedScriptIds);
         return res;
     } catch (e: any) {
         logger.error('saveProblems ERROR', e.message);
@@ -424,7 +430,8 @@ export const saveScripts: typeof mutations._saveScripts = async params => {
             ...params,
             userId: session.user?.userId,
         });
-        if (res?.success !== false) void recomputeScriptsConditionErrors(((params as any)?.data || []).map((d: any) => d?.scriptId));
+        // See saveScreensInternal: skip while inside a caller-managed transaction.
+        if (res?.success !== false && !(params as any)?.client) void recomputeScriptsConditionErrors(((params as any)?.data || []).map((d: any) => d?.scriptId));
         return res;
     } catch (e: any) {
         logger.error('saveScripts ERROR', e.message);
@@ -2161,12 +2168,19 @@ async function saveScriptScreens({
     preserveScreensIds,
     draftOrigin,
     uploadedFiles = {},
+    oldScriptId,
+    client,
 }: {
     preserveScreensIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
     uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    // Pass this when the caller already knows it (e.g. it just saved the
+    // script in the same transaction) to skip a redundant lookup that, inside
+    // an open transaction, would race the not-yet-committed script insert.
+    oldScriptId?: string | null;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2176,9 +2190,15 @@ async function saveScriptScreens({
         let saved = 0;
         const errors: string[] = [];
 
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        if (oldScriptId === undefined) {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            oldScriptId = script.data.oldScriptId;
+        }
+
+        const incomingScreens: any[] = [];
+        const collisionBaselineScreens: any[] = [];
 
         for (const screen of screens) {
             const {
@@ -2190,7 +2210,7 @@ async function saveScriptScreens({
                 isDeleted,
                 deletedAt,
                 version,
-                oldScriptId,
+                oldScriptId: _ignoreOldScriptId,
                 oldScreenId,
                 screenId: _ignoreScreenId,
                 scriptId: _ignoreScriptId,
@@ -2241,28 +2261,34 @@ async function saveScriptScreens({
                 logger.error('process image', e.message);
             }
 
-            const incomingScreen = {
+            incomingScreens.push({
                 ...s,
                 scriptId,
-                oldScriptId: script.data.oldScriptId,
+                oldScriptId,
                 screenId,
                 version: 1,
-            };
+            });
+            // Rebase the trusted source onto the minted id so unchanged
+            // legacy collisions retain the same stable path identity.
+            collisionBaselineScreens.push({ ...screen, scriptId, screenId });
+        }
+
+        if (errors.length) return { errors, saved: 0, success: false, };
+
+        if (incomingScreens.length) {
             const res = await saveScreensInternal(
-                { data: [incomingScreen], draftOrigin },
-                // Rebase the trusted source onto the minted id so unchanged
-                // legacy collisions retain the same stable path identity.
-                { screens: [{ ...screen, scriptId, screenId }] },
+                { data: incomingScreens, draftOrigin, client },
+                { screens: collisionBaselineScreens },
             );
 
-            res.errors?.forEach(e => errors.push(`(screenId=${_ignoreScreenId}) ${e || ''}`));
+            res.errors?.forEach(e => errors.push(e || ''));
 
-            if (!res.errors?.length) saved++;
+            if (!res.errors?.length) saved = incomingScreens.length;
         }
 
         if (errors.length) return { errors, saved, success: false, };
 
-        void recomputeScriptConditionErrors(scriptId);
+        if (!client) void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptScreens ERROR', e.message);
@@ -2276,12 +2302,16 @@ async function saveScriptDiagnoses({
     preserveDiagnosesIds,
     draftOrigin,
     uploadedFiles = {},
+    oldScriptId,
+    client,
 }: {
     preserveDiagnosesIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
     uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    oldScriptId?: string | null;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2291,9 +2321,15 @@ async function saveScriptDiagnoses({
         let saved = 0;
         const errors: string[] = [];
 
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        if (oldScriptId === undefined) {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            oldScriptId = script.data.oldScriptId;
+        }
+
+        const incomingDiagnoses: any[] = [];
+        const collisionBaselineDiagnoses: any[] = [];
 
         for (const diagnosis of diagnoses) {
             const {
@@ -2347,26 +2383,32 @@ async function saveScriptDiagnoses({
                 logger.error('process image', e.message);
             }
 
-            const incomingDiagnosis = {
+            incomingDiagnoses.push({
                 ...d,
                 scriptId,
-                oldScriptId: script.data.oldScriptId,
+                oldScriptId,
                 diagnosisId,
                 version: 1,
-            };
+            });
+            collisionBaselineDiagnoses.push({ ...diagnosis, scriptId, diagnosisId });
+        }
+
+        if (errors.length) return { errors, saved: 0, success: false, };
+
+        if (incomingDiagnoses.length) {
             const res = await saveDiagnosesInternal(
-                { data: [incomingDiagnosis], draftOrigin },
-                { diagnoses: [{ ...diagnosis, scriptId, diagnosisId }] },
+                { data: incomingDiagnoses, draftOrigin, client },
+                { diagnoses: collisionBaselineDiagnoses },
             );
 
-            res.errors?.forEach(e => errors.push(`(diagnosisId=${_ignoreDiagnosisId}) ${e || ''}`));
+            res.errors?.forEach(e => errors.push(e || ''));
 
-            if (!res.errors?.length) saved++;
+            if (!res.errors?.length) saved = incomingDiagnoses.length;
         }
 
         if (errors.length) return { errors, saved, success: false, };
 
-        void recomputeScriptConditionErrors(scriptId);
+        if (!client) void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptDiagnoses ERROR', e.message);
@@ -2380,12 +2422,16 @@ async function saveScriptProblems({
     preserveProblemsIds,
     draftOrigin,
     uploadedFiles = {},
+    oldScriptId,
+    client,
 }: {
     preserveProblemsIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     problems: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['problems'];
     uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    oldScriptId?: string | null;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2395,9 +2441,15 @@ async function saveScriptProblems({
         let saved = 0;
         const errors: string[] = [];
 
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        if (oldScriptId === undefined) {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            oldScriptId = script.data.oldScriptId;
+        }
+
+        const incomingProblems: any[] = [];
+        const collisionBaselineProblems: any[] = [];
 
         for (const problem of problems) {
             const {
@@ -2450,26 +2502,32 @@ async function saveScriptProblems({
                 logger.error('process image', e.message);
             }
 
-            const incomingProblem = {
+            incomingProblems.push({
                 ...d,
                 scriptId,
-                oldScriptId: script.data.oldScriptId,
+                oldScriptId,
                 problemId,
                 version: 1,
-            };
+            });
+            collisionBaselineProblems.push({ ...problem, scriptId, problemId });
+        }
+
+        if (errors.length) return { errors, saved: 0, success: false, };
+
+        if (incomingProblems.length) {
             const res = await saveProblemsInternal(
-                { data: [incomingProblem], draftOrigin },
-                { problems: [{ ...problem, scriptId, problemId }] },
+                { data: incomingProblems, draftOrigin, client },
+                { problems: collisionBaselineProblems },
             );
 
-            res.errors?.forEach(e => errors.push(`(problemId=${_ignoreProblemId}) ${e || ''}`));
+            res.errors?.forEach(e => errors.push(e || ''));
 
-            if (!res.errors?.length) saved++;
+            if (!res.errors?.length) saved = incomingProblems.length;
         }
 
         if (errors.length) return { errors, saved, success: false, };
 
-        void recomputeScriptConditionErrors(scriptId);
+        if (!client) void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptProblems ERROR', e.message);
@@ -2477,9 +2535,10 @@ async function saveScriptProblems({
     }
 }
 
-export async function deleteScriptsItems({ scriptsIds, draftOrigin, }: {
+export async function deleteScriptsItems({ scriptsIds, draftOrigin, client, }: {
     scriptsIds: string[];
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2487,13 +2546,13 @@ export async function deleteScriptsItems({ scriptsIds, draftOrigin, }: {
     try {
         const errors: string[] = [];
 
-        const delScreens = await deleteScreens({ scriptsIds, draftOrigin });
+        const delScreens = await deleteScreens({ scriptsIds, draftOrigin, client });
         delScreens.errors?.forEach(e => errors.push(e));
 
-        const delDiagnoses = await deleteDiagnoses({ scriptsIds, draftOrigin });
+        const delDiagnoses = await deleteDiagnoses({ scriptsIds, draftOrigin, client });
         delDiagnoses.errors?.forEach(e => errors.push(e));
 
-        const delProblems = await deleteProblems({ scriptsIds, draftOrigin });
+        const delProblems = await deleteProblems({ scriptsIds, draftOrigin, client });
         delProblems.errors?.forEach(e => errors.push(e));
 
         if (errors.length) return { errors, success: false, };
@@ -2544,15 +2603,6 @@ export async function saveScriptsWithItems({ data, uploadedFiles, }: {
             if (overWriteScriptWithId && !overWriteScript?.data) {
                 errors.push('Overwrite script was not found');
                 continue;
-            }
-
-            if (overWriteScript?.data) {
-                const res = await deleteScriptsItems({
-                    scriptsIds: [overWriteScript.data.scriptId],
-                    draftOrigin,
-                });
-                res.errors?.forEach(e => errors.push(e));
-                if (errors.length) continue;
             }
 
             const {
@@ -2610,60 +2660,97 @@ export async function saveScriptsWithItems({ data, uploadedFiles, }: {
 
             const scriptId = overWriteScript?.data?.scriptId || v4();
 
-            const res = await saveScripts({
-                data: [{
-                    ...s,
-                    scriptId,
-                    version: 1,
-                    printSections: printSections.map(s => ({
-                        ...s,
-                        screensIds: s.screensIds.map((id: string) => oldScreensIdsMap[id]).filter((id: string | undefined | null): id is string => !!id),
-                    })),
-                    reviewConfigurations: reviewConfigurations.map(c => ({
-                        ...c,
-                        screen: oldScreensIdsMap[c.screen],
-                    })).filter((c): c is typeof c & { screen: string } => !!c.screen),
-                }],
-                draftOrigin,
-            });
+            // Everything below writes to the DB for this one script (its
+            // overwrite-delete, the script row, and its screens/diagnoses/
+            // problems). Run it as a single transaction so a failure partway
+            // through doesn't leave the script half-saved — either all of it
+            // lands, or none of it does. Other scripts in this same import
+            // are unaffected either way, matching the existing behavior of
+            // `continue`-ing past a failed script.
+            try {
+                // Counts are only applied to `info`/`savedScriptIds` after this
+                // resolves successfully (see below) — mutating them from inside
+                // the callback would overcount if a later step in the same
+                // transaction fails and rolls everything back.
+                const txInfo = await db.transaction(async (tx) => {
+                    if (overWriteScript?.data) {
+                        const delRes = await deleteScriptsItems({
+                            scriptsIds: [overWriteScript.data.scriptId],
+                            draftOrigin,
+                            client: tx,
+                        });
+                        if (delRes.errors?.length) throw new Error(delRes.errors.join(', '));
+                    }
 
-            res.errors?.forEach(e => errors.push(e));
-            if (errors.length) continue;
+                    const res = await saveScripts({
+                        data: [{
+                            ...s,
+                            scriptId,
+                            version: 1,
+                            printSections: printSections.map(s => ({
+                                ...s,
+                                screensIds: s.screensIds.map((id: string) => oldScreensIdsMap[id]).filter((id: string | undefined | null): id is string => !!id),
+                            })),
+                            reviewConfigurations: reviewConfigurations.map(c => ({
+                                ...c,
+                                screen: oldScreensIdsMap[c.screen],
+                            })).filter((c): c is typeof c & { screen: string } => !!c.screen),
+                        }],
+                        draftOrigin,
+                        client: tx,
+                    });
 
-            const saveScreens = await saveScriptScreens({ 
-                preserveScreensIds: true, 
-                scriptId, 
-                screens, 
-                draftOrigin,
-                uploadedFiles, 
-            });
-            saveScreens.errors?.forEach(e => errors.push(e));
-            info.screens += saveScreens.saved;
+                    if (res.errors?.length) throw new Error(res.errors.join(', '));
 
-            const saveDiagnoses = await saveScriptDiagnoses({ 
-                preserveDiagnosesIds: true, 
-                scriptId, 
-                diagnoses, 
-                draftOrigin,
-                uploadedFiles, 
-            });
-            saveDiagnoses.errors?.forEach(e => errors.push(e));
-            info.diagnoses += saveDiagnoses.saved;
+                    const saveScreens = await saveScriptScreens({
+                        preserveScreensIds: true,
+                        scriptId,
+                        screens,
+                        draftOrigin,
+                        uploadedFiles,
+                        oldScriptId,
+                        client: tx,
+                    });
+                    if (saveScreens.errors?.length) throw new Error(saveScreens.errors.join(', '));
 
-            const saveProblems = await saveScriptProblems({ 
-                preserveProblemsIds: true, 
-                scriptId, 
-                problems, 
-                draftOrigin,
-                uploadedFiles, 
-            });
-            saveProblems.errors?.forEach(e => errors.push(e));
-            info.problems += saveProblems.saved;
+                    const saveDiagnoses = await saveScriptDiagnoses({
+                        preserveDiagnosesIds: true,
+                        scriptId,
+                        diagnoses,
+                        draftOrigin,
+                        uploadedFiles,
+                        oldScriptId,
+                        client: tx,
+                    });
+                    if (saveDiagnoses.errors?.length) throw new Error(saveDiagnoses.errors.join(', '));
 
-            if (errors.length) continue;
+                    const saveProblems = await saveScriptProblems({
+                        preserveProblemsIds: true,
+                        scriptId,
+                        problems,
+                        draftOrigin,
+                        uploadedFiles,
+                        oldScriptId,
+                        client: tx,
+                    });
+                    if (saveProblems.errors?.length) throw new Error(saveProblems.errors.join(', '));
 
-            info.scripts++;
-            savedScriptIds.push(scriptId);
+                    return {
+                        screens: saveScreens.saved,
+                        diagnoses: saveDiagnoses.saved,
+                        problems: saveProblems.saved,
+                    };
+                });
+
+                info.screens += txInfo.screens;
+                info.diagnoses += txInfo.diagnoses;
+                info.problems += txInfo.problems;
+                info.scripts++;
+                savedScriptIds.push(scriptId);
+            } catch (e: any) {
+                errors.push(e.message);
+                continue;
+            }
         }
 
         if (errors.length) return { success: false, errors, info, savedScriptIds, };

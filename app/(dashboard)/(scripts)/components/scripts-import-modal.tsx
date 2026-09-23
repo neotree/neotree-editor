@@ -1,6 +1,6 @@
 // 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import axios from "axios";
@@ -29,7 +29,7 @@ import { useAppContext } from "@/contexts/app";
 import { ErrorCard } from "@/components/error-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { OverlayInfoCard } from "@/components/overlay-info-card";
-import { BROADCAST_ACTIONS_IN_PROGRESS } from "@/lib/in-progress";
+import { BROADCAST_ACTIONS_IN_PROGRESS, IMPORT_JOB_COMPLETE_EVENT } from "@/lib/in-progress";
 import { SocketEventsListener } from "@/components/socket-events-listener";
 import socket  from '@/lib/socket';
 
@@ -87,33 +87,11 @@ export function ScriptsImportModal({
     const overwriteDataKeys = watch('overwriteDataKeys');
     const overwriteDrugsLibraryItems = watch('overwriteDrugsLibraryItems');
 
-    const importScripts = handleSubmit(async (data) => {
+    // Handles the final result of an import, whichever way it arrived: an
+    // immediate failure from the POST itself (auth/validation), or the
+    // background job's result delivered later over the socket channel.
+    const handleImportResult = (res: Awaited<ReturnType<typeof copyScripts>>) => {
         try {
-            if (!data.siteId) throw new Error('Please select a site!');
-            if (!data.scriptId) throw new Error('Please provide a script ID!');
-            if (overWriteScriptWithId && !data.confirmed) throw new Error('Please confirm that you want to overwrite this script!');
-
-            setLoading(true);
-
-            // const res = await copyScripts({ 
-            //     fromRemoteSiteId: data.siteId, 
-            //     scriptsIds: [data.scriptId], 
-            //     overWriteScriptWithId: overWriteScriptWithId,
-            //     broadcastAction: true,
-            // });
-
-            // TODO: Replace this with server action
-            const response = await axios.post('/api/scripts/copy', { 
-                requestKey,
-                fromRemoteSiteId: data.siteId, 
-                overwriteDrugsLibraryItems: data.overwriteDrugsLibraryItems, 
-                overwriteDataKeys: data.overwriteDataKeys, 
-                scriptsIds: [data.scriptId], 
-                overWriteScriptWithId: overWriteScriptWithId,
-                broadcastAction: true,
-            });
-            const res = response.data as Awaited<ReturnType<typeof copyScripts>>;
-
             if (!res.success) throw new Error(res.errors?.join(', ') || 'Failed to import script');
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 
@@ -141,7 +119,7 @@ export function ScriptsImportModal({
                     onOpenChange(false);
                 },
             });
-        } catch(e: any) {
+        } catch (e: any) {
             alert({
                 variant: 'error',
                 title: 'Error',
@@ -149,6 +127,87 @@ export function ScriptsImportModal({
             });
         } finally {
             setLoading(false);
+        }
+    };
+
+    // The import runs in the background on the server (it can take minutes
+    // for large scripts) — the POST only acks that it started. The actual
+    // result arrives over the same per-requestKey socket channel already
+    // used for progress. As a safety net against a dropped socket event, we
+    // also poll by re-POSTing the identical request every 45s; the endpoint
+    // is idempotent on requestKey, so a poll either returns the
+    // already-finished result (if the socket event was missed) or another
+    // "still running" ack (a cheap no-op — it does NOT re-run the import,
+    // see lib/import-jobs.ts's coalescing). This is a repeating poll rather
+    // than a one-shot check specifically so it keeps recovering regardless
+    // of how long the import actually takes, not just within one fixed
+    // window.
+    const waitForImportCompletion = (requestBody: Record<string, any>) => {
+        let settled = false;
+
+        const stopPolling = () => {
+            settled = true;
+            socket.off(requestBody.requestKey, onComplete);
+            clearInterval(pollTimer);
+        };
+
+        const onComplete = (key: string, value: any) => {
+            if (key !== IMPORT_JOB_COMPLETE_EVENT || settled) return;
+            stopPolling();
+            handleImportResult(value);
+        };
+
+        socket.on(requestBody.requestKey, onComplete);
+
+        const pollTimer = setInterval(async () => {
+            if (settled) return;
+            try {
+                const response = await axios.post('/api/scripts/copy', requestBody);
+                const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof copyScripts>>;
+                if (!res.started && !settled) {
+                    stopPolling();
+                    handleImportResult(res);
+                }
+            } catch {
+                // Ignore — either the socket listener or the next poll will still resolve it.
+            }
+        }, 45 * 1000);
+    };
+
+    const importScripts = handleSubmit(async (data) => {
+        try {
+            if (!data.siteId) throw new Error('Please select a site!');
+            if (!data.scriptId) throw new Error('Please provide a script ID!');
+            if (overWriteScriptWithId && !data.confirmed) throw new Error('Please confirm that you want to overwrite this script!');
+
+            setLoading(true);
+
+            const requestBody = {
+                requestKey,
+                fromRemoteSiteId: data.siteId,
+                overwriteDrugsLibraryItems: data.overwriteDrugsLibraryItems,
+                overwriteDataKeys: data.overwriteDataKeys,
+                scriptsIds: [data.scriptId],
+                overWriteScriptWithId: overWriteScriptWithId,
+                broadcastAction: true,
+            };
+
+            const response = await axios.post('/api/scripts/copy', requestBody);
+            const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof copyScripts>>;
+
+            if (!res.started) {
+                handleImportResult(res);
+                return;
+            }
+
+            waitForImportCompletion(requestBody);
+        } catch(e: any) {
+            setLoading(false);
+            alert({
+                variant: 'error',
+                title: 'Error',
+                message: 'Failed to import script: ' + e.message,
+            });
         }
     });
 
@@ -503,6 +562,35 @@ function ImportInfo({
 
     useEffect(() => { if (showProp) setShow(true); }, [showProp]);
 
+    // Elapsed-time clock: gives users something concrete to watch while a
+    // slow step (e.g. propagating an overwritten data key/drug item to every
+    // script that references it) runs in the background.
+    const startedAtRef = useRef<number | null>(null);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+    useEffect(() => {
+        if (!show) {
+            startedAtRef.current = null;
+            setElapsedSeconds(0);
+            return;
+        }
+
+        startedAtRef.current = Date.now();
+        setElapsedSeconds(0);
+
+        const interval = setInterval(() => {
+            if (startedAtRef.current) setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [show]);
+
+    const formatElapsed = (totalSeconds: number) => {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+    };
+
     const actionsInProgress = useMemo(() => {
         return [
             ...(!site ? [{ 
@@ -575,10 +663,14 @@ function ImportInfo({
 
     return (
         <>
-            <OverlayInfoCard 
+            <OverlayInfoCard
                 show={show}
                 // onClose={() => setShow(false)}
             >
+                <div className="text-xs text-muted-foreground mb-2">
+                    Running for {formatElapsed(elapsedSeconds)}
+                </div>
+
                 <div className="flex flex-col gap-y-1">
                     {actionsInProgress.map(a => {
                         const inProgress = latestEvent === a.key;

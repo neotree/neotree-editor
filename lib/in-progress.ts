@@ -16,9 +16,19 @@ export const BROADCAST_ACTIONS_IN_PROGRESS = {
 
 export async function broadcastActionInProgress(
     requestKey: string,
-    action: string, 
+    action: string,
     loading: boolean
 ) {
     await new Promise(resolve => setTimeout(resolve, 0));
     socket.emit('in_progress', requestKey, action, loading);
+}
+
+// A dedicated event name (distinct from the boolean-valued keys above) used
+// to deliver the final result of a background import job over the same
+// per-requestKey socket channel, once the HTTP response has already returned.
+export const IMPORT_JOB_COMPLETE_EVENT = 'import_job_complete';
+
+export async function broadcastImportJobComplete(requestKey: string, result: unknown) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+    socket.emit('in_progress', requestKey, IMPORT_JOB_COMPLETE_EVENT, result);
 }
