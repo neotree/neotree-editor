@@ -31,10 +31,11 @@ import type {
 import type { IntegrityBaseline, IntegrityPolicy } from "@/lib/integrity-policy"
 import { defaultPreferences } from "@/constants"
 import { dataKeys, dataKeysDrafts } from "./_data-keys"
-
-export * from "./_data-keys"
+import { tmpTransactions } from "./_tmp-transactions";
 import { aliases } from "./aliases"
 
+export * from './_tmp-transactions';
+export * from "./_data-keys"
 export * from "./aliases"
 
 export const bytea = customType<{ data: Buffer; notNull: false; default: false }>({
@@ -336,6 +337,11 @@ export const hospitalsDrafts = pgTable("nt_hospitals_drafts", {
   id: serial("id").primaryKey(),
   hospitalDraftId: uuid("hospital_draft_id").notNull().unique().defaultRandom(),
   hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "cascade" }),
+  transactionId: uuid('transaction_id').references(() => tmpTransactions.transactionId, { 
+    onDelete: 'cascade', 
+    onUpdate: 'cascade',
+  }),
+  remoteId: uuid('remote_id'),
   data: jsonb("data").$type<typeof hospitals.$inferInsert>().notNull(),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
 
@@ -521,6 +527,11 @@ export const configKeysDrafts = pgTable("nt_config_keys_drafts", {
   id: serial("id").primaryKey(),
   configKeyDraftId: uuid("config_key_draft_id").notNull().unique().defaultRandom(),
   configKeyId: uuid("config_key_id").references(() => configKeys.configKeyId, { onDelete: "cascade" }),
+  transactionId: uuid('transaction_id').references(() => tmpTransactions.transactionId, { 
+    onDelete: 'cascade', 
+    onUpdate: 'cascade',
+  }),
+  remoteId: uuid('remote_id'),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof configKeys.$inferInsert>().notNull(),
   createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
@@ -648,6 +659,11 @@ export const scriptsDrafts = pgTable("nt_scripts_drafts", {
   id: serial("id").primaryKey(),
   scriptDraftId: uuid("script_draft_id").notNull().unique().defaultRandom(),
   scriptId: uuid("script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
+  transactionId: uuid('transaction_id').references(() => tmpTransactions.transactionId, { 
+    onDelete: 'cascade', 
+    onUpdate: 'cascade',
+  }),
+  remoteId: uuid('remote_id'),
   position: integer("position").notNull(),
   hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "set null" }),
   data: jsonb("data")
@@ -819,6 +835,11 @@ export const screensDrafts = pgTable("nt_screens_drafts", {
   screenId: uuid("screen_id").references(() => screens.screenId, { onDelete: "cascade" }),
   scriptId: uuid("script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
   scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
+  transactionId: uuid('transaction_id').references(() => tmpTransactions.transactionId, { 
+    onDelete: 'cascade', 
+    onUpdate: 'cascade',
+  }),
+  remoteId: uuid('remote_id'),
   type: screenTypeEnum("type").notNull(),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof screens.$inferInsert>().notNull(),
@@ -946,6 +967,11 @@ export const diagnosesDrafts = pgTable("nt_diagnoses_drafts", {
   diagnosisId: uuid("diagnosis_id").references(() => diagnoses.diagnosisId, { onDelete: "cascade" }),
   scriptId: uuid("script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
   scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
+  transactionId: uuid('transaction_id').references(() => tmpTransactions.transactionId, { 
+    onDelete: 'cascade', 
+    onUpdate: 'cascade',
+  }),
+  remoteId: uuid('remote_id'),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof diagnoses.$inferInsert>().notNull(),
   draftOrigin: draftOriginEnum("draft_origin").notNull().default("editor"),
@@ -1071,6 +1097,11 @@ export const problemsDrafts = pgTable("nt_problems_drafts", {
   problemId: uuid("problem_id").references(() => problems.problemId, { onDelete: "cascade" }),
   scriptId: uuid("script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
   scriptDraftId: uuid("script_draft_id").references(() => scriptsDrafts.scriptDraftId, { onDelete: "cascade" }),
+  transactionId: uuid('transaction_id').references(() => tmpTransactions.transactionId, { 
+    onDelete: 'cascade', 
+    onUpdate: 'cascade',
+  }),
+  remoteId: uuid('remote_id'),
   position: integer("position").notNull(),
   data: jsonb("data").$type<typeof problems.$inferInsert>().notNull(),
   draftOrigin: draftOriginEnum("draft_origin").notNull().default("editor"),
@@ -1191,6 +1222,11 @@ export const drugsLibraryDrafts = pgTable("nt_drugs_library_drafts", {
   id: serial("id").primaryKey(),
   itemDraftId: uuid("item_draft_id").notNull().unique().defaultRandom(),
   itemId: uuid("item_id").references(() => drugsLibrary.itemId, { onDelete: "cascade" }),
+  transactionId: uuid('transaction_id').references(() => tmpTransactions.transactionId, { 
+    onDelete: 'cascade', 
+    onUpdate: 'cascade',
+  }),
+  remoteId: uuid('remote_id'),
   key: text("key").notNull(),
   type: drugTypeEnum("type").notNull().default("drug"),
   position: integer("position").notNull(),
@@ -1238,6 +1274,10 @@ export const drugsLibraryHistoryRelations = relations(drugsLibraryHistory, ({ on
 // PENDING DELETION
 export const pendingDeletion = pgTable("nt_pending_deletion", {
   id: serial("id").primaryKey(),
+  transactionId: uuid('transaction_id').references(() => tmpTransactions.transactionId, { 
+    onDelete: 'cascade', 
+    onUpdate: 'cascade',
+  }),
   scriptId: uuid("script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),
   screenId: uuid("screen_id").references(() => screens.screenId, { onDelete: "cascade" }),
   screenScriptId: uuid("screen_script_id").references(() => scripts.scriptId, { onDelete: "cascade" }),

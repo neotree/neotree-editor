@@ -6,7 +6,10 @@ import db from '@/databases/pg/drizzle';
 import { configKeys, configKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 
-export type SaveConfigKeysData = Partial<typeof configKeys.$inferSelect>;
+export type SaveConfigKeysData = Partial<typeof configKeys.$inferSelect & {
+    transactionId?: string; 
+    remoteId?: string;
+}>;
 
 export type SaveConfigKeysResponse = { 
     success: boolean; 
@@ -24,7 +27,7 @@ export async function _saveConfigKeys({ data, broadcastAction, userId, }: {
         const errors = [];
 
         let index = 0;
-        for (const { configKeyId: itemConfigKeyId, ...item } of data) {
+        for (const { configKeyId: itemConfigKeyId, transactionId, remoteId, ...item } of data) {
             try {
                 index++;
 
@@ -81,6 +84,8 @@ export async function _saveConfigKeys({ data, broadcastAction, userId, }: {
                             position: data.position,
                             configKeyId: published?.configKeyId,
                             createdByUserId: userId,
+                            transactionId, 
+                            remoteId,
                         });
                     }
                 }

@@ -27,6 +27,8 @@ export type DiagnosisType = typeof diagnoses.$inferSelect & {
     scriptTitle?: string;
     hospitalName?: string;
     draftCreatedByUserId?: string | null;
+    transactionId?: string;
+    remoteId?: string;
 };
 
 export type GetDiagnosesResults = {

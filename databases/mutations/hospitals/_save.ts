@@ -6,7 +6,10 @@ import db from '@/databases/pg/drizzle';
 import { hospitals, hospitalsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 
-export type SaveHospitalsData = Partial<typeof hospitals.$inferSelect>;
+export type SaveHospitalsData = Partial<typeof hospitals.$inferSelect & {
+    transactionId?: string; 
+    remoteId?: string;
+}>;
 
 export type SaveHospitalsResponse = { 
     success: boolean; 
@@ -24,7 +27,7 @@ export async function _saveHospitals({ data, broadcastAction = true, userId, }: 
         const errors = [];
 
         let index = 0;
-        for (const { hospitalId: itemHospitalId, ...item } of data) {
+        for (const { hospitalId: itemHospitalId, transactionId, remoteId, ...item } of data) {
             try {
                 index++;
 
@@ -63,6 +66,8 @@ export async function _saveHospitals({ data, broadcastAction = true, userId, }: 
                             hospitalDraftId: hospitalId,
                             hospitalId: published?.hospitalId,
                             createdByUserId: userId,
+                            transactionId, 
+                            remoteId,
                         });
                     }
                 }

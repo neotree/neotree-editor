@@ -15,6 +15,8 @@ import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
     deletedUniqueKeys?: string[];
+    transactionId?: string; 
+    remoteId?: string;
 };
 
 export type SaveDataKeysParams = {
@@ -193,6 +195,8 @@ export async function _saveDataKeys({
                 deletedAt, 
                 updatedAt, 
                 deletedUniqueKeys = [],
+                transactionId, 
+                remoteId,
                 ...item 
             } of data
         ) {
@@ -310,6 +314,8 @@ export async function _saveDataKeys({
                             uniqueKey,
                             draftOrigin,
                             createdByUserId: userId,
+                            transactionId, 
+                            remoteId,
                         });
 
                         if (data.uniqueKey) {

@@ -11,6 +11,8 @@ import {
     uuid,
 } from "drizzle-orm/pg-core";
 
+import { tmpTransactions } from "./_tmp-transactions";
+
 export type DataKeyDraftOrigin = "data_key_sync" | "editor" | "import" | "other";
 
 // DATA KEYS
@@ -57,6 +59,11 @@ export const dataKeysDrafts = pgTable(
     {
         id: serial('id').primaryKey(),
         uuid: uuid('uuid').notNull().unique().default(sql`md5(random()::text || clock_timestamp()::text)::uuid`),
+        transactionId: uuid('transaction_id').references(() => tmpTransactions.transactionId, { 
+            onDelete: 'cascade', 
+            onUpdate: 'cascade',
+        }),
+        remoteId: uuid('remote_id'),
         name: text('name').notNull(),
         uniqueKey: uuid('unique_key').notNull(),
         dataKeyId: uuid('data_key_id').references(() => dataKeys.uuid, { onDelete: 'cascade', }),

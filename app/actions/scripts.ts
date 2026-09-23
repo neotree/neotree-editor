@@ -48,6 +48,7 @@ import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastActionInProgress } from "@/lib/in-progress";
 import { loadRemoteDataKeys, loadRemoteScriptsWithItems, uploadRemoteFiles } from "./remote";
 import { uploadReferencedFileIfMissing } from "@/lib/files";
+import { dumpTmpTractionData, writeFileToTransactionDir } from "./tmp-transactions";
 
 export const getScriptsMetadata: typeof queries._getScriptsMetadata = (...args) => {
     return queries._getScriptsMetadata(...args);
@@ -2156,12 +2157,14 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
 }
 
 async function saveScriptScreens({
+    transactionId,
     screens,
     scriptId,
     preserveScreensIds,
     draftOrigin,
     uploadedFiles = {},
 }: {
+    transactionId?: string;
     preserveScreensIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
@@ -2247,6 +2250,8 @@ async function saveScriptScreens({
                 oldScriptId: script.data.oldScriptId,
                 screenId,
                 version: 1,
+                remoteId: _ignoreScreenId,
+                transactionId,
             };
             const res = await saveScreensInternal(
                 { data: [incomingScreen], draftOrigin },
@@ -2271,12 +2276,14 @@ async function saveScriptScreens({
 }
 
 async function saveScriptDiagnoses({
+    transactionId,
     diagnoses,
     scriptId,
     preserveDiagnosesIds,
     draftOrigin,
     uploadedFiles = {},
 }: {
+    transactionId?: string;
     preserveDiagnosesIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
@@ -2353,6 +2360,8 @@ async function saveScriptDiagnoses({
                 oldScriptId: script.data.oldScriptId,
                 diagnosisId,
                 version: 1,
+                remoteId: _ignoreDiagnosisId,
+                transactionId,
             };
             const res = await saveDiagnosesInternal(
                 { data: [incomingDiagnosis], draftOrigin },
@@ -2375,12 +2384,14 @@ async function saveScriptDiagnoses({
 }
 
 async function saveScriptProblems({
+    transactionId,
     problems,
     scriptId,
     preserveProblemsIds,
     draftOrigin,
     uploadedFiles = {},
 }: {
+    transactionId?: string;
     preserveProblemsIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
@@ -2456,6 +2467,8 @@ async function saveScriptProblems({
                 oldScriptId: script.data.oldScriptId,
                 problemId,
                 version: 1,
+                remoteId: _ignoreProblemId,
+                transactionId,
             };
             const res = await saveProblemsInternal(
                 { data: [incomingProblem], draftOrigin },
@@ -2514,7 +2527,8 @@ const saveScriptsWithItemsInfo = {
     dataKeys: 0,
 };
 
-export async function saveScriptsWithItems({ data, uploadedFiles, }: {
+export async function saveScriptsWithItems({ data, uploadedFiles, transactionId, }: {
+    transactionId?: string;
     uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
@@ -2614,6 +2628,8 @@ export async function saveScriptsWithItems({ data, uploadedFiles, }: {
                 data: [{
                     ...s,
                     scriptId,
+                    transactionId,
+                    remoteId: _ignoreScriptId,
                     version: 1,
                     printSections: printSections.map(s => ({
                         ...s,
@@ -2636,6 +2652,7 @@ export async function saveScriptsWithItems({ data, uploadedFiles, }: {
                 screens, 
                 draftOrigin,
                 uploadedFiles, 
+                transactionId,
             });
             saveScreens.errors?.forEach(e => errors.push(e));
             info.screens += saveScreens.saved;
@@ -2646,6 +2663,7 @@ export async function saveScriptsWithItems({ data, uploadedFiles, }: {
                 diagnoses, 
                 draftOrigin,
                 uploadedFiles, 
+                transactionId,
             });
             saveDiagnoses.errors?.forEach(e => errors.push(e));
             info.diagnoses += saveDiagnoses.saved;
@@ -2656,6 +2674,7 @@ export async function saveScriptsWithItems({ data, uploadedFiles, }: {
                 problems, 
                 draftOrigin,
                 uploadedFiles, 
+                transactionId,
             });
             saveProblems.errors?.forEach(e => errors.push(e));
             info.problems += saveProblems.saved;
@@ -2677,6 +2696,7 @@ export async function saveScriptsWithItems({ data, uploadedFiles, }: {
 }
 
 export async function copyScripts(params?: {
+    transactionId?: string;
     requestKey?: string;
     scriptsIds?: string[];
     confirmCopyAll?: boolean;
@@ -2706,6 +2726,7 @@ export async function copyScripts(params?: {
 
     const {
         requestKey,
+        transactionId,
         scriptsIds = [],
         confirmCopyAll,
         toRemoteSiteId,
@@ -2816,6 +2837,36 @@ export async function copyScripts(params?: {
             } | null;
         } = { success: true, info, };
 
+        const dump: Parameters<typeof dumpTmpTractionData>[0]['data'] = [];
+
+        if (transactionId) {
+            if (scripts.data.length) {
+                dump.push({ 
+                    name: 'scripts', 
+                    data: scripts.data, 
+                    transactionUuid: transactionId, 
+                });
+            }
+
+            if (dffItemsToSave.length) {
+                dump.push({ 
+                    name: 'drugsLibrary', 
+                    data: dffItemsToSave, 
+                    transactionUuid: transactionId, 
+                });
+            }
+
+            if (dataKeysToSave.length) {
+                dump.push({ 
+                    name: 'dataKeys', 
+                    data: dataKeysToSave, 
+                    transactionUuid: transactionId, 
+                });
+            }
+
+            await dumpTmpTractionData({ data: dump, throwError: true, });
+        }
+
         if (scripts.data.length) {
             await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, true);
 
@@ -2836,6 +2887,7 @@ export async function copyScripts(params?: {
             } else {
                 const saveScriptsStartedAt = Date.now();
                 response = await saveScriptsWithItems({
+                    transactionId,
                     uploadedFiles: importedFiles,
                     data: scripts.data.map(s => ({
                         ...s,
@@ -2860,9 +2912,21 @@ export async function copyScripts(params?: {
 
             const saveDrugsStartedAt = Date.now();
             const res = overwriteDrugsLibraryItems ? 
-                await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId: session.user?.userId, })
+                await _saveDrugsLibraryItemsUpdateIfExists({ 
+                    data: dffItemsToSave.map(d => ({
+                        ...d,
+                        transactionId,
+                    })), 
+                    userId: session.user?.userId, 
+                })
                 :
-                await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId: session.user?.userId, });
+                await _saveDrugsLibraryItemsIfKeysNotExist({ 
+                    data: dffItemsToSave.map(d => ({
+                        ...d,
+                        transactionId,
+                    })), 
+                    userId: session.user?.userId, 
+                });
             if (res.success) response.info.dffItems = dffItemsToSave.length;
             markTiming('save_drugs_library_items', saveDrugsStartedAt);
         }
@@ -2874,7 +2938,10 @@ export async function copyScripts(params?: {
 
             const saveDataKeysStartedAt = Date.now();
             const res = await _saveDataKeys({
-                data: dataKeysToSave,
+                data: dataKeysToSave.map(d => ({
+                    ...d,
+                    transactionId,
+                })),
                 userId: session.user?.userId,
                 draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
                 propagatedDraftOrigin: fromRemoteSiteId ? 'import' : 'data_key_sync',

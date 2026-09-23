@@ -33,7 +33,7 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
 
     try {
         let index = 0;
-        for (const { problemId: itemProblemId, ...item } of data) {
+        for (const { problemId: itemProblemId, transactionId, remoteId, ...item } of data) {
             try {
                 index++;
 
@@ -119,6 +119,8 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
                                     problemId: published?.problemId,
                                     createdByUserId: userId,
                                     draftOrigin: requestedDraftOrigin,
+                                    transactionId, 
+                                    remoteId,
                                 });
 
                                 sqlInfo[`${problemId} - createProblemDraft`] = q.toSQL();

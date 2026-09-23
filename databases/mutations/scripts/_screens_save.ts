@@ -238,7 +238,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
     
     try {
         let index = 0;
-        for (const { screenId: itemScreenId, ...item } of data) {
+        for (const { screenId: itemScreenId, transactionId, remoteId, ...item } of data) {
             try {
                 index++;
                 const normalized = normalizeScreenSelectionRuleItemIds(item);
@@ -333,6 +333,8 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                                     screenId: published?.screenId,
                                     createdByUserId: userId,
                                     draftOrigin: requestedDraftOrigin,
+                                    transactionId, 
+                                    remoteId,
                                 });
 
                                 info.query = q.toSQL();

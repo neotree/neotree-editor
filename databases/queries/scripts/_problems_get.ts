@@ -26,6 +26,8 @@ export type ProblemType = typeof problems.$inferSelect & {
     scriptTitle?: string;
     hospitalName?: string;
     draftCreatedByUserId?: string | null;
+    transactionId?: string;
+    remoteId?: string;
 };
 
 export type GetProblemsResults = {

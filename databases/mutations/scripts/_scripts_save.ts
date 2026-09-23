@@ -37,7 +37,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
 
     try {
         let index = 0;
-        for (const { scriptId: itemScriptId, ...item } of data) {
+        for (const { scriptId: itemScriptId, transactionId, remoteId, ...item } of data) {
             try {
                 index++;
 
@@ -102,6 +102,8 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                             scriptId: published?.scriptId,
                             draftOrigin,
                             createdByUserId: userId,
+                            transactionId, 
+                            remoteId,
                         });
 
                         info.query = q.toSQL();

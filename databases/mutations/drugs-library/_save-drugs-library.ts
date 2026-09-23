@@ -10,7 +10,10 @@ import { _saveScreens } from '@/databases/mutations/scripts';
 import { _getScreens } from '@/databases/queries/scripts';
 import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
 
-export type SaveDrugsLibraryItemsData = Partial<typeof drugsLibrary.$inferSelect>;
+export type SaveDrugsLibraryItemsData = Partial<typeof drugsLibrary.$inferSelect & {
+    transactionId?: string; 
+    remoteId?: string;
+}>;
 
 export type SaveDrugsLibraryItemsResponse = { 
     success: boolean; 
@@ -149,7 +152,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }:
         const removeReferences: string[] = [];
 
         let index = 0;
-        for (const { itemId: _itemId, ...item } of data) {
+        for (const { itemId: _itemId, transactionId, remoteId, ...item } of data) {
             try {
                 index++;
 
@@ -220,6 +223,8 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }:
                             key: data.key,
                             type: data.type,
                             createdByUserId: userId,
+                            transactionId, 
+                            remoteId,
                         });
                     }
 

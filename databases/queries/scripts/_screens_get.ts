@@ -33,6 +33,8 @@ export type ScreenType = typeof screens.$inferSelect & {
     scriptTitle?: string;
     hospitalName?: string;
     draftCreatedByUserId?: string | null;
+    transactionId?: string;
+    remoteId?: string;
 };
 
 export type GetScreensResults = {

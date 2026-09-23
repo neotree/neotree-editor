@@ -29,6 +29,8 @@ export type ScriptType = typeof scripts.$inferSelect & {
     draftCreatedByUserId?: string | null;
     hasChangedItems?: boolean;
     itemsChangedByUserId?: string | null;
+    transactionId?: string;
+    remoteId?: string;
 };
 
 export type GetScriptsResults = {
