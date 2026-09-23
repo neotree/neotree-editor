@@ -24,11 +24,19 @@ export async function broadcastActionInProgress(
 }
 
 // A dedicated event name (distinct from the boolean-valued keys above) used
-// to deliver the final result of a background import job over the same
-// per-requestKey socket channel, once the HTTP response has already returned.
+// to signal that a background import job has settled, over the same
+// per-requestKey socket channel used for progress.
+//
+// This intentionally carries NO import data — the socket.io server relays
+// every event via an unauthenticated, global `io.emit(...)` (see
+// server/index.js), so anything broadcast here is readable by any connected
+// client, not just the requester. The signal only tells the frontend to go
+// fetch the real result over the existing authenticated HTTP endpoint
+// (POST /api/scripts/copy, gated by session auth), the same way the
+// fallback poll in scripts-import-modal.tsx already does.
 export const IMPORT_JOB_COMPLETE_EVENT = 'import_job_complete';
 
-export async function broadcastImportJobComplete(requestKey: string, result: unknown) {
+export async function broadcastImportJobComplete(requestKey: string) {
     await new Promise(resolve => setTimeout(resolve, 0));
-    socket.emit('in_progress', requestKey, IMPORT_JOB_COMPLETE_EVENT, result);
+    socket.emit('in_progress', requestKey, IMPORT_JOB_COMPLETE_EVENT, true);
 }

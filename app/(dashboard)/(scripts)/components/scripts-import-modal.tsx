@@ -145,33 +145,40 @@ export function ScriptsImportModal({
     const waitForImportCompletion = (requestBody: Record<string, any>) => {
         let settled = false;
 
-        const stopPolling = () => {
+        const stopWaiting = () => {
             settled = true;
-            socket.off(requestBody.requestKey, onComplete);
+            socket.off(requestBody.requestKey, onSignal);
             clearInterval(pollTimer);
         };
 
-        const onComplete = (key: string, value: any) => {
-            if (key !== IMPORT_JOB_COMPLETE_EVENT || settled) return;
-            stopPolling();
-            handleImportResult(value);
-        };
-
-        socket.on(requestBody.requestKey, onComplete);
-
-        const pollTimer = setInterval(async () => {
+        // The socket event is only a "check now" signal — it never carries
+        // the import result itself (the socket.io relay is an unauthenticated,
+        // global broadcast, so the result must only ever travel over this
+        // authenticated HTTP endpoint instead). This same check also serves
+        // as the periodic fallback poll below, for a socket event that never
+        // arrives.
+        const checkStatus = async () => {
             if (settled) return;
             try {
                 const response = await axios.post('/api/scripts/copy', requestBody);
                 const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof copyScripts>>;
                 if (!res.started && !settled) {
-                    stopPolling();
+                    stopWaiting();
                     handleImportResult(res);
                 }
             } catch {
-                // Ignore — either the socket listener or the next poll will still resolve it.
+                // Ignore — the next signal or poll will still resolve it.
             }
-        }, 45 * 1000);
+        };
+
+        const onSignal = (key: string) => {
+            if (key !== IMPORT_JOB_COMPLETE_EVENT || settled) return;
+            checkStatus();
+        };
+
+        socket.on(requestBody.requestKey, onSignal);
+
+        const pollTimer = setInterval(checkStatus, 45 * 1000);
     };
 
     const importScripts = handleSubmit(async (data) => {

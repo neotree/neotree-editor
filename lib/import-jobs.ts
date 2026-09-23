@@ -156,8 +156,12 @@ export function startOrJoinImportJob<T>({
         job.status = status;
         job.result = result;
         job.settledAt = Date.now();
+        // Signal only — no result payload goes over the socket (see
+        // broadcastImportJobComplete's comment in lib/in-progress.ts). The
+        // frontend fetches the actual result over the authenticated HTTP
+        // endpoint once it receives this.
         job.requestKeys.forEach((key) => {
-            broadcastImportJobComplete(key, job.result);
+            broadcastImportJobComplete(key);
         });
         logDraftCounts(`run settled (${status})`, contentKey, requestKey);
         scheduleCleanup(contentKey, job);
