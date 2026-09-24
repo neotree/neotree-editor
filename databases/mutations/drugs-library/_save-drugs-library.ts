@@ -12,10 +12,43 @@ import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
 
 export type SaveDrugsLibraryItemsData = Partial<typeof drugsLibrary.$inferSelect>;
 
-export type SaveDrugsLibraryItemsResponse = { 
-    success: boolean; 
-    errors?: string[]; 
+export type SaveDrugsLibraryItemsResponse = {
+    success: boolean;
+    errors?: string[];
 };
+
+// A drug/fluid/feed key rename fans out to every screen in the system that
+// references it (see _saveDrugsLibraryItems below) — chunk + bound the
+// concurrency of that resave instead of one unbatched sequential call.
+const RENAME_FANOUT_SAVE_CHUNK_SIZE = 50;
+const RENAME_FANOUT_SAVE_CONCURRENCY = 3;
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+}
+
+async function mapWithConcurrency<T>(
+    items: T[],
+    concurrency: number,
+    fn: (item: T) => Promise<void>,
+) {
+    const workers = Math.max(1, Math.min(concurrency, items.length || 1));
+    let index = 0;
+
+    async function runWorker() {
+        while (index < items.length) {
+            const current = items[index];
+            index++;
+            await fn(current);
+        }
+    }
+
+    await Promise.all(Array.from({ length: workers }).map(() => runWorker()));
+}
 
 const getUniqueKey = async (key: string, tries = 1, ogKey = '') => {
     const [{ count: draftsCount }] = await db.select({
@@ -276,7 +309,19 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }:
                 if (isUpdated) updatedScreens.push({ ...screen, drugs, fluids, feeds, });
             });
 
-            if (updatedScreens.length) await _saveScreens({ data: updatedScreens, userId, });
+            if (updatedScreens.length) {
+                await mapWithConcurrency(
+                    chunkArray(updatedScreens, RENAME_FANOUT_SAVE_CHUNK_SIZE),
+                    RENAME_FANOUT_SAVE_CONCURRENCY,
+                    async (chunk) => {
+                        // Safe to chunk/parallelize here specifically: every screen came
+                        // from _getScreens above, so it already has a real position —
+                        // the racy MAX(position)+1 fallback in _saveScreens is never hit.
+                        const res = await _saveScreens({ data: chunk, userId, });
+                        if (res.errors?.length) errors.push(...res.errors);
+                    },
+                );
+            }
         }
 
         if (errors.length) {

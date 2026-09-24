@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { diagnoses, diagnosesDrafts, pendingDeletion, scriptsDrafts, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 
@@ -12,6 +13,7 @@ export type DeleteDiagnosesData = {
     confirmDeleteAll?: boolean;
     userId?: string | null;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
+    client?: DbOrTransaction;
 };
 
 export type DeleteDiagnosesResponse = { 
@@ -35,19 +37,21 @@ export async function _deleteDiagnoses(
         diagnosesIds = [], 
         scriptsIds = [], 
         confirmDeleteAll,
-        broadcastAction, 
+        broadcastAction,
         userId,
         draftOrigin = "editor",
+        client,
     }: DeleteDiagnosesData,
 ) {
     const response: DeleteDiagnosesResponse = { success: false, };
+    const executor = client || db;
 
     try {
         const shouldConfirmDeleteAll = !scriptsIds.length && !diagnosesIds.length && !confirmDeleteAll;
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the diagnoses, please confirm this action!');
 
         // delete drafts
-        await db.delete(diagnosesDrafts).where(and(
+        await executor.delete(diagnosesDrafts).where(and(
             !diagnosesIds.length ? undefined : inArray(diagnosesDrafts.diagnosisDraftId, diagnosesIds),
             !scriptsIds.length ? undefined : or(
                 inArray(diagnosesDrafts.scriptId, scriptsIds),
@@ -56,7 +60,7 @@ export async function _deleteDiagnoses(
         ));
 
         // insert config keys into pendingDeletion, we'll delete them when data is published
-        const diagnosesArr = await db
+        const diagnosesArr = await executor
             .select({
                 diagnosisId: diagnoses.diagnosisId,
                 diagnosisScriptId: diagnoses.scriptId,
@@ -79,7 +83,7 @@ export async function _deleteDiagnoses(
             createdByUserId: userId,
         }));
         
-        if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
+        if (pendingDeletionInsertData.length) await executor.insert(pendingDeletion).values(pendingDeletionInsertData);
 
         response.success = true;
     } catch(e: any) {
