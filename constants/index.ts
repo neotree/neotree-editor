@@ -113,14 +113,54 @@ export const dataKeyTypes: {
         hasChildren: true,
     },
     {
-        value: 'yesno',
-        label: 'yesno',
-        hasChildren: false,
+        value: 'zw_edliz_summary_table',
+        label: 'zw_edliz_summary_table',
+        hasChildren: true,
     },
+    {
+        value: 'mwi_edliz_summary_table',
+        label: 'mwi_edliz_summary_table',
+        hasChildren: true,
+    },
+    {
+        value: 'dropdown',
+        label: 'dropdown',
+        hasChildren: true,
+    },
+    // {
+    //     value: 'problem',
+    //     label: 'problem',
+    //     hasChildren: true,
+    // },
+    // {
+    //     value: 'diagnosis',
+    //     label: 'diagnosis',
+    //     hasChildren: true,
+    // },
     // {
     //     value: 'progress',
     //     label: 'progress',
     //     hasChildren: true,
+    // },
+    // {
+    //     value: 'diagnosis_symptom_sign',
+    //     label: 'diagnosis_symptom_sign',
+    //     hasChildren: false,
+    // },
+    // {
+    //     value: 'diagnosis_symptom_risk',
+    //     label: 'diagnosis_symptom_risk',
+    //     hasChildren: false,
+    // },
+    // {
+    //     value: 'problem_symptom_sign',
+    //     label: 'problem_symptom_sign',
+    //     hasChildren: false,
+    // },
+    // {
+    //     value: 'problem_symptom_risk',
+    //     label: 'problem_symptom_risk',
+    //     hasChildren: false,
     // },
     // {
     //     value: 'drug',
@@ -133,43 +173,8 @@ export const dataKeyTypes: {
     //     hasChildren: false,
     // },
     {
-        value: 'zw_edliz_summary_table',
-        label: 'zw_edliz_summary_table',
-        hasChildren: true,
-    },
-    {
-        value: 'mwi_edliz_summary_table',
-        label: 'mwi_edliz_summary_table',
-        hasChildren: true,
-    },
-    {
-        value: 'problem',
-        label: 'problem',
-        hasChildren: true,
-    },
-    {
-        value: 'diagnosis',
-        label: 'diagnosis',
-        hasChildren: true,
-    },
-    {
-        value: 'diagnosis_symptom_sign',
-        label: 'diagnosis_symptom_sign',
-        hasChildren: false,
-    },
-    {
-        value: 'diagnosis_symptom_risk',
-        label: 'diagnosis_symptom_risk',
-        hasChildren: false,
-    },
-    {
-        value: 'problem_symptom_sign',
-        label: 'problem_symptom_sign',
-        hasChildren: false,
-    },
-    {
-        value: 'problem_symptom_risk',
-        label: 'problem_symptom_risk',
+        value: 'yesno',
+        label: 'yesno',
         hasChildren: false,
     },
     {
@@ -181,11 +186,6 @@ export const dataKeyTypes: {
         value: 'datetime',
         label: 'datetime',
         hasChildren: false,
-    },
-    {
-        value: 'dropdown',
-        label: 'dropdown',
-        hasChildren: true,
     },
     {
         value: 'number',

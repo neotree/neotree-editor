@@ -209,7 +209,7 @@ export function DataKeysCtxProvider({
         params?: GetDataKeysParams,
         opts?: LoadDataKeysOpts,
     ) => {
-        setLoadingDataKeys(true);
+        setLoadingDataKeys(!opts?.silent);
 
         try {
             // Build query params (without pagination)
@@ -297,7 +297,7 @@ export function DataKeysCtxProvider({
         if (filter) {
             if (filter === 'published') {
                 filtered = filtered.filter(dataKey => !dataKey?.isDraft);
-            } else if (filter === 'draft') {
+            } else if (filter === 'drafts') {
                 filtered = filtered.filter(dataKey => !!dataKey?.isDraft);
             } else {
                 filtered = filtered.filter(dataKey => dataKey?.dataType === filter);
