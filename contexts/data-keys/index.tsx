@@ -209,7 +209,7 @@ export function DataKeysCtxProvider({
         params?: GetDataKeysParams,
         opts?: LoadDataKeysOpts,
     ) => {
-        setLoadingDataKeys(true);
+        setLoadingDataKeys(!opts?.silent);
 
         try {
             // Build query params (without pagination)
