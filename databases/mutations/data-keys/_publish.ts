@@ -18,8 +18,9 @@ export async function _publishDataKeys(opts?: {
   allowConfidentialDowngrade?: boolean
   client?: DbOrTransaction
 }) {
-  const results: { success: boolean; errors?: string[] } = { success: false }
+  const results: { success: boolean; errors?: string[]; confidentialDowngrades?: { dataKeyId: string; name: string }[] } = { success: false }
   const errors: string[] = []
+  const confidentialDowngrades: { dataKeyId: string; name: string }[] = []
   const changeLogs: SaveChangeLogData[] = []
 
   if (!opts?.client || !Number.isFinite(opts?.dataVersion)) {
@@ -164,6 +165,7 @@ export async function _publishDataKeys(opts?: {
             `Cannot remove confidentiality from data key "${current?.name || dataKeyId}" during publish. ` +
               `Set allowConfidentialDowngrade=true for an explicit downgrade.`,
           )
+          confidentialDowngrades.push({ dataKeyId, name: current?.name || dataKeyId })
           continue
         }
 
@@ -269,7 +271,8 @@ export async function _publishDataKeys(opts?: {
     }
   } catch (e: any) {
     results.success = false
-    results.errors = [e.message]
+    results.errors = errors.length ? errors : [e.message]
+    results.confidentialDowngrades = confidentialDowngrades.length ? confidentialDowngrades : undefined
     logger.error("_publishDataKeys ERROR", e)
   }
 

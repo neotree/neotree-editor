@@ -1350,8 +1350,10 @@ export const countAllDrafts = async () => {
   }
 }
 
-export async function publishData({ scope }: { scope: number }): Promise<PublishDataResponse> {
+export async function publishData({ scope, allowConfidentialDowngrade }: { scope: number; allowConfidentialDowngrade?: boolean }): Promise<PublishDataResponse> {
   const results: PublishDataResponse = { success: true }
+  let confidentialDowngradeDetails: { dataKeyId: string; name: string }[] | null = null
+  let confidentialDowngradeErrors: string[] | null = null
   try {
     const session = await isAllowed([
       "create_config_keys",
@@ -1468,9 +1470,16 @@ export async function publishData({ scope }: { scope: number }): Promise<Publish
         userId,
         publisherUserId,
         dataVersion: nextDataVersion,
+        allowConfidentialDowngrade,
         client: tx,
       })
-      if (!publishDataKeys.success) throw new Error(publishDataKeys.errors?.join(", ") || "Failed to publish data keys")
+      if (!publishDataKeys.success) {
+        if (publishDataKeys.confidentialDowngrades?.length) {
+          confidentialDowngradeDetails = publishDataKeys.confidentialDowngrades
+          confidentialDowngradeErrors = publishDataKeys.errors || null
+        }
+        throw new Error(publishDataKeys.errors?.join(", ") || "Failed to publish data keys")
+      }
 
       const publishScripts = await scriptsMutations._publishScripts({
         userId,
@@ -1529,7 +1538,12 @@ export async function publishData({ scope }: { scope: number }): Promise<Publish
     socket.emit("data_changed", "publish_data")
   } catch (e: any) {
     results.success = false
-    results.errors = [e.message]
+    if (confidentialDowngradeDetails) {
+      results.errors = confidentialDowngradeErrors || [e.message]
+      results.blockingDetails = { ...(results.blockingDetails || {}), confidentialDowngrades: confidentialDowngradeDetails }
+    } else {
+      results.errors = [e.message]
+    }
     logger.error("publishData ERROR", e.message)
   } finally {
     return results

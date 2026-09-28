@@ -47,3 +47,23 @@ export function isDataKeyIntegrityPublishDetails(
     ))
   ))
 }
+
+export type ConfidentialDowngradeDetails = {
+  confidentialDowngrades: { dataKeyId: string; name: string }[]
+}
+
+export function isConfidentialDowngradeDetails(
+  value: unknown,
+): value is ConfidentialDowngradeDetails {
+  if (!value || typeof value !== "object") return false
+
+  const details = value as Partial<ConfidentialDowngradeDetails>
+  if (!Array.isArray(details.confidentialDowngrades) || !details.confidentialDowngrades.length) return false
+
+  return details.confidentialDowngrades.every((key) => (
+    !!key
+    && typeof key === "object"
+    && typeof key.dataKeyId === "string"
+    && typeof key.name === "string"
+  ))
+}
