@@ -115,6 +115,12 @@ const parsePositiveInt = (value: string | undefined, fallback: number) => {
 
 const SAVE_CHUNK_SIZE = parsePositiveInt(process.env.DATA_KEYS_REFS_SAVE_CHUNK_SIZE, 50);
 const SAVE_RETRY_CONCURRENCY = parsePositiveInt(process.env.DATA_KEYS_REFS_RETRY_CONCURRENCY, 5);
+// Chunks within one entity type used to be processed strictly one at a time.
+// A small concurrency here (on top of the 4 entity types already running
+// concurrently via Promise.all below) speeds this up without overwhelming
+// the shared DB pool (postgres-js default of 10 connections, shared with the
+// rest of the app — 4 entity types x 2 chunk-concurrency = up to 8 at once).
+const SAVE_CHUNK_CONCURRENCY = parsePositiveInt(process.env.DATA_KEYS_REFS_SAVE_CHUNK_CONCURRENCY, 2);
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
     if (size <= 0) return [arr];
@@ -293,117 +299,118 @@ export async function _updateDataKeysRefs({
         const candidateScripts = new Set<string>();
 
         if (changedUniqueKeys.length || likePatterns.length) {
-            const screensPublishedCandidates = await executor
-                .select({ scriptId: screens.scriptId })
-                .from(screens)
-                .where(and(
-                    isNull(screens.deletedAt),
-                    or(
-                        changedUniqueKeys.length ? inArray(screens.keyId, changedUniqueKeys) : undefined,
-                        changedUniqueKeys.length ? inArray(screens.refIdDataKey, changedUniqueKeys) : undefined,
-                        buildLikeClauses(sql`${screens.fields}`, likePatterns),
-                        buildLikeClauses(sql`${screens.items}`, likePatterns),
-                    ),
-                ));
+            // These 8 queries are all independent (none depends on another's
+            // result — they're merged into the same Set afterward, and Set
+            // merge order doesn't matter), so run them concurrently instead of
+            // one at a time.
+            const noRows: { scriptId?: string | null; scriptDraftId?: string | null; }[] = [];
 
-            screensPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
-
-            const diagnosesPublishedCandidates = await executor
-                .select({ scriptId: diagnoses.scriptId })
-                .from(diagnoses)
-                .where(and(
-                    isNull(diagnoses.deletedAt),
-                    or(
-                        changedUniqueKeys.length ? inArray(diagnoses.keyId, changedUniqueKeys) : undefined,
-                        buildLikeClauses(sql`${diagnoses.symptoms}`, likePatterns),
-                    ),
-                ));
-
-            diagnosesPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
-
-            const problemsPublishedCandidates = await executor
-                .select({ scriptId: problems.scriptId })
-                .from(problems)
-                .where(and(
-                    isNull(problems.deletedAt),
-                    or(
-                        changedUniqueKeys.length ? inArray(problems.keyId, changedUniqueKeys) : undefined,
-                    ),
-                ));
-
-            problemsPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
-
-            if (likePatterns.length) {
-                const scriptsPublishedCandidates = await executor
+            const [
+                screensPublishedCandidates,
+                diagnosesPublishedCandidates,
+                problemsPublishedCandidates,
+                scriptsPublishedCandidates,
+                scriptsDraftCandidates,
+                screensDraftCandidates,
+                diagnosesDraftCandidates,
+                problemsDraftCandidates,
+            ] = await Promise.all([
+                executor
+                    .select({ scriptId: screens.scriptId })
+                    .from(screens)
+                    .where(and(
+                        isNull(screens.deletedAt),
+                        or(
+                            changedUniqueKeys.length ? inArray(screens.keyId, changedUniqueKeys) : undefined,
+                            changedUniqueKeys.length ? inArray(screens.refIdDataKey, changedUniqueKeys) : undefined,
+                            buildLikeClauses(sql`${screens.fields}`, likePatterns),
+                            buildLikeClauses(sql`${screens.items}`, likePatterns),
+                        ),
+                    )),
+                executor
+                    .select({ scriptId: diagnoses.scriptId })
+                    .from(diagnoses)
+                    .where(and(
+                        isNull(diagnoses.deletedAt),
+                        or(
+                            changedUniqueKeys.length ? inArray(diagnoses.keyId, changedUniqueKeys) : undefined,
+                            buildLikeClauses(sql`${diagnoses.symptoms}`, likePatterns),
+                        ),
+                    )),
+                executor
+                    .select({ scriptId: problems.scriptId })
+                    .from(problems)
+                    .where(and(
+                        isNull(problems.deletedAt),
+                        or(
+                            changedUniqueKeys.length ? inArray(problems.keyId, changedUniqueKeys) : undefined,
+                        ),
+                    )),
+                !likePatterns.length ? Promise.resolve(noRows) : executor
                     .select({ scriptId: scriptsTable.scriptId })
                     .from(scriptsTable)
                     .where(and(
                         isNull(scriptsTable.deletedAt),
                         buildLikeClauses(sql`${scriptsTable.nuidSearchFields}`, likePatterns),
-                    ));
-
-                scriptsPublishedCandidates.forEach(row => {
-                    if (row.scriptId) candidateScripts.add(row.scriptId);
-                });
-
-                const scriptsDraftCandidates = await executor
+                    )),
+                !likePatterns.length ? Promise.resolve(noRows) : executor
                     .select({
                         scriptDraftId: scriptsDraftsTable.scriptDraftId,
                         scriptId: scriptsDraftsTable.scriptId,
                     })
                     .from(scriptsDraftsTable)
-                    .where(buildLikeClauses(sql`${scriptsDraftsTable.data}`, likePatterns));
-
-                scriptsDraftCandidates.forEach(row => {
-                    if (row.scriptId) candidateScripts.add(row.scriptId);
-                    if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-                });
-
-                const screensDraftCandidates = await executor
+                    .where(buildLikeClauses(sql`${scriptsDraftsTable.data}`, likePatterns)),
+                !likePatterns.length ? Promise.resolve(noRows) : executor
                     .select({
                         scriptId: screensDrafts.scriptId,
                         scriptDraftId: screensDrafts.scriptDraftId,
                     })
                     .from(screensDrafts)
-                    .where(buildLikeClauses(sql`${screensDrafts.data}`, likePatterns));
-
-                screensDraftCandidates.forEach(row => {
-                    if (row.scriptId) candidateScripts.add(row.scriptId);
-                    if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-                });
-
-                const diagnosesDraftCandidates = await executor
+                    .where(buildLikeClauses(sql`${screensDrafts.data}`, likePatterns)),
+                !likePatterns.length ? Promise.resolve(noRows) : executor
                     .select({
                         scriptId: diagnosesDrafts.scriptId,
                         scriptDraftId: diagnosesDrafts.scriptDraftId,
                     })
                     .from(diagnosesDrafts)
-                    .where(buildLikeClauses(sql`${diagnosesDrafts.data}`, likePatterns));
-
-                diagnosesDraftCandidates.forEach(row => {
-                    if (row.scriptId) candidateScripts.add(row.scriptId);
-                    if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-                });
-
-                const problemsDraftCandidates = await executor
+                    .where(buildLikeClauses(sql`${diagnosesDrafts.data}`, likePatterns)),
+                !likePatterns.length ? Promise.resolve(noRows) : executor
                     .select({
                         scriptId: problemsDrafts.scriptId,
                         scriptDraftId: problemsDrafts.scriptDraftId,
                     })
                     .from(problemsDrafts)
-                    .where(buildLikeClauses(sql`${problemsDrafts.data}`, likePatterns));
+                    .where(buildLikeClauses(sql`${problemsDrafts.data}`, likePatterns)),
+            ]);
 
-                problemsDraftCandidates.forEach(row => {
-                    if (row.scriptId) candidateScripts.add(row.scriptId);
-                    if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-                });
-            }
+            screensPublishedCandidates.forEach(row => {
+                if (row.scriptId) candidateScripts.add(row.scriptId);
+            });
+            diagnosesPublishedCandidates.forEach(row => {
+                if (row.scriptId) candidateScripts.add(row.scriptId);
+            });
+            problemsPublishedCandidates.forEach(row => {
+                if (row.scriptId) candidateScripts.add(row.scriptId);
+            });
+            scriptsPublishedCandidates.forEach(row => {
+                if (row.scriptId) candidateScripts.add(row.scriptId);
+            });
+            scriptsDraftCandidates.forEach(row => {
+                if (row.scriptId) candidateScripts.add(row.scriptId);
+                if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
+            });
+            screensDraftCandidates.forEach(row => {
+                if (row.scriptId) candidateScripts.add(row.scriptId);
+                if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
+            });
+            diagnosesDraftCandidates.forEach(row => {
+                if (row.scriptId) candidateScripts.add(row.scriptId);
+                if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
+            });
+            problemsDraftCandidates.forEach(row => {
+                if (row.scriptId) candidateScripts.add(row.scriptId);
+                if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
+            });
         }
 
         stats.candidateScripts = candidateScripts.size;
@@ -425,16 +432,15 @@ export async function _updateDataKeysRefs({
         }
 
         const scriptsIds = useFullScan ? undefined : Array.from(candidateScripts);
-        const { data: screensArr, errors: screensGetErrors } = await _getScreens(
-            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
-        );
-        const { data: diagnosesArr, errors: diagnosesGetErrors } = await _getDiagnoses(
-            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
-        );
-
-        const { data: problemsArr, errors: problemsGetErrors } = await _getProblems(
-            { ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }
-        );
+        const [
+            { data: screensArr, errors: screensGetErrors },
+            { data: diagnosesArr, errors: diagnosesGetErrors },
+            { data: problemsArr, errors: problemsGetErrors },
+        ] = await Promise.all([
+            _getScreens({ ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }),
+            _getDiagnoses({ ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }),
+            _getProblems({ ...(scriptsIds?.length ? { scriptsIds } : {}), client: executor }),
+        ]);
 
         const prefetchErrors = [
             ...(screensGetErrors || []),
@@ -445,22 +451,23 @@ export async function _updateDataKeysRefs({
             return { success: false, errors: prefetchErrors, info: stats };
         }
 
-        const scriptDraftRows = await executor.query.scriptsDrafts.findMany({
-            where: scriptsIds?.length
-                ? or(
-                    inArray(scriptsDraftsTable.scriptDraftId, scriptsIds),
-                    inArray(scriptsDraftsTable.scriptId, scriptsIds),
-                )
-                : undefined,
-        });
+        const [scriptDraftRows, publishedScriptRows] = await Promise.all([
+            executor.query.scriptsDrafts.findMany({
+                where: scriptsIds?.length
+                    ? or(
+                        inArray(scriptsDraftsTable.scriptDraftId, scriptsIds),
+                        inArray(scriptsDraftsTable.scriptId, scriptsIds),
+                    )
+                    : undefined,
+            }),
+            executor.query.scripts.findMany({
+                where: and(
+                    isNull(scriptsTable.deletedAt),
+                    scriptsIds?.length ? inArray(scriptsTable.scriptId, scriptsIds) : undefined,
+                ),
+            }),
+        ]);
         const scriptDraftIds = new Set(scriptDraftRows.map(row => row.scriptDraftId).filter(Boolean));
-
-        const publishedScriptRows = await executor.query.scripts.findMany({
-            where: and(
-                isNull(scriptsTable.deletedAt),
-                scriptsIds?.length ? inArray(scriptsTable.scriptId, scriptsIds) : undefined,
-            ),
-        });
 
         const scriptRecords: NuidSearchScriptSource[] = [
             ...scriptDraftRows.map(row => ({
@@ -933,7 +940,7 @@ export async function _updateDataKeysRefs({
         const saveErrors: string[] = [];
 
         const saveDiagnosesTask = async () => {
-            for (const chunk of chunkArray(diagnosesUpdatedData, SAVE_CHUNK_SIZE)) {
+            await mapWithConcurrency(chunkArray(diagnosesUpdatedData, SAVE_CHUNK_SIZE), SAVE_CHUNK_CONCURRENCY, async (chunk) => {
                 const res = await _saveDiagnoses({ data: chunk, userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
@@ -948,11 +955,11 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedDiagnoses += chunk.length;
                 }
-            }
+            });
         };
 
         const saveProblemsTask = async () => {
-            for (const chunk of chunkArray(problemsUpdatedData, SAVE_CHUNK_SIZE)) {
+            await mapWithConcurrency(chunkArray(problemsUpdatedData, SAVE_CHUNK_SIZE), SAVE_CHUNK_CONCURRENCY, async (chunk) => {
                 const res = await _saveProblems({ data: chunk, userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
@@ -967,11 +974,11 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedProblems += chunk.length;
                 }
-            }
+            });
         };
 
         const saveScreensTask = async () => {
-            for (const chunk of chunkArray(screensUpdatedData, SAVE_CHUNK_SIZE)) {
+            await mapWithConcurrency(chunkArray(screensUpdatedData, SAVE_CHUNK_SIZE), SAVE_CHUNK_CONCURRENCY, async (chunk) => {
                 const res = await _saveScreens({ data: chunk, userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
@@ -986,15 +993,15 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedScreens += chunk.length;
                 }
-            }
+            });
         };
 
         const saveScriptRecordsTask = async () => {
-            for (const chunk of chunkArray(scriptRecordsUpdatedData, SAVE_CHUNK_SIZE)) {
-                const toPayload = (script: NuidSearchScriptSource) => ({
-                    scriptId: script.scriptId,
-                    nuidSearchFields: script.nuidSearchFields,
-                });
+            const toPayload = (script: NuidSearchScriptSource) => ({
+                scriptId: script.scriptId,
+                nuidSearchFields: script.nuidSearchFields,
+            });
+            await mapWithConcurrency(chunkArray(scriptRecordsUpdatedData, SAVE_CHUNK_SIZE), SAVE_CHUNK_CONCURRENCY, async (chunk) => {
                 const res = await _saveScripts({ data: chunk.map(toPayload), userId, draftOrigin, client: executor });
                 if (res.errors?.length) {
                     stats.chunkRetries++;
@@ -1009,7 +1016,7 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedScriptRecords += chunk.length;
                 }
-            }
+            });
         };
 
         await Promise.all([saveDiagnosesTask(), saveProblemsTask(), saveScreensTask(), saveScriptRecordsTask()]);
