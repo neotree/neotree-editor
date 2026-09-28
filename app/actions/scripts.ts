@@ -2823,6 +2823,10 @@ export async function copyScripts(params?: {
 
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
+        if (!fromRemoteSiteId && scriptsIds.length && !scripts.data.length) {
+            return { success: false, errors: [`Script(s) not found: ${scriptsIds.join(', ')}`], info, };
+        }
+
         let siteUrl: undefined | string = undefined;
 
         if (fromRemoteSiteId) {
@@ -2849,7 +2853,11 @@ export async function copyScripts(params?: {
 
             scripts = res;
 
-            const uploadRes = await uploadRemoteFiles({ 
+            if (scriptsIds.length && !scripts.data.length) {
+                return { success: false, errors: [`Script(s) not found on the source site: ${scriptsIds.join(', ')}`], info, };
+            }
+
+            const uploadRes = await uploadRemoteFiles({
                 files: res.files, 
                 requestKey,
                 remoteSiteId: fromRemoteSiteId,
@@ -2950,7 +2958,12 @@ export async function copyScripts(params?: {
                 await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId: session.user?.userId, })
                 :
                 await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId: session.user?.userId, });
-            if (res.success) response.info.dffItems = dffItemsToSave.length;
+            if (res.success) {
+                response.info.dffItems = dffItemsToSave.length;
+            } else {
+                response.success = false;
+                response.errors = [...(response.errors || []), ...(res.errors || ['Failed to save drugs library items'])];
+            }
             markTiming('save_drugs_library_items', saveDrugsStartedAt);
         }
 
@@ -2971,6 +2984,9 @@ export async function copyScripts(params?: {
                 importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])
                     .map((script: { scriptId?: string | null }) => script.scriptId)
                     .filter((value): value is string => !!value);
+            } else {
+                response.success = false;
+                response.errors = [...(response.errors || []), ...(res.errors || ['Failed to save data keys'])];
             }
             markTiming('save_data_keys', saveDataKeysStartedAt);
         }
