@@ -9,6 +9,7 @@ import type {
   VarNode,
 } from "./ast";
 import { quoteValue } from "./quote";
+import { OUTCOME_COLLECTIONS } from "./script-outcomes";
 import { suggestClosest } from "./suggest";
 
 // Data-type families (compared case-insensitively).
@@ -240,10 +241,87 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext, source = ""): 
     }
   };
 
+
+/**
+ * `$Diagnoses` / `$Problems` hold a LIST of outcomes, so a comparison is the
+ * wrong shape for them:
+ *
+ *  - `= 'X'` only means "one of them is X" by accident of how the runtime
+ *    expands a list, and reads as if the patient had exactly one outcome;
+ *  - `!= 'X'` means "at least one of them is not X", which is true as soon as
+ *    the patient has any other outcome — and true again when none have been
+ *    confirmed at all, because an unresolved key compares unequal to
+ *    everything. That is a screen shown unconditionally.
+ *  - ordering (`>`, `<`, …) has no meaning on a list at all.
+ *
+ * Membership says exactly what the author means, so it is required here.
+ */
+const COLLECTION_NAMES = new Map(
+  Object.keys(OUTCOME_COLLECTIONS).map((name) => [name.toLowerCase(), name]),
+);
+
+const COLLECTION_MEMBERSHIP_OP: Record<string, "includes" | "excludes"> = {
+  "=": "includes",
+  "==": "includes",
+  "!=": "excludes",
+};
+
+
   const checkComparison = (node: ComparisonNode): void => {
     const right = node.right;
     const badValue = flagBadValue(right);
     if (!badValue) flagValueWhitespace(right);
+
+    // A list on the right of a comparison never worked: the runtime treats
+    // `[ ... ]` as a bracket group, compiles it, and leaves a JavaScript comma
+    // expression behind — which evaluates to its LAST item. So
+    // `$Sex = ['M','F']` silently means `$Sex = 'F'`. Membership is the only
+    // way to ask this question.
+    if (right.type === "Array" && node.left.type === "Var") {
+      const membershipOp = COLLECTION_MEMBERSHIP_OP[node.op];
+      const values = right.items.map((item) => source.slice(item.start, item.end).trim()).filter(Boolean);
+      const suggestion = membershipOp && values.length
+        ? `[$${node.left.name} ${membershipOp} (${values.join(", ")})]`
+        : undefined;
+
+      diagnostics.push({
+        severity: "error",
+        code: "ARRAY_COMPARISON",
+        message: `A list cannot be compared with "${node.op}" — only its last item would be checked.`
+          + (suggestion ? ` Use "${membershipOp}", e.g. ${suggestion}.` : ` Use "includes" or "excludes".`),
+        start: node.start,
+        end: node.end,
+        suggestion,
+      });
+      return;
+    }
+
+    // Checked before key resolution: these two names are fixed, so the rule
+    // holds even while the key catalogue is still loading.
+    if (node.left.type === "Var") {
+      const collection = COLLECTION_NAMES.get(node.left.name.toLowerCase());
+      if (collection) {
+        const membershipOp = COLLECTION_MEMBERSHIP_OP[node.op];
+        const value = source.slice(right.start, right.end).trim();
+        // Bracketed, so the rewrite does not immediately trip the rule that a
+        // membership may not share a line with and/or.
+        const suggestion = membershipOp && value
+          ? `[$${collection} ${membershipOp} (${value})]`
+          : undefined;
+
+        diagnostics.push({
+          severity: "error",
+          code: "COLLECTION_COMPARISON",
+          message: membershipOp
+            ? `"$${collection}" is a list of outcomes, so "${node.op}" is unreliable here. Use "${membershipOp}", e.g. ${suggestion}.`
+            : `"$${collection}" is a list of outcomes; "${node.op}" has no meaning on it. Use "includes" or "excludes", e.g. [$${collection} includes ('A')].`,
+          start: node.start,
+          end: node.end,
+          suggestion,
+        });
+        return;
+      }
+    }
 
     if (ctx.skipKeyResolution) return;
     if (node.left.type !== "Var") return;
@@ -314,10 +392,16 @@ export function analyze(ast: ProgramNode, ctx: ValidationContext, source = ""): 
     const targetName = node.target.type === "Var" ? node.target.name : "Key";
     const example = `[$${targetName} ${node.op} ('A')]`;
 
-    // The runtime evaluates includes/excludes over its whole enclosing line
-    // (or [ ] group), so a membership must stand ALONE — it cannot share a line
-    // or a [ ] group with and/or. Each list check needs its own brackets and is
-    // combined outside them: [$X includes ('A')] and [$Y includes ('B')].
+    // The runtime used to evaluate includes/excludes over its whole enclosing
+    // line (or [ ] group) and discard everything else on it, so a membership
+    // had to stand ALONE. That is fixed (NEOAPP-1514): membership now resolves
+    // in place and composes freely — see ./membership-runtime.ts.
+    //
+    // The restriction is kept deliberately, because a script published today
+    // still reaches devices running the old build, where a combined membership
+    // silently evaluates to false. Relax this to a warning (and drop the
+    // bracketDepth nudge below) once the fixed app version is the floor in the
+    // field — not before.
     if (env.combinedInScope) {
       diagnostics.push({
         severity: "error",

@@ -1,3 +1,10 @@
+import { resolveMemberships } from "@/lib/conditional-expression/membership-runtime";
+import {
+  buildOutcomeEntries,
+  referencesOutcomeCollection,
+  NO_OUTCOME_ENTRIES,
+} from "@/lib/conditional-expression/outcome-collections-runtime";
+
 export type ScreenEntryValue = {
   value?: any;
   value2?: any;
@@ -85,70 +92,20 @@ export function parseCondition(
     entries: ScreenEntry[] = []
 ) {
     _condition = `${_condition || ''}`.split('\n').map(_condition => {
-        const _form = [...entries];
+        // $Diagnoses / $Problems, only for lines that ask for them — each
+        // outcome otherwise costs a full substitution pass.
+        const _form = [
+            ...entries,
+            ...(referencesOutcomeCollection(_condition)
+                ? buildOutcomeEntries(entries) as ScreenEntry[]
+                : NO_OUTCOME_ENTRIES as ScreenEntry[]),
+        ];
 
         _condition = _condition.replace(/\[(.*?)\]/gi, (_, match: string) => {
             return parseCondition(match, _form);
         });
 
-        if (
-            _condition.match(/ excludes /gi) ||
-            _condition.match(/ includes /gi) ||
-            _condition.match(/ or_excludes /gi) ||
-            _condition.match(/ or_includes /gi)
-        ) {
-            let joinWith = 'and';
-            if (_condition.match(/ or_excludes /gi) || _condition.match(/ or_includes /gi)) {
-                joinWith = 'or';
-                _condition = _condition.replaceAll(' or_excludes ', ' excludes ');
-                _condition = _condition.replaceAll(' or_includes ', ' includes ');
-            }
-
-            const [key, vals] = _condition.match(/ excludes /gi) ?
-                _condition.split(/ excludes /gi).map(s => s.trim())
-                :
-                _condition.split(/ includes /gi).map(s => s.trim());
-
-            const valsParsed = (vals || '')
-                .replace(/\((.*?)\)/gi, '$1').trim().split(',')
-                .map(s => s.trim().replace(/\'(.*?)\'/gi, '$1'))
-                .map(s => s.trim().replace(/\"(.*?)\"/gi, '$1'))
-                .map(s => s.trim().replace(/\`(.*?)\`/gi, '$1'));
-
-            // const valsParsed = `${vals || ''}`
-            //     .replace(/\((.*?)\)/, '$1')
-            //     .split(',')
-            //     .map(v => v.trim().replaceAll('"', '').replaceAll("'", '').replaceAll('`', '').replaceAll('`', ''));
-
-            const entryVals = _form.map(e => {
-                    let found: string[] = [];
-                    const entryVals = e.value || e.values || [];
-                    entryVals.forEach(v => {
-                        if (`$${v.key?.toLowerCase?.()}` === key?.toLowerCase?.()) {
-                            const val = Array.isArray(v.value) ? v.value : [v.value];
-                            val.forEach(v => {
-                                if (v.key) {
-                                    found.push(v.key);
-                                }
-                            });
-                        }
-                    });
-                    return found.filter(v => v);
-                }).reduce((acc, arr) => [...acc, ...arr], []);
-
-            _condition = valsParsed
-                .map(v => {
-                    // let includes = entryVals.map(v => v.toLowerCase()).includes(v.toLowerCase());
-                    // if (_condition.match(/ excludes /gi)) {
-                    //     includes = !includes;
-                    // }
-                    // return includes;
-                    return `${JSON.stringify(entryVals.map(v => v.toLowerCase()))}.includes(${JSON.stringify(v).toLowerCase()})`;
-                })
-                .join(` ${joinWith} `);
-
-            return _condition;
-        }
+        _condition = resolveMemberships(_condition, _form);
 
         const parseValue = (condition = '', { value, calculateValue, type, inputKey, key, dataType }: ScreenEntryValue) => {
             value = ((calculateValue === null) || (calculateValue === undefined)) ? value : calculateValue;
