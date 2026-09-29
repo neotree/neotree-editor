@@ -5,6 +5,12 @@ declare global {
 }
 
 export const getSocketEvent = async (eventName: string) => {
-    const events = { ...socketEvents, };
+    const events = { ...globalThis.socketEvents, };
     return events[eventName];
+};
+
+export const removeSocketEvent = async (eventName: string) => {
+    if (eventName && globalThis.socketEvents) {
+        delete globalThis.socketEvents[eventName];
+    }
 };
