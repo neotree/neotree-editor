@@ -314,7 +314,7 @@ export function ScriptsImportModal({
 
             {open && (
                 <ImportInfo 
-                    show={loading} 
+                    loading={loading} 
                     site={selectedSite}
                     overwriteDataKeys={overwriteDataKeys}
                     overwriteDrugsLibraryItems={overwriteDrugsLibraryItems}
@@ -555,12 +555,12 @@ export function ScriptsImportModal({
 
 function ImportInfo({ 
     requestKey,
-    show: showProp, 
+    loading, 
     site, 
     overwriteDataKeys,
     overwriteDrugsLibraryItems,
 }: {
-    show: boolean;
+    loading: boolean;
     site?: ReturnType<typeof useAppContext>['sites'][0];
     overwriteDataKeys?: boolean;
     overwriteDrugsLibraryItems?: boolean;
@@ -569,7 +569,7 @@ function ImportInfo({
     const { getSocketEvent } = useAppContext();
     const [show, setShow] = useState(false);
 
-    useEffect(() => { if (showProp) setShow(true); }, [showProp]);
+    useEffect(() => { if (loading) setShow(true); }, [loading]);
 
     // Elapsed-time clock: gives users something concrete to watch while a
     // slow step (e.g. propagating an overwritten data key/drug item to every
@@ -670,10 +670,14 @@ function ImportInfo({
         });
     }, [requestKey]);
 
-    const getSocketEventInterval = useRef<null | ReturnType<typeof setInterval>>(null);
+    const getSocketEventTimeout = useRef<null | ReturnType<typeof setTimeout>>(null);
 
-    useEffect(() => {        
-        if (show && !getSocketEventInterval.current) {
+    useEffect(() => {  
+        if (!loading && getSocketEventTimeout.current) {
+            clearTimeout(getSocketEventTimeout.current);
+        }
+
+        if (loading && !getSocketEventTimeout.current) {
             const fn = async () => {
                 const res: string[] = await getSocketEvent(requestKey);
                 const evts = (res || []).map(e => e.split('__'));
@@ -684,21 +688,17 @@ function ImportInfo({
                     ...acc,
                     [e[0]]: e[1] === 'true',
                 }), {} as Record<string, boolean>));
+                getSocketEventTimeout.current = setTimeout(fn, 5 * 1000);
             };
             fn();
-            getSocketEventInterval.current = setInterval(fn, 5 * 1000);
         }
-    }, [requestKey, show, getSocketEvent]);
+    }, [requestKey, loading, getSocketEvent]);
 
     return (
         <>
             <OverlayInfoCard
                 show={show}
-                onClose={() => {
-                    if (getSocketEventInterval.current) {
-                        clearInterval(getSocketEventInterval.current);
-                    }
-                }}
+                // onClose={() => setShow(false)}
             >
                 <div className="text-xs text-muted-foreground mb-2">
                     Running for {formatElapsed(elapsedSeconds)}
@@ -707,7 +707,9 @@ function ImportInfo({
                 <div className="flex flex-col gap-y-1">
                     {actionsInProgress.map(a => {
                         const inProgress = latestEvent === a.key;
-                        const isCompleted = events[a.key] === false;
+                        let isCompleted = events[a.key] === false;
+
+                        if (loading && latestEvent && !events[latestEvent] && inProgress) isCompleted = false;
 
                         let className = 'opacity-50';
 
