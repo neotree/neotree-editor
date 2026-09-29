@@ -18,6 +18,7 @@ import { getAuthenticatedUserWithRoles, } from "@/app/actions/get-authenticated-
 import * as opsActions from "@/app/actions/ops";
 import * as sysActions from "@/app/actions/sys";
 import * as dataKeysActions from '@/app/actions/data-keys';
+import * as socketEventsActions from '@/app/actions/socket-events';
 
 import "@/app/globals.css";
 
@@ -61,7 +62,7 @@ export default async function RootLayout({
     ]);
 
     return (
-        <html lang="en">
+        <html lang="en" suppressHydrationWarning>
             <body className={roboto.className} suppressHydrationWarning>
                 <NuqsAdapter>
                     <AuthContextProvider>
@@ -77,6 +78,7 @@ export default async function RootLayout({
                                 {...editorDetails}
                                 {...authenticatedUser}
                                 {...dataKeysActions}
+                                {...socketEventsActions}
                                 sites={sites.data || []}
                                 sys={sys}
                                 getSites={getSitesWithoutConfidentialData}
