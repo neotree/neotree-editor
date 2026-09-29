@@ -52,7 +52,7 @@ export function ScriptsImportModal({
     onOpenChange: (open: boolean) => void;
     onImportSuccess?: () => void;
 }) {
-    const [requestKey] = useState(Math.random().toString(12).substring(2));
+    const [requestKey, setRequestKey] = useState(Math.random().toString(12).substring(2));
 
     const router = useRouter();
     const routeParams = useParams();
@@ -327,6 +327,7 @@ export function ScriptsImportModal({
                 onOpenChange={() => {
                     onOpenChange(false);
                     resetForm(getDefaultFormFields(overWriteScriptWithId));
+                    setRequestKey(Math.random().toString(12).substring(2));
                 }}
                 title={isOverwriteImport ? "Import and overwrite script" : "Import script"}
                 actions={(
@@ -565,6 +566,7 @@ function ImportInfo({
     overwriteDrugsLibraryItems?: boolean;
     requestKey: string;
 }) {
+    const { getSocketEvent } = useAppContext();
     const [show, setShow] = useState(false);
 
     useEffect(() => { if (showProp) setShow(true); }, [showProp]);
@@ -668,11 +670,35 @@ function ImportInfo({
         });
     }, [requestKey]);
 
+    const getSocketEventInterval = useRef<null | ReturnType<typeof setInterval>>(null);
+
+    useEffect(() => {        
+        if (show && !getSocketEventInterval.current) {
+            const fn = async () => {
+                const res: string[] = await getSocketEvent(requestKey);
+                const evts = (res || []).map(e => e.split('__'));
+                const lastEvent = evts[evts.length - 1] || [];
+                setLatestEvent(lastEvent[0] || '');
+                setEvents(prev => evts.reduce((acc, e) => ({
+                    ...prev,
+                    ...acc,
+                    [e[0]]: e[1] === 'true',
+                }), {} as Record<string, boolean>));
+            };
+            fn();
+            getSocketEventInterval.current = setInterval(fn, 5 * 1000);
+        }
+    }, [requestKey, show, getSocketEvent]);
+
     return (
         <>
             <OverlayInfoCard
                 show={show}
-                // onClose={() => setShow(false)}
+                onClose={() => {
+                    if (getSocketEventInterval.current) {
+                        clearInterval(getSocketEventInterval.current);
+                    }
+                }}
             >
                 <div className="text-xs text-muted-foreground mb-2">
                     Running for {formatElapsed(elapsedSeconds)}

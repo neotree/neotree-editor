@@ -77,6 +77,7 @@ const jobsByContentKey: Map<string, ImportJob> = globalThis.importJobsByContentK
 if (process.env.NODE_ENV !== 'production') globalThis.importJobsByContentKey = jobsByContentKey;
 
 export function buildImportContentKey(params: {
+    requestKey?: string;
     userId?: string | null;
     fromRemoteSiteId?: string | null;
     scriptsIds?: (string | null | undefined)[];
@@ -88,6 +89,7 @@ export function buildImportContentKey(params: {
         params.fromRemoteSiteId || "",
         scriptsIds.join(","),
         params.overWriteScriptWithId || "",
+        params.requestKey || '',
     ].join("::");
 }
 
