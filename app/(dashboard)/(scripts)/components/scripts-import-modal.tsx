@@ -566,7 +566,7 @@ function ImportInfo({
     overwriteDrugsLibraryItems?: boolean;
     requestKey: string;
 }) {
-    const { getSocketEvent } = useAppContext();
+    const { getSocketEvent, removeSocketEvent } = useAppContext();
     const [show, setShow] = useState(false);
 
     useEffect(() => { if (loading) setShow(true); }, [loading]);
@@ -675,6 +675,7 @@ function ImportInfo({
     useEffect(() => {  
         if (!loading && getSocketEventTimeout.current) {
             clearTimeout(getSocketEventTimeout.current);
+            removeSocketEvent(requestKey);
         }
 
         if (loading && !getSocketEventTimeout.current) {
@@ -682,7 +683,7 @@ function ImportInfo({
                 const res: string[] = await getSocketEvent(requestKey);
                 const evts = (res || []).map(e => e.split('__'));
                 const lastEvent = evts[evts.length - 1] || [];
-                setLatestEvent(lastEvent[0] || '');
+                setLatestEvent(lastEvent[0] || actionsInProgress[0]?.key || '');
                 setEvents(prev => evts.reduce((acc, e) => ({
                     ...prev,
                     ...acc,
@@ -690,9 +691,10 @@ function ImportInfo({
                 }), {} as Record<string, boolean>));
                 getSocketEventTimeout.current = setTimeout(fn, 5 * 1000);
             };
+            setLatestEvent(actionsInProgress[0]?.key || '');
             fn();
         }
-    }, [requestKey, loading, getSocketEvent]);
+    }, [requestKey, loading, actionsInProgress, getSocketEvent, removeSocketEvent]);
 
     return (
         <>
