@@ -19,10 +19,10 @@ export async function broadcastActionInProgress(
     action: string,
     loading: boolean
 ) {
-    await new Promise(resolve => setTimeout(resolve, 0));
-    socket.emit('in_progress', requestKey, action, loading);
     globalThis.socketEvents[requestKey] = globalThis.socketEvents[requestKey] || [];
     globalThis.socketEvents[requestKey].push([action, loading].join('__'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    socket.emit('in_progress', requestKey, action, loading);
 }
 
 // A dedicated event name (distinct from the boolean-valued keys above) used
