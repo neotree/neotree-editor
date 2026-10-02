@@ -55,6 +55,12 @@ export async function _searchScripts({
             or(
                 sql`lower(${schema.scripts.title}::text) like ${`%${searchTerm}%`}`,
                 sql`lower(${schema.scripts.printTitle}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.scripts.nuidSearchFields}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.scripts.eligibilityCriteria}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.scripts.reviewConfigurations}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.scripts.preferences}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.scripts.printConfig}::text) like ${`%${searchTerm}%`}`,
+                sql`lower(${schema.scripts.printSections}::text) like ${`%${searchTerm}%`}`,
             ),
         ));
 
