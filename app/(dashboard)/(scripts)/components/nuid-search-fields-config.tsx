@@ -771,7 +771,8 @@ export function Field({
                     <div>
                         <Label error={!disabled && !label} htmlFor="label">Label *</Label>
                         <Input
-                            {...register('label', { required: true, disabled, })}
+                            disabled
+                            {...register('label', { required: true, disabled: true, })}
                             error={!disabled && !label}
                         />
                         <span className="text-xs text-muted-foreground">
