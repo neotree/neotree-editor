@@ -66,7 +66,7 @@ function Form({
     const { dataKeyId, } = useParams();
     const searchParams = useSearchParams();
 
-    const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
+    const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, getLatestDataKeys } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
     const { alert } = useAlertModal();
     const { viewOnly } = useAppContext();
@@ -93,6 +93,8 @@ function Form({
     // (e.g. Y/N) can't be added, removed or reordered — only the label may change.
     const optionsLocked = isReadOnly || isNuidManaged;
 
+    const [lastUpdateDate, setLastUpdateDate] = useState<Date>();
+    const [currentDataKey, setCurrentDataKey] = useState(dataKey);
     const {
         control,
         register,
@@ -133,6 +135,34 @@ function Form({
     const [saveImpact, setSaveImpact] = useState<SaveRefsImpact>();
 
     const dataTypeInfo = dataKeyTypes.find(t => t.value === dataType);
+
+    useEffect(() => {
+        if (
+            !lastUpdateDate && 
+            dataKey && 
+            (JSON.stringify({ ...dataKey }) !== JSON.stringify({ ...currentDataKey })) &&
+            (JSON.stringify(options) !== JSON.stringify(dataKey.options))
+        ) {
+            confirm(() => {
+                setValue('name', dataKey?.name || prefill.name || '');
+                setValue('refId', dataKey?.refId || '');
+                setValue('dataType', dataKey?.dataType || prefill.dataType || '');
+                setValue('confidential', dataKey ? !!dataKey.confidential : true);
+                setValue('confidentialLabelOnly', dataKey ? !!dataKey.confidentialLabelOnly : false);
+                setValue('label', dataKey?.label || prefill.label || '');
+                setValue('options', dataKey?.options || []);
+                setValue('metadata', dataKey?.metadata || {});
+                setValue('version', dataKey?.version || 1);
+                setValue('deletedUniqueKeys', [] as string[]);
+            }, {
+                danger: true,
+                title: 'Incoming changes',
+                message: 'Data key has been updated, do you want to overwrite your current changes?',
+                negativeLabel: 'Ignore',
+                positiveLabel: 'Accept incoming changes',
+            });
+        }
+    }, [dataKey, options, lastUpdateDate, currentDataKey, setValue, confirm]);
 
     const buildPreviewPayload = useCallback(() => {
         const values = getValues();
@@ -227,8 +257,9 @@ function Form({
         if (uniqueKey) {
             setValue("uniqueKey" as any, uniqueKey);
         }
-
+        setLastUpdateDate(new Date());
         const res = await saveDataKeys([{ ...(payload as unknown as DataKeyFormData) }]);
+        await getLatestDataKeys();
         if (res && 'info' in res) {
             setSaveImpact(res.info?.refs);
         }
