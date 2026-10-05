@@ -1,4 +1,4 @@
-// File: /home/farai/Workbench/Neotree/neotree-editor/app/api/scripts/with-nuid-search-fields/route.ts
+// File: /home/wilson/development/neotree/neotree-editor/app/api/scripts/with-nuid-search-fields/route.ts
 import * as entry from '../../../../../../app/api/scripts/with-nuid-search-fields/route.js'
 import type { NextRequest } from 'next/server.js'
 
