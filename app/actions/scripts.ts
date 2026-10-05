@@ -1895,6 +1895,10 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
                 condition: screens.condition,
                 repeatable: screens.repeatable,
                 fields: screens.fields,
+                // A single/multi select screen keeps its options here rather
+                // than on a field, so without this its duplicate option values
+                // are invisible to the badge and to the publish gate.
+                items: screens.items,
             })
                 .from(screens)
                 .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
