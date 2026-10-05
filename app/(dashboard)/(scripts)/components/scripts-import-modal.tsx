@@ -52,7 +52,7 @@ export function ScriptsImportModal({
     onOpenChange: (open: boolean) => void;
     onImportSuccess?: () => void;
 }) {
-    const [requestKey] = useState(Math.random().toString(12).substring(2));
+    const [requestKey, setRequestKey] = useState(Math.random().toString(12).substring(2));
 
     const router = useRouter();
     const routeParams = useParams();
@@ -314,7 +314,7 @@ export function ScriptsImportModal({
 
             {open && (
                 <ImportInfo 
-                    show={loading} 
+                    loading={loading} 
                     site={selectedSite}
                     overwriteDataKeys={overwriteDataKeys}
                     overwriteDrugsLibraryItems={overwriteDrugsLibraryItems}
@@ -327,6 +327,7 @@ export function ScriptsImportModal({
                 onOpenChange={() => {
                     onOpenChange(false);
                     resetForm(getDefaultFormFields(overWriteScriptWithId));
+                    setRequestKey(Math.random().toString(12).substring(2));
                 }}
                 title={isOverwriteImport ? "Import and overwrite script" : "Import script"}
                 actions={(
@@ -554,20 +555,21 @@ export function ScriptsImportModal({
 
 function ImportInfo({ 
     requestKey,
-    show: showProp, 
+    loading, 
     site, 
     overwriteDataKeys,
     overwriteDrugsLibraryItems,
 }: {
-    show: boolean;
+    loading: boolean;
     site?: ReturnType<typeof useAppContext>['sites'][0];
     overwriteDataKeys?: boolean;
     overwriteDrugsLibraryItems?: boolean;
     requestKey: string;
 }) {
+    const { getSocketEvent, removeSocketEvent } = useAppContext();
     const [show, setShow] = useState(false);
 
-    useEffect(() => { if (showProp) setShow(true); }, [showProp]);
+    useEffect(() => { if (loading) setShow(true); }, [loading]);
 
     // Elapsed-time clock: gives users something concrete to watch while a
     // slow step (e.g. propagating an overwritten data key/drug item to every
@@ -668,6 +670,32 @@ function ImportInfo({
         });
     }, [requestKey]);
 
+    const getSocketEventTimeout = useRef<null | ReturnType<typeof setTimeout>>(null);
+
+    useEffect(() => {  
+        if (!loading && getSocketEventTimeout.current) {
+            clearTimeout(getSocketEventTimeout.current);
+            removeSocketEvent(requestKey);
+        }
+
+        if (loading && !getSocketEventTimeout.current) {
+            const fn = async () => {
+                const res: string[] = await getSocketEvent(requestKey);
+                const evts = (res || []).map(e => e.split('__'));
+                const lastEvent = evts[evts.length - 1] || [];
+                setLatestEvent(lastEvent[0] || actionsInProgress[0]?.key || '');
+                setEvents(prev => evts.reduce((acc, e) => ({
+                    ...prev,
+                    ...acc,
+                    [e[0]]: e[1] === 'true',
+                }), {} as Record<string, boolean>));
+                getSocketEventTimeout.current = setTimeout(fn, 5 * 1000);
+            };
+            setLatestEvent(actionsInProgress[0]?.key || '');
+            fn();
+        }
+    }, [requestKey, loading, actionsInProgress, getSocketEvent, removeSocketEvent]);
+
     return (
         <>
             <OverlayInfoCard
@@ -681,7 +709,9 @@ function ImportInfo({
                 <div className="flex flex-col gap-y-1">
                     {actionsInProgress.map(a => {
                         const inProgress = latestEvent === a.key;
-                        const isCompleted = events[a.key] === false;
+                        let isCompleted = events[a.key] === false;
+
+                        if (loading && latestEvent && !events[latestEvent] && inProgress) isCompleted = false;
 
                         let className = 'opacity-50';
 

@@ -19,6 +19,8 @@ export async function broadcastActionInProgress(
     action: string,
     loading: boolean
 ) {
+    globalThis.socketEvents[requestKey] = globalThis.socketEvents[requestKey] || [];
+    globalThis.socketEvents[requestKey].push([action, loading].join('__'));
     await new Promise(resolve => setTimeout(resolve, 0));
     socket.emit('in_progress', requestKey, action, loading);
 }

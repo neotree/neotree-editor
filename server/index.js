@@ -11,6 +11,10 @@ const port = Number(process.env.PORT);
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
+/** @type {Record<string, any>} */
+const socketEvents = {};
+globalThis.socketEvents = socketEvents;
+
 app.prepare().then(() => {
     const httpServer = createServer(handler);
 
@@ -37,6 +41,8 @@ app.prepare().then(() => {
         socket.on('files_deleted', (...args) => onEvent('files_deleted', ...args));
         socket.on('in_progress', (...args) => {
             const [requestKey, action, loading] = args;
+            socketEvents[requestKey] = socketEvents[requestKey] || [];
+            socketEvents[requestKey].push([action, loading].join('__'));
             onEvent(requestKey, action, loading);
         });
     });
