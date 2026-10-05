@@ -278,17 +278,26 @@ const COLLECTION_MEMBERSHIP_OP: Record<string, "includes" | "excludes"> = {
     // `$Sex = ['M','F']` silently means `$Sex = 'F'`. Membership is the only
     // way to ask this question.
     if (right.type === "Array" && node.left.type === "Var") {
-      const membershipOp = COLLECTION_MEMBERSHIP_OP[node.op];
+      const key = node.left.name;
       const values = right.items.map((item) => source.slice(item.start, item.end).trim()).filter(Boolean);
-      const suggestion = membershipOp && values.length
-        ? `[$${node.left.name} ${membershipOp} (${values.join(", ")})]`
+      const isEquality = node.op === "=" || node.op === "==";
+
+      // The rewrite is spelled out in "=" / "or" rather than as a membership on
+      // purpose. App builds are rolled out site by site over months, and older
+      // ones cannot evaluate membership at all — they return false for it. An
+      // "or" chain means exactly the same thing on every build, so fixing this
+      // can never cost an un-updated site a screen it used to show.
+      const suggestion = isEquality && values.length
+        ? `(${values.map((v) => `$${key} = ${v}`).join(" or ")})`
         : undefined;
 
       diagnostics.push({
         severity: "error",
         code: "ARRAY_COMPARISON",
         message: `A list cannot be compared with "${node.op}" — only its last item would be checked.`
-          + (suggestion ? ` Use "${membershipOp}", e.g. ${suggestion}.` : ` Use "includes" or "excludes".`),
+          + (suggestion
+            ? ` Write it out, e.g. ${suggestion}.`
+            : ` Write it out as "$${key} != ..." joined by "and", or use "excludes" once every site is on the current app.`),
         start: node.start,
         end: node.end,
         suggestion,
