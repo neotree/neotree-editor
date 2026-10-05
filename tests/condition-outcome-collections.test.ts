@@ -58,6 +58,27 @@ assert.equal(fix("$Diagnoses != 'RDN'"), "[$Diagnoses excludes ('RDN')]", "!= be
 assert.equal(fix("$Problems = 'Yell'"), "[$Problems includes ('Yell')]", "works for $Problems");
 assert.equal(fix("$Diagnoses > 'RDN'"), undefined, "no quick fix for ordering — there is no right answer");
 
+// ---- the array rewrite stays evaluable on every app build -------------------
+// Membership is not understood by app builds still in service at sites that
+// have not been updated, so this fix is written out in "=" / "or" instead.
+const arrayFix = (input: string) =>
+  diag(input).find((d) => d.code === "ARRAY_COMPARISON")?.suggestion;
+
+assert.equal(
+  arrayFix("$Sex = ['M','F']"),
+  "($Sex = 'M' or $Sex = 'F')",
+  "a list comparison is rewritten into primitives every build understands, not into membership",
+);
+assert.ok(
+  !`${arrayFix("$Sex = ['M','F']")}`.includes("includes"),
+  "the fix must never introduce membership on an ordinary key",
+);
+assert.equal(
+  arrayFix("$Sex != ['M','F']"),
+  undefined,
+  "no automatic fix for !=: the and-chain is wrong for multi-selects and excludes needs a current app",
+);
+
 // ---- the fix must not trip the OTHER membership rule ------------------------
 // The editor also forbids a membership sharing a line with and/or unless it is
 // bracketed. A suggestion that immediately produced a new error would be worse
