@@ -24,8 +24,25 @@ import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionEditor } from "@/components/conditional-expression"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 import type { ConditionKey } from "@/lib/conditional-expression"
+import { useFieldKeyCollisions } from "@/components/field-key-collisions"
+import { ScriptIssueBadge, collisionIssues } from "@/components/script-issues"
 
 type Item = NonNullable<ScriptField["items"]>[0]
+
+/**
+ * Duplicate values inside this one option list.
+ *
+ * Computed here rather than passed down: the list is all the detector needs,
+ * and the author should see the clash on the option that caused it, not only
+ * on the field row above it.
+ */
+function useOptionCollisions(items: Item[], label: string) {
+  return useFieldKeyCollisions({
+    fields: [{ key: label || "field", label: label || "Field", items }],
+    items: [],
+    screenTitle: " ",
+  })
+}
 
 export function FieldItems({
   items = [],
@@ -50,6 +67,8 @@ export function FieldItems({
   conditionKeysLoading?: boolean
   onChange: (items: Item[]) => void
 }) {
+  const optionCollisions = useOptionCollisions(items, `${dataKey?.name || ""}`)
+
   const { confirm } = useConfirmModal()
   const [currentItem, setCurrentItem] = useQueryState("fieldItem", {
     defaultValue: "",
@@ -140,6 +159,16 @@ export function FieldItems({
             },
             {
               name: "Label",
+              cellRenderer({ rowIndex }) {
+                const item = items[rowIndex]
+                const issues = collisionIssues(optionCollisions.forFieldOptionIndex(0, rowIndex))
+                return (
+                  <span className="inline-flex items-center gap-x-2">
+                    <span>{item?.label}</span>
+                    {!!issues.length && <ScriptIssueBadge issues={issues} />}
+                  </span>
+                )
+              },
             },
             {
               name: "Exclusive",
