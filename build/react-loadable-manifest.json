@@ -812,9 +812,9 @@
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/apex.js": {
-    "id": 5134,
+    "id": 9397,
     "files": [
-      "static/chunks/react-syntax-highlighter_languages_refractor_apex.9ca90747483e8ccb.js"
+      "static/chunks/react-syntax-highlighter_languages_refractor_apex.603091e1c356a416.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/apl.js": {
