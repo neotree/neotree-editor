@@ -1323,7 +1323,18 @@ export async function getScriptsConditionKeys(
         const draftMatch = (scriptCol: any, scriptDraftCol: any) =>
             or(inArray(scriptCol, ids), inArray(scriptDraftCol, ids));
 
-        const [pubScreens, draftScreens, pubDiag, draftDiag, pubProb, draftProb, dataKeysRes, configurationKeysRes] = await Promise.all([
+        const [
+            scripts,
+            pubScreens, 
+            draftScreens, 
+            pubDiag, 
+            draftDiag, 
+            pubProb, 
+            draftProb, 
+            dataKeysRes, 
+            configurationKeysRes
+        ] = await Promise.all([
+            getScripts({ scriptsIds: ids, }),
             db.select({
                 scriptId: screens.scriptId, screenId: screens.screenId, key: screens.key,
                 label: screens.label, title: screens.title, type: screens.type,
@@ -1385,6 +1396,7 @@ export async function getScriptsConditionKeys(
             : [];
 
         const dataKeys = await scrapDataKeys({
+            scripts: scripts.data || [],
             dataKeys: dataKeysRes.data || [],
             screens: mergedScreens as any,
             diagnoses: mergedDiagnoses as any,
