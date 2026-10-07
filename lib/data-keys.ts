@@ -1,6 +1,6 @@
 import { v4 as uuidV4 } from "uuid";
 
-import { _getScreens, _getDiagnoses, _getProblems } from "@/databases/queries/scripts";
+import { _getScreens, _getDiagnoses, _getProblems, _getScripts } from "@/databases/queries/scripts";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 import { diagnoses, drugsLibrary } from "@/databases/pg/schema";
@@ -25,7 +25,7 @@ type Scrapped = {
             children: KeyWithoutOptions[];
         })[];
     };
-    type: 'dff' | 'diagnosis' | 'screen' | 'problem';
+    type: 'dff' | 'diagnosis' | 'screen' | 'problem' | 'nuidSearchField';
     id: string;
 };
 
@@ -111,6 +111,7 @@ export function pickDataKey(keys: (KeyWithoutOptions & { options: string[]; })[]
 }
 
 type ScrapDataKeysParams = {
+    scripts?: Awaited<ReturnType<typeof _getScripts>>['data'];
     screens?: Awaited<ReturnType<typeof _getScreens>>['data'];
     diagnoses?: Awaited<ReturnType<typeof _getDiagnoses>>['data'];
     problems?: Awaited<ReturnType<typeof _getProblems>>['data'];
@@ -121,12 +122,33 @@ type ScrapDataKeysParams = {
 };
 
 export async function scrapDataKeys({
+    scripts = [],
     screens = [],
     diagnoses = [],
     problems = [],
     dataKeys: dataKeysParam,
     linkScrappedToDataKeys = true,
 }: ScrapDataKeysParams) {
+    let scriptsKeys: Scrapped[] = scripts.reduce((acc, s) => {
+        const nuidSearchFields = s.nuidSearchFields;
+
+        nuidSearchFields.forEach(f => {
+            acc.push({
+                id: f.fieldId,
+                type: 'nuidSearchField',
+                key: {
+                    name: f.key,
+                    label: f.label,
+                    children: [],
+                    dataType: 'field',
+                    uniqueKey: f.keyId,
+                },
+            })
+        });
+
+        return acc;
+    }, [] as Scrapped[]);
+
     let diagnosesKeys: Scrapped[] = diagnoses.map(s => {
         const name = s.key || s.name;
         return {
@@ -216,7 +238,7 @@ export async function scrapDataKeys({
         };
     });
 
-    const mergedKeys = mergeScrappedKeys(diagnosesKeys, problemsKeys, screensKeys);
+    const mergedKeys = mergeScrappedKeys(diagnosesKeys, problemsKeys, screensKeys, scriptsKeys);
     let scrappedKeys = removeDuplicateDataKeys(mergedKeys).filter(k => k.name) as typeof mergedKeys;
 
     const { data: dataKeys, } = dataKeysParam ? { data: dataKeysParam, } : (
