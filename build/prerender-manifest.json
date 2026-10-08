@@ -1,1 +1,11 @@
-{"version":4,"routes":{"/api/ping":{"initialHeaders":{"content-type":"application/json","x-next-cache-tags":"_N_T_/layout,_N_T_/api/layout,_N_T_/api/ping/layout,_N_T_/api/ping/route,_N_T_/api/ping"},"experimentalBypassFor":[{"type":"header","key":"Next-Action"},{"type":"header","key":"content-type","value":"multipart/form-data;.*"}],"initialRevalidateSeconds":false,"srcRoute":"/api/ping","dataRoute":null}},"dynamicRoutes":{},"notFoundRoutes":[],"preview":{"previewModeId":"a05db7c73fe724cfffe467939bfea649","previewModeSigningKey":"b000ab7f9004287f732941f3137ffc198cd9884b53f6fc8d78cf49b54a44681c","previewModeEncryptionKey":"391cb757827af4228b542528f0a2c2704e4e8d96dce4aa3ce50cd79ce3483300"}}
+{
+  "version": 4,
+  "routes": {},
+  "dynamicRoutes": {},
+  "notFoundRoutes": [],
+  "preview": {
+    "previewModeId": "815e5c8aae18106e87810b7b5951a124",
+    "previewModeSigningKey": "f5bb108ba2bf0ab63060b4a5ce06384c41087f05854fcc916199f439cc898cd9",
+    "previewModeEncryptionKey": "952ceb46636b1c1231c60c2600fdd6b46107e1b4c4e752994f3a9823d2905014"
+  }
+}
