@@ -4,7 +4,8 @@ import logger from "@/lib/logger"
 import { isAuthenticated } from "@/app/actions/is-authenticated"
 import { getEntityHistory } from "@/app/actions/change-logs"
 
-export async function GET(req: NextRequest, { params }: { params: { entityId: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ entityId: string }> }) {
+  const params = await props.params;
   try {
     const isAuthorised = await isAuthenticated()
 

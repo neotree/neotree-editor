@@ -3,14 +3,20 @@ import { ScriptMetaActions } from './components/actions';
 import { JsonViewer } from "./components/json-viewer";
 
 type Props = {
-    params: {
+    params: Promise<{
         scriptId: string;
-    },
+    }>,
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function OpsScripyPage({ params: { scriptId }, }: Props) {
+export default async function OpsScripyPage(props: Props) {
+    const params = await props.params;
+
+    const {
+        scriptId
+    } = params;
+
     const [scriptsMeta] = await Promise.all([
         getScriptsMetadata({ scriptsIds: [scriptId], returnDraftsIfExist: true, }),
     ]);

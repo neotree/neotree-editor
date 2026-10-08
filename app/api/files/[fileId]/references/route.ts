@@ -5,13 +5,19 @@ import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 
 interface IParams {
-    params: {
+    params: Promise<{
         fileId: string;
-    };
+    }>;
 }
 
-export async function GET(_: Request, { params: { fileId } }: IParams) {
-	try {
+export async function GET(_: Request, props: IParams) {
+    const params = await props.params;
+
+    const {
+        fileId
+    } = params;
+
+    try {
         const isAuthorised = await isAuthenticated();
         
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });

@@ -5,10 +5,20 @@ import { ScriptFormCtxProvider } from "@/contexts/script-form";
 
 type ScriptPageLayoutProps = {
     children: React.ReactNode;
-    params: { scriptId: string; };
+    params: Promise<{ scriptId: string; }>;
 };
 
-export default async function ScriptPageLayout({ children, params: { scriptId, } }: ScriptPageLayoutProps) {
+export default async function ScriptPageLayout(props: ScriptPageLayoutProps) {
+    const params = await props.params;
+
+    const {
+        scriptId
+    } = params;
+
+    const {
+        children
+    } = props;
+
     const [{ data: formData }] = await Promise.all([
         getScript({ scriptId, returnDraftIfExists: true, }),
     ]);

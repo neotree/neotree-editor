@@ -18,7 +18,8 @@ type SearchParams = {
   page?: string
 }
 
-export default async function ChangelogsPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function ChangelogsPage(props: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await props.searchParams;
   const summaries = await getDataVersionSummaries({
     limit: 25,
     offset: 0,

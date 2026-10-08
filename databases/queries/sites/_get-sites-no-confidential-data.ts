@@ -39,7 +39,7 @@ export async function _getSitesWithoutConfidentialData(params?: GetSitesWithoutC
             },
         });
 
-        const localSites = getLocalSites();
+        const localSites = await getLocalSites();
         const devSites = [];
         if (process.env.NODE_ENV !== 'production') {
             if (types.includes('webeditor')) {
