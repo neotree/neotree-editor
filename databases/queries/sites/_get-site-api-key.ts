@@ -24,7 +24,7 @@ export async function _getSiteApiKey(siteId: string): Promise<{
         let site = res || null;
 
         if (!res) {
-            const localSites = getLocalSites();
+            const localSites = await getLocalSites();
             Object.values(localSites).forEach(s=> {
                 if (s.siteId === siteId) {
                     site = {

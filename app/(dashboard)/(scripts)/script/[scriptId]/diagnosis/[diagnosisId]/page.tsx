@@ -6,13 +6,20 @@ import { DiagnosisForm } from "../../../../components/diagnoses/form";
 import { PageContainer } from "../../../../components/page-container";
 
 type Props = {
-    params: { diagnosisId: string; scriptId: string; };
-    searchParams: { [key: string]: string; };
+    params: Promise<{ diagnosisId: string; scriptId: string; }>;
+    searchParams: Promise<{ [key: string]: string; }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function Diagnoses({ params: { diagnosisId, scriptId } }: Props) {
+export default async function Diagnoses(props: Props) {
+    const params = await props.params;
+
+    const {
+        diagnosisId,
+        scriptId
+    } = params;
+
     const [diagnosis, script, screens] = await Promise.all([
         getDiagnosis({ diagnosisId, returnDraftIfExists: true, }),
         getScript({ scriptId, returnDraftIfExists: true, }),

@@ -13,11 +13,13 @@ import { DeviceManagementProfileForm } from "../../components/device-management-
 export const dynamic = "force-dynamic";
 
 type Props = {
-  params: { profileId: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
+  params: Promise<{ profileId: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default async function EditMdmProfilePage({ params, searchParams }: Props) {
+export default async function EditMdmProfilePage(props: Props) {
+  const params = await props.params;
+  const searchParams = await props.searchParams;
   const { user, yes: hasAccess } = await canAccessPage();
 
   if (!user) redirect("/login");

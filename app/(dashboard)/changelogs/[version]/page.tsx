@@ -64,7 +64,8 @@ async function getAllChangeLogsForDataVersion(dataVersion: number) {
   return aggregated
 }
 
-export default async function DataVersionPage({ params }: { params: Params }) {
+export default async function DataVersionPage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   const numericVersion = parseDataVersionParam(params.version)
   if (numericVersion === null) {
     notFound()

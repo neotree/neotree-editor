@@ -13,11 +13,13 @@ import { DeviceMdmLinkForm } from "../../components/device-mdm-link-form";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  params: { linkId: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
+  params: Promise<{ linkId: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default async function EditDeviceMdmLinkPage({ params, searchParams }: Props) {
+export default async function EditDeviceMdmLinkPage(props: Props) {
+  const params = await props.params;
+  const searchParams = await props.searchParams;
   const { user, yes: hasAccess } = await canAccessPage();
 
   if (!user) redirect("/login");

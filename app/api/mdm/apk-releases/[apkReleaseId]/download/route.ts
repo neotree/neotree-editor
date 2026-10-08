@@ -7,9 +7,9 @@ import { verifyApkDownloadToken } from "@/lib/app-updates/download-token"
 import { apkFileResponse } from "@/lib/app-updates/apk-file-response"
 
 type Params = {
-  params: {
+  params: Promise<{
     apkReleaseId: string
-  }
+  }>
 }
 
 function isAuthorized(req: NextRequest, apkReleaseId: string) {
@@ -26,8 +26,9 @@ function isAuthorized(req: NextRequest, apkReleaseId: string) {
   return verifyApkDownloadToken(apkReleaseId, queryToken)
 }
 
-export async function GET(req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, props: Params) {
   try {
+    const params = await props.params
     if (!isAuthorized(req, params.apkReleaseId)) {
       return NextResponse.json({ errors: ["Unauthorized"] }, { status: 401 })
     }

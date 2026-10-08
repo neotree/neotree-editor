@@ -7,13 +7,14 @@ import { authenticateMobileDevice } from "@/lib/mobile-device-auth"
 import { apkFileResponse } from "@/lib/app-updates/apk-file-response"
 
 type Params = {
-  params: {
+  params: Promise<{
     apkReleaseId: string
-  }
+  }>
 }
 
-export async function GET(req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, props: Params) {
   try {
+    const params = await props.params
     const deviceId = req.nextUrl.searchParams.get("deviceId") || req.headers.get("x-device-id") || ""
     const auth = await authenticateMobileDevice(req, deviceId)
     if (!auth.ok) return NextResponse.json({ errors: auth.errors }, { status: auth.status })

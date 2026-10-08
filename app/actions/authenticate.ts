@@ -5,7 +5,7 @@ import { _getApiKeys } from '@/databases/queries/api-keys';
 import { _getAuthClients } from '@/databases/queries/auth-clients';
 
 export async function validateHeadersItem(key: string, cb: (value: string) => Promise<boolean>) {
-    const headersList = headers();
+    const headersList = await headers();
     const value = headersList.get(key);
     
     if (!value) return false;

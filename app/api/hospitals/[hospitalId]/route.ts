@@ -5,12 +5,18 @@ import { getHospital } from "@/app/actions/hospitals";
 import logger from "@/lib/logger";
 
 interface IParams {
-    params: {
+    params: Promise<{
         hospitalId: string;
-    };
+    }>;
 }
 
-export async function GET(req: NextRequest, { params: { hospitalId } }: IParams) {
+export async function GET(req: NextRequest, props: IParams) {
+    const params = await props.params;
+
+    const {
+        hospitalId
+    } = params;
+
     try {
         const isAuthorised = await isAuthenticated();
 

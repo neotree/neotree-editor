@@ -11,10 +11,11 @@ import { ApkReleaseForm } from "../components/apk-release-form";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  searchParams?: { [key: string]: string | string[] | undefined };
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default async function AppUpdateApkPage({ searchParams }: Props) {
+export default async function AppUpdateApkPage(props: Props) {
+  const searchParams = await props.searchParams;
   const { user, yes: hasAccess } = await canAccessPage();
 
   if (!user) redirect("/login");
