@@ -12,6 +12,9 @@ export default (phase) => {
         //     ignoreDuringBuilds: true,
         // },
         distDir: phase === PHASE_DEVELOPMENT_SERVER ? undefined : 'build',
+        // Next 15 streams metadata after the page renders, so the layout <title> overwrites the one each page
+        // sets via components/title.tsx. Serving blocking metadata to every client restores the Next 14 order.
+        htmlLimitedBots: /.*/,
         images: {
             domains: [
                 'localhost',

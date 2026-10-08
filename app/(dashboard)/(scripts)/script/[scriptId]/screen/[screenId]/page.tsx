@@ -6,13 +6,20 @@ import { ScreenForm } from "../../../../components/screens/form";
 import { PageContainer } from "../../../../components/page-container";
 
 type Props = {
-    params: { screenId: string; scriptId: string; };
-    searchParams: { [key: string]: string; };
+    params: Promise<{ screenId: string; scriptId: string; }>;
+    searchParams: Promise<{ [key: string]: string; }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function Screens({ params: { screenId, scriptId } }: Props) {
+export default async function Screens(props: Props) {
+    const params = await props.params;
+
+    const {
+        screenId,
+        scriptId
+    } = params;
+
     const [screen, script, screens] = await Promise.all([
         getScreen({ screenId, returnDraftIfExists: true, }),
         getScript({ scriptId, returnDraftIfExists: true, }),
