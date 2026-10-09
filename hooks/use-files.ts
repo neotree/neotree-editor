@@ -19,6 +19,10 @@ type OpenModalOptions = Partial<SelectOptions> & {
 };
 
 export type FilesStore = SelectOptions & {
+    deleteState?: { 
+        fileId: string;
+        replaceWithFileId?: string;
+    };
     isModalOpen: boolean;
     loading: boolean;
     files: Awaited<ReturnType<typeof _getFiles>>['data'];
@@ -29,6 +33,7 @@ export type FilesStore = SelectOptions & {
     limit: number;
     totalPages: number;
     totalRows: number;
+    setDeleteState: (fileId?:  string, replaceWithFileId?:  string) => void;
     getFiles: (options?: GetFilesOptions) => Promise<void>;
     openModal: (options?: OpenModalOptions) => void;
     closeModal: () => void;
@@ -89,6 +94,9 @@ export const useFiles = create<FilesStore>((set, getStore) => {
         totalRows: 0,
         onSelectFiles: null,
         selectMultiple: false,
+        setDeleteState(fileId, replaceWithFileId?: string) {
+            set({ deleteState: fileId === undefined ? undefined : { fileId, replaceWithFileId, }, });
+        },
         getFiles,
         openModal(options) {
             set({ 

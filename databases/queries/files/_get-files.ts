@@ -1,7 +1,7 @@
 import { and, count, desc, gte, lte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
-import { files } from "@/databases/pg/schema";
+import { files, filesAliases } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { isEmpty } from "@/lib/isEmpty";
 import { getAppUrl } from "@/lib/urls";
@@ -10,14 +10,25 @@ import { FileDetails, GetFilesParams, GetFilesResults } from "./types";
 export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResults> {
     try {
         const {
-            filesIds,
+            filesIds: _filesIds = [],
             archived,
             searchValue,
             limit,
             page: pageParam = 1,
             uploadDateGTE,
             uploadDateLTE,
+            withData,
+            withAliases,
         } = { ...params };
+
+        const aliases = !_filesIds.length ? [] : await db.query.filesAliases.findMany({
+            where: inArray(filesAliases.alias, _filesIds),
+        });
+
+        const filesIds = [
+            ..._filesIds, 
+            ...aliases.filter(a => a.fileId).map(a => a.fileId!),
+        ];
 
         let page = Math.max(0, pageParam);
         const search = !searchValue ? '' : ['%', searchValue, '%'].join('');
@@ -57,6 +68,10 @@ export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResult
                 size: true,
                 metadata: true,
                 createdAt: true,
+                data: withData === true ? true : undefined,
+            },
+            with: {
+                aliases: withAliases === true ? true : undefined,
             },
         });
 

@@ -27,6 +27,7 @@ import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
+import type { ScriptField } from "@/types";
 
 function assertCanManageIntegrityPolicy(user?: { role?: string | null } | null) {
   if (user?.role !== "super_user") {
@@ -35,7 +36,7 @@ function assertCanManageIntegrityPolicy(user?: { role?: string | null } | null) 
 }
 
 async function buildCurrentIntegrityBaseline(policy: IntegrityPolicy, userId?: string | null) {
-  const [publishedDataKeysRows, publishedScreensRows, publishedDiagnosesRows, publishedProblemsRows] = await Promise.all([
+  const [publishedDataKeysRows, publishedScreensRows, publishedDiagnosesRows, publishedProblemsRows, publishedScriptsRows] = await Promise.all([
     db
       .select({
         dataKey: dataKeys,
@@ -84,6 +85,16 @@ async function buildCurrentIntegrityBaseline(policy: IntegrityPolicy, userId?: s
         isNull(problems.deletedAt),
         isNull(pendingDeletion.id),
       )),
+    db
+      .select({
+        script: scripts,
+      })
+      .from(scripts)
+      .leftJoin(pendingDeletion, eq(pendingDeletion.scriptId, scripts.scriptId))
+      .where(and(
+        isNull(scripts.deletedAt),
+        isNull(pendingDeletion.id),
+      )),
   ]);
 
   const publishedDataKeys = publishedDataKeysRows.map((row) => ({
@@ -114,6 +125,12 @@ async function buildCurrentIntegrityBaseline(policy: IntegrityPolicy, userId?: s
     isDeleted: false,
   })) as ProblemType[];
 
+  const publishedScripts = publishedScriptsRows.map((row) => ({
+    scriptId: row.script.scriptId,
+    title: row.script.title,
+    nuidSearchFields: (row.script.nuidSearchFields || []) as ScriptField[],
+  }));
+
   const baseline: IntegrityBaseline = buildIntegrityBaselineFromSnapshotData({
     policy,
     userId,
@@ -121,6 +138,7 @@ async function buildCurrentIntegrityBaseline(policy: IntegrityPolicy, userId?: s
     screens: publishedScreens,
     diagnoses: publishedDiagnoses,
     problems: publishedProblems,
+    scripts: publishedScripts,
   });
 
   return {

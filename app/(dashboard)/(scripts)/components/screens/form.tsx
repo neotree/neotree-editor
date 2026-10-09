@@ -58,6 +58,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
+import { collectNewOutcomeKeyCollisions, getOutcomeCollectionForScreenType, getUnavailableOutcomeKeys, type ConditionKey } from "@/lib/conditional-expression";
 
 type Props = {
     scriptId: string;
@@ -99,10 +101,14 @@ export function ScreenForm(props: Props) {
         save,
     } = form;
     const [alias, setAlias] = useState('');
+    const { conditionKeys, keysLoading, keysReady } = useConditionKeys();
+    const [conditionHasErrors, setConditionHasErrors] = useState(false);
+    const [skipToConditionHasErrors, setSkipToConditionHasErrors] = useState(false);
     const type = watch('type');
     const skippable = watch('skippable');
     const printable = watch('printable');
     const confidential = watch('confidential');
+    const confidentialLabelOnly = watch('confidentialLabelOnly');
     const keyId = watch('keyId');
     const prePopulate = watch('prePopulate');
     const image1 = watch('image1');
@@ -116,11 +122,76 @@ export function ScreenForm(props: Props) {
     const key = watch('key');
     const listStyle = form.watch('listStyle');
     const printDisplayColumns = form.watch('printDisplayColumns');
+    const screenFields = watch('fields');
+    const screenItems = watch('items');
+    const screenLabel = watch('label');
+    const screenTitle = watch('title');
+    const parsedPosition = formData?.position === null || formData?.position === undefined
+        ? Number.NaN
+        : Number(formData.position);
+    const currentPosition = Number.isFinite(parsedPosition)
+        ? parsedPosition
+        : Math.max(0, ...screens.map(screen => Number(screen?.position) || 0)) + 1;
+    const screensForValidation = useMemo(() => {
+        const current = {
+            screenId: formData?.screenId,
+            title: screenTitle,
+            type,
+            key,
+            position: currentPosition,
+            fields: screenFields,
+            items: screenItems,
+        };
+        const currentId = `${formData?.screenId || ''}`;
+        return [
+            ...screens.filter(screen => !currentId || `${screen?.screenId || ''}` !== currentId),
+            current,
+        ];
+    }, [currentPosition, formData?.screenId, key, screenFields, screenItems, screenTitle, screens, type]);
+    const unavailableOutcomeKeys = useMemo(
+        () => getUnavailableOutcomeKeys({ screens: screensForValidation, consumerPosition: currentPosition }),
+        [currentPosition, screensForValidation],
+    );
+    const reservedKeyCollisions = useMemo(
+        () => collectNewOutcomeKeyCollisions({
+            screens: [{
+                screenId: formData?.screenId,
+                title: screenTitle,
+                type,
+                key,
+                fields: screenFields,
+                items: screenItems,
+            }],
+        }, {
+            screens: formData ? [formData as any] : [],
+        }),
+        [formData, key, screenFields, screenItems, screenTitle, type],
+    );
+    // Keys defined on this (possibly unsaved) screen, so conditions can
+    // reference sibling fields before the first save. Use the screen `type`
+    // (e.g. multi_select) rather than its stored dataType (e.g. set<id>) so
+    // membership checks recognise it.
+    const localConditionKeys = useMemo<ConditionKey[]>(() => {
+        const fromFields: ConditionKey[] = (screenFields || []).map(f => ({
+            name: `${f?.key || ''}`.trim(),
+            label: `${f?.key || ''}${f?.label ? ` - ${f.label}` : ''}`,
+            dataType: f?.type,
+        }));
+        if (key) {
+            fromFields.push({
+                name: `${key}`.trim(),
+                label: `${key}${screenLabel ? ` - ${screenLabel}` : ''}`,
+                dataType: type,
+            });
+        }
+        return fromFields.filter(k => !!k.name);
+    }, [screenFields, key, screenLabel, type]);
     const selectedDataKey = useMemo(() => {
         const [dataKey] = !keyId ? [null] : extractDataKeys([keyId]);
         return dataKey;
     }, [extractDataKeys, keyId]);
     const inheritedConfidential = !!selectedDataKey?.confidential;
+    const inheritedConfidentialLabelOnly = !!selectedDataKey?.confidentialLabelOnly;
 
     const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
 
@@ -146,6 +217,12 @@ export function ScreenForm(props: Props) {
             setValue('confidential', inheritedConfidential, { shouldDirty: true, });
         }
     }, [confidential, inheritedConfidential, setValue]);
+
+    useEffect(() => {
+        if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+            setValue('confidentialLabelOnly', inheritedConfidentialLabelOnly, { shouldDirty: true, });
+        }
+    }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
 
     const lockStatus = !(isLocked || isScriptLocked) ? null : (
         <div>
@@ -230,7 +307,7 @@ export function ScreenForm(props: Props) {
                         >Cancel</Button>
 
                         <Button
-                            disabled={!type && !formIsDirty || disabled}
+                            disabled={(!type && !formIsDirty) || disabled || conditionHasErrors || skipToConditionHasErrors}
                             onClick={() => {
                                 setValue('dataType', getScreenDataType(type));
                                 if (type === 'management') {
@@ -249,6 +326,7 @@ export function ScreenForm(props: Props) {
 
     const isDiagnosisScreen = type === 'diagnosis';
     const isProblemsScreen = type === 'problems';
+    const outcomeCollection = getOutcomeCollectionForScreenType(type);
     const isProgressScreen = type === 'progress';
     const isFormScreen = type === 'form';
     const isChecklistScreen = type === 'checklist';
@@ -288,6 +366,7 @@ export function ScreenForm(props: Props) {
                     setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
                     setValue('label', label, { shouldDirty: true, });
                     setValue('confidential', !!dataKey?.confidential, { shouldDirty: true, });
+                    setValue('confidentialLabelOnly', !!dataKey?.confidentialLabelOnly, { shouldDirty: true, });
                     if (hasItems) setValue('items', [], { shouldDirty: true, });
                     if (hasFields) setValue('fields', [], { shouldDirty: true, });
 
@@ -424,11 +503,25 @@ export function ScreenForm(props: Props) {
 
                 <div>
                     <Label secondary htmlFor="condition">Conditional expression <ConditionalExpressionModal /></Label>
-                    <Textarea
-                        {...register('condition', { disabled, })}
+                    <Controller
+                        control={control}
                         name="condition"
-                        noRing={false}
-                        rows={5}
+                        render={({ field: { value, onChange } }) => (
+                            <ConditionEditor
+                                id="condition"
+                                rows={5}
+                                value={value || ''}
+                                onChange={onChange}
+                                keys={conditionKeys}
+                                extraKeys={localConditionKeys}
+                                keysLoading={keysLoading}
+                                keysReady={keysReady}
+                                unavailableKeys={unavailableOutcomeKeys}
+                                disabled={disabled}
+                                initialValue={formData?.condition || ''}
+                                onValidityChange={setConditionHasErrors}
+                            />
+                        )}
                     />
                     <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                 </div>
@@ -436,10 +529,25 @@ export function ScreenForm(props: Props) {
                 <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:items-baseline">
                     <div className="flex-1">
                         <Label secondary htmlFor="skipToCondition">Skip to screen conditional expression</Label>
-                        <Input
-                            {...register('skipToCondition', { disabled, })}
+                        <Controller
+                            control={control}
                             name="skipToCondition"
-                            noRing={false}
+                            render={({ field: { value, onChange } }) => (
+                                <ConditionEditor
+                                    id="skipToCondition"
+                                    rows={3}
+                                    value={value || ''}
+                                    onChange={onChange}
+                                    keys={conditionKeys}
+                                    extraKeys={localConditionKeys}
+                                    keysLoading={keysLoading}
+                                    keysReady={keysReady}
+                                    unavailableKeys={unavailableOutcomeKeys}
+                                    disabled={disabled}
+                                    initialValue={formData?.skipToCondition || ''}
+                                    onValidityChange={setSkipToConditionHasErrors}
+                                />
+                            )}
                         />
                         <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
                     </div>
@@ -479,6 +587,14 @@ export function ScreenForm(props: Props) {
                 </div>
 
                 <Title>Properties</Title>
+
+                {!!reservedKeyCollisions.length && (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        {reservedKeyCollisions.map((collision, index) => (
+                            <p key={`${collision.location}-${index}`}>{collision.message}</p>
+                        ))}
+                    </div>
+                )}
 
                 <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
                     <div>
@@ -537,6 +653,19 @@ export function ScreenForm(props: Props) {
 
                 {(isDiagnosisScreen || isProblemsScreen) && (
                     <>
+                        <div>
+                            <Label secondary htmlFor="outcomeCollection">Conditional-expression collection</Label>
+                            <Input
+                                id="outcomeCollection"
+                                value={`$${outcomeCollection}`}
+                                readOnly
+                                noRing={false}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                This virtual collection is assigned automatically. Its suggested values come from the script&apos;s Problems &amp; Diagnoses section.
+                            </span>
+                        </div>
+
                         <div>
                             <Label secondary htmlFor="title2">Title 2 *</Label>
                             <Input
@@ -866,6 +995,46 @@ export function ScreenForm(props: Props) {
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
+
+                        <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="flex-1 flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                                        onClick={() =>
+                                            alert({
+                                                title: "Confidentiality is managed in Data Keys",
+                                                message: "Change this in the Data Key. Screens inherit confidential status automatically.",
+                                                variant: "info",
+                                            })
+                                        }
+                                    >
+                                        <Switch
+                                            id="confidentialLabelOnly"
+                                            checked={!!confidentialLabelOnly}
+                                            disabled
+                                        />
+                                        <Label secondary htmlFor="confidentialLabelOnly">Confidential (label only)</Label>
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <div className="flex flex-col gap-y-1">
+                                        <span>Change confidentiality in the Data Key library.</span>
+                                        {!!keyId && (
+                                            <Link
+                                                href={`/data-keys/edit/${keyId}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="underline"
+                                            >
+                                                Open Data Key
+                                            </Link>
+                                        )}
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </>
                 )}
 
@@ -1158,7 +1327,7 @@ export function ScreenForm(props: Props) {
                 >Cancel</Button>
 
                 <Button
-                    disabled={disabled}
+                    disabled={disabled || conditionHasErrors || skipToConditionHasErrors || !!reservedKeyCollisions.length}
                     onClick={() => save()}
                 >
                     Save Draft
@@ -1192,6 +1361,8 @@ export function ScreenForm(props: Props) {
                         form={form}
                         disabled={disabled}
                         scriptId={scriptId}
+                        unavailableOutcomeKeys={unavailableOutcomeKeys}
+                        persistedFields={(formData?.fields || []) as ScriptField[]}
                     />
                     
                     {repeatable && (

@@ -67,6 +67,7 @@ export const defaultField = {
     calculation: null,
     condition: '',
     confidential: false,
+    confidentialLabelOnly: false,
     dataType: null,
     defaultValue: null,
     format: null,

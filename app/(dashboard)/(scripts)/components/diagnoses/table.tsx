@@ -12,6 +12,10 @@ import { DiagnosesTableRowActions } from "./table-row-actions";
 import { useDiagnosesTable, UseDiagnosesTableParams } from '../../hooks/use-diagnoses-table';
 import { CopyDiagnosesModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
+import { ConditionErrorBadge, useConditionKeys } from "@/components/conditional-expression";
+import { useScriptsContext } from "@/contexts/scripts";
+import { getOutcomeProducer, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { useScriptFormCtx } from "@/contexts/script-form";
 
 type Props = UseDiagnosesTableParams;
 
@@ -34,6 +38,13 @@ export function DiagnosesTable(props: Props) {
     } = useDiagnosesTable(props);
 
     const { sys, viewOnly } = useAppContext();
+    const { conditionKeys, keysReady } = useConditionKeys();
+    const { conditionScreens, conditionCatalogueReady } = useScriptFormCtx();
+    const producer = getOutcomeProducer(conditionScreens, "Diagnoses");
+    const unavailableOutcomeKeys = getUnavailableOutcomeKeys({
+        screens: conditionScreens,
+        consumerPosition: Number(producer?.position),
+    });
 
     return (
         <>
@@ -91,6 +102,28 @@ export function DiagnosesTable(props: Props) {
                         },
                         {
                             name: 'Name',
+                            cellRenderer(cell) {
+                                const s = diagnosesArr[cell.rowIndex];
+                                return (
+                                    <span className="inline-flex items-center gap-x-2">
+                                        <span>{s?.name}</span>
+                                        {!!s && (
+                                            <ConditionErrorBadge
+                                                keys={conditionKeys}
+                                                keysReady={keysReady}
+                                                unavailableKeys={conditionCatalogueReady ? unavailableOutcomeKeys : undefined}
+                                                expressions={[
+                                                    { value: s.expression, label: 'Expression' },
+                                                    ...(s.symptoms || []).map((symptom) => ({
+                                                        value: symptom.expression,
+                                                        label: `Symptom "${symptom.name || symptom.key || ''}" expression`,
+                                                    })),
+                                                ]}
+                                            />
+                                        )}
+                                    </span>
+                                );
+                            },
                         },
                         {
                             name: 'Description',

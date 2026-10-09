@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { v4 } from "uuid";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 
 import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
@@ -17,6 +17,8 @@ import { SelectDataKey } from "@/components/select-data-key";
 import { Title } from "../title";
 import { useDiagnosisForm } from "../..//hooks/use-diagnosis-form";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
+import { collectNewOutcomeKeyCollisions } from "@/lib/conditional-expression";
 
 type Props = {
     children?: React.ReactNode | ((params: { extraProps: any }) => React.ReactNode);
@@ -28,6 +30,7 @@ type Props = {
     form: ReturnType<typeof useDiagnosisForm>;
     open?: boolean;
     onClose?: () => void;
+    unavailableOutcomeKeys?: Record<string, string>;
 };
 
 export function Symptom<P = {}>({
@@ -37,12 +40,15 @@ export function Symptom<P = {}>({
     disabled: disabledProp,
     open: controlledOpen,
     onClose: controlledOnClose,
+    unavailableOutcomeKeys,
     ...extraProps
 }: Props & P) {
     const { data: symptom, index: symptomIndex, } = { ...symptomProp, };
 
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
     const open = controlledOpen ?? uncontrolledOpen;
+    const [expressionHasErrors, setExpressionHasErrors] = useState(false);
+    const { conditionKeys, keysLoading, keysReady } = useConditionKeys({ enabled: open });
     const setOpen = controlledOnClose
         ? (nextOpen: boolean) => {
             if (!nextOpen) controlledOnClose();
@@ -76,10 +82,19 @@ export function Symptom<P = {}>({
     });
 
     const type = watch('type');
+    const key = watch('key');
     const name = watch('name');
     const printable = watch('printable');
+    const parentName = useWatch({ control: form.control, name: 'name' });
 
     const disabled = useMemo(() => !!disabledProp, [disabledProp]);
+    const reservedKeyCollisions = useMemo(
+        () => collectNewOutcomeKeyCollisions(
+            { diagnoses: [{ name: parentName, symptoms: [{ symptomId: symptom?.symptomId, key, name }] as any }] },
+            { diagnoses: [{ name: parentName, symptoms: symptom ? [symptom] : [] }] },
+        ),
+        [key, name, parentName, symptom],
+    );
 
     const onSave = handleSubmit(data => {
         if (!isEmpty(symptomIndex) && symptom) {
@@ -120,7 +135,7 @@ export function Symptom<P = {}>({
                         </DialogClose>
 
                         <Button
-                            disabled={disabled}
+                            disabled={disabled || expressionHasErrors || !!reservedKeyCollisions.length}
                             onClick={() => onSave()}
                         >
                             Save
@@ -166,6 +181,9 @@ export function Symptom<P = {}>({
                                                 setValue('keyId', item?.uniqueKey, { shouldDirty: true, });
                                             }}
                                         />
+                                        {!!reservedKeyCollisions.length && (
+                                            <p className="mt-1 text-xs text-destructive">{reservedKeyCollisions[0].message}</p>
+                                        )}
                                     </>
                                 );
                             }}
@@ -193,9 +211,23 @@ export function Symptom<P = {}>({
 
                     <div>
                         <Label htmlFor="expression">Sign/Risk expression <ConditionalExpressionModal /></Label>
-                        <Input
-                            {...register('expression', { disabled, })}
+                        <Controller
+                            control={control}
                             name="expression"
+                            render={({ field: { value, onChange } }) => (
+                                <ConditionEditor
+                                    value={`${value || ''}`}
+                                    onChange={onChange}
+                                    keys={conditionKeys}
+                                    keysLoading={keysLoading}
+                                    keysReady={keysReady}
+                                    unavailableKeys={unavailableOutcomeKeys}
+                                    disabled={disabled}
+                                    rows={3}
+                                    initialValue={`${symptom?.expression || ''}`}
+                                    onValidityChange={setExpressionHasErrors}
+                                />
+                            )}
                         />
                         <span className="text-xs text-muted-foreground">Example: <b>{CONDITIONAL_EXP_EXAMPLE}</b></span>
                     </div>

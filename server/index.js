@@ -11,10 +11,18 @@ const port = Number(process.env.PORT);
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
+/** @type {Record<string, any>} */
+const socketEvents = {};
+globalThis.socketEvents = socketEvents;
+
 app.prepare().then(() => {
     const httpServer = createServer(handler);
 
-    const io = new Server(httpServer);
+    const io = new Server(httpServer, {
+        cors: '*',
+        maxHttpBufferSize: 1e7,
+        pingTimeout: 60000,
+    });
 
     io.on("connection", (socket) => {
         console.log('Client connected');
@@ -30,6 +38,13 @@ app.prepare().then(() => {
         socket.on('mode_changed', (...args) => onEvent('mode_changed', ...args));
         socket.on('update_system', (...args) => onEvent('update_system', ...args));
         socket.on('file_uploaded', (...args) => onEvent('file_uploaded', ...args));
+        socket.on('files_deleted', (...args) => onEvent('files_deleted', ...args));
+        socket.on('in_progress', (...args) => {
+            const [requestKey, action, loading] = args;
+            socketEvents[requestKey] = socketEvents[requestKey] || [];
+            socketEvents[requestKey].push([action, loading].join('__'));
+            onEvent(requestKey, action, loading);
+        });
     });
 
     httpServer

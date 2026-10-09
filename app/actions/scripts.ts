@@ -1,8 +1,11 @@
 'use server';
 
 import { v4 } from "uuid";
-import queryString from "query-string";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
+import db from "@/databases/pg/drizzle";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
+import { screens, diagnoses, problems, screensDrafts, diagnosesDrafts, problemsDrafts, pendingDeletion, scripts as scriptsTable, scriptsDrafts } from "@/databases/pg/schema";
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
 import { _saveDrugsLibraryItemsUpdateIfExists, _saveDrugsLibraryItemsIfKeysNotExist } from "@/databases/mutations/drugs-library";
@@ -12,15 +15,44 @@ import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
-import { isValidUrl } from "@/lib/urls";
-import { processImage } from "@/lib/process-image";
-import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
-import { dataKeyToJSON, parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
+import { _getDataKeys } from "@/databases/queries/data-keys";
+import { _getConfigKeys } from "@/databases/queries/config-keys";
+import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
+import { parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
 import { getIntegrityPolicyState } from "@/lib/integrity-policy";
 import { createIntegrityImportSnapshot } from "./integrity-imports";
+import {
+    buildScriptOutcomeReferencePatches,
+    collectNewOutcomeKeyCollisions,
+    collectScriptConditionFindings,
+    collectScriptOutcomeReferences,
+    buildConditionReportSignature,
+    isSupersededConditionReportSignature,
+    getConfigurationConditionKeySignature,
+    getScriptConditionInputsStamp,
+    getOutcomeCollectionForScreenType,
+    isOutcomeCollectionName,
+    type OutcomeCollectionName,
+    type OutcomeReferenceFinding,
+    type ScriptConditionEntityRef,
+} from "@/lib/conditional-expression";
+import { buildScriptConditionKeys } from "@/lib/conditional-expression/script-keys";
+import {
+    findScriptFieldKeyCollisions,
+    type FieldKeyCollision,
+    type FieldKeyCollisionKind,
+    type FieldKeyCollisionSeverity,
+} from "@/lib/field-key-collisions";
+import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
+import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
+import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastActionInProgress } from "@/lib/in-progress";
+import { loadRemoteDataKeys, loadRemoteScriptsWithItems, uploadRemoteFiles } from "./remote";
+import { uploadReferencedFileIfMissing } from "@/lib/files";
 
-export const getScriptsMetadata = queries._getScriptsMetadata;
+export const getScriptsMetadata: typeof queries._getScriptsMetadata = async (...args) => {
+    return queries._getScriptsMetadata(...args);
+};
 
 // DIAGNOSES
 export const countScreens: typeof queries._countScreens = async (...args) => {
@@ -58,31 +90,127 @@ export const getScreen: typeof queries._getScreen = async (...args) => {
     return await queries._getScreen(...args);
 };
 
+/**
+ * Resolves the script IDs affected by an entity delete so their cached CE report
+ * can be refreshed afterwards. Reads scriptId from both the published and draft
+ * tables of whichever entity ids were supplied, unioned with any explicit
+ * scriptsIds. Must be called BEFORE the delete (entities still resolvable).
+ */
+async function resolveDeleteAffectedScriptIds(params: any): Promise<string[]> {
+    const ids = new Set<string>();
+    for (const id of ((params?.scriptsIds || []) as any[])) if (id) ids.add(`${id}`);
+
+    const screensIds = ((params?.screensIds || []) as any[]).filter(Boolean);
+    const diagnosesIds = ((params?.diagnosesIds || []) as any[]).filter(Boolean);
+    const problemsIds = ((params?.problemsIds || []) as any[]).filter(Boolean);
+
+    const lookups: Promise<{ scriptId: string | null }[]>[] = [];
+    if (screensIds.length) {
+        lookups.push(db.select({ scriptId: screens.scriptId }).from(screens).where(inArray(screens.screenId, screensIds)));
+        lookups.push(db.select({ scriptId: screensDrafts.scriptId }).from(screensDrafts).where(inArray(screensDrafts.screenId, screensIds)));
+    }
+    if (diagnosesIds.length) {
+        lookups.push(db.select({ scriptId: diagnoses.scriptId }).from(diagnoses).where(inArray(diagnoses.diagnosisId, diagnosesIds)));
+        lookups.push(db.select({ scriptId: diagnosesDrafts.scriptId }).from(diagnosesDrafts).where(inArray(diagnosesDrafts.diagnosisId, diagnosesIds)));
+    }
+    if (problemsIds.length) {
+        lookups.push(db.select({ scriptId: problems.scriptId }).from(problems).where(inArray(problems.problemId, problemsIds)));
+        lookups.push(db.select({ scriptId: problemsDrafts.scriptId }).from(problemsDrafts).where(inArray(problemsDrafts.problemId, problemsIds)));
+    }
+
+    try {
+        for (const rows of await Promise.all(lookups)) {
+            for (const r of rows) if (r?.scriptId) ids.add(`${r.scriptId}`);
+        }
+    } catch (e: any) {
+        logger.error('resolveDeleteAffectedScriptIds ERROR', e?.message);
+    }
+    return Array.from(ids);
+}
+
+async function resolveSaveAffectedScriptIds(
+    data: any[] = [],
+    entity: "screen" | "diagnosis" | "problem",
+): Promise<string[]> {
+    const params = {
+        scriptsIds: data.map((item) => item?.scriptId).filter(Boolean),
+        screensIds: entity === "screen" ? data.map((item) => item?.screenId).filter(Boolean) : [],
+        diagnosesIds: entity === "diagnosis" ? data.map((item) => item?.diagnosisId).filter(Boolean) : [],
+        problemsIds: entity === "problem" ? data.map((item) => item?.problemId).filter(Boolean) : [],
+    };
+    return resolveDeleteAffectedScriptIds(params);
+}
+
 export const deleteScreens: typeof mutations._deleteScreens = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._deleteScreens({
+
+        const affectedScriptIds = await resolveDeleteAffectedScriptIds(params);
+        const res = await mutations._deleteScreens({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        return res;
     } catch (e: any) {
         logger.error('deleteScreens ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
 };
 
-export const saveScreens: typeof mutations._saveScreens = async params => {
+type OutcomeCollisionBaseline = {
+    screens?: any[];
+    diagnoses?: any[];
+    problems?: any[];
+};
+
+/**
+ * Shared screen save implementation. `collisionBaseline` is deliberately an
+ * internal second argument: ordinary editor requests must always load their
+ * baseline from persistence, while trusted copy/import flows can carry the
+ * source entity forward after minting a new id.
+ */
+async function saveScreensInternal(
+    params: Parameters<typeof mutations._saveScreens>[0],
+    collisionBaseline?: OutcomeCollisionBaseline,
+): Promise<Awaited<ReturnType<typeof mutations._saveScreens>>> {
     try {
         const session = await isAllowed();
-        return await mutations._saveScreens({
+        const incoming = (params?.data || []) as any[];
+        const affectedScriptIds = await resolveSaveAffectedScriptIds(incoming, "screen");
+        let collisions = collectNewOutcomeKeyCollisions({ screens: incoming });
+        if (collisions.length) {
+            if (collisionBaseline?.screens) {
+                collisions = collectNewOutcomeKeyCollisions(
+                    { screens: incoming },
+                    { screens: collisionBaseline.screens },
+                );
+            } else {
+                const screenIds = incoming.map((screen) => screen?.screenId).filter(Boolean);
+                const current = screenIds.length
+                    ? await queries._getScreens({ screensIds: screenIds, returnDraftsIfExist: true })
+                    : { data: [] as any[], errors: undefined };
+                if (current.errors?.length) throw new Error(current.errors.join(", "));
+                collisions = collectNewOutcomeKeyCollisions({ screens: incoming }, { screens: current.data });
+            }
+        }
+        if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
+        const res = await mutations._saveScreens({
             ...params,
             userId: session.user?.userId,
         });
+        // Skip when running inside a caller-managed transaction (params.client):
+        // the write isn't committed yet, so a recompute here would read stale
+        // data. The caller is responsible for recomputing once it commits.
+        if (res?.success !== false && !params?.client) void recomputeScriptsConditionErrors(affectedScriptIds);
+        return res;
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [e.message], success: false, };
     }
-};
+}
+
+export const saveScreens: typeof mutations._saveScreens = async params => saveScreensInternal(params);
 
 // DIAGNOSES
 export const countDiagnoses: typeof queries._countDiagnoses = async (...args) => {
@@ -113,10 +241,20 @@ export const getDiagnosis: typeof queries._getDiagnosis = async (...args) => {
 export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._deleteDiagnoses({
+        const affectedScriptIds = await resolveDeleteAffectedScriptIds(params);
+        const referenced = await getDeleteOutcomeReferences("Diagnoses", params?.diagnosesIds || []);
+        if (referenced.length) {
+            return {
+                success: false,
+                errors: [buildReferencedOutcomeDeleteMessage("diagnoses", referenced)],
+            };
+        }
+        const res = await mutations._deleteDiagnoses({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        return res;
     } catch (e: any) {
         logger.error('deleteDiagnoses ERROR', e.message);
         return { errors: [e.message], success: false, };
@@ -152,41 +290,99 @@ export const getProblem: typeof queries._getProblem = async (...args) => {
 export const deleteProblems: typeof mutations._deleteProblems = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._deleteProblems({
+        const affectedScriptIds = await resolveDeleteAffectedScriptIds(params);
+        const referenced = await getDeleteOutcomeReferences("Problems", params?.problemsIds || []);
+        if (referenced.length) {
+            return {
+                success: false,
+                errors: [buildReferencedOutcomeDeleteMessage("problems", referenced)],
+            };
+        }
+        const res = await mutations._deleteProblems({
             ...params,
             userId: session.user?.userId,
         });
+        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        return res;
     } catch (e: any) {
         logger.error('deleteProblems ERROR', e.message);
         return { errors: [e.message], success: false, };
     }
 };
 
-export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => {
+async function saveDiagnosesInternal(
+    params: Parameters<typeof mutations._saveDiagnoses>[0],
+    collisionBaseline?: OutcomeCollisionBaseline,
+): Promise<Awaited<ReturnType<typeof mutations._saveDiagnoses>>> {
     try {
         const session = await isAllowed();
-        return await mutations._saveDiagnoses({
-            ...params,
-            userId: session.user?.userId,
-        });
+        const incoming = (params?.data || []) as any[];
+        const affectedScriptIds = await resolveSaveAffectedScriptIds(incoming, "diagnosis");
+        let collisions = collectNewOutcomeKeyCollisions({ diagnoses: incoming });
+        if (collisions.length) {
+            if (collisionBaseline?.diagnoses) {
+                collisions = collectNewOutcomeKeyCollisions(
+                    { diagnoses: incoming },
+                    { diagnoses: collisionBaseline.diagnoses },
+                );
+            } else {
+                const diagnosisIds = incoming.map((diagnosis) => diagnosis?.diagnosisId).filter(Boolean);
+                const current = diagnosisIds.length
+                    ? await queries._getDiagnoses({ diagnosesIds: diagnosisIds, returnDraftsIfExist: true })
+                    : { data: [] as any[], errors: undefined };
+                if (current.errors?.length) throw new Error(current.errors.join(", "));
+                collisions = collectNewOutcomeKeyCollisions({ diagnoses: incoming }, { diagnoses: current.data });
+            }
+        }
+        if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
+        const res = await saveOutcomeEntityWithReferenceRewrite("diagnosis", params, session.user?.userId);
+        // See saveScreensInternal: skip while inside a caller-managed transaction.
+        if (res?.success !== false && !params?.client) void recomputeScriptsConditionErrors(affectedScriptIds);
+        return res;
     } catch (e: any) {
         logger.error('saveDiagnoses ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [e.message], success: false, };
     }
-};
+}
 
-export const saveProblems: typeof mutations._saveProblems = async params => {
+export const saveDiagnoses: typeof mutations._saveDiagnoses = async params => saveDiagnosesInternal(params);
+
+async function saveProblemsInternal(
+    params: Parameters<typeof mutations._saveProblems>[0],
+    collisionBaseline?: OutcomeCollisionBaseline,
+): Promise<Awaited<ReturnType<typeof mutations._saveProblems>>> {
     try {
         const session = await isAllowed();
-        return await mutations._saveProblems({
-            ...params,
-            userId: session.user?.userId,
-        });
+        const incoming = (params?.data || []) as any[];
+        const affectedScriptIds = await resolveSaveAffectedScriptIds(incoming, "problem");
+        let collisions = collectNewOutcomeKeyCollisions({ problems: incoming });
+        if (collisions.length) {
+            if (collisionBaseline?.problems) {
+                collisions = collectNewOutcomeKeyCollisions(
+                    { problems: incoming },
+                    { problems: collisionBaseline.problems },
+                );
+            } else {
+                const problemIds = incoming.map((problem) => problem?.problemId).filter(Boolean);
+                const current = problemIds.length
+                    ? await queries._getProblems({ problemsIds: problemIds, returnDraftsIfExist: true })
+                    : { data: [] as any[], errors: undefined };
+                if (current.errors?.length) throw new Error(current.errors.join(", "));
+                collisions = collectNewOutcomeKeyCollisions({ problems: incoming }, { problems: current.data });
+            }
+        }
+        if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
+        const res = await saveOutcomeEntityWithReferenceRewrite("problem", params, session.user?.userId);
+        // See saveScreensInternal: skip while inside a caller-managed transaction.
+        if (res?.success !== false && !params?.client) void recomputeScriptsConditionErrors(affectedScriptIds);
+        return res;
     } catch (e: any) {
         logger.error('saveProblems ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [e.message], success: false, };
     }
-};
+}
+
+export const saveProblems: typeof mutations._saveProblems = async params => saveProblemsInternal(params);
 
 // SCRIPTS
 export const countScripts: typeof queries._countScripts = async (...args) => {
@@ -230,10 +426,13 @@ export const deleteScripts: typeof mutations._deleteScripts = async params => {
 export const saveScripts: typeof mutations._saveScripts = async params => {
     try {
         const session = await isAllowed();
-        return await mutations._saveScripts({
+        const res = await mutations._saveScripts({
             ...params,
             userId: session.user?.userId,
         });
+        // See saveScreensInternal: skip while inside a caller-managed transaction.
+        if (res?.success !== false && !(params as any)?.client) void recomputeScriptsConditionErrors(((params as any)?.data || []).map((d: any) => d?.scriptId));
+        return res;
     } catch (e: any) {
         logger.error('saveScripts ERROR', e.message);
         return { errors: [e.message], data: undefined, success: false, };
@@ -309,16 +508,1695 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
     }
 }
 
-export async function saveScriptScreens({
+export type ScriptConditionErrorInput = {
+    scriptId: string;
+    nuidSearchFields?: any;
+    eligibilityCriteria?: any;
+};
+
+export type ScriptConditionReport = {
+    count: number;
+    findings: { location: string; href?: string; message?: string }[];
+    /** Invalidates cached reports when the effective Configuration keys change. */
+    configurationSignature?: string;
+    /**
+     * Covers the per-script inputs the validation reads: Configuration keys,
+     * the script's own NUID/eligibility expressions, and its screens, diagnoses
+     * and problems. Readers refresh any report that no longer matches, so a
+     * missed write-site recompute self-corrects instead of leaving a
+     * permanently wrong badge. Data key library changes are swept separately —
+     * they affect every script, so they must not expire reports one read at a time.
+     */
+    inputsSignature?: string;
+};
+
+async function getScriptContentStamps(scriptIds: string[]): Promise<Map<string, string>> {
+    const stamps = new Map<string, string>();
+    if (!scriptIds.length) return stamps;
+
+    try {
+        const rows = await db.execute<{ scriptId: string; source: string; count: string; updated: string | null }>(sql`
+            select script_id as "scriptId", source, count(*)::text as count, max(updated_at)::text as updated
+            from (
+                select script_id, 'sc' as source, updated_at from nt_screens where deleted_at is null
+                union all select script_id, 'scd' as source, updated_at from nt_screens_drafts
+                union all select script_id, 'dg' as source, updated_at from nt_diagnoses where deleted_at is null
+                union all select script_id, 'dgd' as source, updated_at from nt_diagnoses_drafts
+                union all select script_id, 'pr' as source, updated_at from nt_problems where deleted_at is null
+                union all select script_id, 'prd' as source, updated_at from nt_problems_drafts
+            ) entities
+            where script_id in (${sql.join(scriptIds.map((id) => sql`${id}`), sql`, `)})
+            group by script_id, source
+        `);
+
+        const byScript = new Map<string, string[]>();
+        for (const row of rows as any[] as { scriptId: string; source: string; count: string; updated: string | null }[]) {
+            const id = `${row.scriptId || ''}`;
+            if (!id) continue;
+            const list = byScript.get(id) || [];
+            list.push(`${row.source}:${row.count || 0}:${row.updated || ''}`);
+            byScript.set(id, list);
+        }
+        byScript.forEach((parts, id) => stamps.set(id, parts.sort((a, b) => a.localeCompare(b)).join('|')));
+    } catch (e: any) {
+        logger.error('getScriptContentStamps ERROR', e?.message);
+    }
+
+    return stamps;
+}
+
+async function getScriptConditionInputStamps(scriptIds: string[]): Promise<Map<string, string>> {
+    const stamps = new Map<string, string>();
+    if (!scriptIds.length) return stamps;
+
+    try {
+        // One join rather than a published read plus a drafts read: this runs on
+        // every cached-report check, so the extra round trip showed up on every
+        // scripts-list load.
+        const rows = await db
+            .select({
+                scriptId: scriptsTable.scriptId,
+                nuidSearchFields: scriptsTable.nuidSearchFields,
+                eligibilityCriteria: scriptsTable.eligibilityCriteria,
+                draftData: scriptsDrafts.data,
+            })
+            .from(scriptsTable)
+            .leftJoin(scriptsDrafts, eq(scriptsDrafts.scriptId, scriptsTable.scriptId))
+            .where(inArray(scriptsTable.scriptId, scriptIds));
+
+        for (const row of rows) {
+            const id = `${row.scriptId || ''}`;
+            if (!id) continue;
+            // A draft supersedes its published row, matching the draft-inclusive report.
+            stamps.set(id, getScriptConditionInputsStamp((row.draftData || row) as any));
+        }
+    } catch (e: any) {
+        logger.error('getScriptConditionInputStamps ERROR', e?.message);
+    }
+
+    return stamps;
+}
+
+
+type ConditionReportStamps = {
+    contentStamps: Map<string, string>;
+    inputStamps: Map<string, string>;
+};
+
+/**
+ * The stamp reads, which depend on nothing but the script ids.
+ *
+ * Separated from signature assembly so a caller can start them alongside its
+ * own reads — the Configuration keys and the cached reports — instead of
+ * waiting for those first. Only the final hash needs the Configuration
+ * signature, and by then everything is already in hand.
+ */
+async function fetchConditionReportStamps(ids: string[]): Promise<ConditionReportStamps> {
+    const [contentStamps, inputStamps] = await Promise.all([
+        getScriptContentStamps(ids),
+        getScriptConditionInputStamps(ids),
+    ]);
+    return { contentStamps, inputStamps };
+}
+
+function buildConditionReportSignatures(
+    ids: string[],
+    configurationSignature: string,
+    stamps: ConditionReportStamps,
+): Map<string, string> {
+    const expected = new Map<string, string>();
+    for (const id of ids) {
+        expected.set(id, buildConditionReportSignature({
+            configuration: configurationSignature,
+            inputs: stamps.inputStamps.get(id) || '',
+            content: stamps.contentStamps.get(id) || '',
+        }));
+    }
+    return expected;
+}
+
+async function resolveConditionReportSignatures(
+    scriptIds: (string | null | undefined)[],
+    configurationSignature: string,
+): Promise<Map<string, string>> {
+    const ids = Array.from(new Set((scriptIds || []).map((id) => `${id || ''}`).filter(Boolean)));
+    if (!ids.length) return new Map<string, string>();
+    return buildConditionReportSignatures(ids, configurationSignature, await fetchConditionReportStamps(ids));
+}
+
+function hrefForConditionEntity(scriptId: string, entity?: ScriptConditionEntityRef): string {
+    if (!entity) return `/script/${scriptId}`;
+    switch (entity.kind) {
+        case 'screen':
+            return entity.screenId ? `/script/${scriptId}/screen/${entity.screenId}` : `/script/${scriptId}?section=screens`;
+        case 'diagnosis':
+            return entity.diagnosisId ? `/script/${scriptId}/diagnosis/${entity.diagnosisId}` : `/script/${scriptId}?section=diagnoses`;
+        case 'problem':
+            return entity.problemId ? `/script/${scriptId}/problem/${entity.problemId}` : `/script/${scriptId}?section=diagnoses`;
+        default:
+            return `/script/${scriptId}`;
+    }
+}
+
+function buildConditionReport(scriptId: string, script: any, inputsSignature?: string): ScriptConditionReport {
+    const findings = collectScriptConditionFindings(script);
+    return {
+        count: findings.length,
+        configurationSignature: getConfigurationConditionKeySignature(script?.configurationKeys || []),
+        inputsSignature,
+        findings: findings.slice(0, 100).map((f) => ({
+            location: f.location,
+            href: hrefForConditionEntity(scriptId, f.entity),
+            message: f.errors[0]?.message,
+        })),
+    };
+}
+
+export type OutcomeReferenceImpact = {
+    count: number;
+    occurrences: number;
+    findings: (OutcomeReferenceFinding & { href: string })[];
+};
+
+async function loadOutcomeReferenceImpact({
+    scriptId,
+    collection,
+    values,
+    excludeDiagnosisIds,
+    excludeProblemIds,
+    sourceEntityId,
+}: {
+    scriptId: string;
+    collection: OutcomeCollectionName;
+    values?: string[];
+    excludeDiagnosisIds?: string[];
+    excludeProblemIds?: string[];
+    sourceEntityId?: string;
+}): Promise<OutcomeReferenceImpact> {
+    const result = await getScriptsWithItems({ scriptsIds: [scriptId], returnDraftsIfExist: true });
+    if (result.errors?.length) throw new Error(result.errors.join(", "));
+    const script = result.data[0];
+    if (!script) throw new Error("Script was not found");
+
+    let effectiveValues = values || [];
+    const excludedOutcomeIds = new Set([
+        ...(collection === "Diagnoses" ? excludeDiagnosisIds || [] : excludeProblemIds || []),
+        ...(sourceEntityId ? [sourceEntityId] : []),
+    ]);
+    if (effectiveValues.length && excludedOutcomeIds.size) {
+        const idField = collection === "Diagnoses" ? "diagnosisId" : "problemId";
+        const outcomes = collection === "Diagnoses" ? script.diagnoses || [] : script.problems || [];
+        const survivingKeys = new Set(outcomes
+            .filter((outcome: any) => !excludedOutcomeIds.has(`${outcome?.[idField] || ""}`))
+            .map((outcome: any) => `${outcome?.key || ""}`.trim().toLowerCase())
+            .filter(Boolean));
+        effectiveValues = effectiveValues.filter((value) => !survivingKeys.has(`${value}`.trim().toLowerCase()));
+    }
+
+    const findings = effectiveValues.length || !(values || []).length
+        ? collectScriptOutcomeReferences(script, collection, effectiveValues, {
+            diagnosisIds: excludeDiagnosisIds,
+            problemIds: excludeProblemIds,
+          }).map((finding) => ({
+            ...finding,
+            href: hrefForConditionEntity(scriptId, finding.entity),
+          }))
+        : [];
+    return {
+        count: findings.length,
+        occurrences: findings.reduce((sum, finding) => sum + finding.occurrences, 0),
+        findings,
+    };
+}
+
+/** Read-only impact preview used before an outcome rename or delete. */
+export async function getOutcomeReferenceImpact(params: {
+    scriptId: string;
+    collection: OutcomeCollectionName;
+    values?: string[];
+    excludeDiagnosisIds?: string[];
+    excludeProblemIds?: string[];
+    sourceEntityId?: string;
+}): Promise<{ data?: OutcomeReferenceImpact; errors?: string[] }> {
+    try {
+        await isAllowed();
+        if (!params?.scriptId) throw new Error("Missing scriptId");
+        if (!isOutcomeCollectionName(params?.collection)) throw new Error("Invalid outcome collection");
+        return { data: await loadOutcomeReferenceImpact(params) };
+    } catch (e: any) {
+        logger.error("getOutcomeReferenceImpact ERROR", e?.message);
+        return { errors: [e?.message || "Failed to inspect conditional-expression references"] };
+    }
+}
+
+type DeleteOutcomeReference = OutcomeReferenceFinding & { scriptId: string };
+
+async function getDeleteOutcomeReferences(
+    collection: OutcomeCollectionName,
+    entityIds: string[],
+): Promise<DeleteOutcomeReference[]> {
+    const ids = Array.from(new Set((entityIds || []).filter(Boolean)));
+    if (!ids.length) return [];
+
+    const entitiesResult = collection === "Diagnoses"
+        ? await queries._getDiagnoses({ diagnosesIds: ids, returnDraftsIfExist: true })
+        : await queries._getProblems({ problemsIds: ids, returnDraftsIfExist: true });
+    if (entitiesResult.errors?.length) throw new Error(entitiesResult.errors.join(", "));
+    const entities = entitiesResult.data;
+    const byScript = new Map<string, string[]>();
+    entities.forEach((entity: any) => {
+        const scriptId = `${entity?.scriptId || ""}`;
+        const entityId = `${(collection === "Diagnoses" ? entity?.diagnosisId : entity?.problemId) || ""}`;
+        if (!scriptId || !entityId) return;
+        byScript.set(scriptId, [...(byScript.get(scriptId) || []), entityId]);
+    });
+
+    const findings: DeleteOutcomeReference[] = [];
+    await runWithConcurrency(Array.from(byScript.entries()), 4, async ([scriptId, excludedIds]) => {
+        const allOutcomesResult = collection === "Diagnoses"
+            ? await queries._getDiagnoses({ scriptsIds: [scriptId], returnDraftsIfExist: true })
+            : await queries._getProblems({ scriptsIds: [scriptId], returnDraftsIfExist: true });
+        if (allOutcomesResult.errors?.length) throw new Error(allOutcomesResult.errors.join(", "));
+        const allOutcomes = allOutcomesResult.data;
+        const excludedSet = new Set(excludedIds);
+        const survivingKeys = new Set(allOutcomes
+            .filter((entity: any) => !excludedSet.has(`${(collection === "Diagnoses" ? entity?.diagnosisId : entity?.problemId) || ""}`))
+            .map((entity: any) => `${entity?.key || ""}`.trim().toLowerCase())
+            .filter(Boolean));
+        const values = entities
+            .filter((entity: any) => `${entity?.scriptId || ""}` === scriptId)
+            .map((entity: any) => `${entity?.key || ""}`.trim())
+            .filter((value) => !!value && !survivingKeys.has(value.toLowerCase()));
+        if (!values.length) return;
+        const impact = await loadOutcomeReferenceImpact({
+            scriptId,
+            collection,
+            values,
+            excludeDiagnosisIds: collection === "Diagnoses" ? excludedIds : undefined,
+            excludeProblemIds: collection === "Problems" ? excludedIds : undefined,
+        });
+        findings.push(...impact.findings.map((finding) => ({ ...finding, scriptId })));
+    });
+    return findings;
+}
+
+function buildReferencedOutcomeDeleteMessage(label: string, findings: DeleteOutcomeReference[]): string {
+    const locations = Array.from(new Set(findings.map((finding) => finding.location)));
+    const preview = locations.slice(0, 8).map((location) => `• ${location}`).join("\n");
+    const more = locations.length > 8 ? `\n• and ${locations.length - 8} more` : "";
+    return `Cannot delete these ${label} because ${locations.length} conditional expression${locations.length === 1 ? "" : "s"} still reference them. Update the references first:\n${preview}${more}`;
+}
+
+function mergePatches(items: any[], patches: any[], idField: string): any[] {
+    const merged = new Map<string, any>();
+    [...items, ...patches].forEach((item) => {
+        const id = `${item?.[idField] || ""}`;
+        if (!id) return;
+        merged.set(id, { ...(merged.get(id) || {}), ...item });
+    });
+    return Array.from(merged.values());
+}
+
+async function saveOutcomeEntityWithReferenceRewrite(
+    kind: "diagnosis" | "problem",
+    params: any,
+    userId?: string,
+): Promise<any> {
+    const saveDirect = () => kind === "diagnosis"
+        ? mutations._saveDiagnoses({ ...params, userId })
+        : mutations._saveProblems({ ...params, userId });
+    const items = (params?.data || []) as any[];
+    if (items.length !== 1) return saveDirect();
+
+    const item = items[0];
+    const idField = kind === "diagnosis" ? "diagnosisId" : "problemId";
+    const entityId = `${item?.[idField] || ""}`;
+    if (!entityId || item?.key === undefined) return saveDirect();
+
+    const currentResult = kind === "diagnosis"
+        ? await queries._getDiagnosis({ diagnosisId: entityId, returnDraftIfExists: true })
+        : await queries._getProblem({ problemId: entityId, returnDraftIfExists: true });
+    if (currentResult.errors?.length) throw new Error(currentResult.errors.join(", "));
+    const current: any = currentResult.data;
+    const oldKey = `${current?.key || ""}`.trim();
+    const newKey = `${item?.key || ""}`.trim();
+    if (!current || !oldKey || !newKey || oldKey === newKey) return saveDirect();
+
+    const scriptId = `${item?.scriptId || current?.scriptId || ""}`;
+    if (!scriptId) throw new Error(`Cannot rename ${kind}: script reference is missing`);
+    const scriptsResult = await getScriptsWithItems({ scriptsIds: [scriptId], returnDraftsIfExist: true });
+    if (scriptsResult.errors?.length) throw new Error(scriptsResult.errors.join(", "));
+    const script: any = scriptsResult.data[0];
+    if (!script) throw new Error("Cannot rename outcome: script was not found");
+
+    const collection: OutcomeCollectionName = kind === "diagnosis" ? "Diagnoses" : "Problems";
+    const entityList = kind === "diagnosis" ? script.diagnoses : script.problems;
+    const oldKeyStillProduced = (entityList || []).some((entity: any) => (
+        `${entity?.[idField] || ""}` !== entityId
+        && `${entity?.key || ""}`.trim().toLowerCase() === oldKey.toLowerCase()
+    ));
+    const overlaid = (entityList || []).map((entity: any) =>
+        `${entity?.[idField] || ""}` === entityId ? { ...entity, ...item } : entity,
+    );
+    const scriptWithIncoming = {
+        ...script,
+        ...(kind === "diagnosis" ? { diagnoses: overlaid } : { problems: overlaid }),
+    };
+    const patches = oldKeyStillProduced
+        ? { screens: [], diagnoses: [], problems: [], script: undefined, findings: [], occurrences: 0 }
+        : buildScriptOutcomeReferencePatches(scriptWithIncoming, collection, oldKey, newKey);
+
+    await db.transaction(async (tx) => {
+        const diagnosisData = mergePatches(kind === "diagnosis" ? items : [], patches.diagnoses, "diagnosisId");
+        const problemData = mergePatches(kind === "problem" ? items : [], patches.problems, "problemId");
+        const results: any[] = [];
+        if (patches.screens.length) results.push(await mutations._saveScreens({ data: patches.screens, userId, client: tx, draftOrigin: "editor" }));
+        if (diagnosisData.length) results.push(await mutations._saveDiagnoses({ data: diagnosisData, userId, client: tx, syncSilently: true, draftOrigin: "editor" }));
+        if (problemData.length) results.push(await mutations._saveProblems({ data: problemData, userId, client: tx, syncSilently: true, draftOrigin: "editor" }));
+        if (patches.script) results.push(await mutations._saveScripts({ data: [patches.script], userId, client: tx, syncSilently: true, draftOrigin: "editor" }));
+        const errors = results.flatMap((result) => result?.errors || []);
+        if (errors.length || results.some((result) => result?.success === false)) {
+            throw new Error(errors.join(", ") || "Failed to update conditional-expression references");
+        }
+    });
+
+    if (params?.broadcastAction && !params?.syncSilently) {
+        socket.emit("data_changed", kind === "diagnosis" ? "save_diagnoses" : "save_problems");
+    }
+    return { success: true };
+}
+
+/**
+ * Lean, batched (no N+1) computation of CE reports for the given scripts —
+ * one query each for screens/diagnoses/problems + one for the data-key
+ * registry, grouped and scrapped in memory. Reflects PUBLISHED content (the
+ * persisted per-script report, kept fresh on write, is draft-inclusive).
+ */
+async function computeConditionReportsLean(
+    inputs: ScriptConditionErrorInput[],
+    configurationKeys: any[],
+    opts?: { signatures?: Map<string, string> },
+): Promise<Record<string, ScriptConditionReport>> {
+    const scriptIds = inputs.map((s) => `${s?.scriptId || ''}`).filter(Boolean);
+    if (!scriptIds.length) return {};
+
+    const [screenRows, diagnosisRows, problemRows, dataKeysRes] = await Promise.all([
+        db
+            .select({
+                scriptId: screens.scriptId,
+                screenId: screens.screenId,
+                key: screens.key,
+                label: screens.label,
+                title: screens.title,
+                type: screens.type,
+                position: screens.position,
+                condition: screens.condition,
+                skipToCondition: screens.skipToCondition,
+                fields: screens.fields,
+                items: screens.items,
+                drugs: screens.drugs,
+                fluids: screens.fluids,
+                feeds: screens.feeds,
+            })
+            .from(screens)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
+            .where(and(isNull(screens.deletedAt), isNull(pendingDeletion.id), inArray(screens.scriptId, scriptIds))),
+        db
+            .select({
+                scriptId: diagnoses.scriptId,
+                diagnosisId: diagnoses.diagnosisId,
+                key: diagnoses.key,
+                name: diagnoses.name,
+                expression: diagnoses.expression,
+                symptoms: diagnoses.symptoms,
+            })
+            .from(diagnoses)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
+            .where(and(isNull(diagnoses.deletedAt), isNull(pendingDeletion.id), inArray(diagnoses.scriptId, scriptIds))),
+        db
+            .select({
+                scriptId: problems.scriptId,
+                problemId: problems.problemId,
+                key: problems.key,
+                name: problems.name,
+                expression: problems.expression,
+                symptoms: problems.symptoms,
+            })
+            .from(problems)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.problemId, problems.problemId))
+            .where(and(isNull(problems.deletedAt), isNull(pendingDeletion.id), inArray(problems.scriptId, scriptIds))),
+        _getDataKeys({ returnDraftsIfExist: true }),
+    ]);
+
+    if (dataKeysRes.errors?.length) throw new Error(dataKeysRes.errors.join(", "));
+    const globalDataKeys = dataKeysRes.data || [];
+    const dataKeyIndex = indexDataKeysById(globalDataKeys as any);
+
+    const groupByScript = <T extends { scriptId?: string | null }>(rows: T[] = []) => {
+        const map = new Map<string, T[]>();
+        for (const row of rows) {
+            const id = `${row?.scriptId || ''}`;
+            if (!id) continue;
+            const arr = map.get(id);
+            if (arr) arr.push(row);
+            else map.set(id, [row]);
+        }
+        return map;
+    };
+
+    const screensByScript = groupByScript(screenRows);
+    const diagnosesByScript = groupByScript(diagnosisRows);
+    const problemsByScript = groupByScript(problemRows);
+
+    const DRUG_SCREEN_TYPES = ['drugs', 'fluids', 'feeds'];
+    const drugKeysOf = (scriptScreens: any[]) => {
+        const keys = new Set<string>();
+        for (const scr of scriptScreens) {
+            if (!DRUG_SCREEN_TYPES.includes(`${scr?.type}`)) continue;
+            for (const item of [...(scr?.drugs || []), ...(scr?.fluids || []), ...(scr?.feeds || [])]) {
+                if (item?.key) keys.add(`${item.key}`);
+            }
+        }
+        return keys;
+    };
+    const allDrugKeys = drugKeysOf(screenRows as any[]);
+    const drugItemsRes: Awaited<ReturnType<typeof _getDrugsLibraryItems>> = allDrugKeys.size
+        ? await _getDrugsLibraryItems({ keys: Array.from(allDrugKeys) })
+        : { data: [] as any[] };
+    if (drugItemsRes.errors?.length) throw new Error(drugItemsRes.errors.join(", "));
+    const drugItemsByKey = new Map<string, any>();
+    for (const d of drugItemsRes.data || []) if (d?.key) drugItemsByKey.set(`${d.key}`, d);
+
+    const reports: Record<string, ScriptConditionReport> = {};
+    const signatures = opts?.signatures
+        ?? await resolveConditionReportSignatures(scriptIds, getConfigurationConditionKeySignature(configurationKeys));
+
+    await runWithConcurrency(inputs, 6, async (s) => {
+        const scriptId = `${s?.scriptId || ''}`;
+        if (!scriptId) return;
+
+        const scriptScreens = screensByScript.get(scriptId) || [];
+        const scriptDiagnoses = diagnosesByScript.get(scriptId) || [];
+        const scriptProblems = problemsByScript.get(scriptId) || [];
+        const scriptDrugs = Array.from(drugKeysOf(scriptScreens as any[]))
+            .map((k) => drugItemsByKey.get(k))
+            .filter(Boolean);
+
+        const dataKeys = await scrapDataKeys({
+            dataKeys: globalDataKeys,
+            screens: scriptScreens as any,
+            diagnoses: scriptDiagnoses as any,
+            problems: scriptProblems as any,
+            drugsLibrary: scriptDrugs as any,
+        });
+
+        const nuidSearchFields = (s?.nuidSearchFields || []) as any[];
+        reports[scriptId] = buildConditionReport(scriptId, {
+            scriptId,
+            dataKeys,
+            screens: scriptScreens,
+            diagnoses: scriptDiagnoses,
+            problems: scriptProblems,
+            drugsLibrary: scriptDrugs,
+            nuidSearchFields,
+            nuidDataKeys: resolveNuidLibraryKeys(nuidSearchFields, dataKeyIndex),
+            eligibilityCriteria: s?.eligibilityCriteria,
+            configurationKeys,
+        }, signatures.get(scriptId));
+    });
+
+    return reports;
+}
+
+/**
+ * Correctness-first refresh for reports whose Configuration signature is
+ * stale. Unlike the published lean fallback, this reads each effective script
+ * with its drafts so a global Configuration edit cannot erase draft-only CE
+ * findings from the cached report.
+ */
+async function computeConditionReportsDraftInclusive(
+    inputs: ScriptConditionErrorInput[],
+    configurationKeys: any[],
+    opts?: { dataKeys?: any[]; dataKeyIndex?: Map<string, any>; signatures?: Map<string, string> },
+): Promise<Record<string, ScriptConditionReport>> {
+    const scriptIds = inputs.map((input) => `${input?.scriptId || ''}`).filter(Boolean);
+    if (!scriptIds.length) return {};
+
+    // Keep this path lean: publish and Configuration invalidation can refresh
+    // many scripts at once, so query only CE-relevant columns and never load
+    // image blobs, hospital relations, or one full script graph per id.
+    const [
+        scriptRows,
+        scriptDraftRows,
+        screenRows,
+        screenDraftRows,
+        diagnosisRows,
+        diagnosisDraftRows,
+        problemRows,
+        problemDraftRows,
+        registry,
+    ] = await Promise.all([
+        db.select({
+            scriptId: scriptsTable.scriptId,
+            nuidSearchFields: scriptsTable.nuidSearchFields,
+            eligibilityCriteria: scriptsTable.eligibilityCriteria,
+        }).from(scriptsTable).where(and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scriptIds))),
+        db.select({
+            scriptId: scriptsDrafts.scriptId,
+            scriptDraftId: scriptsDrafts.scriptDraftId,
+            data: scriptsDrafts.data,
+        })
+            .from(scriptsDrafts)
+            .where(or(
+                inArray(scriptsDrafts.scriptId, scriptIds),
+                inArray(scriptsDrafts.scriptDraftId, scriptIds),
+            )),
+        db.select({
+            scriptId: screens.scriptId,
+            screenId: screens.screenId,
+            key: screens.key,
+            label: screens.label,
+            title: screens.title,
+            type: screens.type,
+            position: screens.position,
+            condition: screens.condition,
+            skipToCondition: screens.skipToCondition,
+            fields: screens.fields,
+            items: screens.items,
+            drugs: screens.drugs,
+            fluids: screens.fluids,
+            feeds: screens.feeds,
+        }).from(screens)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
+            .where(and(isNull(screens.deletedAt), isNull(pendingDeletion.id), inArray(screens.scriptId, scriptIds))),
+        db.select({
+            screenId: screensDrafts.screenId,
+            scriptId: screensDrafts.scriptId,
+            scriptDraftId: screensDrafts.scriptDraftId,
+            data: screensDrafts.data,
+        })
+            .from(screensDrafts)
+            .where(or(
+                inArray(screensDrafts.scriptId, scriptIds),
+                inArray(screensDrafts.scriptDraftId, scriptIds),
+            )),
+        db.select({
+            scriptId: diagnoses.scriptId,
+            diagnosisId: diagnoses.diagnosisId,
+            key: diagnoses.key,
+            name: diagnoses.name,
+            position: diagnoses.position,
+            expression: diagnoses.expression,
+            symptoms: diagnoses.symptoms,
+        }).from(diagnoses)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
+            .where(and(isNull(diagnoses.deletedAt), isNull(pendingDeletion.id), inArray(diagnoses.scriptId, scriptIds))),
+        db.select({
+            diagnosisId: diagnosesDrafts.diagnosisId,
+            scriptId: diagnosesDrafts.scriptId,
+            scriptDraftId: diagnosesDrafts.scriptDraftId,
+            data: diagnosesDrafts.data,
+        })
+            .from(diagnosesDrafts)
+            .where(or(
+                inArray(diagnosesDrafts.scriptId, scriptIds),
+                inArray(diagnosesDrafts.scriptDraftId, scriptIds),
+            )),
+        db.select({
+            scriptId: problems.scriptId,
+            problemId: problems.problemId,
+            key: problems.key,
+            name: problems.name,
+            position: problems.position,
+            expression: problems.expression,
+            symptoms: problems.symptoms,
+        }).from(problems)
+            .leftJoin(pendingDeletion, eq(pendingDeletion.problemId, problems.problemId))
+            .where(and(isNull(problems.deletedAt), isNull(pendingDeletion.id), inArray(problems.scriptId, scriptIds))),
+        db.select({
+            problemId: problemsDrafts.problemId,
+            scriptId: problemsDrafts.scriptId,
+            scriptDraftId: problemsDrafts.scriptDraftId,
+            data: problemsDrafts.data,
+        })
+            .from(problemsDrafts)
+            .where(or(
+                inArray(problemsDrafts.scriptId, scriptIds),
+                inArray(problemsDrafts.scriptDraftId, scriptIds),
+            )),
+        opts?.dataKeys
+            ? Promise.resolve({ data: opts.dataKeys, errors: undefined })
+            : _getDataKeys({ returnDraftsIfExist: true }),
+    ]);
+    if (registry.errors?.length) throw new Error(registry.errors.join(", "));
+
+    const globalDataKeys = registry.data || [];
+    const dataKeyIndex = opts?.dataKeyIndex ?? indexDataKeysById(globalDataKeys as any);
+
+    const groupPublished = <T extends { scriptId?: string | null }>(rows: T[]) => {
+        const grouped = new Map<string, T[]>();
+        for (const row of rows) {
+            const scriptId = `${row?.scriptId || ''}`;
+            if (!scriptId) continue;
+            const current = grouped.get(scriptId);
+            if (current) current.push(row);
+            else grouped.set(scriptId, [row]);
+        }
+        return grouped;
+    };
+    const requestedIds = new Set(scriptIds);
+    const resolveDraftScriptId = (row: { scriptId?: string | null; scriptDraftId?: string | null; data?: any }) => {
+        const candidates = [
+            row?.scriptId,
+            row?.scriptDraftId,
+            row?.data?.scriptId,
+            row?.data?.scriptDraftId,
+        ].map((candidate) => `${candidate || ''}`).filter(Boolean);
+        return candidates.find((candidate) => requestedIds.has(candidate)) || '';
+    };
+    const groupDrafts = <T extends { scriptId?: string | null; scriptDraftId?: string | null; data?: any }>(rows: T[], idField: string) => {
+        const grouped = new Map<string, any[]>();
+        for (const row of rows) {
+            const data = row?.data || {};
+            const scriptId = resolveDraftScriptId(row);
+            if (!scriptId) continue;
+            const effective = {
+                ...data,
+                scriptId,
+                [idField]: data?.[idField] || (row as any)?.[idField],
+            };
+            const current = grouped.get(scriptId);
+            if (current) current.push(effective);
+            else grouped.set(scriptId, [effective]);
+        }
+        return grouped;
+    };
+    const mergeEffective = <T extends Record<string, any>>(
+        published: T[],
+        drafts: T[],
+        idField: string,
+    ): T[] => {
+        const draftedIds = new Set(drafts.map((row) => `${row?.[idField] || ''}`).filter(Boolean));
+        return [...published.filter((row) => !draftedIds.has(`${row?.[idField] || ''}`)), ...drafts];
+    };
+
+    const publishedScripts = new Map(scriptRows.map((row) => [`${row.scriptId}`, row]));
+    const draftScripts = new Map(
+        scriptDraftRows
+            .map((row) => [resolveDraftScriptId(row), row.data] as const)
+            .filter(([scriptId]) => !!scriptId),
+    );
+    const publishedScreens = groupPublished(screenRows);
+    const draftScreens = groupDrafts(screenDraftRows, 'screenId');
+    const publishedDiagnoses = groupPublished(diagnosisRows);
+    const draftDiagnoses = groupDrafts(diagnosisDraftRows, 'diagnosisId');
+    const publishedProblems = groupPublished(problemRows);
+    const draftProblems = groupDrafts(problemDraftRows, 'problemId');
+
+    const effectiveById = new Map<string, {
+        input: ScriptConditionErrorInput;
+        screens: any[];
+        diagnoses: any[];
+        problems: any[];
+        script: any;
+    }>();
+    const allDrugKeys = new Set<string>();
+    for (const input of inputs) {
+        const scriptId = `${input?.scriptId || ''}`;
+        if (!scriptId || (!publishedScripts.has(scriptId) && !draftScripts.has(scriptId))) continue;
+        const effectiveScreens = mergeEffective(publishedScreens.get(scriptId) || [], draftScreens.get(scriptId) || [], 'screenId');
+        const effectiveDiagnoses = mergeEffective(publishedDiagnoses.get(scriptId) || [], draftDiagnoses.get(scriptId) || [], 'diagnosisId');
+        const effectiveProblems = mergeEffective(publishedProblems.get(scriptId) || [], draftProblems.get(scriptId) || [], 'problemId');
+        collectDrugKeysFromScreens(effectiveScreens).forEach((key) => allDrugKeys.add(key));
+        effectiveById.set(scriptId, {
+            input,
+            screens: effectiveScreens,
+            diagnoses: effectiveDiagnoses,
+            problems: effectiveProblems,
+            script: {
+                ...(publishedScripts.get(scriptId) || {}),
+                ...(draftScripts.get(scriptId) || {}),
+                scriptId,
+            },
+        });
+    }
+
+    const drugItemsResult = allDrugKeys.size
+        ? await _getDrugsLibraryItems({ keys: Array.from(allDrugKeys) })
+        : { data: [] as any[], errors: undefined };
+    if (drugItemsResult.errors?.length) throw new Error(drugItemsResult.errors.join(", "));
+    const drugItemsByKey = new Map<string, any>();
+    for (const item of drugItemsResult.data || []) {
+        const key = `${item?.key || ''}`;
+        if (key) drugItemsByKey.set(key, item);
+    }
+
+    const reports: Record<string, ScriptConditionReport> = {};
+    const signatures = opts?.signatures
+        ?? await resolveConditionReportSignatures(scriptIds, getConfigurationConditionKeySignature(configurationKeys));
+    await runWithConcurrency(Array.from(effectiveById.entries()), 6, async ([scriptId, effective]) => {
+        const drugKeys = collectDrugKeysFromScreens(effective.screens);
+        const drugsLibrary = Array.from(drugKeys).map((key) => drugItemsByKey.get(key)).filter(Boolean);
+        const dataKeys = await scrapDataKeys({
+            dataKeys: globalDataKeys as any,
+            screens: effective.screens as any,
+            diagnoses: effective.diagnoses as any,
+            problems: effective.problems as any,
+            drugsLibrary: drugsLibrary as any,
+        });
+        const nuidSearchFields = (effective.script?.nuidSearchFields || effective.input?.nuidSearchFields || []) as any[];
+        reports[scriptId] = buildConditionReport(scriptId, {
+            ...effective.script,
+            scriptId,
+            screens: effective.screens,
+            diagnoses: effective.diagnoses,
+            problems: effective.problems,
+            drugsLibrary,
+            dataKeys,
+            configurationKeys,
+            nuidSearchFields,
+            nuidDataKeys: resolveNuidLibraryKeys(nuidSearchFields, dataKeyIndex),
+            eligibilityCriteria: effective.script?.eligibilityCriteria !== undefined
+                ? effective.script.eligibilityCriteria
+                : effective.input?.eligibilityCriteria,
+        }, signatures.get(scriptId));
+    });
+    return reports;
+}
+
+const DRUG_SCREEN_TYPES = ['drugs', 'fluids', 'feeds'];
+function collectDrugKeysFromScreens(scriptScreens: any[]): Set<string> {
+    const keys = new Set<string>();
+    for (const scr of scriptScreens || []) {
+        if (!DRUG_SCREEN_TYPES.includes(`${scr?.type}`)) continue;
+        for (const item of [...(scr?.drugs || []), ...(scr?.fluids || []), ...(scr?.feeds || [])]) {
+            if (item?.key) keys.add(`${item.key}`);
+        }
+    }
+    return keys;
+}
+
+/**
+ * Lean, draft-inclusive computation of a script's condition keys (the scrapped
+ * data keys a conditional expression may reference).
+ *
+ * This powers the child-entity CE badges (screens/diagnoses/problems rows) and
+ * the condition editors' autocomplete. It returns the same `scrapDataKeys`
+ * output as `getScriptsWithItems` plus script-scoped virtual Diagnoses/Problems
+ * collections, while selecting only the columns needed to build both.
+ *
+ * Draft-inclusive: a draft entity supersedes its published counterpart, and
+ * draft-only entities are included, matching `getScriptsWithItems`.
+ */
+export async function getScriptsConditionKeys(
+    scriptIds: string[],
+): Promise<{ data: {
+    scriptId: string;
+    dataKeys: any[];
+    conditionKeys: ReturnType<typeof buildScriptConditionKeys>;
+    conditionScreens: { screenId?: string; type?: string; key?: string; title?: string; position?: number }[];
+}[]; errors?: string[] }> {
+    try {
+        const ids = Array.from(new Set((scriptIds || []).map((s) => `${s || ''}`).filter(Boolean)));
+        if (!ids.length) return { data: [] };
+
+        const draftMatch = (scriptCol: any, scriptDraftCol: any) =>
+            or(inArray(scriptCol, ids), inArray(scriptDraftCol, ids));
+
+        const [
+            scripts,
+            pubScreens, 
+            draftScreens, 
+            pubDiag, 
+            draftDiag, 
+            pubProb, 
+            draftProb, 
+            dataKeysRes, 
+            configurationKeysRes
+        ] = await Promise.all([
+            getScripts({ scriptsIds: ids, }),
+            db.select({
+                scriptId: screens.scriptId, screenId: screens.screenId, key: screens.key,
+                label: screens.label, title: screens.title, type: screens.type,
+                position: screens.position,
+                fields: screens.fields, items: screens.items,
+                drugs: screens.drugs, fluids: screens.fluids, feeds: screens.feeds,
+            })
+                .from(screens)
+                .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
+                .where(and(isNull(screens.deletedAt), isNull(pendingDeletion.id), inArray(screens.scriptId, ids))),
+            db.select({ screenId: screensDrafts.screenId, data: screensDrafts.data })
+                .from(screensDrafts)
+                .where(draftMatch(screensDrafts.scriptId, screensDrafts.scriptDraftId)),
+            db.select({
+                scriptId: diagnoses.scriptId, diagnosisId: diagnoses.diagnosisId,
+                key: diagnoses.key, name: diagnoses.name, position: diagnoses.position, symptoms: diagnoses.symptoms,
+            })
+                .from(diagnoses)
+                .leftJoin(pendingDeletion, eq(pendingDeletion.diagnosisId, diagnoses.diagnosisId))
+                .where(and(isNull(diagnoses.deletedAt), isNull(pendingDeletion.id), inArray(diagnoses.scriptId, ids))),
+            db.select({ diagnosisId: diagnosesDrafts.diagnosisId, data: diagnosesDrafts.data })
+                .from(diagnosesDrafts)
+                .where(draftMatch(diagnosesDrafts.scriptId, diagnosesDrafts.scriptDraftId)),
+            db.select({
+                scriptId: problems.scriptId, problemId: problems.problemId,
+                key: problems.key, name: problems.name, position: problems.position, symptoms: problems.symptoms,
+            })
+                .from(problems)
+                .leftJoin(pendingDeletion, eq(pendingDeletion.problemId, problems.problemId))
+                .where(and(isNull(problems.deletedAt), isNull(pendingDeletion.id), inArray(problems.scriptId, ids))),
+            db.select({ problemId: problemsDrafts.problemId, data: problemsDrafts.data })
+                .from(problemsDrafts)
+                .where(draftMatch(problemsDrafts.scriptId, problemsDrafts.scriptDraftId)),
+            // Shared with the group layout's prefetch for this request, so the
+            // registry is loaded once per page render rather than twice.
+            getConditionKeyRegistry(),
+            _getConfigKeys({ returnDraftsIfExist: true }),
+        ]);
+
+        if (dataKeysRes.errors?.length) throw new Error(dataKeysRes.errors.join(", "));
+        if (configurationKeysRes.errors?.length) throw new Error(configurationKeysRes.errors.join(", "));
+
+        // A draft supersedes its published counterpart; draft-only entities are added.
+        const mergeEntities = <T extends Record<string, any>>(pub: T[], drafts: { data: any }[], idField: string) => {
+            const draftedIds = new Set(drafts.map((d: any) => d[idField]).filter(Boolean));
+            return [
+                ...pub.filter((p) => !draftedIds.has((p as any)[idField])),
+                ...drafts.map((d) => d.data),
+            ];
+        };
+
+        const mergedScreens = mergeEntities(pubScreens as any[], draftScreens as any[], 'screenId');
+        const mergedDiagnoses = mergeEntities(pubDiag as any[], draftDiag as any[], 'diagnosisId');
+        const mergedProblems = mergeEntities(pubProb as any[], draftProb as any[], 'problemId');
+
+        const drugKeys = collectDrugKeysFromScreens(mergedScreens);
+        const drugItems = drugKeys.size
+            ? (await _getDrugsLibraryItems({ keys: Array.from(drugKeys) })).data || []
+            : [];
+
+        const dataKeys = await scrapDataKeys({
+            scripts: scripts.data || [],
+            dataKeys: dataKeysRes.data || [],
+            screens: mergedScreens as any,
+            diagnoses: mergedDiagnoses as any,
+            problems: mergedProblems as any,
+            drugsLibrary: drugItems as any,
+        });
+        const conditionKeys = buildScriptConditionKeys({
+            dataKeys,
+            configurationKeys: configurationKeysRes.data || [],
+            diagnoses: mergedDiagnoses,
+            problems: mergedProblems,
+            screens: mergedScreens,
+        });
+
+        // The keys route is called per script, so one combined entry is enough.
+        const conditionScreens = mergedScreens.map((screen: any) => ({
+            screenId: screen?.screenId,
+            type: screen?.type,
+            key: getOutcomeCollectionForScreenType(screen?.type) || screen?.key,
+            title: screen?.title,
+            position: screen?.position,
+        }));
+        return { data: [{ scriptId: ids[0], dataKeys, conditionKeys, conditionScreens }] };
+    } catch (e: any) {
+        logger.error('getScriptsConditionKeys ERROR', e?.message);
+        return { data: [], errors: [e.message] };
+    }
+}
+
+/**
+ * Returns a map of scriptId -> CE error report for scripts that have any error.
+ * Called ONCE (not per row) by the scripts list, asynchronously, so it adds no
+ * render latency.
+ *
+ * Prefers the precomputed `conditionErrorReport` column (kept fresh on write,
+ * draft-inclusive) and computes the effective draft state for missing or stale
+ * reports. A
+ * Configuration-key signature makes old cache entries self-expire during a
+ * normal read, with no migration or backfill job.
+ */
+/**
+ * Coalesces reader-side refreshes so concurrent page loads that both notice the
+ * same stale script compute it once.
+ *
+ * `recomputeInFlight` only guards the recompute entry points; readers call the
+ * batch computation directly and would otherwise duplicate the work — and the
+ * persist that follows is fire-and-forget, so a second read arriving before the
+ * write lands would start again from scratch.
+ *
+ * Ids already being computed are awaited; the rest are computed as one batch,
+ * so batching survives the guard.
+ */
+const readerComputeInFlight = new Map<string, Promise<Record<string, ScriptConditionReport>>>();
+
+async function computeConditionReportsCoalesced(
+    inputs: ScriptConditionErrorInput[],
+    configurationKeys: any[],
+    opts?: { dataKeys?: any[]; dataKeyIndex?: Map<string, any>; signatures?: Map<string, string> },
+): Promise<Record<string, ScriptConditionReport>> {
+    const result: Record<string, ScriptConditionReport> = {};
+    const waits: Promise<void>[] = [];
+    const todo: ScriptConditionErrorInput[] = [];
+
+    for (const input of inputs) {
+        const id = `${input?.scriptId || ''}`;
+        if (!id) continue;
+        const existing = readerComputeInFlight.get(id);
+        if (existing) {
+            waits.push(existing.then((reports) => {
+                if (reports[id]) result[id] = reports[id];
+            }).catch(() => { /* the owning call logs it */ }));
+        } else {
+            todo.push(input);
+        }
+    }
+
+    if (todo.length) {
+        const promise = computeConditionReportsDraftInclusive(todo, configurationKeys, opts);
+        const ids = todo.map((input) => `${input?.scriptId || ''}`).filter(Boolean);
+        ids.forEach((id) => readerComputeInFlight.set(id, promise));
+        try {
+            Object.assign(result, await promise);
+        } finally {
+            ids.forEach((id) => {
+                if (readerComputeInFlight.get(id) === promise) readerComputeInFlight.delete(id);
+            });
+        }
+    }
+
+    await Promise.all(waits);
+    return result;
+}
+
+/**
+ * Forces one script's CE report to be recomputed and returns the fresh count.
+ *
+ * The signature check should keep reports honest on its own; this is the manual
+ * way out when a badge still looks wrong, so nobody has to wait on a fix to
+ * clear a stale indicator.
+ */
+export async function recheckScriptConditionErrors(scriptId: string): Promise<{
+    count: number;
+    errors?: string[];
+}> {
+    try {
+        await isAllowed();
+        const id = `${scriptId || ''}`;
+        if (!id) return { count: 0, errors: ['A script id is required'] };
+
+        await recomputeScriptConditionErrors(id);
+
+        const [row] = await db
+            .select({ report: scriptsTable.conditionErrorReport })
+            .from(scriptsTable)
+            .where(eq(scriptsTable.scriptId, id));
+
+        return { count: (row?.report as ScriptConditionReport | null)?.count || 0 };
+    } catch (e: any) {
+        logger.error('recheckScriptConditionErrors ERROR', e.message);
+        return { count: 0, errors: [e.message] };
+    }
+}
+
+export async function getScriptsConditionErrors(
+    scripts: ScriptConditionErrorInput[],
+): Promise<{ data: Record<string, ScriptConditionReport>; errors: string[] }> {
+    try {
+        const scriptIds = (scripts || []).map((s) => `${s?.scriptId || ''}`).filter(Boolean);
+        if (!scriptIds.length) return { data: {}, errors: [] };
+
+        // None of these three reads depends on the others, so they run together:
+        // run serially they made this call about twice as slow as it needed to be.
+        const [configurationKeysRes, reportRows, stamps] = await Promise.all([
+            _getConfigKeys({ returnDraftsIfExist: true }),
+            db
+                .select({ scriptId: scriptsTable.scriptId, report: scriptsTable.conditionErrorReport })
+                .from(scriptsTable)
+                .where(inArray(scriptsTable.scriptId, scriptIds))
+                // Column not migrated yet — fall through to computing everything lean.
+                .catch(() => [] as { scriptId: string; report: unknown }[]),
+            fetchConditionReportStamps(scriptIds),
+        ]);
+        if (configurationKeysRes.errors?.length) throw new Error(configurationKeysRes.errors.join(", "));
+        const configurationKeys = configurationKeysRes.data || [];
+        const configurationSignature = getConfigurationConditionKeySignature(configurationKeys);
+
+        const persisted = new Map<string, ScriptConditionReport | null>();
+        for (const row of reportRows) persisted.set(`${row.scriptId}`, (row.report as ScriptConditionReport | null) || null);
+
+        const signatures = buildConditionReportSignatures(scriptIds, configurationSignature, stamps);
+
+        const result: Record<string, ScriptConditionReport> = {};
+        const missing: ScriptConditionErrorInput[] = [];
+        const stale: ScriptConditionErrorInput[] = [];
+        const refreshInBackground: ScriptConditionErrorInput[] = [];
+        for (const s of scripts) {
+            const id = `${s?.scriptId || ''}`;
+            if (!id) continue;
+            const report = persisted.get(id);
+            const expected = signatures.get(id);
+            // A report is only trusted while the inputs it was computed from are
+            // unchanged.
+            if (report && !!expected && report.inputsSignature === expected) {
+                result[id] = report;
+            } else if (report && !report.inputsSignature && report.configurationSignature === configurationSignature) {
+                // Written before signatures existed. It still passes the check
+                // that was in force when it was written, so serve it and re-sign
+                // out of band.
+                result[id] = report;
+                refreshInBackground.push(s);
+            } else if (report && isSupersededConditionReportSignature(report.inputsSignature, expected)) {
+                // The script is unchanged; only the validation rules moved on.
+                // Every script hits this at once after such a deploy, so it is
+                // explicitly not the inline `stale` path.
+                result[id] = report;
+                refreshInBackground.push(s);
+            } else if (report) {
+                stale.push(s);
+            } else {
+                missing.push(s);
+            }
+        }
+
+        if (refreshInBackground.length) {
+            void (async () => {
+                try {
+                    const computed = await computeConditionReportsCoalesced(refreshInBackground, configurationKeys, { signatures });
+                    await persistConditionReports(computed);
+                } catch (e: any) {
+                    logger.error('getScriptsConditionErrors background refresh ERROR', e?.message);
+                }
+            })();
+        }
+
+        if (missing.length) {
+            const computed = await computeConditionReportsCoalesced(missing, configurationKeys, { signatures });
+            Object.assign(result, computed);
+            void persistConditionReports(computed);
+        }
+        if (stale.length) {
+            const computed = await computeConditionReportsCoalesced(stale, configurationKeys, { signatures });
+            Object.assign(result, computed);
+            void persistConditionReports(computed);
+        }
+
+        const pruned: Record<string, ScriptConditionReport> = {};
+        for (const [id, report] of Object.entries(result)) {
+            if (report && report.count > 0) pruned[id] = report;
+        }
+        return { data: pruned, errors: [] };
+    } catch (e: any) {
+        logger.error('getScriptsConditionErrors ERROR', e.message);
+        return { data: {}, errors: [e.message] };
+    }
+}
+
+/** Does the actual per-script CE report computation + persist. Never throws. */
+async function doRecomputeScriptConditionErrors(
+    id: string,
+    opts?: {
+        dataKeys?: any[];
+        dataKeyIndex?: Map<string, any>;
+        configurationKeys?: any[];
+        signatures?: Map<string, string>;
+    },
+): Promise<void> {
+    try {
+        let configurationKeys = opts?.configurationKeys;
+        if (configurationKeys === undefined) {
+            const configurationKeysRes = await _getConfigKeys({ returnDraftsIfExist: true });
+            if (configurationKeysRes.errors?.length) {
+                logger.error('recomputeScriptConditionErrors Configuration ERROR', configurationKeysRes.errors.join(", "));
+                return;
+            }
+            configurationKeys = configurationKeysRes.data || [];
+        }
+        const configurationSignature = getConfigurationConditionKeySignature(configurationKeys);
+        const signatures = opts?.signatures
+            ?? await resolveConditionReportSignatures([id], configurationSignature);
+        const reports = await computeConditionReportsDraftInclusive(
+            [{ scriptId: id }],
+            configurationKeys,
+            { dataKeys: opts?.dataKeys, dataKeyIndex: opts?.dataKeyIndex, signatures },
+        );
+        const report = reports[id] ?? {
+                count: 0,
+                findings: [],
+                configurationSignature,
+                inputsSignature: signatures.get(id),
+            };
+        await db.update(scriptsTable).set({ conditionErrorReport: report }).where(eq(scriptsTable.scriptId, id));
+    } catch (e: any) {
+        logger.error('recomputeScriptConditionErrors ERROR', e?.message);
+    }
+}
+
+
+const recomputeInFlight = new Map<string, { dirty: boolean; promise: Promise<void> }>();
+
+/**
+ * Recomputes a single script's CE report (draft-inclusive) and persists it.
+ * Coalesced per script + fire-and-forget from save paths; never throws.
+ *
+ * Pass a prebuilt `dataKeyIndex` when recomputing many scripts so the registry
+ * is loaded once for the batch instead of once per script.
+ */
+export async function recomputeScriptConditionErrors(
+    scriptId: string,
+    opts?: {
+        dataKeys?: any[];
+        dataKeyIndex?: Map<string, any>;
+        configurationKeys?: any[];
+        signatures?: Map<string, string>;
+    },
+): Promise<void> {
+    const id = `${scriptId || ''}`;
+    if (!id) return;
+
+    const active = recomputeInFlight.get(id);
+    if (active) {
+        active.dirty = true;
+        await active.promise;
+        return;
+    }
+
+    const state = { dirty: false, promise: Promise.resolve() };
+    recomputeInFlight.set(id, state);
+    state.promise = (async () => {
+        try {
+            do {
+                state.dirty = false;
+                await doRecomputeScriptConditionErrors(id, opts);
+            } while (state.dirty);
+        } finally {
+            recomputeInFlight.delete(id);
+        }
+    })();
+
+    await state.promise;
+}
+
+/** Runs tasks with a bounded concurrency so batches don't stampede the DB. */
+async function runWithConcurrency<T>(items: T[], limit: number, task: (item: T) => Promise<void>): Promise<void> {
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+            const item = items[nextIndex++];
+            await task(item);
+        }
+    });
+    await Promise.all(workers);
+}
+
+/**
+ * Recomputes several scripts' CE reports in one draft-aware lean batch.
+ * Per-script in-flight state is still honoured so a save racing the batch is
+ * followed by one final refresh of that script before callers are released.
+ */
+export async function recomputeScriptsConditionErrors(scriptIds: (string | null | undefined)[]): Promise<void> {
+    const ids = Array.from(new Set((scriptIds || []).map((s) => `${s || ''}`).filter(Boolean)));
+    if (!ids.length) return;
+    
+    let dataKeyIndex: Map<string, any> | undefined;
+    let dataKeys: any[] | undefined;
+    let configurationKeys: any[] | undefined;
+    try {
+        const registry = await _getDataKeys({ returnDraftsIfExist: true });
+        if (registry.errors?.length) logger.error('recomputeScriptsConditionErrors registry ERROR', registry.errors.join(", "));
+        else {
+            dataKeys = registry.data || [];
+            dataKeyIndex = indexDataKeysById(dataKeys as any);
+        }
+    } catch (e: any) {
+        logger.error('recomputeScriptsConditionErrors registry ERROR', e?.message);
+    }
+    try {
+        const configurationKeysRes = await _getConfigKeys({ returnDraftsIfExist: true });
+        if (configurationKeysRes.errors?.length) {
+            logger.error('recomputeScriptsConditionErrors Configuration ERROR', configurationKeysRes.errors.join(", "));
+            return;
+        }
+        configurationKeys = configurationKeysRes.data || [];
+    } catch (e: any) {
+        logger.error('recomputeScriptsConditionErrors Configuration ERROR', e?.message);
+        return;
+    }
+    const resolvedConfigurationKeys = configurationKeys || [];
+    
+    const ownedStates: { id: string; dirty: boolean; promise: Promise<void> }[] = [];
+    const alreadyInFlight: string[] = [];
+    for (const id of ids) {
+        if (recomputeInFlight.has(id)) {
+            alreadyInFlight.push(id);
+            continue;
+        }
+        const state = { id, dirty: false, promise: Promise.resolve() };
+        ownedStates.push(state);
+        recomputeInFlight.set(id, state);
+    }
+
+    const batchPromise = (async () => {
+        try {
+            const reports = await computeConditionReportsDraftInclusive(
+                ownedStates.map(({ id }) => ({ scriptId: id })),
+                resolvedConfigurationKeys,
+                { dataKeys, dataKeyIndex },
+            );
+            await persistConditionReports(reports);
+
+            // Any save that arrived during the batch marked its state dirty.
+            // Re-read only those scripts until their latest committed state is
+            // represented; the common publish path remains a single batch.
+            // Drain globally, not once per worker. A clean state can become
+            // dirty while another state's refresh is awaiting I/O; rechecking
+            // the full owned set closes that save-vs-cleanup race.
+            while (ownedStates.some((state) => state.dirty)) {
+                const dirtyStates = ownedStates.filter((state) => state.dirty);
+                dirtyStates.forEach((state) => { state.dirty = false; });
+                // These scripts changed after the batch resolved, so their
+                // signatures have to be re-read — once for the set, not once
+                // per script.
+                const signatures = await resolveConditionReportSignatures(
+                    dirtyStates.map(({ id }) => id),
+                    getConfigurationConditionKeySignature(resolvedConfigurationKeys),
+                );
+                await runWithConcurrency(dirtyStates, 6, async (state) => {
+                    await doRecomputeScriptConditionErrors(state.id, {
+                        dataKeys,
+                        dataKeyIndex,
+                        configurationKeys: resolvedConfigurationKeys,
+                        signatures,
+                    });
+                });
+            }
+        } catch (e: any) {
+            logger.error('recomputeScriptsConditionErrors batch ERROR', e?.message);
+        } finally {
+            for (const state of ownedStates) {
+                if (recomputeInFlight.get(state.id) === state) recomputeInFlight.delete(state.id);
+            }
+        }
+    })();
+    for (const state of ownedStates) state.promise = batchPromise;
+
+    const inFlightSignatures = alreadyInFlight.length
+        ? await resolveConditionReportSignatures(
+            alreadyInFlight,
+            getConfigurationConditionKeySignature(resolvedConfigurationKeys),
+        )
+        : undefined;
+
+    await Promise.all([
+        batchPromise,
+        runWithConcurrency(alreadyInFlight, 6, (id) =>
+            recomputeScriptConditionErrors(id, {
+                dataKeys,
+                dataKeyIndex,
+                configurationKeys: resolvedConfigurationKeys,
+                signatures: inFlightSignatures,
+            }),
+        ),
+    ]);
+}
+
+/**
+ * Writes already-computed reports back to the `conditionErrorReport` column so
+ * they don't have to be recomputed on the next read. This is what makes the
+ * cache self-populate: the first read that computes-lean warms the column, and
+ * every subsequent read is a plain indexed select. Fire-and-forget; a failure
+ * here (e.g. column not migrated) must never surface to the caller.
+ */
+async function persistConditionReports(reports: Record<string, ScriptConditionReport>): Promise<void> {
+    const entries = Object.entries(reports || {});
+    if (!entries.length) return;
+    try {
+        await runWithConcurrency(entries, 6, async ([id, report]) => {
+            await db
+                .update(scriptsTable)
+                .set({ conditionErrorReport: report })
+                .where(eq(scriptsTable.scriptId, id))
+                .catch((e: any) => logger.error('persistConditionReports row ERROR', e?.message));
+        });
+    } catch (e: any) {
+        logger.error('persistConditionReports ERROR', e?.message);
+    }
+}
+
+export type ScriptFieldKeyCollisionReport = {
+    scriptId: string;
+    title: string;
+    blocking: number;
+    warnings: number;
+    /** How many of each rule fired, so a summary can name them individually. */
+    byKind: Partial<Record<FieldKeyCollisionKind, number>>;
+    examples: {
+        /** Which rule fired, so a reader can name it from FIELD_KEY_COLLISION_RULES. */
+        kind: FieldKeyCollisionKind;
+        severity: FieldKeyCollisionSeverity;
+        /** The key as the author spelled it, for a badge that has room for one detail. */
+        displayKey: string;
+        location: string;
+        message: string;
+        href?: string;
+    }[];
+};
+
+/**
+ * Summarizes duplicate field keys across the scripts being published.
+ *
+ * Unlike the conditional-expression gate this needs no precomputed column:
+ * collisions are a group-by over each screen's `fields`, and conditions are only
+ * parsed for keys that actually repeat — which is rare. One screens query per
+ * publish covers the whole scope. Never throws: a failure here must not block
+ * publishing.
+ */
+export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: string[] }): Promise<{
+    scripts: ScriptFieldKeyCollisionReport[];
+    totalBlocking: number;
+    totalWarnings: number;
+    /** Per-rule totals across the whole scope, for the publish summary headline. */
+    totalsByKind: Partial<Record<FieldKeyCollisionKind, number>>;
+}> {
+    const empty = {
+        scripts: [] as ScriptFieldKeyCollisionReport[],
+        totalBlocking: 0,
+        totalWarnings: 0,
+        totalsByKind: {} as Partial<Record<FieldKeyCollisionKind, number>>,
+    };
+    try {
+        const scopeIds = opts?.scriptIds;
+        if (scopeIds && !scopeIds.length) return empty;
+
+        const scriptFilter = scopeIds?.length
+            ? and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scopeIds))
+            : isNull(scriptsTable.deletedAt);
+
+        const [scriptRows, screenRows, draftRows] = await Promise.all([
+            db.select({ scriptId: scriptsTable.scriptId, title: scriptsTable.title })
+                .from(scriptsTable)
+                .where(scriptFilter),
+            db.select({
+                scriptId: screens.scriptId,
+                screenId: screens.screenId,
+                title: screens.title,
+                label: screens.label,
+                key: screens.key,
+                position: screens.position,
+                condition: screens.condition,
+                repeatable: screens.repeatable,
+                fields: screens.fields,
+                // A single/multi select screen keeps its options here rather
+                // than on a field, so without this its duplicate option values
+                // are invisible to the badge and to the publish gate.
+                items: screens.items,
+            })
+                .from(screens)
+                .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
+                .where(
+                    scopeIds?.length
+                        ? and(isNull(screens.deletedAt), isNull(pendingDeletion.id), inArray(screens.scriptId, scopeIds))
+                        : and(isNull(screens.deletedAt), isNull(pendingDeletion.id)),
+                ),
+            db.select({ scriptId: screensDrafts.scriptId, screenId: screensDrafts.screenId, data: screensDrafts.data })
+                .from(screensDrafts)
+                .where(scopeIds?.length ? inArray(screensDrafts.scriptId, scopeIds) : undefined),
+        ]);
+
+        // A draft supersedes its published screen; draft-only screens are added.
+        const draftedScreenIds = new Set<string>();
+        for (const row of draftRows) {
+            const id = `${row?.screenId || (row?.data as any)?.screenId || ''}`;
+            if (id) draftedScreenIds.add(id);
+        }
+
+        const screensByScript = new Map<string, any[]>();
+        const pushScreen = (scriptId: string, screen: any) => {
+            if (!scriptId) return;
+            const list = screensByScript.get(scriptId);
+            if (list) list.push(screen);
+            else screensByScript.set(scriptId, [screen]);
+        };
+
+        for (const row of screenRows) {
+            if (draftedScreenIds.has(`${row?.screenId || ''}`)) continue;
+            pushScreen(`${row?.scriptId || ''}`, row);
+        }
+        for (const row of draftRows) {
+            const data = (row?.data || {}) as any;
+            pushScreen(`${row?.scriptId || data?.scriptId || ''}`, data);
+        }
+
+        const scripts: ScriptFieldKeyCollisionReport[] = [];
+        let totalBlocking = 0;
+        let totalWarnings = 0;
+        const totalsByKind: Partial<Record<FieldKeyCollisionKind, number>> = {};
+
+        for (const script of scriptRows) {
+            const scriptId = `${script?.scriptId || ''}`;
+            const scriptScreens = screensByScript.get(scriptId) || [];
+            if (!scriptScreens.length) continue;
+
+            const collisions = findScriptFieldKeyCollisions({ scriptId, screens: scriptScreens as any });
+            if (!collisions.length) continue;
+
+            const blocking = collisions.filter((c: FieldKeyCollision) => c.severity === 'blocking');
+            const warnings = collisions.length - blocking.length;
+            totalBlocking += blocking.length;
+            totalWarnings += warnings;
+
+            // Counted off the collisions already in hand — no extra scan.
+            const byKind: Partial<Record<FieldKeyCollisionKind, number>> = {};
+            for (const c of collisions) {
+                byKind[c.kind] = (byKind[c.kind] || 0) + 1;
+                totalsByKind[c.kind] = (totalsByKind[c.kind] || 0) + 1;
+            }
+
+            scripts.push({
+                scriptId,
+                title: `${script?.title || 'Untitled script'}`,
+                blocking: blocking.length,
+                warnings,
+                byKind,
+                examples: (blocking.length ? blocking : collisions).slice(0, 5).map((c) => ({
+                    kind: c.kind,
+                    severity: c.severity,
+                    displayKey: c.displayKey,
+                    location: c.location,
+                    message: c.message,
+                    href: c.screenId ? `/script/${scriptId}/screen/${c.screenId}` : `/script/${scriptId}?section=screens`,
+                })),
+            });
+        }
+
+        // Worst offenders first.
+        scripts.sort((a, b) => (b.blocking - a.blocking) || (b.warnings - a.warnings));
+        return { scripts, totalBlocking, totalWarnings, totalsByKind };
+    } catch (e: any) {
+        logger.error('getScriptsWithFieldKeyCollisions ERROR', e?.message);
+        return empty;
+    }
+}
+
+/**
+ * Summarizes scripts that carry conditional-expression errors, for the
+ * publish-time gate.
+ *
+ * Prefers the precomputed `conditionErrorReport` column (kept fresh on every
+ * save) and lazily computes lean for any missing report or Configuration-key
+ * signature mismatch. This self-heals during normal reads without a migration
+ * or backfill job. Never throws: a failure here must not block publishing.
+ *
+ * Pass `scriptIds` to restrict the check to the scripts actually being published
+ * (the publish scope) — an empty array means "no scripts in scope" and returns
+ * nothing; omit it to scan every script. `forceRefresh` computes the effective
+ * draft state in the request itself, including scripts that have never had a
+ * published row and therefore cannot carry a persisted report yet.
+ */
+export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[]; forceRefresh?: boolean }): Promise<{
+    scripts: { scriptId: string; title: string; count: number }[];
+    totalFindings: number;
+}> {
+    try {
+        const scopeIds = opts?.scriptIds
+            ? Array.from(new Set(opts.scriptIds.map((id) => `${id || ''}`).filter(Boolean)))
+            : undefined;
+        if (scopeIds && !scopeIds.length) return { scripts: [], totalFindings: 0 };
+        const scopeSet = scopeIds ? new Set(scopeIds) : undefined;
+
+        const configurationKeysRes = await _getConfigKeys({ returnDraftsIfExist: true });
+        if (configurationKeysRes.errors?.length) throw new Error(configurationKeysRes.errors.join(", "));
+        const configurationKeys = configurationKeysRes.data || [];
+        const configurationSignature = getConfigurationConditionKeySignature(configurationKeys);
+
+        const [rows, draftRows] = await Promise.all([
+            db
+                .select({
+                    scriptId: scriptsTable.scriptId,
+                    title: scriptsTable.title,
+                    report: scriptsTable.conditionErrorReport,
+                    nuidSearchFields: scriptsTable.nuidSearchFields,
+                    eligibilityCriteria: scriptsTable.eligibilityCriteria,
+                })
+                .from(scriptsTable)
+                .where(
+                    scopeIds
+                        ? and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scopeIds))
+                        : isNull(scriptsTable.deletedAt),
+                ),
+            db
+                .select({
+                    scriptId: scriptsDrafts.scriptId,
+                    scriptDraftId: scriptsDrafts.scriptDraftId,
+                    data: scriptsDrafts.data,
+                })
+                .from(scriptsDrafts)
+                .where(scopeIds ? or(
+                    inArray(scriptsDrafts.scriptId, scopeIds),
+                    inArray(scriptsDrafts.scriptDraftId, scopeIds),
+                ) : undefined),
+        ]);
+
+        type EffectiveScript = ScriptConditionErrorInput & {
+            title: string;
+            report: ScriptConditionReport | null;
+            hasDraft: boolean;
+        };
+        const effectiveById = new Map<string, EffectiveScript>();
+        for (const row of rows) {
+            const id = `${row.scriptId || ''}`;
+            if (!id) continue;
+            effectiveById.set(id, {
+                scriptId: id,
+                title: `${row.title || 'Untitled script'}`,
+                report: (row.report as ScriptConditionReport | null) || null,
+                hasDraft: false,
+                nuidSearchFields: row.nuidSearchFields,
+                eligibilityCriteria: row.eligibilityCriteria,
+            });
+        }
+        for (const row of draftRows) {
+            const data = row?.data || {};
+            const candidates = [data?.scriptId, row?.scriptDraftId, row?.scriptId]
+                .map((candidate) => `${candidate || ''}`)
+                .filter(Boolean);
+            const id = scopeSet
+                ? candidates.find((candidate) => scopeSet.has(candidate))
+                : candidates[0];
+            if (!id) continue;
+            const current = effectiveById.get(id);
+            effectiveById.set(id, {
+                scriptId: id,
+                title: data?.title !== undefined
+                    ? `${data.title || 'Untitled script'}`
+                    : current?.title || 'Untitled script',
+                report: current?.report || null,
+                hasDraft: true,
+                nuidSearchFields: data?.nuidSearchFields !== undefined
+                    ? data.nuidSearchFields
+                    : current?.nuidSearchFields,
+                eligibilityCriteria: data?.eligibilityCriteria !== undefined
+                    ? data.eligibilityCriteria
+                    : current?.eligibilityCriteria,
+            });
+        }
+
+        const titleById = new Map<string, string>();
+        const counts = new Map<string, number>();
+        const missing: ScriptConditionErrorInput[] = [];
+        const stale: ScriptConditionErrorInput[] = [];
+        const refresh: ScriptConditionErrorInput[] = [];
+
+        const signatures = await resolveConditionReportSignatures(
+            Array.from(effectiveById.keys()),
+            configurationSignature,
+        );
+
+        for (const row of effectiveById.values()) {
+            const id = row.scriptId;
+            titleById.set(id, row.title);
+            const input = {
+                scriptId: id,
+                nuidSearchFields: row.nuidSearchFields,
+                eligibilityCriteria: row.eligibilityCriteria,
+            };
+            const expected = signatures.get(id);
+            if (opts?.forceRefresh) {
+                refresh.push(input);
+            } else if (row.report && !!expected && row.report.inputsSignature === expected) {
+                const report = row.report;
+                counts.set(id, report.count || 0);
+            } else if (row.report || row.hasDraft) {
+                // Draft-only scripts have no published cache row. They must use
+                // the same draft-inclusive computation as stale published rows.
+                stale.push(input);
+            } else {
+                missing.push(input);
+            }
+        }
+
+        if (refresh.length) {
+            const computed = await computeConditionReportsCoalesced(refresh, configurationKeys, { signatures });
+            for (const [id, report] of Object.entries(computed)) {
+                counts.set(id, report?.count || 0);
+            }
+            await persistConditionReports(computed);
+        }
+        // Lazily fill in never-computed scripts (also self-heals the column
+        // for next time — computeConditionReportsLean is a bounded bulk query).
+        if (missing.length) {
+            const computed = await computeConditionReportsLean(missing, configurationKeys, { signatures });
+            for (const [id, report] of Object.entries(computed)) {
+                counts.set(id, report?.count || 0);
+            }
+            void persistConditionReports(computed);
+        }
+        if (stale.length) {
+            const computed = await computeConditionReportsCoalesced(stale, configurationKeys, { signatures });
+            for (const [id, report] of Object.entries(computed)) {
+                counts.set(id, report?.count || 0);
+            }
+            void persistConditionReports(computed);
+        }
+
+        const scripts: { scriptId: string; title: string; count: number }[] = [];
+        let totalFindings = 0;
+        counts.forEach((count, id) => {
+            if (count > 0) {
+                scripts.push({ scriptId: id, title: titleById.get(id) || 'Untitled script', count });
+                totalFindings += count;
+            }
+        });
+        // Worst offenders first.
+        scripts.sort((a, b) => b.count - a.count);
+        return { scripts, totalFindings };
+    } catch (e: any) {
+        // Column not migrated yet, or a transient DB error — degrade to "no warnings".
+        logger.error('getScriptsWithConditionErrors ERROR', e?.message);
+        return { scripts: [], totalFindings: 0 };
+    }
+}
+
+async function saveScriptScreens({
     screens,
     scriptId,
     preserveScreensIds,
     draftOrigin,
+    uploadedFiles = {},
+    oldScriptId,
+    client,
 }: {
     preserveScreensIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    // Pass this when the caller already knows it (e.g. it just saved the
+    // script in the same transaction) to skip a redundant lookup that, inside
+    // an open transaction, would race the not-yet-committed script insert.
+    oldScriptId?: string | null;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -328,9 +2206,15 @@ export async function saveScriptScreens({
         let saved = 0;
         const errors: string[] = [];
 
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        if (oldScriptId === undefined) {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            oldScriptId = script.data.oldScriptId;
+        }
+
+        const incomingScreens: any[] = [];
+        const collisionBaselineScreens: any[] = [];
 
         for (const screen of screens) {
             const {
@@ -342,7 +2226,7 @@ export async function saveScriptScreens({
                 isDeleted,
                 deletedAt,
                 version,
-                oldScriptId,
+                oldScriptId: _ignoreOldScriptId,
                 oldScreenId,
                 screenId: _ignoreScreenId,
                 scriptId: _ignoreScriptId,
@@ -358,39 +2242,69 @@ export async function saveScriptScreens({
 
             try {
                 if (s.image1) {
-                    const res = await processImage(s.image1);
-                    s.image1 = res.image;
+                    if (uploadedFiles[s.image1.fileId || s.image1.data]) {
+                        s.image1 = uploadedFiles[s.image1.fileId || s.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image1);
+                        s.image1 = res.file;
+                    }
                 }
                 if (s.image2) {
-                    const res = await processImage(s.image2);
-                    s.image2 = res.image;
+                    if (uploadedFiles[s.image2.fileId || s.image2.data]) {
+                        s.image2 = uploadedFiles[s.image2.fileId || s.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image2);
+                        s.image2 = res.file;
+                    }
                 }
                 if (s.image3) {
-                    const res = await processImage(s.image3);
-                    s.image3 = res.image;
+                    if (uploadedFiles[s.image3.fileId || s.image3.data]) {
+                        s.image3 = uploadedFiles[s.image3.fileId || s.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image3);
+                        s.image3 = res.file;
+                    }
+                }
+                if (s.contentTextImage) {
+                    if (uploadedFiles[s.contentTextImage.fileId || s.contentTextImage.data]) {
+                        s.contentTextImage = uploadedFiles[s.contentTextImage.fileId || s.contentTextImage.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.contentTextImage);
+                        s.contentTextImage = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
             }
 
-            const res = await saveScreens({
-                data: [{
-                    ...s,
-                    scriptId,
-                    oldScriptId: script.data.oldScriptId,
-                    screenId,
-                    version: 1,
-                }],
-                draftOrigin,
+            incomingScreens.push({
+                ...s,
+                scriptId,
+                oldScriptId,
+                screenId,
+                version: 1,
             });
+            // Rebase the trusted source onto the minted id so unchanged
+            // legacy collisions retain the same stable path identity.
+            collisionBaselineScreens.push({ ...screen, scriptId, screenId });
+        }
 
-            res.errors?.forEach(e => errors.push(`(screenId=${_ignoreScreenId}) ${e || ''}`));
+        if (errors.length) return { errors, saved: 0, success: false, };
 
-            if (!res.errors?.length) saved++;
+        if (incomingScreens.length) {
+            const res = await saveScreensInternal(
+                { data: incomingScreens, draftOrigin, client },
+                { screens: collisionBaselineScreens },
+            );
+
+            res.errors?.forEach(e => errors.push(e || ''));
+
+            if (!res.errors?.length) saved = incomingScreens.length;
         }
 
         if (errors.length) return { errors, saved, success: false, };
 
+        if (!client) void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptScreens ERROR', e.message);
@@ -398,16 +2312,22 @@ export async function saveScriptScreens({
     }
 }
 
-export async function saveScriptDiagnoses({
+async function saveScriptDiagnoses({
     diagnoses,
     scriptId,
     preserveDiagnosesIds,
     draftOrigin,
+    uploadedFiles = {},
+    oldScriptId,
+    client,
 }: {
     preserveDiagnosesIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    oldScriptId?: string | null;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -417,9 +2337,15 @@ export async function saveScriptDiagnoses({
         let saved = 0;
         const errors: string[] = [];
 
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        if (oldScriptId === undefined) {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            oldScriptId = script.data.oldScriptId;
+        }
+
+        const incomingDiagnoses: any[] = [];
+        const collisionBaselineDiagnoses: any[] = [];
 
         for (const diagnosis of diagnoses) {
             const {
@@ -446,39 +2372,59 @@ export async function saveScriptDiagnoses({
 
             try {
                 if (d.image1) {
-                    const res = await processImage(d.image1);
-                    d.image1 = res.image;
+                    if (uploadedFiles[d.image1.fileId || d.image1.data]) {
+                        d.image1 = uploadedFiles[d.image1.fileId || d.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image1);
+                        d.image1 = res.file;
+                    }
                 }
                 if (d.image2) {
-                    const res = await processImage(d.image2);
-                    d.image2 = res.image;
+                    if (uploadedFiles[d.image2.fileId || d.image2.data]) {
+                        d.image2 = uploadedFiles[d.image2.fileId || d.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image2);
+                        d.image2 = res.file;
+                    }
                 }
                 if (d.image3) {
-                    const res = await processImage(d.image3);
-                    d.image3 = res.image;
+                    if (uploadedFiles[d.image3.fileId || d.image3.data]) {
+                        d.image3 = uploadedFiles[d.image3.fileId || d.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image3);
+                        d.image3 = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
             }
 
-            const res = await saveDiagnoses({
-                data: [{
-                    ...d,
-                    scriptId,
-                    oldScriptId: script.data.oldScriptId,
-                    diagnosisId,
-                    version: 1,
-                }],
-                draftOrigin,
+            incomingDiagnoses.push({
+                ...d,
+                scriptId,
+                oldScriptId,
+                diagnosisId,
+                version: 1,
             });
+            collisionBaselineDiagnoses.push({ ...diagnosis, scriptId, diagnosisId });
+        }
 
-            res.errors?.forEach(e => errors.push(`(diagnosisId=${_ignoreDiagnosisId}) ${e || ''}`));
+        if (errors.length) return { errors, saved: 0, success: false, };
 
-            if (!res.errors?.length) saved++;
+        if (incomingDiagnoses.length) {
+            const res = await saveDiagnosesInternal(
+                { data: incomingDiagnoses, draftOrigin, client },
+                { diagnoses: collisionBaselineDiagnoses },
+            );
+
+            res.errors?.forEach(e => errors.push(e || ''));
+
+            if (!res.errors?.length) saved = incomingDiagnoses.length;
         }
 
         if (errors.length) return { errors, saved, success: false, };
 
+        if (!client) void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptDiagnoses ERROR', e.message);
@@ -486,16 +2432,22 @@ export async function saveScriptDiagnoses({
     }
 }
 
-export async function saveScriptProblems({
+async function saveScriptProblems({
     problems,
     scriptId,
     preserveProblemsIds,
     draftOrigin,
+    uploadedFiles = {},
+    oldScriptId,
+    client,
 }: {
     preserveProblemsIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     problems: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['problems'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    oldScriptId?: string | null;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -505,9 +2457,15 @@ export async function saveScriptProblems({
         let saved = 0;
         const errors: string[] = [];
 
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        if (oldScriptId === undefined) {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            oldScriptId = script.data.oldScriptId;
+        }
+
+        const incomingProblems: any[] = [];
+        const collisionBaselineProblems: any[] = [];
 
         for (const problem of problems) {
             const {
@@ -533,39 +2491,59 @@ export async function saveScriptProblems({
 
             try {
                 if (d.image1) {
-                    const res = await processImage(d.image1);
-                    d.image1 = res.image;
+                    if (uploadedFiles[d.image1.fileId || d.image1.data]) {
+                        d.image1 = uploadedFiles[d.image1.fileId || d.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image1);
+                        d.image1 = res.file;
+                    }
                 }
                 if (d.image2) {
-                    const res = await processImage(d.image2);
-                    d.image2 = res.image;
+                    if (uploadedFiles[d.image2.fileId || d.image2.data]) {
+                        d.image2 = uploadedFiles[d.image2.fileId || d.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image2);
+                        d.image2 = res.file;
+                    }
                 }
                 if (d.image3) {
-                    const res = await processImage(d.image3);
-                    d.image3 = res.image;
+                    if (uploadedFiles[d.image3.fileId || d.image3.data]) {
+                        d.image3 = uploadedFiles[d.image3.fileId || d.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image3);
+                        d.image3 = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
             }
 
-            const res = await saveProblems({
-                data: [{
-                    ...d,
-                    scriptId,
-                    oldScriptId: script.data.oldScriptId,
-                    problemId,
-                    version: 1,
-                }],
-                draftOrigin,
+            incomingProblems.push({
+                ...d,
+                scriptId,
+                oldScriptId,
+                problemId,
+                version: 1,
             });
+            collisionBaselineProblems.push({ ...problem, scriptId, problemId });
+        }
 
-            res.errors?.forEach(e => errors.push(`(problemId=${_ignoreProblemId}) ${e || ''}`));
+        if (errors.length) return { errors, saved: 0, success: false, };
 
-            if (!res.errors?.length) saved++;
+        if (incomingProblems.length) {
+            const res = await saveProblemsInternal(
+                { data: incomingProblems, draftOrigin, client },
+                { problems: collisionBaselineProblems },
+            );
+
+            res.errors?.forEach(e => errors.push(e || ''));
+
+            if (!res.errors?.length) saved = incomingProblems.length;
         }
 
         if (errors.length) return { errors, saved, success: false, };
 
+        if (!client) void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptProblems ERROR', e.message);
@@ -573,9 +2551,10 @@ export async function saveScriptProblems({
     }
 }
 
-export async function deleteScriptsItems({ scriptsIds, draftOrigin, }: {
+export async function deleteScriptsItems({ scriptsIds, draftOrigin, client, }: {
     scriptsIds: string[];
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -583,13 +2562,13 @@ export async function deleteScriptsItems({ scriptsIds, draftOrigin, }: {
     try {
         const errors: string[] = [];
 
-        const delScreens = await deleteScreens({ scriptsIds, draftOrigin });
+        const delScreens = await deleteScreens({ scriptsIds, draftOrigin, client });
         delScreens.errors?.forEach(e => errors.push(e));
 
-        const delDiagnoses = await deleteDiagnoses({ scriptsIds, draftOrigin });
+        const delDiagnoses = await deleteDiagnoses({ scriptsIds, draftOrigin, client });
         delDiagnoses.errors?.forEach(e => errors.push(e));
 
-        const delProblems = await deleteProblems({ scriptsIds, draftOrigin });
+        const delProblems = await deleteProblems({ scriptsIds, draftOrigin, client });
         delProblems.errors?.forEach(e => errors.push(e));
 
         if (errors.length) return { errors, success: false, };
@@ -610,7 +2589,8 @@ const saveScriptsWithItemsInfo = {
     dataKeys: 0,
 };
 
-export async function saveScriptsWithItems({ data, }: {
+export async function saveScriptsWithItems({ data, uploadedFiles, }: {
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
         draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
@@ -639,15 +2619,6 @@ export async function saveScriptsWithItems({ data, }: {
             if (overWriteScriptWithId && !overWriteScript?.data) {
                 errors.push('Overwrite script was not found');
                 continue;
-            }
-
-            if (overWriteScript?.data) {
-                const res = await deleteScriptsItems({
-                    scriptsIds: [overWriteScript.data.scriptId],
-                    draftOrigin,
-                });
-                res.errors?.forEach(e => errors.push(e));
-                if (errors.length) continue;
             }
 
             const {
@@ -699,52 +2670,108 @@ export async function saveScriptsWithItems({ data, }: {
             });
 
             const problems = copiedProblems.map(d => {
-                const diagnosisId = v4();
-                return { ...d, diagnosisId, };
+                const problemId = v4();
+                return { ...d, problemId, };
             });
 
             const scriptId = overWriteScript?.data?.scriptId || v4();
 
-            const res = await saveScripts({
-                data: [{
-                    ...s,
-                    scriptId,
-                    version: 1,
-                    printSections: printSections.map(s => ({
-                        ...s,
-                        screensIds: s.screensIds.map((id: string) => oldScreensIdsMap[id]).filter((id: string | undefined | null): id is string => !!id),
-                    })),
-                    reviewConfigurations: reviewConfigurations.map(c => ({
-                        ...c,
-                        screen: oldScreensIdsMap[c.screen],
-                    })).filter((c): c is typeof c & { screen: string } => !!c.screen),
-                }],
-                draftOrigin,
-            });
+            // Everything below writes to the DB for this one script (its
+            // overwrite-delete, the script row, and its screens/diagnoses/
+            // problems). Run it as a single transaction so a failure partway
+            // through doesn't leave the script half-saved — either all of it
+            // lands, or none of it does. Other scripts in this same import
+            // are unaffected either way, matching the existing behavior of
+            // `continue`-ing past a failed script.
+            try {
+                // Counts are only applied to `info`/`savedScriptIds` after this
+                // resolves successfully (see below) — mutating them from inside
+                // the callback would overcount if a later step in the same
+                // transaction fails and rolls everything back.
+                const txInfo = await db.transaction(async (tx) => {
+                    if (overWriteScript?.data) {
+                        const delRes = await deleteScriptsItems({
+                            scriptsIds: [overWriteScript.data.scriptId],
+                            draftOrigin,
+                            client: tx,
+                        });
+                        if (delRes.errors?.length) throw new Error(delRes.errors.join(', '));
+                    }
 
-            res.errors?.forEach(e => errors.push(e));
-            if (errors.length) continue;
+                    const res = await saveScripts({
+                        data: [{
+                            ...s,
+                            scriptId,
+                            version: 1,
+                            printSections: printSections.map(s => ({
+                                ...s,
+                                screensIds: s.screensIds.map((id: string) => oldScreensIdsMap[id]).filter((id: string | undefined | null): id is string => !!id),
+                            })),
+                            reviewConfigurations: reviewConfigurations.map(c => ({
+                                ...c,
+                                screen: oldScreensIdsMap[c.screen],
+                            })).filter((c): c is typeof c & { screen: string } => !!c.screen),
+                        }],
+                        draftOrigin,
+                        client: tx,
+                    });
 
-            const saveScreens = await saveScriptScreens({ preserveScreensIds: true, scriptId, screens, draftOrigin });
-            saveScreens.errors?.forEach(e => errors.push(e));
-            info.screens += saveScreens.saved;
+                    if (res.errors?.length) throw new Error(res.errors.join(', '));
 
-            const saveDiagnoses = await saveScriptDiagnoses({ preserveDiagnosesIds: true, scriptId, diagnoses, draftOrigin });
-            saveDiagnoses.errors?.forEach(e => errors.push(e));
-            info.diagnoses += saveDiagnoses.saved;
+                    const saveScreens = await saveScriptScreens({
+                        preserveScreensIds: true,
+                        scriptId,
+                        screens,
+                        draftOrigin,
+                        uploadedFiles,
+                        oldScriptId,
+                        client: tx,
+                    });
+                    if (saveScreens.errors?.length) throw new Error(saveScreens.errors.join(', '));
 
-            const saveProblems = await saveScriptProblems({ preserveProblemsIds: true, scriptId, problems, draftOrigin });
-            saveProblems.errors?.forEach(e => errors.push(e));
-            info.problems += saveProblems.saved;
+                    const saveDiagnoses = await saveScriptDiagnoses({
+                        preserveDiagnosesIds: true,
+                        scriptId,
+                        diagnoses,
+                        draftOrigin,
+                        uploadedFiles,
+                        oldScriptId,
+                        client: tx,
+                    });
+                    if (saveDiagnoses.errors?.length) throw new Error(saveDiagnoses.errors.join(', '));
 
-            if (errors.length) continue;
+                    const saveProblems = await saveScriptProblems({
+                        preserveProblemsIds: true,
+                        scriptId,
+                        problems,
+                        draftOrigin,
+                        uploadedFiles,
+                        oldScriptId,
+                        client: tx,
+                    });
+                    if (saveProblems.errors?.length) throw new Error(saveProblems.errors.join(', '));
 
-            info.scripts++;
-            savedScriptIds.push(scriptId);
+                    return {
+                        screens: saveScreens.saved,
+                        diagnoses: saveDiagnoses.saved,
+                        problems: saveProblems.saved,
+                    };
+                });
+
+                info.screens += txInfo.screens;
+                info.diagnoses += txInfo.diagnoses;
+                info.problems += txInfo.problems;
+                info.scripts++;
+                savedScriptIds.push(scriptId);
+            } catch (e: any) {
+                errors.push(e.message);
+                continue;
+            }
         }
 
         if (errors.length) return { success: false, errors, info, savedScriptIds, };
 
+        void recomputeScriptsConditionErrors(savedScriptIds);
         return { success: true, info, savedScriptIds, };
     } catch (e: any) {
         logger.error('saveScriptsWithItems ERROR', e.message);
@@ -753,6 +2780,7 @@ export async function saveScriptsWithItems({ data, }: {
 }
 
 export async function copyScripts(params?: {
+    requestKey?: string;
     scriptsIds?: string[];
     confirmCopyAll?: boolean;
     toRemoteSiteId?: string;
@@ -780,6 +2808,7 @@ export async function copyScripts(params?: {
     };
 
     const {
+        requestKey,
         scriptsIds = [],
         confirmCopyAll,
         toRemoteSiteId,
@@ -790,12 +2819,17 @@ export async function copyScripts(params?: {
         overwriteDrugsLibraryItems,
     } = { ...params };
 
+    const broadcastActionInProgress = (action: string, loading: boolean) => {
+        return _broadcastActionInProgress(requestKey!, action, loading);
+    };
+
     try {
         const session = await isAllowed();
 
         let importedDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
         let scrappedDataKeys: Awaited<ReturnType<typeof scrapDataKeys>> = [];
         let importedDataKeyAffectedScriptIds: string[] = [];
+        let importedFiles: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'] = {};
 
         if (!scriptsIds.length && !confirmCopyAll) throw new Error('You&apos;re about copy all the scripts, please confirm this action!');
 
@@ -805,75 +2839,53 @@ export async function copyScripts(params?: {
 
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
+        if (!fromRemoteSiteId && scriptsIds.length && !scripts.data.length) {
+            return { success: false, errors: [`Script(s) not found: ${scriptsIds.join(', ')}`], info, };
+        }
+
+        let siteUrl: undefined | string = undefined;
+
         if (fromRemoteSiteId) {
-            const remoteFetchStartedAt = Date.now();
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
-            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys?' + queryString.stringify({
-                returnDraftsIfExist: false,
-            }));
+            siteUrl = axiosClient.defaults.baseURL;
+
+            const importedDataKeysRes = await loadRemoteDataKeys({
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+                axiosClient,
+            });
             importedDataKeys = importedDataKeysRes.data;
 
-            const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
-                scriptsIds: JSON.stringify(scriptsIds),
-                data: JSON.stringify({
-                    returnDraftsIfExist: false,
-                }),
-            }));
-            const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
+            const res = await loadRemoteScriptsWithItems({
+                dataKeys: importedDataKeys,
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+                axiosClient,
+                scriptsIds,
+            });
 
-            if (resData.errors) return { success: false, errors: resData.errors, info, };
+            if (res.errors?.length) return { success: false, errors: res.errors, info, };
 
-            scripts = resData;
-            markTiming('remote_fetch', remoteFetchStartedAt);
+            scripts = res;
 
+            if (scriptsIds.length && !scripts.data.length) {
+                return { success: false, errors: [`Script(s) not found on the source site: ${scriptsIds.join(', ')}`], info, };
+            }
 
-            scripts.data.forEach(({ screens, diagnoses, problems, dataKeys, drugsLibrary }, i) => {
-                const getImageUrl = (suffix: string) => {
-                    let host = res.config.baseURL || '';
-                    if (host.substring(host.length - 1, host.length) === '/') host = host.substring(0, host.length - 1);
-                    if (suffix[0] === '/') suffix = suffix.substring(1, suffix.length);
-                    return [host, suffix].filter(s => s).join('/');
-                };
+            const uploadRes = await uploadRemoteFiles({
+                files: res.files, 
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+            });
 
+            importedFiles = uploadRes.data;
+
+            timings['remote_fetch'] = importedDataKeysRes.time + res.time;
+
+            scripts.data.forEach(({ dataKeys, drugsLibrary }) => {
                 scrappedDataKeys = [...scrappedDataKeys, ...dataKeys];
                 dffItemsToSave = [...dffItemsToSave, ...drugsLibrary];
-
-                screens.forEach((d, j) => {
-                    if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
-                        scripts.data[i].screens[j].image1!.data = getImageUrl(d.image1.data);
-                    }
-                    if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
-                        scripts.data[i].screens[j].image2!.data = getImageUrl(d.image2.data);
-                    }
-                    if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
-                        scripts.data[i].screens[j].image3!.data = getImageUrl(d.image3.data);
-                    }
-                });
-
-                diagnoses.forEach((d, j) => {
-                    if (d.image1?.data && d.image1?.fileId && !isValidUrl(d.image1.data)) {
-                        scripts.data[i].diagnoses[j].image1!.data = getImageUrl(d.image1.data);
-                    }
-                    if (d.image2?.data && d.image2?.fileId && !isValidUrl(d.image2.data)) {
-                        scripts.data[i].diagnoses[j].image2!.data = getImageUrl(d.image2.data);
-                    }
-                    if (d.image3?.data && d.image3?.fileId && !isValidUrl(d.image3.data)) {
-                        scripts.data[i].diagnoses[j].image3!.data = getImageUrl(d.image3.data);
-                    }
-                });
-
-                problems.forEach((p, j) => {
-                    if (p.image1?.data && p.image1?.fileId && !isValidUrl(p.image1.data)) {
-                        scripts.data[i].problems[j].image1!.data = getImageUrl(p.image1.data);
-                    }
-                    if (p.image2?.data && p.image2?.fileId && !isValidUrl(p.image2.data)) {
-                        scripts.data[i].problems[j].image2!.data = getImageUrl(p.image2.data);
-                    }
-                    if (p.image3?.data && p.image3?.fileId && !isValidUrl(p.image3.data)) {
-                        scripts.data[i].problems[j].image3!.data = getImageUrl(p.image3.data);
-                    }
-                });
             });
 
             let index = -1;
@@ -900,6 +2912,7 @@ export async function copyScripts(params?: {
                     return overwriteDataKeys || k.isNew;
                 });
             }
+
             markTiming('parse_imported_data_keys', parseImportedStartedAt);
         }
 
@@ -915,6 +2928,8 @@ export async function copyScripts(params?: {
         } = { success: true, info, };
 
         if (scripts.data.length) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, true);
+
             if (toRemoteSiteId) {
                 const remoteSaveStartedAt = Date.now();
                 const axiosClient = await getSiteAxiosClient(toRemoteSiteId);
@@ -932,6 +2947,7 @@ export async function copyScripts(params?: {
             } else {
                 const saveScriptsStartedAt = Date.now();
                 response = await saveScriptsWithItems({
+                    uploadedFiles: importedFiles,
                     data: scripts.data.map(s => ({
                         ...s,
                         overWriteScriptWithId,
@@ -944,21 +2960,34 @@ export async function copyScripts(params?: {
             }
         }
 
+        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
+
         if (!response.success || response.errors?.length) {
             return response;
         }
 
         if (dffItemsToSave.length) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, true);
+
             const saveDrugsStartedAt = Date.now();
             const res = overwriteDrugsLibraryItems ? 
                 await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId: session.user?.userId, })
                 :
                 await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId: session.user?.userId, });
-            if (res.success) response.info.dffItems = dffItemsToSave.length;
+            if (res.success) {
+                response.info.dffItems = dffItemsToSave.length;
+            } else {
+                response.success = false;
+                response.errors = [...(response.errors || []), ...(res.errors || ['Failed to save drugs library items'])];
+            }
             markTiming('save_drugs_library_items', saveDrugsStartedAt);
         }
 
+        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
+
         if (dataKeysToSave.length) {
+            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, true);
+
             const saveDataKeysStartedAt = Date.now();
             const res = await _saveDataKeys({
                 data: dataKeysToSave,
@@ -971,9 +3000,14 @@ export async function copyScripts(params?: {
                 importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])
                     .map((script: { scriptId?: string | null }) => script.scriptId)
                     .filter((value): value is string => !!value);
+            } else {
+                response.success = false;
+                response.errors = [...(response.errors || []), ...(res.errors || ['Failed to save data keys'])];
             }
             markTiming('save_data_keys', saveDataKeysStartedAt);
         }
+
+        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
 
         if (
             fromRemoteSiteId &&
@@ -1047,6 +3081,11 @@ export async function copyScripts(params?: {
                     screens: importedScripts.flatMap((script) => script.screens || []),
                     diagnoses: importedScripts.flatMap((script) => script.diagnoses || []),
                     problems: importedScripts.flatMap((script) => script.problems || []),
+                    scripts: importedScripts.map((script) => ({
+                        scriptId: script.scriptId,
+                        title: script.title,
+                        nuidSearchFields: script.nuidSearchFields || [],
+                    })),
                 });
 
                 response.integrityImportReview = {

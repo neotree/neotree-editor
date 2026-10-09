@@ -34,6 +34,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { pendingChangesAPI } from "@/lib/indexed-db"
 import type { DataKeyIntegrityPublishDetails } from "@/lib/data-key-integrity"
+import { isDataKeyIntegrityPublishDetails, isConfidentialDowngradeDetails } from "@/lib/publish-data"
 import { getDataKeyIntegrityRulesHref } from "@/lib/data-key-integrity-rules"
 
 type Props = {
@@ -42,7 +43,7 @@ type Props = {
 
 const scopeOptions = [
   { label: "my changes only", value: "0" },
-  { label: "everything", value: "1" },
+  // { label: "everything", value: "1" },
 ]
 
 const DETAILED_SCRIPT_THRESHOLD = 3
@@ -81,6 +82,10 @@ export function PublishDrafts({ variant }: Props) {
   const [publishBlockingDetails, setPublishBlockingDetails] = useState<DataKeyIntegrityPublishDetails | null>(null)
   const [publishBlockingModalOpen, setPublishBlockingModalOpen] = useState(false)
 
+  const [confidentialDowngradeKeys, setConfidentialDowngradeKeys] = useState<{ dataKeyId: string; name: string }[]>([])
+  const [confidentialDowngradeErrors, setConfidentialDowngradeErrors] = useState<string[]>([])
+  const [confidentialDowngradeModalOpen, setConfidentialDowngradeModalOpen] = useState(false)
+
   const { publishData: _publishData, discardDrafts: _discardDrafts, authenticatedUser } = useAppContext()
   const isCreatingDataKey = pathname === "/data-keys/new"
 
@@ -107,11 +112,18 @@ export function PublishDrafts({ variant }: Props) {
     setPublishBlockingDetails(null)
   }, [])
 
+  const closeConfidentialDowngradeModal = useCallback(() => {
+    setConfidentialDowngradeModalOpen(false)
+    setConfidentialDowngradeKeys([])
+    setConfidentialDowngradeErrors([])
+  }, [])
+
   useEffect(() => {
     closePublishBlockingModal()
-  }, [pathname, closePublishBlockingModal])
+    closeConfidentialDowngradeModal()
+  }, [pathname, closePublishBlockingModal, closeConfidentialDowngradeModal])
 
-  const publishData = useCallback(async () => {
+  const publishData = useCallback(async (overrides?: { allowConfidentialDowngrade?: boolean }) => {
     try {
       setLoading(true)
 
@@ -120,14 +132,26 @@ export function PublishDrafts({ variant }: Props) {
       // TODO: Replace this with server action
       const response = await axios.post("/api/ops/publish-data", {
         scope: Number(scope),
+        ...overrides,
       } satisfies Parameters<typeof _publishData>[0])
       const res = response.data as Awaited<ReturnType<typeof _publishData>>
 
       if (res.errors) {
-        if (res.blockingDetails) {
+        const confidentialDowngradeDetails = isConfidentialDowngradeDetails(res.blockingDetails)
+          ? res.blockingDetails
+          : null
+        const blockingDetails = isDataKeyIntegrityPublishDetails(res.blockingDetails)
+          ? res.blockingDetails
+          : null
+
+        if (confidentialDowngradeDetails) {
+          setConfidentialDowngradeKeys(confidentialDowngradeDetails.confidentialDowngrades)
+          setConfidentialDowngradeErrors(res.errors)
+          setConfidentialDowngradeModalOpen(true)
+        } else if (blockingDetails && !isCreatingDataKey) {
           setPublishBlockingErrors(res.errors)
-          setPublishBlockingDetails(res.blockingDetails)
-          setPublishBlockingModalOpen(!isCreatingDataKey)
+          setPublishBlockingDetails(blockingDetails)
+          setPublishBlockingModalOpen(true)
         } else {
           alert({
             variant: "error",
@@ -205,12 +229,12 @@ export function PublishDrafts({ variant }: Props) {
     ) : (
       <Button className="h-auto text-xs px-4 py-1">Publish</Button>
     )
-  const validationRulesHref = publishBlockingDetails?.scripts[0]?.scriptId
+  const validationRulesHref = publishBlockingDetails?.scripts?.[0]?.scriptId
     ? getDataKeyIntegrityRulesHref(publishBlockingDetails.scripts[0].scriptId)
     : null
-  const primaryRegistryHref = publishBlockingDetails?.scripts[0]?.registryHref || null
+  const primaryRegistryHref = publishBlockingDetails?.scripts?.[0]?.registryHref || null
   const ruleCounts = publishBlockingDetails ? getRuleCounts(publishBlockingDetails) : []
-  const blocksOnlyNewIssues = !!publishBlockingDetails?.summary.some((line) => line.toLowerCase().includes("block new issues only"))
+  const blocksOnlyNewIssues = !!publishBlockingDetails?.summary?.some((line) => line.toLowerCase().includes("block new issues only"))
 
   return (
     <>
@@ -379,6 +403,70 @@ export function PublishDrafts({ variant }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={confidentialDowngradeModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closeConfidentialDowngradeModal()
+          else setConfidentialDowngradeModalOpen(true)
+        }}
+      >
+        <AlertDialogContent className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <AlertDialogHeader className="shrink-0 border-b border-border px-6 py-5">
+            <AlertDialogTitle>Publish blocked — confidentiality downgrade</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pluralize(confidentialDowngradeKeys.length, "data key")} in this publish would lose confidentiality protection. Choose how to proceed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+            <div className="space-y-3">
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                <div className="font-medium text-red-950">Affected data keys</div>
+                <ul className="mt-2 list-inside list-disc text-sm text-red-800">
+                  {confidentialDowngradeKeys.map((key) => (
+                    <li key={key.dataKeyId}>{key.name}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                {confidentialDowngradeErrors.map((error, index) => (
+                  <div
+                    key={`${index}-${error}`}
+                    className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700"
+                  >
+                    {error}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <AlertDialogFooter className="shrink-0 border-t border-border px-6 py-3">
+            <AlertDialogCancel onClick={closeConfidentialDowngradeModal}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                closeConfidentialDowngradeModal()
+                discardDrafts()
+              }}
+            >
+              Discard changes
+            </Button>
+            <Button
+              onClick={() => {
+                closeConfidentialDowngradeModal()
+                publishData({ allowConfidentialDowngrade: true })
+              }}
+            >
+              Allow downgrade & publish
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog
         onOpenChange={(open) => {
           if (open && variant === "discard") fetchPendingDeletions()
@@ -423,7 +511,7 @@ export function PublishDrafts({ variant }: Props) {
 
             <Button
               variant={variant === "discard" ? "destructive" : undefined}
-              onClick={variant === "discard" ? discardDrafts : publishData}
+              onClick={variant === "discard" ? discardDrafts : () => publishData()}
             >
               {ucFirst(variant)} data
             </Button>

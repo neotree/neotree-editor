@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from "react";
 import Link from "next/link";
 import { 
     MoreVertical, 
@@ -10,6 +11,7 @@ import {
     Eye, 
     Upload, 
     ExternalLink,
+    RefreshCw,
 } from "lucide-react"
 
 import {
@@ -24,15 +26,18 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { Clipboard } from "@/components/clipboard";
 import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
+import { cn } from "@/lib/utils";
 
-export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onDelete, onDuplicate }: {
+export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onDelete, onDuplicate, onRecheckIssues }: {
     disabled: boolean;
     item: Awaited<ReturnType<IScriptsContext['getScripts']>>['data'][0];
     onDelete: () => void;
     onDuplicate: () => void;
     setScriptsIdsToExport: () => void;
+    onRecheckIssues?: () => Promise<void> | void;
 }) {
     const [_, copyToClipboard] = useCopyToClipboard({ showValueOnToast: true, });
+    const [rechecking, setRechecking] = useState(false);
 
     const lockStatusParams: LockStatusProps = {
         isDraft: item.isDraft || !!item.hasChangedItems,
@@ -89,6 +94,21 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
                             <CopyPlus className="mr-2 h-4 w-4" />
                             Duplicate
                         </DropdownMenuItem>
+
+                        {!!onRecheckIssues && (
+                            <DropdownMenuItem
+                                disabled={rechecking}
+                                onSelect={(e) => {
+                                    e.preventDefault();
+                                    setRechecking(true);
+                                    Promise.resolve(onRecheckIssues())
+                                        .finally(() => setRechecking(false));
+                                }}
+                            >
+                                <RefreshCw className={cn('mr-2 h-4 w-4', rechecking && 'animate-spin')} />
+                                {rechecking ? 'Rechecking…' : 'Recheck issues'}
+                            </DropdownMenuItem>
+                        )}
 
                         {/* <DropdownMenuItem
                             onClick={() => setTimeout(() => setScriptsIdsToExport(), 0)}

@@ -6,13 +6,13 @@ type SearchableDataKey = {
 };
 
 export function matchesDataKeySearch(dataKey: SearchableDataKey, searchValue: string) {
-    const { normalizedValue, isExactMatch } = normalizeSearchTerm(searchValue);
+    const { normalizedValue, isQuotedSearch } = normalizeSearchTerm(searchValue, { doubleQuotesOnly: true });
 
     if (!normalizedValue) return true;
 
     return [dataKey.name || '', dataKey.label || ''].some(field =>
-        isExactMatch
-            ? field === normalizedValue
+        isQuotedSearch
+            ? field.includes(normalizedValue)
             : field.toLowerCase().includes(normalizedValue)
     );
 }

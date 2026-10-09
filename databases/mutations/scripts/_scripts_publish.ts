@@ -1,5 +1,4 @@
 import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm"
-import { v4 } from "uuid"
 
 import { _saveChangeLogs, type SaveChangeLogData } from "@/databases/mutations/changelogs/_save-change-log"
 import logger from "@/lib/logger"
@@ -18,6 +17,7 @@ import { removeHexCharacters } from "@/databases/utils"
 import { _saveScriptsHistory } from "./_scripts_history"
 import { getPublishedEntityVersion } from "@/lib/changelog-rollback"
 import { buildDeleteChangeSnapshots } from "@/lib/changelog-publish"
+import { buildPublishedChildScriptReference, resolvePublishedScriptId } from "@/lib/script-draft-publish"
 
 export async function _publishScripts({
   userId,
@@ -48,7 +48,7 @@ export async function _publishScripts({
     const inserts = drafts
       .filter((c) => !c.scriptId)
       .map((draft) => {
-        const resolvedScriptId = draft.data.scriptId || draft.scriptDraftId || v4()
+        const resolvedScriptId = resolvePublishedScriptId(draft)
         return {
           ...draft,
           scriptId: resolvedScriptId,
@@ -134,44 +134,6 @@ export async function _publishScripts({
         }
       }
 
-      for (const insertedScript of inserts) {
-        const scriptId = insertedScript.data.scriptId!
-        await executor
-          .update(screensDrafts)
-          .set({ scriptId })
-          .where(
-            or(
-              eq(screensDrafts.scriptId, insertedScript.scriptDraftId),
-              eq(screensDrafts.scriptDraftId, insertedScript.scriptDraftId),
-              eq(screensDrafts.scriptId, scriptId),
-              eq(screensDrafts.scriptDraftId, scriptId),
-            ),
-          )
-
-        await executor
-          .update(diagnosesDrafts)
-          .set({ scriptId })
-          .where(
-            or(
-              eq(diagnosesDrafts.scriptId, insertedScript.scriptDraftId),
-              eq(diagnosesDrafts.scriptDraftId, insertedScript.scriptDraftId),
-              eq(diagnosesDrafts.scriptId, scriptId),
-              eq(diagnosesDrafts.scriptDraftId, scriptId),
-            ),
-          )
-
-        await executor
-          .update(problemsDrafts)
-          .set({ scriptId })
-          .where(
-            or(
-              eq(problemsDrafts.scriptId, insertedScript.scriptDraftId),
-              eq(problemsDrafts.scriptDraftId, insertedScript.scriptDraftId),
-              eq(problemsDrafts.scriptId, scriptId),
-              eq(problemsDrafts.scriptDraftId, scriptId),
-            ),
-          )
-      }
       const insertChangeLogs = await _saveScriptsHistory({
         drafts: persistedInserts,
         previous: dataBefore,
@@ -182,6 +144,35 @@ export async function _publishScripts({
         ...log,
         dataVersion: dataVersion
       })))
+    }
+
+    // Child drafts retain a cascading foreign key to the script draft. Move
+    // them onto the published script before deleting the parent draft so they
+    // remain available to the child publishers that run next.
+    for (const draft of drafts) {
+      const childScriptReference = buildPublishedChildScriptReference(draft)
+
+      await executor
+        .update(screensDrafts)
+        .set(childScriptReference)
+        .where(eq(screensDrafts.scriptDraftId, draft.scriptDraftId))
+
+      await executor
+        .update(diagnosesDrafts)
+        .set(childScriptReference)
+        .where(eq(diagnosesDrafts.scriptDraftId, draft.scriptDraftId))
+
+      await executor
+        .update(problemsDrafts)
+        .set(childScriptReference)
+        .where(eq(problemsDrafts.scriptDraftId, draft.scriptDraftId))
+
+      // Child deletion requests use the same cascading parent-draft foreign
+      // key. Keep them alive so the child publishers can apply them next.
+      await executor
+        .update(pendingDeletion)
+        .set({ scriptDraftId: null })
+        .where(eq(pendingDeletion.scriptDraftId, draft.scriptDraftId))
     }
 
     let deleted = await executor.query.pendingDeletion.findMany({

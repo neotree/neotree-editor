@@ -19,8 +19,14 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { DrugsLibrarySearch } from "./search";
 import { ExportMetadataButton } from "./export-metadata-button";
+import { ConditionErrorBadge } from "@/components/conditional-expression";
+import type { ConditionKey } from "@/lib/conditional-expression";
 
 type Props = {};
+
+// Drugs library is a standalone surface (no script key catalogue), so its
+// condition badges do syntax-only validation.
+const NO_CONDITION_KEYS: ConditionKey[] = [];
 
 export function DrugsLibrary({}: Props) {
     const { confirm } = useConfirmModal();
@@ -205,6 +211,24 @@ export function DrugsLibrary({}: Props) {
                 columns={[
                     {
                         name: 'Drug / Fluid',
+                        cellRenderer(cell) {
+                            const item = drugs[cell.rowIndex];
+                            return (
+                                <span className="inline-flex items-center gap-x-2">
+                                    <span>{item?.drug}</span>
+                                    {!!item && (
+                                        <ConditionErrorBadge
+                                            keys={NO_CONDITION_KEYS}
+                                            keysReady={false}
+                                            expressions={[
+                                                { value: item.condition, label: 'Condition' },
+                                                { value: item.calculator_condition, label: 'Calculator condition' },
+                                            ]}
+                                        />
+                                    )}
+                                </span>
+                            );
+                        },
                     },
                     {
                         name: 'Type',

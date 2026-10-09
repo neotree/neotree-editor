@@ -2,7 +2,7 @@ import { and, inArray, isNull } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
 import { scripts, screens, hospitals, scriptsDrafts, problems, diagnoses } from "@/databases/pg/schema";
-import { DiagnosisSymptom, ScriptField, ScriptImage, ScriptItem } from "@/types";
+import { DiagnosisSymptom, ScriptField, FileReference, ScriptItem } from "@/types";
 import * as uuid from "uuid";
 
 export type GetScriptsMetadataParams = {
@@ -46,10 +46,10 @@ export type GetScriptsMetadataResponse = {
                 notes: string;
                 refKey: string;
                 images: {
-                    contentTextImage: null | ScriptImage;
-                    image1: null | ScriptImage;
-                    image2: null | ScriptImage;
-                    image3: null | ScriptImage;
+                    contentTextImage: null | FileReference;
+                    image1: null | FileReference;
+                    image2: null | FileReference;
+                    image3: null | FileReference;
                 };
             } | null;
             fields: {
@@ -61,6 +61,7 @@ export type GetScriptsMetadataResponse = {
                 valueLabel?: null | string;
                 optional?: boolean;
                 confidential: boolean;
+                confidentialLabelOnly: boolean;
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
                 condition?: string | null;
@@ -98,9 +99,9 @@ export type GetScriptsMetadataResponse = {
             text1: string | null;
             text2: string | null;
             text3: string | null;
-            image1: null | ScriptImage;
-            image2: null | ScriptImage;
-            image3: null | ScriptImage;
+            image1: null | FileReference;
+            image2: null | FileReference;
+            image3: null | FileReference;
             symptoms: DiagnosisSymptom[];
                 fields: {
                     label: string;
@@ -111,6 +112,7 @@ export type GetScriptsMetadataResponse = {
                 valueLabel?: null | string;
                     optional?: boolean;
                     confidential: boolean;
+                    confidentialLabelOnly: boolean;
                     minValue?: string | number | null;
                     maxValue?: string | number | null;
                     condition?: string | null;
@@ -136,9 +138,9 @@ export type GetScriptsMetadataResponse = {
             text1: string | null;
             text2: string | null;
             text3: string | null;
-            image1: null | ScriptImage;
-            image2: null | ScriptImage;
-            image3: null | ScriptImage;
+            image1: null | FileReference;
+            image2: null | FileReference;
+            image3: null | FileReference;
             fields: {
                 label: string;
                 key: string;
@@ -148,6 +150,7 @@ export type GetScriptsMetadataResponse = {
             valueLabel?: null | string;
                 optional?: boolean;
                 confidential: boolean;
+                confidentialLabelOnly: boolean;
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
                 condition?: string | null;
@@ -165,9 +168,9 @@ export type GetScriptsMetadataResponse = {
 
 export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Promise<GetScriptsMetadataResponse> {
     try {
-        const sanitizeImage = (image: unknown): null | ScriptImage => {
+        const sanitizeImage = (image: unknown): null | FileReference => {
             if (!image || typeof image !== "object") return null;
-            const img = image as ScriptImage;
+            const img = image as FileReference;
             return {
                 data: `${img.data || ""}`,
                 fileId: img.fileId,
@@ -419,6 +422,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         valueLabel: null,
                                         optional: screen.skippable,
                                         confidential: screen.confidential,
+                                        confidentialLabelOnly: screen.confidentialLabelOnly,
                                         minValue: screen.minValue,
                                         maxValue: screen.maxValue,
                                         condition: screen.condition || '',
@@ -444,6 +448,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'boolean',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: [
                                     {
@@ -466,6 +471,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'diagnosis',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
                             }];
@@ -479,6 +485,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: null,
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
                             }];
@@ -564,6 +571,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         dataType,
                                         optional: f.optional,
                                         confidential: f.confidential,
+                                        confidentialLabelOnly: f.confidentialLabelOnly,
                                         condition: f.condition || '',
                                         options,
                                     }];
@@ -578,6 +586,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     valueLabel: null,
                                     optional: f.optional,
                                     confidential: f.confidential,
+                                    confidentialLabelOnly: f.confidentialLabelOnly,
                                     minValue: f.minValue ?? f.minDate ?? f.minTime,
                                     maxValue: f.maxValue ?? f.maxDate ?? f.maxTime,
                                     condition: f.condition || '',
@@ -596,6 +605,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'single_select_option',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
                             }];
@@ -609,6 +619,7 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 dataType: 'multi_select_option',
                                 optional: screen.skippable,
                                 confidential: screen.confidential,
+                                confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
                             }];

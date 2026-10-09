@@ -26,7 +26,7 @@ type DataKeyUsage = {
         problems: { id: string; scriptId: string; scriptTitle?: string; title: string; type: 'screen' | 'diagnosis' | 'problem', }[];
         usages: {
             id: string;
-            kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom' | 'problem';
+            kind: 'screen' | 'screen_item' | 'screen_field' | 'screen_field_item' | 'diagnosis' | 'diagnosis_symptom' | 'problem' | 'script_nuid_search_field';
             title: string;
             location: string;
             scriptId: string;
@@ -44,6 +44,8 @@ type DataKeyUsage = {
         totalRows: number;
         confidentialTrue: number;
         confidentialFalse: number;
+        confidentialLabelOnlyTrue: number;
+        confidentialLabelOnlyFalse: number;
         scriptsCount: number;
     };
     errors?: string[];
@@ -82,6 +84,8 @@ export async function getDataKeysWithUsage(dataKeys: DataKey[]): Promise<DataKey
             const scripts = new Set(rows.map(r => r.ScriptTitle).filter(Boolean));
             const confidentialTrue = rows.filter(r => r.Confidential === 'true').length;
             const confidentialFalse = rows.filter(r => r.Confidential === 'false').length;
+            const confidentialLabelOnlyTrue = rows.filter(r => r.ConfidentialLabelOnly === 'true').length;
+            const confidentialLabelOnlyFalse = rows.filter(r => r.ConfidentialLabelOnly === 'false').length;
 
             return {
                 ...dataKey,
@@ -93,6 +97,8 @@ export async function getDataKeysWithUsage(dataKeys: DataKey[]): Promise<DataKey
                         totalRows: rows.length,
                         confidentialTrue,
                         confidentialFalse,
+                        confidentialLabelOnlyTrue,
+                        confidentialLabelOnlyFalse,
                         scriptsCount: scripts.size,
                     },
                     errors: [

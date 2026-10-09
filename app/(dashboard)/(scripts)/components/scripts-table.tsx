@@ -1,11 +1,21 @@
 'use client';
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/data-table";
+import {
+    getScriptsConditionErrors,
+    recheckScriptConditionErrors,
+    getScriptsWithFieldKeyCollisions,
+    type ScriptConditionReport,
+    type ScriptFieldKeyCollisionReport,
+} from "@/app/actions/scripts";
+import { ScriptIssueBadge, type ScriptIssue } from "@/components/script-issues";
+import { getFieldKeyCollisionRule } from "@/lib/field-key-collisions";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
@@ -39,6 +49,53 @@ export function ScriptsTable(props: Props) {
 
     const { sys, viewOnly } = useAppContext();
     const { hospitals, } = useScriptsContext();
+
+    const [conditionErrors, setConditionErrors] = useState<Record<string, ScriptConditionReport>>({});
+    const [keyCollisions, setKeyCollisions] = useState<Record<string, ScriptFieldKeyCollisionReport>>({});
+    const scriptsSignature = useMemo(
+        () => (props.scripts?.data || [])
+            .map((s: any) => `${s?.scriptId}:${s?.version}:${s?.isDraft ? 1 : 0}:${s?.hasChangedItems ? 1 : 0}`)
+            .join(','),
+        [props.scripts],
+    );
+    const loadIssues = useCallback(async (opts?: { cancelled?: () => boolean }) => {
+        const isCancelled = () => !!opts?.cancelled?.();
+        const input = (props.scripts?.data || []).map((s: any) => ({
+            scriptId: s?.scriptId,
+            nuidSearchFields: s?.nuidSearchFields,
+            eligibilityCriteria: s?.eligibilityCriteria,
+        }));
+        if (!input.length) {
+            setConditionErrors({});
+            setKeyCollisions({});
+            return;
+        }
+        await Promise.all([
+            getScriptsConditionErrors(input)
+                .then((res) => { if (!isCancelled()) setConditionErrors(res?.data || {}); })
+                .catch(() => { /* badges are best-effort; ignore failures */ }),
+            getScriptsWithFieldKeyCollisions({ scriptIds: input.map((s) => s.scriptId).filter(Boolean) })
+                .then((res) => {
+                    if (isCancelled()) return;
+                    const byScript: Record<string, ScriptFieldKeyCollisionReport> = {};
+                    for (const report of res?.scripts || []) byScript[report.scriptId] = report;
+                    setKeyCollisions(byScript);
+                })
+                .catch(() => { /* badges are best-effort; ignore failures */ }),
+        ]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scriptsSignature]);
+
+    useEffect(() => {
+        let cancelled = false;
+        void loadIssues({ cancelled: () => cancelled });
+        return () => { cancelled = true; };
+    }, [loadIssues]);
+
+    const onRecheckIssues = useCallback(async (scriptId: string) => {
+        await recheckScriptConditionErrors(scriptId);
+        await loadIssues();
+    }, [loadIssues]);
 
     const displayLoader = loading;
 
@@ -86,7 +143,27 @@ export function ScriptsTable(props: Props) {
                         const s = scriptsArr[rowIndex];
                         const searchResults = search.results.find(r => r?.scriptId === s?.scriptId);
 
+                        const nuidSearchFields = !searchResults ? [] : searchResults.matches.filter(f => f.field.includes('nuidSearchField'))
+
+                        const scriptLink = !searchResults ? '' : `/script/${searchResults.scriptId}`;
+
                         const items = !searchResults ? [] : [
+                            {
+                                id: searchResults.scriptId,
+                                title: searchResults.title,
+                                type: 'script',
+                                link: scriptLink,
+                                fields: nuidSearchFields.map(f => {
+                                    return {
+                                        id: f.field,
+                                        title: f.fieldValue,
+                                        type: f.type,
+                                        link: scriptLink+`?nuidSearchField=${f.fieldIndex}`,
+                                        fields: [],
+                                    };
+                                }),
+                            },
+
                             ...searchResults.screens.map(s => {
                                 const link = `/script/${searchResults.scriptId}/screen/${s.screenId}`;
                                 return {
@@ -185,7 +262,7 @@ export function ScriptsTable(props: Props) {
                                                                                 {
                                                                                     name: '',
                                                                                     align: 'right',
-                                                                                    cellClassName: 'w-20 text-right',
+                                                                                    cellClassName: 'w-30 text-right',
                                                                                     thClassName: 'hidden',
                                                                                     cellRenderer({ rowIndex }) {
                                                                                         const _item = item.fields[rowIndex];
@@ -194,7 +271,7 @@ export function ScriptsTable(props: Props) {
                                                                                             <Link
                                                                                                 href={_item.link}
                                                                                                 target="_blank"
-                                                                                                className="flex items-center gap-x-1"
+                                                                                                className="flex items-center gap-x-1 justify-end"
                                                                                             >
                                                                                                 {_item.type}
                                                                                                 <ExternalLink className="h-3 w-3" />
@@ -237,6 +314,36 @@ export function ScriptsTable(props: Props) {
                         },
                         {
                             name: 'Title',
+                            cellRenderer({ rowIndex }) {
+                                const s = scriptsArr[rowIndex];
+                                const report = s ? conditionErrors[s.scriptId] : undefined;
+                                const keyReport = s ? keyCollisions[s.scriptId] : undefined;
+
+                                const issues: ScriptIssue[] = [
+                                    // Each example names its own rule and severity. Deriving
+                                    // either from the script-wide blocking count labelled every
+                                    // warning as a same-screen duplicate.
+                                    ...(keyReport?.examples || []).map((example) => ({
+                                        severity: (example.severity === 'blocking' ? 'error' : 'warning') as ScriptIssue['severity'],
+                                        group: getFieldKeyCollisionRule(example.kind)?.label || 'Duplicate field key',
+                                        message: example.displayKey ? `${example.location} [${example.displayKey}]` : example.location,
+                                        href: example.href,
+                                    })),
+                                    ...(report?.findings || []).map((finding) => ({
+                                        severity: 'error' as ScriptIssue['severity'],
+                                        group: 'Conditional expression',
+                                        message: finding.location,
+                                        href: finding.href,
+                                    })),
+                                ];
+
+                                return (
+                                    <span className="inline-flex items-center gap-x-2">
+                                        <span>{s?.title || ''}</span>
+                                        <ScriptIssueBadge issues={issues} />
+                                    </span>
+                                );
+                            },
                         },
                         {
                             name: 'Description',
@@ -280,6 +387,7 @@ export function ScriptsTable(props: Props) {
                                     <ScriptsTableActions 
                                         item={s}
                                         disabled={disabled}
+                                        onRecheckIssues={() => onRecheckIssues(s.scriptId)}
                                         setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
                                         onDelete={() => onDelete([s.scriptId])}
                                         onDuplicate={() => onDuplicate([s.scriptId])}

@@ -12,6 +12,7 @@ import {
   type IntegrityPolicy,
 } from "@/lib/integrity-policy";
 import { buildIntegrityImportAnalysis } from "@/lib/integrity-imports";
+import type { NuidSearchSource } from "@/lib/data-key-integrity";
 import { prepareImportSnapshotAcceptance, removeAcceptedScriptIds } from "@/lib/integrity-import-acceptance";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
@@ -40,6 +41,7 @@ export async function createIntegrityImportSnapshot({
   screens,
   diagnoses,
   problems,
+  scripts,
 }: {
   actorUserId?: string | null;
   policy: IntegrityPolicy;
@@ -52,6 +54,7 @@ export async function createIntegrityImportSnapshot({
   screens: ScreenType[];
   diagnoses: DiagnosisType[];
   problems: ProblemType[];
+  scripts?: NuidSearchSource[];
 }) {
   const { snapshot, reviewDetails } = buildIntegrityImportAnalysis({
     policy,
@@ -59,6 +62,7 @@ export async function createIntegrityImportSnapshot({
     screens,
     diagnoses,
     problems,
+    scripts,
   });
 
   if (!snapshot.totalBlockingIssues) {

@@ -10,15 +10,17 @@ import { ConfirmModal } from "@/components/modals/confirm";
 import { AlertModal } from "@/components/modals/alert";
 import { FilesModal } from "@/components/modals/files";
 import { AppContextProvider } from "@/contexts/app";
+import { SocketEventsListener } from "@/components/socket-events-listener";
+import { OverlayInfoCardProvider } from "@/components/overlay-info-card";
 import { getSys } from "@/app/actions/sys";
 import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
 import { getAuthenticatedUserWithRoles, } from "@/app/actions/get-authenticated-user";
 import * as opsActions from "@/app/actions/ops";
 import * as sysActions from "@/app/actions/sys";
 import * as dataKeysActions from '@/app/actions/data-keys';
+import * as socketEventsActions from '@/app/actions/socket-events';
 
 import "@/app/globals.css";
-import { SocketEventsListener } from "@/components/socket-events-listener";
 
 const roboto = Roboto({
     subsets: ['latin'],
@@ -51,14 +53,16 @@ export default async function RootLayout({
         editorDetails,
         authenticatedUser,
         sys,
+        sites,
     ] = await Promise.all([
         opsActions.getEditorDetails(),
         getAuthenticatedUserWithRoles(),
         getSys(),
+        getSitesWithoutConfidentialData()
     ]);
 
     return (
-        <html lang="en">
+        <html lang="en" suppressHydrationWarning>
             <body className={roboto.className} suppressHydrationWarning>
                 <NuqsAdapter>
                     <AuthContextProvider>
@@ -74,6 +78,8 @@ export default async function RootLayout({
                                 {...editorDetails}
                                 {...authenticatedUser}
                                 {...dataKeysActions}
+                                {...socketEventsActions}
+                                sites={sites.data || []}
                                 sys={sys}
                                 getSites={getSitesWithoutConfidentialData}
                             >
@@ -101,6 +107,7 @@ export default async function RootLayout({
                             <ConfirmModal />
                             <AlertModal />
                             <FilesModal />
+                            <OverlayInfoCardProvider />
                         </ThemeProvider>
                     </AuthContextProvider>
                 </NuqsAdapter>

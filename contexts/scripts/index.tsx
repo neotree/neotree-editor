@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import queryString from "query-string";
 import axios from "axios";
@@ -8,9 +8,10 @@ import axios from "axios";
 import * as serverActions from '@/app/actions/scripts';
 import * as filesActions from "@/app/actions/files";
 import { getHospitals } from "@/app/actions/hospitals";
-import { getDataKeys } from "@/app/actions/data-keys";
 import { useSearchParams } from "@/hooks/use-search-params";
 import { listScreens, getScriptsWithItems } from "@/app/actions/scripts";
+import type { ConditionKey } from "@/lib/conditional-expression";
+import socket from "@/lib/socket";
 
 export interface IScriptsContext extends  
 ScriptsContextProviderProps,
@@ -69,6 +70,24 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
 
     const [keysLoading, setKeysLoading] = useState(false);
     const [keys, setKeys] = useState<Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['dataKeys']>([]);
+    const [conditionKeys, setConditionKeys] = useState<ConditionKey[]>([]);
+    const [conditionScreens, setConditionScreens] = useState<Awaited<ReturnType<typeof serverActions.getScriptsConditionKeys>>['data'][0]['conditionScreens']>([]);
+    const [conditionCatalogueReady, setConditionCatalogueReady] = useState(false);
+
+    const keysRequestRef = useRef<Promise<void> | null>(null);
+
+    // Scope the key catalogue to the current script: clear it (and any in-flight
+    // request) when the scriptId changes so expressions are never validated
+    // against a previous script's keys.
+    const keysScriptIdRef = useRef(scriptId);
+    useEffect(() => {
+        keysScriptIdRef.current = scriptId;
+        keysRequestRef.current = null;
+        setKeys([]);
+        setConditionKeys([]);
+        setConditionScreens([]);
+        setConditionCatalogueReady(false);
+    }, [scriptId]);
 
     const onCancelScriptForm = useCallback(() => {
         router.push('/');
@@ -106,38 +125,117 @@ function useScriptsContentHook({}: ScriptsContextProviderProps) {
     }, [scriptId, open, alert]);
 
     const loadKeys = useCallback(async () => {
-        try {
-            setKeysLoading(true);
+        // Collapse concurrent calls (multiple condition editors mounting at once)
+        // into a single in-flight request.
+        if (keysRequestRef.current) return keysRequestRef.current;
 
-            const { data: res, } = await axios.get<Awaited<ReturnType<typeof getScriptsWithItems>>>('/api/scripts/keys?data='+JSON.stringify({ 
-                returnDraftsIfExist: true,
-                scriptsIds: [scriptId], 
-            }));
+        const requestedScriptId = scriptId;
 
-            if (res?.errors?.length) throw new Error(res.errors.join(', '));
+        const run = (async () => {
+            try {
+                setKeysLoading(true);
 
-            const scripts = res.data;
+                const { data: res, } = await axios.get<Awaited<ReturnType<typeof serverActions.getScriptsConditionKeys>>>('/api/scripts/keys?data='+JSON.stringify({
+                    returnDraftsIfExist: true,
+                    scriptsIds: [scriptId],
+                }));
 
-            const _keys = scripts.reduce((acc, s) => [...acc, ...s.dataKeys], [] as typeof keys);
+                if (res?.errors?.length) throw new Error(res.errors.join(', '));
 
-            setKeys(_keys);
-        } catch(e: any) {
-            alert({
-                title: '',
-                message: 'Error: ' + e.message,
-                variant: 'error',
-            });
-        } finally {
-            setKeysLoading(false);
-        }
+                // Ignore a stale response if we've since navigated to another script.
+                if (requestedScriptId !== keysScriptIdRef.current) return;
+
+                const scripts = res.data;
+
+                const _keys = scripts.reduce((acc, s) => [...acc, ...s.dataKeys], [] as typeof keys);
+                const _conditionKeys = scripts.reduce(
+                    (acc, s) => [...acc, ...(s.conditionKeys || [])],
+                    [] as ConditionKey[],
+                );
+                const _conditionScreens = scripts.reduce(
+                    (acc, s) => [...acc, ...(s.conditionScreens || [])],
+                    [] as typeof conditionScreens,
+                );
+
+                setKeys(_keys);
+                setConditionKeys(_conditionKeys);
+                setConditionScreens(_conditionScreens);
+                setConditionCatalogueReady(true);
+            } catch(e: any) {
+                alert({
+                    title: '',
+                    message: 'Error: ' + e.message,
+                    variant: 'error',
+                });
+            } finally {
+                setKeysLoading(false);
+                keysRequestRef.current = null;
+            }
+        })();
+
+        keysRequestRef.current = run;
+        return run;
     }, [scriptId, open, alert]);
+
+    // A write can land while the initial request is still in flight. Waiting
+    // for it and then issuing another request guarantees callers receive the
+    // post-write diagnosis/problem catalogue rather than a stale response.
+    const reloadKeys = useCallback(async () => {
+        if (keysRequestRef.current) await keysRequestRef.current;
+        await loadKeys();
+    }, [loadKeys]);
+
+    // Keep virtual outcomes and legacy Configuration keys current when another
+    // editor changes their source data. The root router refresh does not update
+    // client context state, so refresh this catalogue explicitly.
+    useEffect(() => {
+        const relevantActions = new Set([
+            "save_diagnoses",
+            "delete_diagnoses",
+            "save_problems",
+            "delete_problems",
+            "save_screens",
+            "delete_screens",
+            "save_data_keys",
+            "delete_data_keys",
+            "save_config_keys",
+            "delete_config_keys",
+            "resolve_data_key_integrity_entry",
+            "resolve_data_key_integrity_entries_bulk",
+            "save_scripts",
+            "publish_data",
+            "discard_drafts",
+            "clear_pending_deletion",
+            "rollback_change_log",
+            "rollback_data_version",
+            "copy_scripts",
+        ]);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const onDataChanged = (action?: string) => {
+            // Do not fan out expensive key-catalogue requests to script pages
+            // that have never opened a condition-aware surface.
+            if (!conditionCatalogueReady) return;
+            if (action && !relevantActions.has(action)) return;
+            clearTimeout(timer);
+            timer = setTimeout(() => void reloadKeys(), 150);
+        };
+        socket.on("data_changed", onDataChanged);
+        return () => {
+            clearTimeout(timer);
+            socket.off("data_changed", onDataChanged);
+        };
+    }, [conditionCatalogueReady, reloadKeys]);
 
     return {
         screens,
         screensLoading,
         keys,
+        conditionKeys,
+        conditionScreens,
+        conditionCatalogueReady,
         keysLoading,
         loadKeys,
+        reloadKeys,
         loadScreens,
         onCancelDiagnosisForm,
         onCancelScreenForm,

@@ -4,5 +4,6 @@ export type DataKeysUsageExportRow = {
     DataKeyLabel: string;
     ScriptTitle: string;
     Confidential: 'true' | 'false';
+    ConfidentialLabelOnly: 'true' | 'false';
 };
 

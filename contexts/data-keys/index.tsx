@@ -9,7 +9,7 @@ import {
     useState,
     useMemo,
 } from "react";
-import axios from 'axios';
+import axios, { all } from 'axios';
 import { useQueryState } from "nuqs";
 import { useRouter } from 'next/navigation';
 
@@ -24,7 +24,7 @@ import { recordPendingDeletionChange } from "@/lib/change-tracker";
 import { useAppContext } from "@/contexts/app";
 import { buildDataKeyParentIndex } from "@/lib/data-key-children";
 import { matchesDataKeySearch } from "@/lib/data-keys-search";
-
+import { SocketEventsListener } from "@/components/socket-events-listener";
 
 function paginateData<T>(
     data: T[],
@@ -63,6 +63,7 @@ const buildTrackableSnapshot = (dataKey?: Partial<DataKey>) => {
         refId: dataKey.refId || '',
         dataType: dataKey.dataType || '',
         confidential: !!dataKey.confidential,
+        confidentialLabelOnly: !!dataKey.confidentialLabelOnly,
         label: dataKey.label || '',
         options: Array.isArray(dataKey.options) ? dataKey.options : [],
         metadata: dataKey.metadata || {},
@@ -77,6 +78,7 @@ export type DataKeyFormData = {
     refId: DataKey['refId'];
     dataType: DataKey['dataType'];
     confidential: DataKey['confidential'];
+    confidentialLabelOnly: DataKey['confidentialLabelOnly'];
     label: DataKey['label'];
     options: DataKey['options'];
     metadata: DataKey['metadata'];
@@ -100,6 +102,7 @@ export type GetDataKeysParams = {
     }[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    dateAfter?: string;
 };
 
 export type tDataKeysCtx = {
@@ -118,6 +121,13 @@ export type tDataKeysCtx = {
     pagination?: Pagination;
     currentPage: number;
     itemsPerPage: number;
+    unusedDataKeys: {
+        data: DataKey[];
+        show: boolean;
+        errors: string[];
+    };
+    getLatestDataKeys: () => Promise<void>;
+    setUnusedDataKeys: React.Dispatch<React.SetStateAction<tDataKeysCtx['unusedDataKeys']>>;
     setCurrentPage: (page: number) => void;
     setSearchValue: (value: string) => void;
     saveDataKeys: (
@@ -137,11 +147,17 @@ export type tDataKeysCtx = {
     onSort: (value: string) => void;
     setFilter: (value: string) => void;
     setCurrentDataKeyUuid: (uuid: string) => void;
-    loadDataKeys: () => Promise<void>;
+    loadDataKeys: (params?: GetDataKeysParams) => Promise<void>;
+    loadUnusedDataKeys: () => Promise<void>;
     setSelected: React.Dispatch<tDataKeysCtx['selected']>;
     extractDataKeys: (uuids: string[], opts?: {
         withNested?: boolean;
     }) => DataKey[];
+};
+
+type LoadDataKeysOpts = { 
+    silent?: boolean;
+    appendResults?: boolean; 
 };
 
 export const DataKeysCtx = createContext<tDataKeysCtx>(null!);
@@ -155,9 +171,11 @@ export const useDataKeysCtx = () => {
 export function DataKeysCtxProvider({
     children,
     prefetchDataKeys = true,
+    initialDataKeys = [],
 }: {
     children: React.ReactNode;
     prefetchDataKeys?: boolean;
+    initialDataKeys?: DataKey[];
 }) {
     const mounted = useRef(false);
     const router = useRouter();
@@ -182,12 +200,24 @@ export function DataKeysCtxProvider({
      ************ LOAD
     ******************************************************/
     const [loadingDataKeys, setLoadingDataKeys] = useState(false);
-    const [allDataKeys, setAllDataKeys] = useState<DataKey[]>([]);
+    const [allDataKeys, setAllDataKeys] = useState<DataKey[]>(initialDataKeys || []);
+    const [allDataKeysLastFetchedDate, setAllDataKeysLastFetchedDate] = useState(
+        initialDataKeys?.length ? new Date().toISOString() : ''
+    );
     const [errors, setErrors] = useState<string[] | undefined>();
 
+    const [unusedDataKeys, setUnusedDataKeys] = useState<tDataKeysCtx['unusedDataKeys']>({ 
+        data: [], 
+        show: false, 
+        errors: [], 
+    });
+
     // Fetch ALL data once without pagination
-    const loadDataKeys = useCallback(async (params?: GetDataKeysParams) => {
-        setLoadingDataKeys(true);
+    const loadDataKeys = useCallback(async (
+        params?: GetDataKeysParams,
+        opts?: LoadDataKeysOpts,
+    ) => {
+        setLoadingDataKeys(!opts?.silent);
 
         try {
             // Build query params (without pagination)
@@ -203,18 +233,65 @@ export function DataKeysCtxProvider({
             if (params?.dataKeysIds?.length) {
                 queryParams.set('dataKeysIds', JSON.stringify(params.dataKeysIds));
             }
+            if (params?.dateAfter) {
+                queryParams.set('dateAfter', `${params.dateAfter || ''}`);
+            }
 
             const response = await axios.get<{ data: DataKey[], errors?: string[] }>(`/api/data-keys?${queryParams.toString()}`);
+
+            const errors = response.data.errors || [];
+
+            if (errors.length) throw new Error(errors.join(', '));
 
             // Apply sorting on client side using current sort value
             const sortedData = sortDataKeys(response.data.data, sort);
 
-            setAllDataKeys(sortedData);
-            setErrors(response.data.errors);
+            setAllDataKeys(prev => {
+                if (opts?.appendResults) {
+                    let arr = prev.map(d => {
+                        return sortedData.find(d2 => d2.uuid === d.uuid) || d;
+                    });
+                    arr = [
+                        ...arr,
+                        ...sortedData.filter(d => !arr.map(d => d.uuid).includes(d.uuid)),
+                    ];
+                    return arr;
+                } else {
+                    return sortedData;
+                }
+            });
+            setCurrentPage(1);
+            setAllDataKeysLastFetchedDate(new Date().toISOString());
+        } catch (e: any) {
+            if (!opts?.silent) {
+                setErrors([e.message]);
+                alert({
+                    variant: 'error',
+                    title: "Error",
+                    message: "Failed to load data keys: " + e.message,
+                    buttonLabel: "Try again",
+                    onClose: () => loadDataKeys(),
+                });
+            }
+        } finally {
+            setLoadingDataKeys(false);
+        }
+    }, [sort]); // Include sort in dependencies
+
+    // Fetch ALL data once without pagination
+    const loadUnusedDataKeys = useCallback(async () => {
+        setLoadingDataKeys(true);
+
+        try {
+            const response = await axios.get<{ data: DataKey[], errors?: string[] }>(`/api/data-keys/unused`);
+
+            // Apply sorting on client side using current sort value
+            const sortedData = sortDataKeys(response.data.data, sort);
+
+            setUnusedDataKeys({ data: sortedData, show: true, errors: response.data.errors || [], });
             setCurrentPage(1);
         } catch (e: any) {
-            setAllDataKeys([]);
-            setErrors([e.message]);
+            setUnusedDataKeys({ data: [], show: true, errors: [e.message], });
         } finally {
             setLoadingDataKeys(false);
         }
@@ -222,7 +299,7 @@ export function DataKeysCtxProvider({
 
     // Apply filters and search to get filtered data
     const filteredDataKeys = useMemo(() => {
-        let filtered = [...allDataKeys];
+        let filtered = unusedDataKeys.show ? [...unusedDataKeys.data] : [...allDataKeys];
 
 
         if (filter) {
@@ -248,7 +325,7 @@ export function DataKeysCtxProvider({
         }
 
         return filtered;
-    }, [allDataKeys, filter, searchValue]);
+    }, [allDataKeys, unusedDataKeys, filter, searchValue]);
 
     const { dataKeys, pagination } = useMemo(() => {
         if (!filteredDataKeys.length) {
@@ -462,12 +539,12 @@ export function DataKeysCtxProvider({
     }, []);
 
     const extractDataKeys: tDataKeysCtx['extractDataKeys'] = useCallback((uuids, opts) => {
-        let keys = uuids
+        let keys = (uuids || [])
             .map(o => allDataKeys.find(k => (k.uniqueKey === o) || (k.uuid === o))!)
             .filter(k => k);
 
         if (opts?.withNested) {
-            keys.filter(k => k.options.length).forEach(k => {
+            keys.filter(k => Array.isArray(k.options) && k.options.length).forEach(k => {
                 const nested = extractDataKeys(k.options, opts);
                 keys = [...keys, ...nested];
             });
@@ -476,16 +553,16 @@ export function DataKeysCtxProvider({
         return keys.filter((k, i) => keys.map(k => k.uniqueKey).indexOf(k.uniqueKey) === i);
     }, [allDataKeys]);
 
-    if (errors?.length) {
-        return (
-            <Alert
-                title="Error"
-                message={"Failed to load data keys: " + errors.join(', ')}
-                buttonLabel="Try again"
-                onClose={() => loadDataKeys()}
-            />
-        );
-    }
+    const getLatestDataKeys = useCallback(async (opts?: LoadDataKeysOpts) => {
+        if (allDataKeysLastFetchedDate) {
+            loadDataKeys(
+                { dateAfter: allDataKeysLastFetchedDate },
+                { appendResults: true, ...opts },
+            );
+        }
+    }, [allDataKeysLastFetchedDate, loadDataKeys]);
+
+    if (errors?.length) return null;
 
     return (
         <>
@@ -506,6 +583,9 @@ export function DataKeysCtxProvider({
                     pagination,
                     currentPage,
                     itemsPerPage,
+                    unusedDataKeys,
+                    getLatestDataKeys,
+                    setUnusedDataKeys,
                     setCurrentPage,
                     setSearchValue,
                     extractDataKeys,
@@ -514,6 +594,7 @@ export function DataKeysCtxProvider({
                     exportDataKeys,
                     setCurrentDataKeyUuid,
                     loadDataKeys,
+                    loadUnusedDataKeys,
                     setSelected,
                     setSort,
                     onSort,
@@ -522,6 +603,24 @@ export function DataKeysCtxProvider({
             >
                 {children}
             </DataKeysCtx.Provider>
+
+            <SocketEventsListener
+                events={[
+                    {
+                        name: 'mode_changed',
+                        onEvent: { refreshRouter: true, },
+                    },
+                    {
+                        name: 'update_system',
+                        onEvent: { refreshRouter: true, },
+                    },
+                    {
+                        name: 'data_changed',
+                        onEvent: { callback: () => getLatestDataKeys({ silent: true, }), },
+                    },
+
+                ]}
+            />
         </>
     );
 }

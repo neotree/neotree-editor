@@ -4,6 +4,7 @@ import {
   getDataKeyIntegrityEntryFingerprint,
   scanDataKeyIntegrity,
   type DataKeyIntegrityPublishDetails,
+  type NuidSearchSource,
   buildDataKeyIntegrityPublishDetails,
 } from "@/lib/data-key-integrity";
 import {
@@ -45,12 +46,14 @@ export function buildIntegrityImportAnalysis({
   screens,
   diagnoses,
   problems,
+  scripts,
 }: {
   policy: IntegrityPolicy;
   dataKeys: DataKey[];
   screens: ScreenType[];
   diagnoses: DiagnosisType[];
   problems: ProblemType[];
+  scripts?: NuidSearchSource[];
 }): {
   snapshot: IntegrityImportSnapshotShape;
   reviewDetails: DataKeyIntegrityPublishDetails | null;
@@ -61,6 +64,7 @@ export function buildIntegrityImportAnalysis({
     screens,
     diagnoses,
     problems,
+    scripts,
     onlyIssues: true,
     context,
     policy,
@@ -87,12 +91,14 @@ export function buildIntegrityImportSnapshot({
   screens,
   diagnoses,
   problems,
+  scripts,
 }: {
   policy: IntegrityPolicy;
   dataKeys: DataKey[];
   screens: ScreenType[];
   diagnoses: DiagnosisType[];
   problems: ProblemType[];
+  scripts?: NuidSearchSource[];
 }): IntegrityImportSnapshotShape {
   return buildIntegrityImportAnalysis({
     policy,
@@ -100,6 +106,7 @@ export function buildIntegrityImportSnapshot({
     screens,
     diagnoses,
     problems,
+    scripts,
   }).snapshot;
 }
 
@@ -109,12 +116,14 @@ export function buildIntegrityImportReviewDetails({
   screens,
   diagnoses,
   problems,
+  scripts,
 }: {
   policy: IntegrityPolicy;
   dataKeys: DataKey[];
   screens: ScreenType[];
   diagnoses: DiagnosisType[];
   problems: ProblemType[];
+  scripts?: NuidSearchSource[];
 }): DataKeyIntegrityPublishDetails | null {
   return buildIntegrityImportAnalysis({
     policy,
@@ -122,5 +131,6 @@ export function buildIntegrityImportReviewDetails({
     screens,
     diagnoses,
     problems,
+    scripts,
   }).reviewDetails;
 }

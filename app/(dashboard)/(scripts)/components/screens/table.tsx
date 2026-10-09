@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Edit } from "lucide-react";
 
@@ -12,6 +13,10 @@ import { ScreensTableRowActions } from "./table-row-actions";
 import { useScreensTable, UseScreensTableParams } from '../../hooks/use-screens-table';
 import { CopyScreensModal } from "./copy-modal";
 import { ScriptsTableSearch } from "../scripts-table-search";
+import { useConditionKeys } from "@/components/conditional-expression";
+import { ScriptIssueBadge, collisionIssues, conditionIssues } from "@/components/script-issues";
+import { getOutcomeProducers, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { findScriptFieldKeyCollisions, type FieldKeyCollision } from "@/lib/field-key-collisions";
 
 type Props = UseScreensTableParams;
 
@@ -24,6 +29,7 @@ export function ScreensTable(props: Props) {
         isScriptLocked,
         scriptLockedByUserId,
         search,
+        screens,
         screensArr,
         setSearch,
         onSearch,
@@ -34,19 +40,60 @@ export function ScreensTable(props: Props) {
     } = useScreensTable(props);
 
     const { sys, viewOnly } = useAppContext();
+    const { conditionKeys, keysReady } = useConditionKeys();
+    const outcomeProducers = useMemo(() => getOutcomeProducers(screens.data), [screens.data]);
+    const unavailableByPosition = useMemo(() => {
+        const availability = new Map<string, Record<string, string>>();
+        screensArr.forEach((screen) => {
+            const key = `${screen?.position ?? ''}`;
+            if (availability.has(key)) return;
+            availability.set(key, getUnavailableOutcomeKeys({
+                screens: screens.data,
+                consumerPosition: screen?.position,
+                producers: outcomeProducers,
+            }));
+        });
+        return availability;
+    }, [outcomeProducers, screens.data, screensArr]);
+
+    // Collisions per screen, computed once per data change rather than inside
+    // the cell renderer, which re-ran for every row on every render.
+    //
+    // One script-level pass rather than a findScreenFieldKeyCollisions call per
+    // screen: it already runs that loop internally.
+    const collisionsByScreen = useMemo(() => {
+        const map = new Map<string, FieldKeyCollision[]>();
+        const scriptScreens = [];
+        for (const screen of screensArr) {
+            if (!screen?.screenId) continue;
+            map.set(`${screen.screenId}`, []);
+            scriptScreens.push({
+                screenId: screen.screenId,
+                title: screen.title,
+                repeatable: (screen as { repeatable?: boolean | null }).repeatable,
+                fields: (screen?.fields || []) as any[],
+            });
+        }
+
+        for (const collision of findScriptFieldKeyCollisions({ screens: scriptScreens, dataKeys: conditionKeys })) {
+            if (collision.screenId) map.get(collision.screenId)?.push(collision);
+        }
+
+        return map;
+    }, [screensArr, conditionKeys]);
 
     return (
         <>
             {loading && <Loader overlay />}
 
             {!!screensIdsToCopy.length && (
-                <CopyScreensModal 
-                    open 
+                <CopyScreensModal
+                    open
                     screensIds={screensIdsToCopy}
                     onOpenChange={() => {
                         setScreensIdsToCopy([]);
                         setSelected([]);
-                    }} 
+                    }}
                 />
             )}
 
@@ -54,14 +101,14 @@ export function ScreensTable(props: Props) {
                 <div className="pt-4 px-4 text-2xl">Screens</div>
 
                 <div className="px-4">
-                    <ScriptsTableSearch 
+                    <ScriptsTableSearch
                         onSearch={onSearch}
                         search={search}
                         setSearch={setSearch}
                     />
                 </div>
 
-                <DataTable 
+                <DataTable
                     selectedIndexes={selected}
                     onSelect={setSelected}
                     selectable={!disabled}
@@ -103,6 +150,51 @@ export function ScreensTable(props: Props) {
                         },
                         {
                             name: 'Title',
+                            cellRenderer(cell) {
+                                const s = screensArr[cell.rowIndex];
+                                const fieldExpressions = ((s?.fields || []) as any[]).flatMap((f) => {
+                                    const fieldName = f?.key || f?.label || '';
+                                    return [
+                                        { value: f?.condition, label: `Field "${fieldName}" condition`, allowSelf: true },
+                                        { value: f?.calculation, label: `Field "${fieldName}" reference`, mode: 'reference' as const },
+                                        ...((f?.items || []) as any[])
+                                            .filter((item) => `${item?.condition || ''}`.trim())
+                                            .map((item) => ({
+                                                value: item.condition,
+                                                label: `Field "${fieldName}" option "${item.value || item.label}"`,
+                                            })),
+                                    ];
+                                });
+                                const itemExpressions = ((s?.items || []) as any[]).map((item) => ({
+                                    value: item?.condition,
+                                    label: `Item "${item?.label || item?.key || ''}" condition`,
+                                    allowSelf: true,
+                                }));
+                                const keyCollisions = collisionsByScreen.get(`${s?.screenId || ''}`) || [];
+                                return (
+                                    <span className="inline-flex items-center gap-x-2">
+                                        <span>{s?.title}</span>
+                                        {!!s && (
+                                            <ScriptIssueBadge
+                                                issues={[
+                                                    ...collisionIssues(keyCollisions),
+                                                    ...conditionIssues({
+                                                        keys: conditionKeys,
+                                                        keysReady,
+                                                        unavailableKeys: unavailableByPosition.get(`${s.position ?? ''}`) || {},
+                                                        expressions: [
+                                                            { value: s.condition, label: 'Condition', allowSelf: true },
+                                                            { value: s.skipToCondition, label: 'Skip to screen', allowSelf: true },
+                                                            ...fieldExpressions,
+                                                            ...itemExpressions,
+                                                        ],
+                                                    }),
+                                                ]}
+                                            />
+                                        )}
+                                    </span>
+                                );
+                            },
                         },
                         {
                             name: 'Version',
@@ -132,7 +224,7 @@ export function ScreensTable(props: Props) {
                                 const s = screensArr[cell.rowIndex];
                                 if (!s) return null;
                                 return (
-                                    <ScreensTableRowActions 
+                                    <ScreensTableRowActions
                                         screen={s}
                                         disabled={disabled}
                                         isScriptLocked={isScriptLocked}
@@ -157,7 +249,7 @@ export function ScreensTable(props: Props) {
                 />
             </div>
 
-            <ScreensTableBottomActions 
+            <ScreensTableBottomActions
                 disabled={viewOnly}
                 selected={selected}
                 onCopy={() => setScreensIdsToCopy(selected.map(i => screensArr[i]?.screenId).filter(s => s))}

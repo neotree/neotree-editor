@@ -18,8 +18,9 @@ export async function _publishDataKeys(opts?: {
   allowConfidentialDowngrade?: boolean
   client?: DbOrTransaction
 }) {
-  const results: { success: boolean; errors?: string[]; deletedUniqueKeys?: string[] } = { success: false }
+  const results: { success: boolean; errors?: string[]; deletedUniqueKeys?: string[]; confidentialDowngrades?: { dataKeyId: string; name: string }[] } = { success: false }
   const errors: string[] = []
+  const confidentialDowngrades: { dataKeyId: string; name: string }[] = []
   const changeLogs: SaveChangeLogData[] = []
 
   if (!opts?.client || !Number.isFinite(opts?.dataVersion)) {
@@ -160,10 +161,24 @@ export async function _publishDataKeys(opts?: {
 
         const { uuid: __uuid, id, createdAt, updatedAt, deletedAt, ...payload } = c
 
-        if (!opts?.allowConfidentialDowngrade && current?.confidential === true && payload.confidential === false) {
+        // Confidential and confidential-label-only are two tiers of the same protection, so
+        // moving between them (in either direction) is always allowed. Only leaving both tiers
+        // entirely (going fully non-confidential) counts as a downgrade that needs explicit opt-in.
+        const wasConfidential = current?.confidential === true || current?.confidentialLabelOnly === true
+        const becomesNonConfidential = payload.confidential === false && payload.confidentialLabelOnly === false
+
+        if (!opts?.allowConfidentialDowngrade && wasConfidential && becomesNonConfidential) {
           errors.push(
-            `Cannot downgrade confidential data key "${current.name || dataKeyId}" during publish. ` +
+            `Cannot remove confidentiality from data key "${current?.name || dataKeyId}" during publish. ` +
               `Set allowConfidentialDowngrade=true for an explicit downgrade.`,
+          )
+          confidentialDowngrades.push({ dataKeyId, name: current?.name || dataKeyId })
+          continue
+        }
+
+        if (payload.confidential === true && payload.confidentialLabelOnly === true) {
+          errors.push(
+            `Data key "${current?.name || dataKeyId}" cannot be both Confidential and Confidential (label only).`,
           )
           continue
         }
@@ -263,7 +278,8 @@ export async function _publishDataKeys(opts?: {
     }
   } catch (e: any) {
     results.success = false
-    results.errors = [e.message]
+    results.errors = errors.length ? errors : [e.message]
+    results.confidentialDowngrades = confidentialDowngrades.length ? confidentialDowngrades : undefined
     logger.error("_publishDataKeys ERROR", e)
   }
 

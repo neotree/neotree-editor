@@ -29,7 +29,6 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { DateTimePicker } from "@/components/datetime-picker"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { validateDropdownValues } from "@/lib/validate-dropdown-values"
 import { cn } from "@/lib/utils"
@@ -40,6 +39,9 @@ import { useField } from "../../hooks/use-field"
 import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
+import { useFieldKeyCollisions } from "@/components/field-key-collisions"
+import { collectNewOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
 
 type Props = {
   open: boolean
@@ -48,12 +50,15 @@ type Props = {
     index: number
     data: FieldType
   }
+  /** Persisted field used to grandfather only pre-existing key collisions. */
+  baselineField?: FieldType
   form: ReturnType<typeof useScreenForm>
   onClose: () => void
   scriptId: any
+  unavailableOutcomeKeys?: Record<string, string>
 }
 
-export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled: disabledProp, onClose }: Props & P) {
+export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
 
@@ -91,6 +96,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
     defaultValues: getDefaultValues(),
   })
   const [alias, setAlias] = useState("")
+  const { conditionKeys, keysLoading, keysReady } = useConditionKeys()
+  const [conditionHasErrors, setConditionHasErrors] = useState(false)
+  const [calculationHasErrors, setCalculationHasErrors] = useState(false)
 
   const type = watch("type")
   const format = watch("format")
@@ -101,6 +109,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const printable = watch("printable")
   const ips = watch("ips")
   const confidential = watch("confidential")
+  const confidentialLabelOnly = watch("confidentialLabelOnly")
   const maxDate = watch("maxDate")
   const minDate = watch("minDate")
   const maxTime = watch("maxTime")
@@ -113,8 +122,50 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
   const valuesOptions = watch("valuesOptions")
   const editable = watch("editable")
   const printDisplayColumns = watch('printDisplayColumns');
+  const reservedKeyCollisions = useMemo(
+    () => collectNewOutcomeKeyCollisions(
+      { screens: [{ type: "form", fields: [{ fieldId: field?.fieldId, key, label, items }] }] },
+      { screens: [{ type: "form", fields: baselineField ? [baselineField] : [] }] },
+    ),
+    [baselineField, field?.fieldId, items, key, label],
+  )
 
   const valuesErrors = useMemo(() => validateDropdownValues(values), [values])
+
+  // The screen as it would look once this field is saved, so a key clash shows
+  // up here rather than at publish time.
+  const condition = watch("condition")
+  const screenFields = form.watch("fields")
+  const screenRepeatable = form.watch("repeatable")
+  const candidateFields = useMemo(() => {
+    const siblings: FieldType[] = screenFields || []
+    const edited = { fieldId: fieldProp?.data?.fieldId, key, label, type, condition }
+    if (fieldProp && fieldProp.index >= 0) {
+      return siblings.map((f, i) => (i === fieldProp.index ? { ...f, ...edited } : f))
+    }
+    return [...siblings, edited as FieldType]
+  }, [screenFields, fieldProp, key, label, type, condition])
+
+  const keyCollisions = useFieldKeyCollisions({
+    fields: candidateFields as any,
+    repeatable: screenRepeatable,
+    keys: conditionKeys,
+  })
+  const currentKeyCollisions = keyCollisions.forKey(key)
+
+  // Keys on the parent screen (incl. this field), so conditions can reference
+  // sibling fields that haven't been saved yet. Deduplication + precedence is
+  // handled by mergeConditionKeys inside ConditionEditor.
+  const localConditionKeys = useMemo<ConditionKey[]>(() => {
+    const siblings: FieldType[] = form.getValues("fields") || []
+    const arr: ConditionKey[] = siblings.map((f) => ({
+      name: `${f?.key || ""}`.trim(),
+      label: `${f?.key || ""}${f?.label ? ` - ${f.label}` : ""}`,
+      dataType: f?.type,
+    }))
+    if (key) arr.push({ name: `${key}`.trim(), label: `${key}${label ? ` - ${label}` : ""}`, dataType: type })
+    return arr.filter((k) => !!k.name)
+  }, [form, key, label, type])
 
   const isDateField = useMemo(() => type === "date" || type === "datetime", [type])
   const isTimeField = useMemo(() => type === "time", [type])
@@ -230,11 +281,21 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
     return !!dataKey?.confidential
   }, [dataKey?.confidential])
 
+  const inheritedConfidentialLabelOnly = useMemo(() => {
+    return !!dataKey?.confidentialLabelOnly
+  }, [dataKey?.confidentialLabelOnly])
+
   useEffect(() => {
     if (confidential !== inheritedConfidential) {
       setValue("confidential", inheritedConfidential, { shouldDirty: true })
     }
   }, [confidential, inheritedConfidential, setValue]);
+
+  useEffect(() => {
+    if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+      setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: true })
+    }
+  }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
 
   const isKeyDisabled = disabled || !!field;
 
@@ -259,7 +320,7 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
             </DialogClose>
 
             <Button
-              disabled={disabled || !type}
+              disabled={disabled || !type || !!reservedKeyCollisions.length || (showForm && (conditionHasErrors || calculationHasErrors))}
               onClick={() => {
                 if (!showForm) {
                   setShowForm(true)
@@ -332,7 +393,26 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
               <Title>Flow control</Title>
               <div>
                 <Label htmlFor="condition">Conditional expression <ConditionalExpressionModal /></Label>
-                <Textarea {...register("condition", { disabled })} name="condition" noRing={false} rows={5} />
+                <Controller
+                  control={control}
+                  name="condition"
+                  render={({ field: { value, onChange } }) => (
+                    <ConditionEditor
+                      id="condition"
+                      rows={5}
+                      value={value || ""}
+                      onChange={onChange}
+                      keys={conditionKeys}
+                      extraKeys={localConditionKeys}
+                      keysLoading={keysLoading}
+                      keysReady={keysReady}
+                      unavailableKeys={unavailableOutcomeKeys}
+                      disabled={disabled}
+                      initialValue={field?.condition || ""}
+                      onValidityChange={setConditionHasErrors}
+                    />
+                  )}
+                />
                 <span className="text-xs text-muted-foreground">Example: {CONDITIONAL_EXP_EXAMPLE}</span>
               </div>
             </>
@@ -360,8 +440,21 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                       setValue("keyId", item?.uniqueKey, { shouldDirty: true })
                       setValue("label", item?.label, { shouldDirty: true })
                       setValue("confidential", !!item?.confidential, { shouldDirty: true })
+                      setValue("confidentialLabelOnly", !!item?.confidentialLabelOnly, { shouldDirty: true })
                     }}
                   />
+
+                  {currentKeyCollisions.map((collision, i) => (
+                    <p
+                      key={`${collision.kind}-${i}`}
+                      className={cn(
+                        "mt-1 max-w-[280px] text-xs",
+                        collision.severity === "blocking" ? "text-destructive" : "text-amber-600",
+                      )}
+                    >
+                      {collision.message}
+                    </p>
+                  ))}
                 </div>
 
                 <div className="flex-1">
@@ -377,6 +470,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                   />
                 </div>
               </div>
+              {!!reservedKeyCollisions.length && (
+                <p className="text-xs text-destructive">{reservedKeyCollisions[0].message}</p>
+              )}
 
               {(isTextField || isNumberField) && (
                 <div>
@@ -493,6 +589,42 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                 </div>
               </div>
 
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                      onClick={() =>
+                        alert({
+                          title: "Confidentiality is managed in Data Keys",
+                          message: "Change this in the Data Key. Fields inherit confidential status automatically.",
+                          variant: "info",
+                        })
+                      }
+                    >
+                      <Switch id="confidentialLabelOnly" disabled checked={inheritedConfidentialLabelOnly} />
+                      <Label htmlFor="confidentialLabelOnly">Confidential (label only)</Label>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="flex flex-col gap-y-1">
+                      <span>Change confidentiality in the Data Key library.</span>
+                      {!!keyId && (
+                        <Link
+                          href={`/data-keys/edit/${keyId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          Open Data Key
+                        </Link>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               {(isDropdownField || isMultiSelectField) && (
                 <>
                   {!!isMultiSelectField && (
@@ -532,6 +664,9 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                           fieldType={type}
                           onChange={onChange}
                           dataKey={dataKey}
+                          conditionKeys={conditionKeys}
+                          extraConditionKeys={localConditionKeys}
+                          conditionKeysLoading={keysLoading}
                         />
                       )
                     }}
@@ -543,7 +678,27 @@ export function Field<P = {}>({ open, field: fieldProp, form, scriptId, disabled
                 <>
                   <div>
                     <Label htmlFor="calculation">Reference expression <ConditionalExpressionModal /></Label>
-                    <Input {...register("calculation", { disabled })} name="calculation" noRing={false} />
+                    <Controller
+                      control={control}
+                      name="calculation"
+                      render={({ field: { value, onChange } }) => (
+                        <ConditionEditor
+                          id="calculation"
+                          mode="reference"
+                          rows={2}
+                          value={value || ""}
+                          onChange={onChange}
+                          keys={conditionKeys}
+                          extraKeys={localConditionKeys}
+                          keysLoading={keysLoading}
+                          keysReady={keysReady}
+                          unavailableKeys={unavailableOutcomeKeys}
+                          disabled={disabled}
+                          initialValue={(field as { calculation?: string } | undefined)?.calculation || ""}
+                          onValidityChange={setCalculationHasErrors}
+                        />
+                      )}
+                    />
                     <span className="text-xs text-muted-foreground">
                       Example: $key or SUM($key1,$key2...) or DIVIDE($key1,$key2...) or MULTIPLY($key1,$key2...) or
                       SUBTRACT($key1,$key2...)

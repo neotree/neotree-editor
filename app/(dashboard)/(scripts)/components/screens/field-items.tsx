@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { MoreVertical, EditIcon, TrashIcon, PlusIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { v4 as uuidV4 } from "uuid"
@@ -21,8 +21,28 @@ import { isNumericQueryValue } from "@/lib/query-state"
 import { SelectDataKey } from "@/components/select-data-key"
 import { SelectModal } from "@/components/select-modal"
 import { useAlertModal } from "@/hooks/use-alert-modal"
+import { ConditionEditor } from "@/components/conditional-expression"
+import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
+import type { ConditionKey } from "@/lib/conditional-expression"
+import { useFieldKeyCollisions } from "@/components/field-key-collisions"
+import { ScriptIssueBadge, collisionIssues } from "@/components/script-issues"
 
 type Item = NonNullable<ScriptField["items"]>[0]
+
+/**
+ * Duplicate values inside this one option list.
+ *
+ * Computed here rather than passed down: the list is all the detector needs,
+ * and the author should see the clash on the option that caused it, not only
+ * on the field row above it.
+ */
+function useOptionCollisions(items: Item[], label: string) {
+  return useFieldKeyCollisions({
+    fields: [{ key: label || "field", label: label || "Field", items }],
+    items: [],
+    screenTitle: " ",
+  })
+}
 
 export function FieldItems({
   items = [],
@@ -31,6 +51,9 @@ export function FieldItems({
   dataKey,
   allowCustomKey = false,
   hideManualEntry = false,
+  conditionKeys = [],
+  extraConditionKeys = [],
+  conditionKeysLoading,
   onChange,
 }: {
   disabled: boolean
@@ -39,8 +62,13 @@ export function FieldItems({
   dataKey?: DataKey | null
   allowCustomKey?: boolean
   hideManualEntry?: boolean
+  conditionKeys?: ConditionKey[]
+  extraConditionKeys?: ConditionKey[]
+  conditionKeysLoading?: boolean
   onChange: (items: Item[]) => void
 }) {
+  const optionCollisions = useOptionCollisions(items, `${dataKey?.name || ""}`)
+
   const { confirm } = useConfirmModal()
   const [currentItem, setCurrentItem] = useQueryState("fieldItem", {
     defaultValue: "",
@@ -78,6 +106,9 @@ export function FieldItems({
           }}
           hideManualEntry={hideManualEntry}
           allowCustomKey={allowCustomKey}
+          conditionKeys={conditionKeys}
+          extraConditionKeys={extraConditionKeys}
+          conditionKeysLoading={conditionKeysLoading}
           onChange={(data) => {
             if (currentItem === "new") {
               onChange([...items, data])
@@ -108,6 +139,7 @@ export function FieldItems({
             item.enterValueManuallyLabel || "",
             item.exclusiveGroup || "",
             item.forbidWith?.length ? `${item.forbidWith.length}` : "",
+            item.condition || "",
             "",
           ])}
           onSort={(oldIndex: number, newIndex: number) => {
@@ -127,6 +159,16 @@ export function FieldItems({
             },
             {
               name: "Label",
+              cellRenderer({ rowIndex }) {
+                const item = items[rowIndex]
+                const issues = collisionIssues(optionCollisions.forFieldOptionIndex(0, rowIndex))
+                return (
+                  <span className="inline-flex items-center gap-x-2">
+                    <span>{item?.label}</span>
+                    {!!issues.length && <ScriptIssueBadge issues={issues} />}
+                  </span>
+                )
+              },
             },
             {
               name: "Exclusive",
@@ -150,6 +192,14 @@ export function FieldItems({
               name: "Forbid With",
               align: "center",
               cellClassName: fieldType !== "multi_select" ? "hidden" : "",
+            },
+            {
+              name: "Conditional expression",
+              cellRenderer({ rowIndex }) {
+                const condition = `${items[rowIndex]?.condition || ""}`.trim()
+                if (!condition) return <span className="text-muted-foreground">None</span>
+                return <span className="font-mono text-xs">{condition}</span>
+              },
             },
             {
               name: "",
@@ -204,6 +254,9 @@ function Form({
   fieldDataKey,
   allowCustomKey,
   hideManualEntry,
+  conditionKeys = [],
+  extraConditionKeys = [],
+  conditionKeysLoading,
   onClose,
   onChange,
 }: {
@@ -213,6 +266,9 @@ function Form({
   fieldDataKey?: DataKey | null
   allowCustomKey?: boolean
   hideManualEntry?: boolean
+  conditionKeys?: ConditionKey[]
+  extraConditionKeys?: ConditionKey[]
+  conditionKeysLoading?: boolean
   onClose: () => void
   onChange: (item: Item) => void
 }) {
@@ -239,9 +295,11 @@ function Form({
       label2: item?.label2 || "",
       value: item?.value || "",
       keyId: item?.keyId,
+      condition: item?.condition || "",
     },
   })
   const enterValueManually = watch("enterValueManually")
+  const [conditionHasErrors, setConditionHasErrors] = useState(false)
 
   const forbidOptions = useMemo(() => {
     const currentItemId = item?.itemId
@@ -265,10 +323,20 @@ function Form({
       return
     }
 
+    if (conditionHasErrors) {
+      alert({
+        title: "Fix the option condition",
+        message: "This option's condition has an error. Correct it, or clear it to always show the option.",
+        variant: "error",
+      })
+      return
+    }
+
     const payload = {
       ...data,
       enterValueManually: hideManualEntry ? false : data.enterValueManually,
       enterValueManuallyLabel: !hideManualEntry && data.enterValueManually ? manualLabel : "",
+      condition: `${data.condition || ""}`.trim(),
     }
     onChange(payload)
     onClose()
@@ -338,6 +406,31 @@ function Form({
                   disabled: isKeyDisabled,
                 })}
               />
+            </div>
+
+            <div className="px-4">
+              <Label htmlFor="condition">Conditional expression <ConditionalExpressionModal /></Label>
+              <Controller
+                control={control}
+                name="condition"
+                render={({ field: { value, onChange } }) => (
+                  <ConditionEditor
+                    id="condition"
+                    value={`${value || ""}`}
+                    initialValue={`${item?.condition || ""}`}
+                    onChange={onChange}
+                    keys={conditionKeys}
+                    extraKeys={extraConditionKeys}
+                    keysLoading={conditionKeysLoading}
+                    onValidityChange={setConditionHasErrors}
+                    rows={2}
+                    placeholder="e.g. $PHC = 'Bua'"
+                  />
+                )}
+              />
+              <span className="text-xs text-muted-foreground">
+                Leave empty to always offer this option. Otherwise it is offered only while the expression is true.
+              </span>
             </div>
 
             {fieldType === "multi_select" && (

@@ -241,7 +241,10 @@ export async function _publishScreens(opts?: {
       new Set((updates ?? []).map((ud) => ud.scriptId).filter((id): id is string => Boolean(id))),
     )
     if (updatedScripts.length) {
-      await _generateScreenAliases(updatedScripts, { client })
+      const aliasResult = await _generateScreenAliases(updatedScripts, { client })
+      if (!aliasResult.success) {
+        throw new Error(aliasResult.errors?.join(", ") || "Failed to generate screen aliases")
+      }
     }
 
     if (changeLogs.length) {
@@ -252,8 +255,9 @@ export async function _publishScreens(opts?: {
     results.success = true
   } catch (e: any) {
     results.success = false
-    results.errors = [e.message]
-    logger.error("_publishScreens ERROR", e)
+    const message = e?.message || "Failed to publish screens"
+    results.errors = [message]
+    logger.error("_publishScreens ERROR", message)
   }
 
   return results

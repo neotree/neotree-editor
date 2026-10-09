@@ -1,0 +1,549 @@
+import type {
+  ComparisonNode,
+  ConditionKey,
+  Diagnostic,
+  MembershipNode,
+  Node,
+  ProgramNode,
+  ValidationContext,
+  VarNode,
+} from "./ast";
+import { quoteValue } from "./quote";
+import { OUTCOME_COLLECTIONS } from "./script-outcomes";
+import { suggestClosest } from "./suggest";
+
+// Data-type families (compared case-insensitively).
+const MULTI_VALUE_TYPES = new Set([
+  "multi_select",
+  "multiselect",
+  "checklist",
+  "diagnosis",
+  "problem",
+  "drug",
+  "fluid",
+  "list",
+]);
+
+// Types that cannot be meaningfully compared with </>/>=/<=.
+const NON_ORDERED_TYPES = new Set(["text", "string", "boolean", "yesno"]);
+
+// Types that expect a numeric value.
+const NUMERIC_TYPES = new Set(["number", "integer", "decimal", "float", "numeric", "timer"]);
+
+const ORDERING_OPS = new Set([">", "<", ">=", "<="]);
+
+/** True for a string that the runtime would coerce cleanly to a number. */
+function isNumericString(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed !== "" && /^-?\d+(\.\d+)?$/.test(trimmed);
+}
+
+
+function isMultiValueType(dataType: string): boolean {
+  if (!dataType) return false;
+  if (MULTI_VALUE_TYPES.has(dataType)) return true;
+  return dataType.startsWith("set<") || dataType === "set";
+}
+
+/**
+ * Span covering a list value plus the comma separating it from a neighbour, so
+ * deleting the span leaves a well-formed list. Returns null when no separator
+ * sits next to the value (a single-value list), where deletion is not safe.
+ */
+function spanWithSeparator(
+  source: string,
+  start: number,
+  end: number,
+): { start: number; end: number } | null {
+  let before = start - 1;
+  while (before >= 0 && /\s/.test(source[before])) before--;
+  if (source[before] === ",") return { start: before, end };
+
+  let after = end;
+  while (after < source.length && /\s/.test(source[after])) after++;
+  if (source[after] === ",") return { start, end: after + 1 };
+
+  return null;
+}
+
+interface KeyDesc {
+  dataType?: string;
+  options?: string[];
+}
+
+/** Tracks bracket / logical context while walking, for list-reference checks. */
+interface WalkEnv {
+  /** How many `[ ]` groups enclose the current node. */
+  bracketDepth: number;
+  /**
+   * True when the current node shares its innermost `[ ]` group (or the line,
+   * if unbracketed) with an and/or — i.e. it is being combined. `[ ]` starts a
+   * fresh scope; `( )` does not (the runtime only isolates `[ ]`).
+   */
+  combinedInScope: boolean;
+}
+
+export function analyze(ast: ProgramNode, ctx: ValidationContext, source = ""): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  // Keyed both ways. `RESUS` and `Resus` are two different keys with their own
+  // types and options, so a reference resolves to its own key first; the
+  // case-insensitive map is only a fallback, for naming the intended key when a
+  // reference matches nothing exactly.
+  const keyByExactName = new Map<string, ConditionKey>();
+  const keyByLowerName = new Map<string, ConditionKey>();
+  // Every name in the catalogue, for "did you mean" suggestions. Built once
+  // here rather than per unknown key.
+  const allNames: string[] = [];
+  for (const key of ctx.keys) {
+    keyByExactName.set(key.name, key);
+    allNames.push(key.name);
+    // First one wins, so a suggestion is stable rather than depending on order.
+    const lower = key.name.toLowerCase();
+    if (!keyByLowerName.has(lower)) keyByLowerName.set(lower, key);
+  }
+
+  const describeVar = (node: VarNode): KeyDesc | null => {
+    if (node.name.toLowerCase() === "self") {
+      return { dataType: ctx.selfDataType, options: ctx.selfOptions };
+    }
+    const key = keyByExactName.get(node.name) || keyByLowerName.get(node.name.toLowerCase());
+    return key ? { dataType: key.dataType, options: key.options } : null;
+  };
+
+  const checkVar = (node: VarNode): void => {
+    const name = node.name.toLowerCase();
+    if (!name) return; // tokenizer already flagged the empty "$"
+
+    if (name === "self") {
+      if (!ctx.allowSelf) {
+        diagnostics.push({
+          severity: "warning",
+          code: "SELF_NOT_ALLOWED",
+          message: '"$self" may not be available here — it refers to the current field\'s own value.',
+          start: node.start,
+          end: node.end,
+        });
+      }
+      return;
+    }
+
+    // A partially loaded catalogue must never emit key-dependent errors,
+    // including availability errors derived from not-yet-loaded screens.
+    if (ctx.skipKeyResolution) return;
+
+    const unavailable = Object.entries(ctx.unavailableKeys || {})
+      .find(([key]) => key.toLowerCase() === name)?.[1];
+    if (unavailable) {
+      diagnostics.push({
+        severity: "error",
+        code: "OUTCOME_NOT_AVAILABLE",
+        message: unavailable,
+        start: node.start,
+        end: node.end,
+      });
+      return;
+    }
+
+    // Exact (case-sensitive) match is required.
+    if (keyByExactName.has(node.name)) return;
+
+    // No key spelled this way, but one differs only by case — so this is a
+    // casing mistake, not an unknown key.
+    const canonical = keyByLowerName.get(name)?.name;
+    if (canonical) {
+      diagnostics.push({
+        severity: "error",
+        code: "KEY_CASE",
+        message: `Key "$${node.name}" has the wrong casing — use "$${canonical}".`,
+        start: node.start,
+        end: node.end,
+        suggestion: `$${canonical}`,
+      });
+      return;
+    }
+
+    const suggestion = suggestClosest(node.name, allNames);
+    diagnostics.push({
+      severity: "error",
+      code: "UNKNOWN_KEY",
+      message: `Unknown key "$${node.name}".${suggestion ? ` Did you mean "$${suggestion}"?` : ""}`,
+      start: node.start,
+      end: node.end,
+      suggestion: suggestion ? `$${suggestion}` : undefined,
+    });
+  };
+
+  // Reject empty / null-like values (structural — runs even before keys load).
+  // Returns true if it flagged, so callers can skip further value checks.
+  const NULLISH = new Set(["null", "undefined"]);
+  const flagBadValue = (value: Node): boolean => {
+    if (value.type !== "Literal") return false;
+    const raw = String(value.value);
+    if (value.bare && NULLISH.has(raw.toLowerCase())) {
+      diagnostics.push({
+        severity: "error",
+        code: "NULL_VALUE",
+        message: "A value is required — null/undefined is not allowed.",
+        start: value.start,
+        end: value.end,
+      });
+      return true;
+    }
+    if (!value.bare && value.valueType === "string" && raw.trim() === "") {
+      diagnostics.push({
+        severity: "error",
+        code: "EMPTY_VALUE",
+        message: "A value is required — empty text is not allowed.",
+        start: value.start,
+        end: value.end,
+      });
+      return true;
+    }
+    return false;
+  };
+
+  // Leading/trailing spaces inside a quoted value are almost always a mistake
+  // (e.g. '$Sex = "M "' never matches "M" at runtime).
+  const flagValueWhitespace = (value: Node): void => {
+    if (value.type !== "Literal" || value.valueType !== "string" || value.bare) return;
+    const raw = String(value.value);
+    const trimmed = raw.trim();
+    if (trimmed !== "" && trimmed !== raw) {
+      diagnostics.push({
+        severity: "warning",
+        code: "VALUE_WHITESPACE",
+        message: `Value has leading or trailing spaces — did you mean '${trimmed}'?`,
+        start: value.start,
+        end: value.end,
+        suggestion: quoteValue(trimmed),
+      });
+    }
+  };
+
+  // Warn when a quoted value isn't among a key's known options (with a "did you
+  // mean" suggestion). Shared by equality comparisons and list members.
+  const checkOptionValue = (value: Node, desc: KeyDesc, keyName: string): void => {
+    if (value.type !== "Literal" || value.valueType !== "string" || value.bare) return;
+    if (String(value.value).trim() === "") return; // empty handled by flagBadValue
+    if (!desc.options || !desc.options.length) return;
+    const wanted = String(value.value).toLowerCase();
+    const options = desc.options.map((o) => o.toLowerCase());
+    if (!options.includes(wanted)) {
+      const suggestion = suggestClosest(String(value.value), desc.options);
+      diagnostics.push({
+        severity: "error",
+        code: "UNKNOWN_OPTION",
+        message: `"${value.value}" is not a valid option for "$${keyName}".${suggestion ? ` Did you mean "${suggestion}"?` : ""}`,
+        start: value.start,
+        end: value.end,
+        suggestion: suggestion === undefined ? undefined : quoteValue(suggestion),
+      });
+    }
+  };
+
+
+/**
+ * `$Diagnoses` / `$Problems` hold a LIST of outcomes, so a comparison is the
+ * wrong shape for them:
+ *
+ *  - `= 'X'` only means "one of them is X" by accident of how the runtime
+ *    expands a list, and reads as if the patient had exactly one outcome;
+ *  - `!= 'X'` means "at least one of them is not X", which is true as soon as
+ *    the patient has any other outcome — and true again when none have been
+ *    confirmed at all, because an unresolved key compares unequal to
+ *    everything. That is a screen shown unconditionally.
+ *  - ordering (`>`, `<`, …) has no meaning on a list at all.
+ *
+ * Membership says exactly what the author means, so it is required here.
+ */
+const COLLECTION_NAMES = new Map(
+  Object.keys(OUTCOME_COLLECTIONS).map((name) => [name.toLowerCase(), name]),
+);
+
+const COLLECTION_MEMBERSHIP_OP: Record<string, "includes" | "excludes"> = {
+  "=": "includes",
+  "==": "includes",
+  "!=": "excludes",
+};
+
+
+  const checkComparison = (node: ComparisonNode): void => {
+    const right = node.right;
+    const badValue = flagBadValue(right);
+    if (!badValue) flagValueWhitespace(right);
+
+    // A list on the right of a comparison never worked: the runtime treats
+    // `[ ... ]` as a bracket group, compiles it, and leaves a JavaScript comma
+    // expression behind — which evaluates to its LAST item. So
+    // `$Sex = ['M','F']` silently means `$Sex = 'F'`. Membership is the only
+    // way to ask this question.
+    if (right.type === "Array" && node.left.type === "Var") {
+      const key = node.left.name;
+      const values = right.items.map((item) => source.slice(item.start, item.end).trim()).filter(Boolean);
+      const isEquality = node.op === "=" || node.op === "==";
+
+      // The rewrite is spelled out in "=" / "or" rather than as a membership on
+      // purpose. App builds are rolled out site by site over months, and older
+      // ones cannot evaluate membership at all — they return false for it. An
+      // "or" chain means exactly the same thing on every build, so fixing this
+      // can never cost an un-updated site a screen it used to show.
+      const suggestion = isEquality && values.length
+        ? `(${values.map((v) => `$${key} = ${v}`).join(" or ")})`
+        : undefined;
+
+      diagnostics.push({
+        severity: "error",
+        code: "ARRAY_COMPARISON",
+        message: `A list cannot be compared with "${node.op}" — only its last item would be checked.`
+          + (suggestion
+            ? ` Write it out, e.g. ${suggestion}.`
+            : ` Write it out as "$${key} != ..." joined by "and", or use "excludes" once every site is on the current app.`),
+        start: node.start,
+        end: node.end,
+        suggestion,
+      });
+      return;
+    }
+
+    // Checked before key resolution: these two names are fixed, so the rule
+    // holds even while the key catalogue is still loading.
+    if (node.left.type === "Var") {
+      const collection = COLLECTION_NAMES.get(node.left.name.toLowerCase());
+      if (collection) {
+        const membershipOp = COLLECTION_MEMBERSHIP_OP[node.op];
+        const value = source.slice(right.start, right.end).trim();
+        // Bracketed, so the rewrite does not immediately trip the rule that a
+        // membership may not share a line with and/or.
+        const suggestion = membershipOp && value
+          ? `[$${collection} ${membershipOp} (${value})]`
+          : undefined;
+
+        diagnostics.push({
+          severity: "error",
+          code: "COLLECTION_COMPARISON",
+          message: membershipOp
+            ? `"$${collection}" is a list of outcomes, so "${node.op}" is unreliable here. Use "${membershipOp}", e.g. ${suggestion}.`
+            : `"$${collection}" is a list of outcomes; "${node.op}" has no meaning on it. Use "includes" or "excludes", e.g. [$${collection} includes ('A')].`,
+          start: node.start,
+          end: node.end,
+          suggestion,
+        });
+        return;
+      }
+    }
+
+    if (ctx.skipKeyResolution) return;
+    if (node.left.type !== "Var") return;
+    const desc = describeVar(node.left);
+    if (!desc) return; // unknown key already reported
+    const dataType = (desc.dataType || "").toLowerCase();
+
+    if (ORDERING_OPS.has(node.op) && dataType && NON_ORDERED_TYPES.has(dataType)) {
+      diagnostics.push({
+        severity: "warning",
+        code: "TYPE_MISMATCH",
+        message: `"$${node.left.name}" is ${dataType}; "${node.op}" comparisons expect a numeric or date key.`,
+        start: node.start,
+        end: node.end,
+      });
+    }
+
+    if (badValue) return; // already flagged; skip further value checks
+
+    if (right.type === "Literal" && right.bare) {
+      diagnostics.push({
+        severity: "warning",
+        code: "UNQUOTED_VALUE",
+        message: `Text values should be wrapped in quotes: '${right.value}'.`,
+        start: right.start,
+        end: right.end,
+        suggestion: quoteValue(String(right.value)),
+      });
+      return;
+    }
+
+    checkOptionValue(right, desc, node.left.name);
+
+    // Narrow value-type sanity (warnings only). Coercible cases pass: a numeric
+    // string on a numeric key, or 'true'/'false' on a boolean key.
+    if (right.type === "Literal") {
+      if (NUMERIC_TYPES.has(dataType)) {
+        const numericOk =
+          right.valueType === "number" ||
+          (right.valueType === "string" && !right.bare && isNumericString(String(right.value)));
+        if (!numericOk) {
+          diagnostics.push({
+            severity: "warning",
+            code: "VALUE_TYPE",
+            message: `"$${node.left.name}" is ${dataType}; expected a number but got "${right.value}".`,
+            start: right.start,
+            end: right.end,
+          });
+        }
+      } else if (dataType === "boolean") {
+        const booleanOk =
+          right.valueType === "boolean" ||
+          (right.valueType === "string" && !right.bare && ["true", "false"].includes(String(right.value).toLowerCase()));
+        if (!booleanOk) {
+          diagnostics.push({
+            severity: "warning",
+            code: "VALUE_TYPE",
+            message: `"$${node.left.name}" is boolean; expected true or false but got "${right.value}".`,
+            start: right.start,
+            end: right.end,
+          });
+        }
+      }
+    }
+  };
+
+  const checkMembership = (node: MembershipNode, env: WalkEnv): void => {
+    const targetName = node.target.type === "Var" ? node.target.name : "Key";
+    const example = `[$${targetName} ${node.op} ('A')]`;
+
+    // The runtime used to evaluate includes/excludes over its whole enclosing
+    // line (or [ ] group) and discard everything else on it, so a membership
+    // had to stand ALONE. That is fixed (NEOAPP-1514): membership now resolves
+    // in place and composes freely — see ./membership-runtime.ts.
+    //
+    // The restriction is kept deliberately, because a script published today
+    // still reaches devices running the old build, where a combined membership
+    // silently evaluates to false. Relax this to a warning (and drop the
+    // bracketDepth nudge below) once the fixed app version is the floor in the
+    // field — not before.
+    if (env.combinedInScope) {
+      diagnostics.push({
+        severity: "error",
+        code: "MEMBERSHIP_BRACKETS",
+        message: `"${node.op}" cannot be combined with and/or in the same brackets/line. Put each list check in its own [ ]: e.g. ${example} and [ ... ].`,
+        start: node.start,
+        end: node.end,
+      });
+    } else if (env.bracketDepth === 0) {
+      // Standalone but unbracketed — works, but should be bracketed for clarity
+      // and to stay safe if combined later.
+      const text = source.slice(node.start, node.end);
+      diagnostics.push({
+        severity: "warning",
+        code: "MEMBERSHIP_BRACKETS",
+        message: `Wrap "${node.op}" in [ ], e.g. ${example}.`,
+        start: node.start,
+        end: node.end,
+        suggestion: text ? `[${text}]` : undefined,
+      });
+    }
+
+    // The list must contain at least one value.
+    if (!node.values.length) {
+      diagnostics.push({
+        severity: "warning",
+        code: "MEMBERSHIP_EMPTY",
+        message: `"${node.op}" needs at least one value, e.g. ('A', 'B').`,
+        start: node.start,
+        end: node.end,
+      });
+    }
+
+    // Reject empty/null list values, flag stray spaces, then require quoting.
+    node.values.forEach((value) => {
+      if (flagBadValue(value)) return;
+      flagValueWhitespace(value);
+      if (value.type === "Literal" && value.bare) {
+        diagnostics.push({
+          severity: "warning",
+          code: "UNQUOTED_VALUE",
+          message: `List values should be quoted, e.g. '${value.value}'.`,
+          start: value.start,
+          end: value.end,
+          suggestion: quoteValue(String(value.value)),
+        });
+      }
+    });
+
+    // Duplicate values in the list.
+    const seen = new Set<string>();
+    node.values.forEach((value) => {
+      if (value.type !== "Literal") return;
+      const id = String(value.value).toLowerCase();
+      if (seen.has(id)) {
+        const deletable = source ? spanWithSeparator(source, value.start, value.end) : null;
+        diagnostics.push({
+          severity: "warning",
+          code: "DUPLICATE_VALUE",
+          message: `"${value.value}" is listed more than once.`,
+          start: deletable?.start ?? value.start,
+          end: deletable?.end ?? value.end,
+          suggestion: deletable ? "" : undefined,
+        });
+      }
+      seen.add(id);
+    });
+
+    // Target type + option-value checks need the key catalogue.
+    if (ctx.skipKeyResolution) return;
+    if (node.target.type !== "Var") return;
+    const desc = describeVar(node.target);
+    if (!desc) return;
+    const dataType = (desc.dataType || "").toLowerCase();
+    if (dataType && !isMultiValueType(dataType)) {
+      diagnostics.push({
+        severity: "warning",
+        code: "MEMBERSHIP_TYPE",
+        message: `"${node.op}" works on multi-select keys; "$${node.target.name}" is ${dataType}.`,
+        start: node.target.start,
+        end: node.target.end,
+      });
+    }
+
+    // Each listed value should be one of the key's known options.
+    node.values.forEach((value) => checkOptionValue(value, desc, node.target.type === "Var" ? node.target.name : ""));
+  };
+
+  const walk = (node: Node, env: WalkEnv): void => {
+    switch (node.type) {
+      case "Program":
+        node.lines.forEach((line) => walk(line, { bracketDepth: 0, combinedInScope: false }));
+        break;
+      case "Logical": {
+        // Anything under an and/or is being combined within the current scope.
+        const childEnv: WalkEnv = { ...env, combinedInScope: true };
+        walk(node.left, childEnv);
+        walk(node.right, childEnv);
+        break;
+      }
+      case "Group":
+        // Only [ ] starts a fresh scope (the runtime isolates it); ( ) does not.
+        walk(
+          node.expr,
+          node.bracket === "bracket"
+            ? { bracketDepth: env.bracketDepth + 1, combinedInScope: false }
+            : env,
+        );
+        break;
+      case "Not":
+        walk(node.expr, env);
+        break;
+      case "Comparison":
+        checkComparison(node);
+        walk(node.left, env);
+        walk(node.right, env);
+        break;
+      case "Membership":
+        checkMembership(node, env);
+        walk(node.target, env);
+        node.values.forEach((value) => walk(value, env));
+        break;
+      case "Array":
+        node.items.forEach((value) => walk(value, env));
+        break;
+      case "Var":
+        checkVar(node);
+        break;
+      default:
+        break;
+    }
+  };
+
+  walk(ast, { bracketDepth: 0, combinedInScope: false });
+  return diagnostics;
+}

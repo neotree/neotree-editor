@@ -5,7 +5,7 @@ import db from "@/databases/pg/drizzle";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { diagnoses, diagnosesDrafts, hospitals, pendingDeletion, scripts, scriptsDrafts } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { DiagnosisSymptom, Preferences, ScriptImage } from "@/types";
+import { DiagnosisSymptom, Preferences, FileReference } from "@/types";
 
 export type GetDiagnosesParams = {
     diagnosesIds?: string[];
@@ -21,9 +21,9 @@ export type DiagnosisType = typeof diagnoses.$inferSelect & {
     isDeleted: boolean;
     symptoms: DiagnosisSymptom[];
     preferences: Preferences;
-    image1: null | ScriptImage;
-    image2: null | ScriptImage;
-    image3: null | ScriptImage;
+    image1: null | FileReference;
+    image2: null | FileReference;
+    image3: null | FileReference;
     scriptTitle?: string;
     hospitalName?: string;
     draftCreatedByUserId?: string | null;

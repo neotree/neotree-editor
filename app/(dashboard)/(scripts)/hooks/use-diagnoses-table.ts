@@ -15,6 +15,7 @@ import {
   filterScriptsSearchResults,
   parseScriptsSearchResults,
 } from "@/lib/scripts-search"
+import { fetchOutcomeReferenceImpact, formatOutcomeImpactMessage } from "@/components/conditional-expression/outcome-impact"
 
 export type UseDiagnosesTableParams = {
   disabled?: boolean
@@ -60,10 +61,38 @@ export function useDiagnosesTable({
 
   const onDelete = useCallback(
     async (diagnosesIds: string[]) => {
+      const diagnosesToDelete = diagnoses.data.filter((s) => s.diagnosisId && diagnosesIds.includes(s.diagnosisId))
+      const scriptId = `${diagnosesToDelete[0]?.scriptId || ""}`
+      const values = diagnosesToDelete.map((diagnosis) => `${diagnosis?.key || ""}`.trim()).filter(Boolean)
+      if (scriptId && values.length) {
+        try {
+          setLoading(true)
+          const impact = await fetchOutcomeReferenceImpact({
+            scriptId,
+            collection: "Diagnoses",
+            values,
+            excludeDiagnosisIds: diagnosesIds,
+          })
+          if (impact?.count) {
+            alert({
+              title: "Diagnosis is still referenced",
+              message: formatOutcomeImpactMessage(impact, "delete"),
+              variant: "info",
+              buttonLabel: "Close",
+            })
+            return
+          }
+        } catch (e: any) {
+          alert({ title: "Could not inspect references", message: e.message, variant: "error" })
+          return
+        } finally {
+          setLoading(false)
+        }
+      }
+
       confirm(
         async () => {
           const _diagnoses = { ...diagnoses }
-          const diagnosesToDelete = diagnoses.data.filter((s) => s.diagnosisId && diagnosesIds.includes(s.diagnosisId))
 
           setDiagnoses((prev) => ({ ...prev, data: prev.data.filter((s) => !diagnosesIds.includes(s.diagnosisId)) }))
           setSelected([])
@@ -128,7 +157,7 @@ export function useDiagnosesTable({
       // TODO: Replace this with server action
       await axios.post("/api/diagnoses/save", { data: payload, broadcastAction: true })
 
-      await loadDiagnoses()
+      await loadDiagnoses();
 
       router.refresh()
     },

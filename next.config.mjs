@@ -5,6 +5,12 @@ export default (phase) => {
    * @type {import('next').NextConfig}
    */
     const nextConfig = {
+        // typescript: {
+        //     ignoreBuildErrors: true,
+        // },
+        // eslint: {
+        //     ignoreDuringBuilds: true,
+        // },
         distDir: phase === PHASE_DEVELOPMENT_SERVER ? undefined : 'build',
         images: {
             domains: [

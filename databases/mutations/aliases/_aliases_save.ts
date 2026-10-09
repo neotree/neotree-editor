@@ -219,8 +219,9 @@ export async function _saveAliases(
     response.success = true
     return response
   } catch (ex: any) {
-    logger.error(ex.message)
-    errors.push(ex.message)
+    const message = ex?.message || "Failed to save aliases"
+    logger.error("_saveAliases ERROR", message, info.query || null)
+    errors.push(message)
     response.errors = errors
     response.info = info
     return response

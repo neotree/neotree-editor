@@ -44,12 +44,15 @@ export function evaluateIntegrityScanScope({
   screenPreviewMap,
   diagnosisPreviewMap,
   problemPreviewMap,
+  scriptPreviewMap,
   publishedScreenMap,
   publishedDiagnosisMap,
   publishedProblemMap,
+  publishedScriptMap,
   affectedScreenIds,
   affectedDiagnosisIds,
   affectedProblemIds,
+  affectedScriptDraftIds,
   dataKeyImpactScriptIds,
 }: {
   policy: IntegrityPolicy
@@ -64,12 +67,15 @@ export function evaluateIntegrityScanScope({
   screenPreviewMap: Map<string, Record<string, any>>
   diagnosisPreviewMap: Map<string, Record<string, any>>
   problemPreviewMap: Map<string, Record<string, any>>
+  scriptPreviewMap?: Map<string, Record<string, any>>
   publishedScreenMap?: Map<string, Record<string, any>>
   publishedDiagnosisMap?: Map<string, Record<string, any>>
   publishedProblemMap?: Map<string, Record<string, any>>
+  publishedScriptMap?: Map<string, Record<string, any>>
   affectedScreenIds?: Set<string>
   affectedDiagnosisIds?: Set<string>
   affectedProblemIds?: Set<string>
+  affectedScriptDraftIds?: Set<string>
   dataKeyImpactScriptIds: string[]
 }) {
   const shouldIncludeDataKeyImpact =
@@ -81,9 +87,22 @@ export function evaluateIntegrityScanScope({
   const shouldClassifyLegacyDataKeySyncDrafts = shouldIgnoreDataKeySyncDrafts && hasExistingDataKeyLibraryChanges
   const shouldIgnoreImportDrafts = !policy.triggerSources.imports
 
-  const effectiveUserScriptDrafts = shouldIgnoreImportDrafts
-    ? userScriptDrafts.filter((draft) => draft.draftOrigin !== "import")
+  // Script drafts can now be raised by data key propagation too (NUID search fields live
+  // on the script record), so they get the same auto-sync filtering as the other entities.
+  const dataKeySyncFilteredScriptDrafts = shouldIgnoreDataKeySyncDrafts
+    ? userScriptDrafts.filter((draft) => !isLegacyAutoSyncDraft(
+        { ...draft, data: draft.data || {} },
+        scriptPreviewMap?.get(draft.scriptId || draft.scriptDraftId || ""),
+        {
+          publishedEntity: publishedScriptMap?.get(draft.scriptId || draft.scriptDraftId || ""),
+          isAffectedByCurrentDataKeyChange: !!affectedScriptDraftIds?.has(draft.scriptId || draft.scriptDraftId || ""),
+        },
+      ))
     : userScriptDrafts
+
+  const effectiveUserScriptDrafts = shouldIgnoreImportDrafts
+    ? dataKeySyncFilteredScriptDrafts.filter((draft) => draft.draftOrigin !== "import")
+    : dataKeySyncFilteredScriptDrafts
 
   const effectiveUserScreenDrafts = shouldIgnoreDataKeySyncDrafts
     ? userScreenDrafts.filter((draft) => !isLegacyAutoSyncDraft(

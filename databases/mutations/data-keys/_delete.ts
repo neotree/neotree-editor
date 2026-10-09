@@ -10,6 +10,7 @@ import { buildDataKeysDeleteImpact, type DataKeyDeleteImpactItem } from '@/lib/d
 import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-compatibility';
 import { getBlockedChildDeletions, getDataKeyParentTitle } from '@/lib/data-key-children';
 import { resolveScriptRemovalExclusions } from '@/lib/data-key-script-removals';
+import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 
@@ -197,6 +198,15 @@ export async function _deleteDataKeys(
             if (loadErrors.length) throw new Error(loadErrors[0]);
 
             const targets = dataKeysRes.data.filter((dataKey) => dataKeysIds.includes(dataKey.uuid));
+
+            const managedTargets = targets.filter((dataKey) => isNuidManagedDataKey(dataKey as any));
+            if (managedTargets.length) {
+                const names = managedTargets.map((dataKey) => dataKey.name || dataKey.uniqueKey).join(', ');
+                throw new Error(
+                    `Cannot delete NUID Search data key${managedTargets.length > 1 ? 's' : ''}: ${names}. ` +
+                    `These are managed by NUID Search and are permanent — they can't be deleted.`,
+                );
+            }
 
             // Child keys stay deletable only when every parent that links them is
             // part of the same deletion batch; otherwise the parent would keep a

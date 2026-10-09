@@ -3,6 +3,7 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { scripts, scriptsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
@@ -19,17 +20,20 @@ export type SaveScriptsResponse = {
 
 export type ScriptDraftOrigin = "editor" | "data_key_sync" | "import" | "other";
 
-export async function _saveScripts({ data, broadcastAction, syncSilently, userId, draftOrigin = "editor", }: {
+export async function _saveScripts({ data, broadcastAction, syncSilently, userId, draftOrigin = "editor", client, }: {
     data: SaveScriptsData[],
     broadcastAction?: boolean;
     userId?: string;
     syncSilently?: boolean;
     draftOrigin?: ScriptDraftOrigin;
+    client?: DbOrTransaction;
 }) {
     const response: SaveScriptsResponse = { success: false, };
     const errors = [];
     const info: SaveScriptsResponse['info'] = {};
      data = removeHexCharacters(data)
+
+    const executor = client || db;
 
     try {
         let index = 0;
@@ -40,11 +44,11 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                 const scriptId = itemScriptId || uuid.v4();
 
                 if (!errors.length) {
-                    const draft = !itemScriptId ? null : await db.query.scriptsDrafts.findFirst({
+                    const draft = !itemScriptId ? null : await executor.query.scriptsDrafts.findFirst({
                         where: eq(scriptsDrafts.scriptDraftId, scriptId),
                     });
 
-                    const published = (draft || !itemScriptId) ? null : await db.query.scripts.findFirst({
+                    const published = (draft || !itemScriptId) ? null : await executor.query.scripts.findFirst({
                         where: eq(scripts.scriptId, scriptId),
                     });
 
@@ -54,7 +58,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                             ...item,
                         } as typeof draft.data;
                         
-                        const q = db
+                        const q = executor
                             .update(scriptsDrafts)
                             .set({
                                 data,
@@ -69,12 +73,12 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                     } else {
                         let position = item.position || published?.position;
                         if (!position) {
-                            const script = await db.query.scripts.findFirst({
+                            const script = await executor.query.scripts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(scripts.position),
                             });
 
-                            const scriptDraft = await db.query.scriptsDrafts.findFirst({
+                            const scriptDraft = await executor.query.scriptsDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(scriptsDrafts.position),
                             });
@@ -90,7 +94,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                             position,
                         } as typeof scriptsDrafts.$inferInsert['data'];
 
-                        const q = db.insert(scriptsDrafts).values({
+                        const q = executor.insert(scriptsDrafts).values({
                             data,
                             scriptDraftId: scriptId,
                             position: data.position,

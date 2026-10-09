@@ -26,6 +26,7 @@ export function ConfirmModal() {
         negativeLabel, 
         close, 
         onConfirm, 
+        onDeny,
     } = useConfirmModal();
 
     return (
@@ -59,7 +60,9 @@ export function ConfirmModal() {
                     )}
 
                     <AlertDialogFooter>
-                        <AlertDialogCancel>{negativeLabel}</AlertDialogCancel>
+                        <AlertDialogCancel
+                            onClick={() => onDeny?.()}
+                        >{negativeLabel}</AlertDialogCancel>
                         <Button
                             variant={danger ? 'destructive' : undefined}
                             asChild

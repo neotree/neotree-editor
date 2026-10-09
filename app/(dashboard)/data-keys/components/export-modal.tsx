@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useSites } from "@/hooks/use-sites";
+import { useAppContext } from "@/contexts/app";
 import { Loader } from "@/components/loader";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,14 +37,8 @@ export function ExportModal({ uuids, }: {
     const [open, setOpen] = useState(false);
     const { dataKeys, exporting, exportDataKeys, extractDataKeys, } = useDataKeysCtx();
 
-    const { 
-        sites, 
-        loading: sitesLoading, 
-        loadSites,
-    } = useSites({
-        loadOnMount: false,
-        onLoadSitesError: () => setOpen(false),
-    });
+    const { sites: _sites } = useAppContext();
+    const sites = _sites.filter(s => s.type === 'webeditor');
 
     const {
         formState: { errors },
@@ -63,7 +57,7 @@ export function ExportModal({ uuids, }: {
     const siteId = watch('siteId');
     const overwriteExisting = watch('overwriteExisting');
 
-    const isLoading = exporting || sitesLoading;
+    const isLoading = exporting;
     const canExport = !!siteId && !isLoading;
 
     const exportData = handleSubmit(async (formData) => {
@@ -85,7 +79,6 @@ export function ExportModal({ uuids, }: {
                 open={open}
                 onOpenChange={open => {
                     resetForm();
-                    if (open) loadSites();
                     setOpen(open);
                 }}
             >

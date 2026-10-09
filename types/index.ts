@@ -51,6 +51,7 @@ export type ScriptItem = {
     exclusiveGroup?: string;
     forbidWith?: string[];
     confidential: boolean;
+    confidentialLabelOnly: boolean;
     checked: boolean;
     enterValueManually?: boolean;
     enterValueManuallyLabel?: string;
@@ -100,6 +101,7 @@ export type ScriptField = {
         optionLabel: string;
     }[];
     confidential: boolean;
+    confidentialLabelOnly: boolean;
     optional: boolean;
     printable: boolean;
     printDisplayColumns?: 1 | 2;
@@ -117,6 +119,12 @@ export type ScriptField = {
         enterValueManually?: boolean;
         enterValueManuallyLabel?: string;
         keyId?: string;
+        /**
+         * Boolean expression deciding whether this option is offered. Empty
+         * means "always". Lets one field carry every option and show the subset
+         * that applies, instead of cloning the field per subset.
+         */
+        condition?: string;
     }[];
 };
 
@@ -161,7 +169,7 @@ export type DiagnosisSymptom = {
     printable: boolean;
 };
 
-export type ScriptImage = {
+export type FileReference = {
     data: string;
     fileId?: string;
     filename?: string;

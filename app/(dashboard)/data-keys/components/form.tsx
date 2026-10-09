@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
 
+import { LockStatus } from '@/components/lock-status';
 import { type DataKeyFormData, useDataKeysCtx } from '@/contexts/data-keys';
 import {
     Select,
@@ -40,6 +41,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { useIsLocked } from '@/hooks/use-is-locked';
+import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { useAppContext } from "@/contexts/app";
 import { cn } from "@/lib/utils";
 import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
@@ -71,7 +73,7 @@ function Form({
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, } = useDataKeysCtx();
+    const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, getLatestDataKeys } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
     const { alert } = useAlertModal();
     const { viewOnly } = useAppContext();
@@ -93,6 +95,13 @@ function Form({
 
     const isReadOnly = !!disabled || isLocked || viewOnly;
 
+    const isNuidManaged = isNuidManagedDataKey(dataKey as any);
+    // Managed NUID keys are locked: key + type (below) and their option children
+    // (e.g. Y/N) can't be added, removed or reordered — only the label may change.
+    const optionsLocked = isReadOnly || isNuidManaged;
+
+    const [shouldResetForm, setShouldResetForm] = useState(false);
+    const [currentDataKey, setCurrentDataKey] = useState(dataKey);
     const {
         control,
         register,
@@ -107,6 +116,7 @@ function Form({
             refId: dataKey?.refId || '',
             dataType: dataKey?.dataType || prefill.dataType || '',
             confidential: dataKey ? !!dataKey.confidential : true,
+            confidentialLabelOnly: dataKey ? !!dataKey.confidentialLabelOnly : false,
             label: dataKey?.label || prefill.label || '',
             options: dataKey?.options || [],
             metadata: dataKey?.metadata || {},
@@ -122,6 +132,7 @@ function Form({
     const nameValue = watch('name');
     const labelValue = watch('label');
     const confidential = !!watch('confidential');
+    const confidentialLabelOnly = !!watch('confidentialLabelOnly');
     const optionsSignature = useMemo(() => JSON.stringify(options || []), [options]);
     const savedOptionsSignature = useMemo(() => JSON.stringify(dataKey?.options || []), [dataKey?.options]);
 
@@ -137,6 +148,31 @@ function Form({
 
     const dataTypeInfo = dataKeyTypes.find(t => t.value === dataType);
 
+    useEffect(() => {
+        if (
+            (dataKey && shouldResetForm) || 
+            (
+                isLocked && 
+                dataKey && 
+                (JSON.stringify({ ...dataKey }) !== JSON.stringify({ ...currentDataKey })) &&
+                (JSON.stringify(options) !== JSON.stringify(dataKey.options))
+            )
+        ) {
+            setShouldResetForm(false);
+            setCurrentDataKey(dataKey);
+            setValue('name', dataKey?.name || prefill.name || '');
+            setValue('refId', dataKey?.refId || '');
+            setValue('dataType', dataKey?.dataType || prefill.dataType || '');
+            setValue('confidential', dataKey ? !!dataKey.confidential : true);
+            setValue('confidentialLabelOnly', dataKey ? !!dataKey.confidentialLabelOnly : false);
+            setValue('label', dataKey?.label || prefill.label || '');
+            setValue('options', dataKey?.options || []);
+            setValue('metadata', dataKey?.metadata || {});
+            setValue('version', dataKey?.version || 1);
+            setValue('deletedUniqueKeys', [] as string[]);
+        }
+    }, [dataKey, options, currentDataKey, isLocked, shouldResetForm, setValue]);
+
     const buildPreviewPayload = useCallback(() => {
         const values = getValues();
         return [{
@@ -146,6 +182,7 @@ function Form({
             label: values.label || '',
             dataType: values.dataType || '',
             confidential: !!values.confidential,
+            confidentialLabelOnly: !!values.confidentialLabelOnly,
             refId: values.refId || '',
             options: values.options || [],
             metadata: values.metadata || {},
@@ -183,6 +220,7 @@ function Form({
             `${uniqueKeyValue || ''}` !== `${dataKey.uniqueKey || ''}` ||
             `${dataType || ''}` !== `${dataKey.dataType || ''}` ||
             !!confidential !== !!dataKey.confidential ||
+            !!confidentialLabelOnly !== !!dataKey.confidentialLabelOnly ||
             optionsSignature !== savedOptionsSignature
         );
         if (!changed) {
@@ -203,6 +241,7 @@ function Form({
         uniqueKeyValue,
         dataType,
         confidential,
+        confidentialLabelOnly,
         optionsSignature,
         savedOptionsSignature,
         loadImpactPreview,
@@ -227,8 +266,9 @@ function Form({
         if (uniqueKey) {
             setValue("uniqueKey" as any, uniqueKey);
         }
-
         const res = await saveDataKeys([{ ...(payload as unknown as DataKeyFormData) }]);
+        await getLatestDataKeys();
+        setShouldResetForm(true);
         if (res && 'info' in res) {
             setSaveImpact(res.info?.refs);
         }
@@ -450,7 +490,7 @@ function Form({
         }));
 
         return (
-            <div className="space-y-3">
+            <div className="space-y-3">                
                 <DataTable
                     title={`Affected scripts (${scriptRows.length})`}
                     rowRenderer={({ props, cells, rowIndex }) => {
@@ -599,6 +639,17 @@ function Form({
                     </CardHeader>
 
                     <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
+                        {isLocked && (
+                            <div>
+                                <LockStatus 
+                                    card
+                                    isDraft={!!dataKey?.isDraft}
+                                    userId={dataKey?.draftCreatedByUserId}
+                                    dataType="data key"
+                                />
+                            </div>
+                        )}
+
                         <Controller 
                             control={control}
                             name="dataType"
@@ -612,7 +663,7 @@ function Form({
                                             <Select
                                                 value={value}
                                                 name="name"
-                                                disabled={isFormDisabled}
+                                                disabled={isFormDisabled || isNuidManaged}
                                                 onValueChange={val => {
                                                     onChange(val);
 
@@ -645,13 +696,18 @@ function Form({
 
                         <div className="px-4">
                             <Label htmlFor="name">Key *</Label>
-                            <Input 
-                                disabled={isFormDisabled}
+                            <Input
+                                disabled={isFormDisabled || isNuidManaged}
                                 {...register('name', {
-                                    disabled: isFormDisabled,
+                                    disabled: isFormDisabled || isNuidManaged,
                                     required: true,
                                 })}
                             />
+                            {isNuidManaged && (
+                                <span className="text-xs text-muted-foreground">
+                                    Managed by NUID Search — the key, data type and options are locked, and it can&apos;t be deleted. You can still edit the label.
+                                </span>
+                            )}
                         </div>
 
                         <div className="px-4">
@@ -696,11 +752,46 @@ function Form({
                                         }
 
                                         setValue('confidential', checked, { shouldDirty: true });
+                                        if (checked && confidentialLabelOnly) {
+                                            setValue('confidentialLabelOnly', false, { shouldDirty: true });
+                                        }
                                     }}
                                 />
                                 <Label htmlFor="dataKeyConfidential">Confidential</Label>
                             </div>
-            
+                            <span className="text-xs text-muted-foreground">
+                                Hides this Data Key&apos;s value and label everywhere it is used.
+                            </span>
+                        </div>
+
+                        <div className="px-4">
+                            <div className="flex items-center space-x-2">
+                                <Switch
+                                    id="dataKeyConfidentialLabelOnly"
+                                    checked={confidentialLabelOnly}
+                                    disabled={isFormDisabled || confidential}
+                                    onCheckedChange={checked => {
+                                        if (!checked && confidentialLabelOnly) {
+                                            confirm(
+                                                () => setValue('confidentialLabelOnly', false, { shouldDirty: true }),
+                                                {
+                                                    title: 'Disable label-only confidentiality?',
+                                                    message: 'You are about to mark this Data Key\'s label as non-confidential. This can expose sensitive labels (e.g. names) in exports. Only continue if you fully understand the impact.',
+                                                    danger: true,
+                                                },
+                                            );
+                                            return;
+                                        }
+
+                                        setValue('confidentialLabelOnly', checked, { shouldDirty: true });
+                                    }}
+                                />
+                                <Label htmlFor="dataKeyConfidentialLabelOnly">Confidential (label only)</Label>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                Hides only this Data Key&apos;s label (e.g. a healthcare worker&apos;s name) from exports, while
+                                keeping its value exportable. Disabled while &quot;Confidential&quot; is on above.
+                            </span>
                         </div>
 
                         <Controller
@@ -712,16 +803,16 @@ function Form({
 
                                 return (
                                     <div className="mt-4 pt-4 border-t border-t-border">
-                                        <DataTable 
-                                            sortable={!isReadOnly}
+                                        <DataTable
+                                            sortable={!optionsLocked}
                                             onSort={(oldIndex: number, newIndex: number) => {
-                                                if (isReadOnly) return;
+                                                if (optionsLocked) return;
                                                 const sorted = arrayMoveImmutable([...value], oldIndex, newIndex);
                                                 onChange(sorted);
                                             }}
                                             search={{}}
                                             title="Options"
-                                            headerActions={isReadOnly ? null : (
+                                            headerActions={optionsLocked ? null : (
                                                 <>
                                                     {children.length > 1 && (
                                                         <SelectModal
@@ -846,7 +937,7 @@ function Form({
                                                                             </Link>
                                                                         </DropdownMenuItem>
 
-                                                                        {!isReadOnly && (
+                                                                        {!optionsLocked && (
                                                                             <DropdownMenuItem
                                                                                 className="text-destructive"
                                                                                 onClick={() => setTimeout(() => handleUnlinkOptions([child]), 0)}

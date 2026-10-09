@@ -17,25 +17,50 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { isNumericQueryValue } from "@/lib/query-state";
 import { FieldsBottomActions } from "./fields-bottom-actions";
 import { Field } from "./field";
+import { useConditionKeys } from "@/components/conditional-expression";
+import { useFieldKeyCollisions } from "@/components/field-key-collisions";
+import { ScriptIssueBadge, collisionIssues, conditionIssues } from "@/components/script-issues";
+import type { ScriptField } from "@/types";
 
 type Props = {
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
     scriptId? : string;
+    unavailableOutcomeKeys?: Record<string, string>;
+    persistedFields?: ScriptField[];
 };
 
 export function Fields({
     form,
     disabled,
-    scriptId
+    scriptId,
+    unavailableOutcomeKeys,
+    persistedFields = [],
 }: Props) {
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const [manualOnly, setManualOnly] = useState(false);
     const [missingManualLabelOnly, setMissingManualLabelOnly] = useState(false);
     const { confirm } = useConfirmModal();
+    const { conditionKeys, keysReady } = useConditionKeys();
 
     const fields = form.watch('fields');
+    const repeatable = form.watch('repeatable');
+    // Unsaved sibling field keys, matching what the field editor validates against.
+    const siblingConditionKeys = useMemo(
+        () => (fields || [])
+            .map((f) => ({ name: `${f?.key || ''}`.trim(), label: `${f?.key || ''}${f?.label ? ` - ${f.label}` : ''}`, dataType: f?.type }))
+            .filter((k) => !!k.name),
+        [fields],
+    );
+    // Duplicate keys break the mobile screen before conditions are evaluated, so
+    // they are flagged from the unsaved form state as the second key is entered.
+    const keyCollisions = useFieldKeyCollisions({
+        fields,
+        repeatable,
+        keys: conditionKeys,
+    });
+
     const fieldMeta = useMemo(() => {
         return fields.map((field) => {
             const items = field.items || [];
@@ -159,6 +184,9 @@ export function Fields({
     const resolvedFieldIndex = activeFieldIndex >= 0
         ? activeFieldIndex
         : (isNumericQueryValue(currentField) ? Number(currentField) : parsedCurrentFieldIndex);
+    const baselineField = activeField?.fieldId
+        ? persistedFields.find((field) => field?.fieldId === activeField.fieldId)
+        : (resolvedFieldIndex !== null && resolvedFieldIndex >= 0 ? persistedFields[resolvedFieldIndex] : undefined);
 
     return (
         <>
@@ -170,6 +198,8 @@ export function Fields({
                     onClose={closeFieldEditor}
                     form={form}
                     scriptId={scriptId}
+                    unavailableOutcomeKeys={unavailableOutcomeKeys}
+                    baselineField={baselineField}
                     disabled={disabled}
                     field={!activeField || resolvedFieldIndex === null || resolvedFieldIndex < 0 ? undefined : {
                         data: activeField,
@@ -246,6 +276,37 @@ export function Fields({
                     },
                     {
                         name: 'Label',
+                        cellRenderer(cell) {
+                            const field = fields[cell.rowIndex];
+                            return (
+                                <span className="inline-flex items-center gap-x-2">
+                                    <span>{field?.label}</span>
+                                    {!!field && (
+                                        <ScriptIssueBadge
+                                            issues={[
+                                                ...collisionIssues(keyCollisions.forFieldIndex(cell.rowIndex)),
+                                                ...conditionIssues({
+                                                    keys: conditionKeys,
+                                                    extraKeys: siblingConditionKeys,
+                                                    keysReady,
+                                                    unavailableKeys: unavailableOutcomeKeys,
+                                                    expressions: [
+                                                        { value: field.condition, label: 'Condition', allowSelf: true },
+                                                        { value: (field as { calculation?: string }).calculation, label: 'Reference expression', mode: 'reference' },
+                                                        ...(field.items || [])
+                                                            .filter((item) => `${item?.condition || ''}`.trim())
+                                                            .map((item) => ({
+                                                                value: item.condition,
+                                                                label: `Option "${item.value || item.label}" shown when`,
+                                                            })),
+                                                    ],
+                                                }),
+                                            ]}
+                                        />
+                                    )}
+                                </span>
+                            );
+                        },
                     },
                     {
                         name: 'Manual Entry',

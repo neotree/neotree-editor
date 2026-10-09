@@ -97,6 +97,7 @@ export function Item<P = {}>({
       exclusiveGroup: item?.exclusiveGroup || "",
       forbidWith: item?.forbidWith || [],
       confidential: item?.confidential || false,
+      confidentialLabelOnly: item?.confidentialLabelOnly || false,
       checked: item?.checked || false,
       enterValueManually: item?.enterValueManually || false,
       enterValueManuallyLabel: item?.enterValueManuallyLabel || "",
@@ -142,6 +143,7 @@ export function Item<P = {}>({
   const keyId = watch("keyId")
   const enterValueManually = watch("enterValueManually")
   const confidential = watch("confidential")
+  const confidentialLabelOnly = watch("confidentialLabelOnly")
   const exclusive = watch("exclusive")
   const checked = watch("checked")
 
@@ -207,11 +209,21 @@ export function Item<P = {}>({
     return !!dataKey?.confidential
   }, [dataKey?.confidential])
 
+  const inheritedConfidentialLabelOnly = useMemo(() => {
+    return !!dataKey?.confidentialLabelOnly
+  }, [dataKey?.confidentialLabelOnly])
+
   useEffect(() => {
     if (confidential !== inheritedConfidential) {
       setValue("confidential", inheritedConfidential, { shouldDirty: true })
     }
   }, [confidential, inheritedConfidential, setValue])
+
+  useEffect(() => {
+    if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+      setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: true })
+    }
+  }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue])
 
   const renderKeyComponent = ({
     value: key,
@@ -248,6 +260,7 @@ export function Item<P = {}>({
           setValue("keyId", dataKey?.uniqueKey, { shouldDirty: true })
           setValue("label", label, { shouldDirty: true })
           setValue("confidential", !!dataKey?.confidential, { shouldDirty: true })
+          setValue("confidentialLabelOnly", !!dataKey?.confidentialLabelOnly, { shouldDirty: true })
           setValue("label", label, { shouldDirty: true })
         }}
       />
@@ -335,6 +348,44 @@ export function Item<P = {}>({
                             <Switch id="confidential" checked={inheritedConfidential} disabled />
                             <Label secondary htmlFor="confidential">
                               Confidential
+                            </Label>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="flex flex-col gap-y-1">
+                            <span>Change confidentiality in the Data Key library.</span>
+                            {!!keyId && (
+                              <Link
+                                href={`/data-keys/edit/${keyId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline"
+                              >
+                                Open Data Key
+                              </Link>
+                            )}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                            onClick={() =>
+                              alert({
+                                title: "Confidentiality is managed in Data Keys",
+                                message: "Change this in the Data Key. Items inherit confidential status automatically.",
+                                variant: "info",
+                              })
+                            }
+                          >
+                            <Switch id="confidentialLabelOnly" checked={inheritedConfidentialLabelOnly} disabled />
+                            <Label secondary htmlFor="confidentialLabelOnly">
+                              Confidential (label only)
                             </Label>
                           </button>
                         </TooltipTrigger>

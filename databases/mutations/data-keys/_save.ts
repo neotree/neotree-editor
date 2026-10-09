@@ -9,6 +9,8 @@ import socket from '@/lib/socket';
 import { _getDataKeys } from '@/databases/queries/data-keys';
 import { normalizeIncomingDataKeyPatch } from '@/lib/data-key-save';
 import { validateDataKeyOptionsAddition } from '@/lib/data-key-children';
+import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
+import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import type { DataKeyDraftOrigin } from '@/databases/pg/_data-keys';
 import {
@@ -217,6 +219,21 @@ export async function _saveDataKeys({
                 return true;
             };
 
+            const resolveConfidentialLabelOnly = ({
+                incoming,
+                existing,
+                fallback,
+            }: {
+                incoming: SaveDataKeysData;
+                existing?: Partial<typeof dataKeys.$inferSelect> | null;
+                fallback?: boolean | null;
+            }) => {
+                if (typeof incoming.confidentialLabelOnly === 'boolean') return incoming.confidentialLabelOnly;
+                if (typeof existing?.confidentialLabelOnly === 'boolean') return existing.confidentialLabelOnly;
+                if (typeof fallback === 'boolean') return fallback;
+                return false;
+            };
+
             const data = dataParam.map(item => {
                 return {
                     ...item,
@@ -226,6 +243,37 @@ export async function _saveDataKeys({
             });
 
             const uniqueKeys: string[] = [];
+
+            if (draftOrigin === 'editor') try {
+                const incomingNames = Array.from(
+                    new Set(data.map((d) => `${d.name || ''}`.trim().toLowerCase()).filter(Boolean)),
+                );
+                if (incomingNames.length) {
+                    const existing = await _getDataKeys({ names: incomingNames, client: executor, });
+                    const managedExisting = (existing.data || []).filter((k) => isNuidManagedDataKey(k as any));
+                    for (const item of data) {
+                        const name = `${item.name || ''}`.trim();
+                        if (!name) continue;
+                        const compat = normalizeDataKeyCompatibilityType(item.dataType);
+                        const dup = managedExisting.find((k) =>
+                            `${k.name || ''}`.trim().toLowerCase() === name.toLowerCase() &&
+                            normalizeDataKeyCompatibilityType(k.dataType) === compat &&
+                            `${k.uniqueKey || ''}` !== `${item.uniqueKey || ''}` &&
+                            `${k.uuid || ''}` !== `${item.uuid || ''}`,
+                        );
+                        if (dup) {
+                            errors.push(
+                                `A NUID Search data key "${dup.name}" (${dup.dataType}) already exists — duplicate managed keys aren't allowed.`,
+                            );
+                        }
+                    }
+                }
+            } catch (e: any) {
+                logger.error('_saveDataKeys managed-duplicate check ERROR', e?.message);
+            }
+            if (errors.length) {
+                throw new Error(errors.join(', '));
+            }
 
             // Full-library snapshot for options validation, fetched once per save.
             let allDataKeysCache: Awaited<ReturnType<typeof _getDataKeys>>['data'] | null = null;
@@ -306,6 +354,7 @@ export async function _saveDataKeys({
                                 where: eq(dataKeys.uuid, draft.dataKeyId),
                                 columns: {
                                     confidential: true,
+                                    confidentialLabelOnly: true,
                                     name: true,
                                 },
                             });
@@ -319,7 +368,27 @@ export async function _saveDataKeys({
                                 existing: draft.data,
                                 fallback: publishedForDraft?.confidential,
                             });
+                            const resolvedConfidentialLabelOnly = resolveConfidentialLabelOnly({
+                                incoming: normalizedItem,
+                                existing: draft.data,
+                                fallback: publishedForDraft?.confidentialLabelOnly,
+                            });
+                            if (resolvedConfidential && resolvedConfidentialLabelOnly) {
+                                errors.push(
+                                    `Data key "${data.name || dataKeyUuid}" cannot be both Confidential and Confidential (label only).`,
+                                );
+                                continue;
+                            }
                             data.confidential = resolvedConfidential;
+                            data.confidentialLabelOnly = resolvedConfidentialLabelOnly;
+
+                            // A NUID-managed key's `name` and `dataType` are immutable — force
+                            // them back to the stored draft values and keep the managed flag.
+                            if (isNuidManagedDataKey(draft.data as any)) {
+                                (data as any).name = (draft.data as any)?.name ?? (data as any).name;
+                                (data as any).dataType = (draft.data as any)?.dataType ?? (data as any).dataType;
+                                (data as any).metadata = { ...((data as any).metadata || {}), managed: NUID_MANAGED };
+                            }
 
                             await executor
                                 .update(dataKeysDrafts)
@@ -350,7 +419,21 @@ export async function _saveDataKeys({
                                 version: published?.version ? (published.version + 1) : 1,
                             } as typeof dataKeys.$inferSelect;
                             const resolvedConfidential = resolveConfidential({ incoming: normalizedItem, existing: published });
+                            const resolvedConfidentialLabelOnly = resolveConfidentialLabelOnly({ incoming: normalizedItem, existing: published });
+                            if (resolvedConfidential && resolvedConfidentialLabelOnly) {
+                                errors.push(
+                                    `Data key "${data.name || dataKeyUuid}" cannot be both Confidential and Confidential (label only).`,
+                                );
+                                continue;
+                            }
                             data.confidential = resolvedConfidential;
+                            data.confidentialLabelOnly = resolvedConfidentialLabelOnly;
+
+                            if (isNuidManagedDataKey(published as any)) {
+                                data.name = published?.name ?? data.name;
+                                data.dataType = published?.dataType ?? data.dataType;
+                                data.metadata = { ...((data as any).metadata || {}), managed: NUID_MANAGED } as any;
+                            }
 
                             await executor.insert(dataKeysDrafts).values({
                                 data,

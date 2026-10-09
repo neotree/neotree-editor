@@ -23,7 +23,7 @@ import type {
   DrugField,
   FeedField,
   Preferences,
-  ScriptImage,
+  FileReference,
   ScriptItem,
   FluidField,
   EligibilityCriteria,
@@ -442,6 +442,7 @@ export const files = pgTable("nt_files", {
 })
 
 export const filesRelations = relations(files, ({ many, one }) => ({
+  aliases: many(filesAliases),
   owner: one(users, {
     fields: [files.ownerId],
     references: [users.userId],
@@ -463,6 +464,13 @@ export const filesAliases = pgTable("nt_files_aliases", {
   fileId: uuid("file_id").references(() => files.fileId, { onDelete: "cascade" }),
   alias: text("alias").notNull(),
 });
+
+export const filesAliasesRelations = relations(filesAliases, ({ one }) => ({
+  owner: one(files, {
+    fields: [filesAliases.fileId],
+    references: [files.fileId],
+  }),
+}))
 
 // CONFIG KEYS
 export const configKeys = pgTable(
@@ -575,6 +583,11 @@ export const scripts = pgTable(
     nuidSearchEnabled: boolean("nuid_search_enabled").notNull().default(false),
     nuidSearchFields: jsonb("nuid_search_fields").default("[]").notNull(),
     eligibilityCriteria: jsonb("eligibility_criteria").$type<EligibilityCriteria | null>(),
+    conditionErrorReport: jsonb("condition_error_report").$type<{
+      count: number
+      findings: { location: string; href?: string; message?: string }[]
+      configurationSignature?: string
+    } | null>(),
     reviewable: boolean("reviewable").notNull().default(false),
     reviewConfigurations: jsonb("review_configurations").default("[]").notNull(),
     preferences: jsonb("preferences").default(JSON.stringify(defaultPreferences)).notNull(),
@@ -717,7 +730,7 @@ export const screens = pgTable(
     step: text("step").notNull().default(""),
     actionText: text("action_text").notNull().default(""),
     contentText: text("content_text").notNull().default(""),
-    contentTextImage: jsonb("content_text_image").$type<null | ScriptImage>(),
+    contentTextImage: jsonb("content_text_image").$type<null | FileReference>(),
     infoText: text("info_text").notNull().default(""),
     title: text("title").notNull(),
     title1: text("title1").notNull().default(""),
@@ -727,9 +740,9 @@ export const screens = pgTable(
     text1: text("text1").notNull().default(""),
     text2: text("text2").notNull().default(""),
     text3: text("text3").notNull().default(""),
-    image1: jsonb("image1").$type<null | ScriptImage>(),
-    image2: jsonb("image2").$type<null | ScriptImage>(),
-    image3: jsonb("image3").$type<null | ScriptImage>(),
+    image1: jsonb("image1").$type<null | FileReference>(),
+    image2: jsonb("image2").$type<null | FileReference>(),
+    image3: jsonb("image3").$type<null | FileReference>(),
     instructions: text("instructions").notNull().default(""),
     instructions2: text("instructions2").notNull().default(""),
     instructions3: text("instructions3").notNull().default(""),
@@ -753,6 +766,7 @@ export const screens = pgTable(
     printable: boolean("printable"),
     skippable: boolean("skippable").notNull().default(false),
     confidential: boolean("confidential").notNull().default(false),
+    confidentialLabelOnly: boolean("confidential_label_only").notNull().default(false),
     prePopulate: jsonb("pre_populate").default("[]").$type<string[]>().notNull(),
     fields: jsonb("fields").default("[]").$type<ScriptField[]>().notNull(),
     items: jsonb("items").default("[]").$type<ScriptItem[]>().notNull(),
@@ -890,9 +904,9 @@ export const diagnoses = pgTable(
     text1: text("text1").notNull().default(""),
     text2: text("text2").notNull().default(""),
     text3: text("text3").notNull().default(""),
-    image1: jsonb("image1").$type<null | ScriptImage>(),
-    image2: jsonb("image2").$type<null | ScriptImage>(),
-    image3: jsonb("image3").$type<null | ScriptImage>(),
+    image1: jsonb("image1").$type<null | FileReference>(),
+    image2: jsonb("image2").$type<null | FileReference>(),
+    image3: jsonb("image3").$type<null | FileReference>(),
     preferences: jsonb("preferences").default(JSON.stringify(defaultPreferences)).$type<Preferences>().notNull(),
 
     publishDate: timestamp("publish_date").defaultNow().notNull(),
@@ -1015,9 +1029,9 @@ export const problems = pgTable(
     text1: text("text1").notNull().default(""),
     text2: text("text2").notNull().default(""),
     text3: text("text3").notNull().default(""),
-    image1: jsonb("image1").$type<null | ScriptImage>(),
-    image2: jsonb("image2").$type<null | ScriptImage>(),
-    image3: jsonb("image3").$type<null | ScriptImage>(),
+    image1: jsonb("image1").$type<null | FileReference>(),
+    image2: jsonb("image2").$type<null | FileReference>(),
+    image3: jsonb("image3").$type<null | FileReference>(),
     preferences: jsonb("preferences").default(JSON.stringify(defaultPreferences)).$type<Preferences>().notNull(),
 
     publishDate: timestamp("publish_date").defaultNow().notNull(),

@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
-import { PlusIcon, Wand2Icon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 
 import type { EligibilityCriteria } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -13,9 +13,14 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTi
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { ReactSelect } from "@/components/react-select"
+import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
 import { useScriptsContext } from "@/contexts/scripts"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { FieldItems } from "./screens/field-items"
+import { getPreScriptUnavailableOutcomeKeys } from "@/lib/conditional-expression"
+import { useScriptFormCtx } from "@/contexts/script-form"
+
+const preScriptUnavailableOutcomeKeys = getPreScriptUnavailableOutcomeKeys()
 
 type Props = {
   disabled: boolean
@@ -28,12 +33,6 @@ type KeyOption = {
   value: string
   label: string
   dataType: string
-}
-
-type ConditionToken = {
-  token: string
-  start: number
-  end: number
 }
 
 const criteriaTypes: { value: EligibilityCriteria["criteria_type"]; label: string }[] = [
@@ -52,7 +51,8 @@ const yesNoItems: NonNullable<EligibilityCriteria["items"]> = [
 
 export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }: Props) {
   const [open, setOpen] = useState(false)
-  const { keys, loadKeys, keysLoading } = useScriptsContext()
+  const { keys } = useScriptFormCtx()
+  const { conditionKeys, keysReady: conditionKeysReady } = useConditionKeys({ enabled: open })
   const safeKeys = useMemo(() => {
     try {
       return { options: getKeyOptions(keys), error: "" }
@@ -65,10 +65,6 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
   }, [keys])
 
   const hasCriteria = !!value?.criteria_type && !!value?.criteria_label
-
-  useEffect(() => {
-    if (open) loadKeys()
-  }, [loadKeys, open])
 
   return (
     <>
@@ -85,8 +81,10 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
         <Form
           value={value || null}
           keyOptions={safeKeys.options}
+          conditionKeys={conditionKeys}
+          conditionKeysReady={conditionKeysReady}
           keyOptionsError={safeKeys.error}
-          keysLoading={keysLoading}
+          keysLoading={false}
           onClose={() => setOpen(false)}
           onChange={async (nextValue) => {
             const saved = await onChange(nextValue)
@@ -101,6 +99,8 @@ export function EligibilityCriteriaForm({ disabled, scriptId, value, onChange }:
 function Form({
   value,
   keyOptions,
+  conditionKeys,
+  conditionKeysReady,
   keyOptionsError,
   keysLoading,
   onClose,
@@ -108,14 +108,16 @@ function Form({
 }: {
   value: EligibilityCriteria | null
   keyOptions: KeyOption[]
+  conditionKeys: ReturnType<typeof useConditionKeys>["conditionKeys"]
+  conditionKeysReady: boolean
   keyOptionsError: string
   keysLoading: boolean
   onClose: () => void
   onChange: (value: EligibilityCriteria) => void | boolean | Promise<void | boolean>
 }) {
   const { alert } = useAlertModal()
-  const [conditionCursor, setConditionCursor] = useState((value?.criteria_condition || "").length)
-  const [conditionError, setConditionError] = useState("")
+  const [conditionHasErrors, setConditionHasErrors] = useState(false)
+  const [alternativeConditionHasErrors, setAlternativeConditionHasErrors] = useState(false)
   const [hasAlternative, setHasAlternative] = useState(!!(value?.feasibilityprompt || value?.alternative_criteria_condition))
   const {
     control,
@@ -259,48 +261,16 @@ function Form({
       !!currentPayload.alternative_criteria_type &&
       !!currentPayload.alternative_criteria_label &&
       !!currentPayload.alternative_criteria_condition)
-  const invalidConditionKeys = useMemo(
-    () => (keysLoading || !keyOptions.length ? [] : getInvalidConditionKeys(condition, keyOptions)),
-    [condition, keyOptions, keysLoading],
-  )
-  const invalidAlternativeConditionKeys = useMemo(
-    () => (keysLoading || !keyOptions.length ? [] : getInvalidConditionKeys(alternativeCondition, keyOptions)),
-    [alternativeCondition, keyOptions, keysLoading],
-  )
-  const incompleteCondition = useMemo(() => hasIncompleteExpression(condition), [condition])
-  const incompleteAlternativeCondition = useMemo(
-    () => (hasAlternative ? hasIncompleteExpression(alternativeCondition) : false),
-    [alternativeCondition, hasAlternative],
-  )
-  const hasValidConditionKeys =
-    !invalidConditionKeys.length && !invalidAlternativeConditionKeys.length
+  const initialCriteriaCondition = value?.criteria_condition || ""
+  const initialAlternativeCondition = value?.alternative_criteria_condition || ""
   const hasChanged = JSON.stringify(currentPayload) !== JSON.stringify(originalPayload)
   const saveDisabled =
     !hasRequiredFields ||
     !hasRequiredAlternativeFields ||
-    !hasValidConditionKeys ||
-    incompleteCondition ||
-    incompleteAlternativeCondition ||
+    conditionHasErrors ||
+    (hasAlternative && alternativeConditionHasErrors) ||
     keysLoading ||
-    !!conditionError ||
     (!!value && !hasChanged)
-
-  const activeConditionToken = useMemo(() => {
-    return getConditionTokenAtCursor(condition, conditionCursor)
-  }, [condition, conditionCursor])
-  const conditionMatches = useMemo(() => {
-    if (!activeConditionToken) return []
-    const token = activeConditionToken.token
-    if (token.toLowerCase() === "self") return []
-    if (token.length > 3 && keyOptions.some((option) => option.value.toLowerCase() === token.toLowerCase())) return []
-    return sortKeyMatches(keyOptions, token).slice(0, 8)
-  }, [activeConditionToken, keyOptions])
-  const showNoConditionMatches = !!(
-    activeConditionToken?.token &&
-    activeConditionToken.token.toLowerCase() !== "self" &&
-    !keyOptions.some((option) => option.value.toLowerCase() === activeConditionToken.token.toLowerCase()) &&
-    !conditionMatches.length
-  )
 
   const save = handleSubmit(async (data) => {
     try {
@@ -407,69 +377,26 @@ function Form({
               control={control}
               name="criteria_condition"
               rules={{ required: "Eligibility criteria is required." }}
-              render={({ field: { value, onChange, onBlur } }) => (
-                <Textarea
+              render={({ field: { value, onChange } }) => (
+                <ConditionEditor
                   id="criteria_condition"
                   rows={4}
                   value={value || ""}
-                  onBlur={onBlur}
-                  onChange={(event) => {
-                    setConditionError("")
-                    onChange(event.target.value)
-                    setConditionCursor(event.target.selectionStart || event.target.value.length)
-                  }}
-                  onClick={(event) => setConditionCursor(event.currentTarget.selectionStart || 0)}
-                  onKeyUp={(event) => setConditionCursor(event.currentTarget.selectionStart || 0)}
+                  onChange={(next) => onChange(next)}
+                  keys={conditionKeys}
+                  keysLoading={keysLoading}
+                  keysReady={conditionKeysReady}
+                  unavailableKeys={preScriptUnavailableOutcomeKeys}
+                  allowSelf
+                  selfDataType={criteriaType}
+                  initialValue={initialCriteriaCondition}
+                  onValidityChange={setConditionHasErrors}
                   placeholder="$self='Yes' or $key>78"
                 />
               )}
             />
             {!!errors.criteria_condition && (
               <p className="text-xs text-destructive">{errors.criteria_condition.message}</p>
-            )}
-
-            {!!conditionError && (
-              <p className="text-xs text-destructive">{conditionError}</p>
-            )}
-
-            {incompleteCondition && (
-              <p className="text-xs text-destructive">Eligibility criteria needs a value on the right side of the expression.</p>
-            )}
-
-            {!!invalidConditionKeys.length && (
-              <p className="text-xs text-destructive">
-                Unknown key{invalidConditionKeys.length === 1 ? "" : "s"}: {invalidConditionKeys.join(", ")}
-              </p>
-            )}
-
-            {showNoConditionMatches && (
-              <p className="text-xs text-muted-foreground">No matching script keys.</p>
-            )}
-
-            {!!conditionMatches.length && (
-              <div className="rounded-md border border-border">
-                {conditionMatches.map((option) => (
-                  <button
-                    type="button"
-                    key={option.value}
-                    className="flex w-full items-center px-3 py-2 text-left text-sm hover:bg-accent"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      try {
-                        const next = insertConditionKeyAtCursor(condition, option.value, activeConditionToken)
-                        setValue("criteria_condition", next.condition, { shouldDirty: true })
-                        setConditionCursor(next.cursor)
-                        setConditionError("")
-                      } catch (error: any) {
-                        setConditionError(error?.message || "Unable to insert the selected key.")
-                      }
-                    }}
-                  >
-                    <Wand2Icon className="mr-2 h-3.5 w-3.5 opacity-60" />
-                    {option.label}
-                  </button>
-                ))}
-              </div>
             )}
           </div>
 
@@ -628,24 +555,30 @@ function Form({
 
                 <div>
                   <Label htmlFor="alternative_criteria_condition">Alternative eligibility criteria *</Label>
-                  <Textarea
-                    id="alternative_criteria_condition"
-                    rows={3}
-                    placeholder="$self>=30"
-                    {...register("alternative_criteria_condition", { required: "Alternative eligibility criteria is required." })}
+                  <Controller
+                    control={control}
+                    name="alternative_criteria_condition"
+                    rules={{ required: "Alternative eligibility criteria is required." }}
+                    render={({ field: { value, onChange } }) => (
+                      <ConditionEditor
+                        id="alternative_criteria_condition"
+                        rows={3}
+                        value={value || ""}
+                        onChange={(next) => onChange(next)}
+                        keys={conditionKeys}
+                        keysLoading={keysLoading}
+                        keysReady={conditionKeysReady}
+                        unavailableKeys={preScriptUnavailableOutcomeKeys}
+                        allowSelf
+                        selfDataType={alternativeCriteriaType}
+                        initialValue={initialAlternativeCondition}
+                        onValidityChange={setAlternativeConditionHasErrors}
+                        placeholder="$self>=30"
+                      />
+                    )}
                   />
                   {!!errors.alternative_criteria_condition && (
                     <p className="mt-1 text-xs text-destructive">{errors.alternative_criteria_condition.message}</p>
-                  )}
-                  {incompleteAlternativeCondition && (
-                    <p className="mt-1 text-xs text-destructive">
-                      Alternative eligibility criteria needs a value on the right side of the expression.
-                    </p>
-                  )}
-                  {!!invalidAlternativeConditionKeys.length && (
-                    <p className="mt-1 text-xs text-destructive">
-                      Unknown key{invalidAlternativeConditionKeys.length === 1 ? "" : "s"}: {invalidAlternativeConditionKeys.join(", ")}
-                    </p>
                   )}
                 </div>
 
@@ -748,109 +681,6 @@ function getKeyOptions(keys: unknown[]): KeyOption[] {
   })
 
   return Array.from(map.values()).sort((a, b) => a.value.localeCompare(b.value))
-}
-
-function getConditionTokenAtCursor(condition: string, cursor: number): ConditionToken | null {
-  const safeCursor = Math.max(0, Math.min(cursor, condition.length))
-  const beforeCursor = condition.slice(0, safeCursor)
-  const tokenStart = beforeCursor.lastIndexOf("$")
-
-  if (tokenStart < 0) return null
-
-  const tokenText = beforeCursor.slice(tokenStart + 1)
-  if (!/^[A-Za-z0-9_.-]*$/.test(tokenText)) return null
-
-  let tokenEnd = safeCursor
-  while (tokenEnd < condition.length && /[A-Za-z0-9_.-]/.test(condition[tokenEnd])) tokenEnd++
-
-  return {
-    token: condition.slice(tokenStart + 1, tokenEnd),
-    start: tokenStart,
-    end: tokenEnd,
-  }
-}
-
-function insertConditionKeyAtCursor(condition: string, key: string, token: ConditionToken | null) {
-  const replacement = `$${key}`
-
-  if (!token) {
-    const prefix = condition && !condition.endsWith(" ") ? `${condition} ` : condition
-    return {
-      condition: `${prefix}${replacement}`,
-      cursor: `${prefix}${replacement}`.length,
-    }
-  }
-
-  const nextCondition = `${condition.slice(0, token.start)}${replacement}${condition.slice(token.end)}`
-  return {
-    condition: nextCondition,
-    cursor: token.start + replacement.length,
-  }
-}
-
-function getInvalidConditionKeys(condition: string, keyOptions: KeyOption[]) {
-  const validKeys = new Set(keyOptions.map((option) => option.value.toLowerCase()))
-  const tokens = Array.from(condition.matchAll(/\$([A-Za-z0-9_.-]+)/g)).map((match) => match[1].trim())
-
-  return tokens.filter((token) => {
-    const normalized = token.toLowerCase()
-    if (normalized === "self") return false
-    return !validKeys.has(normalized)
-  })
-}
-
-function hasIncompleteExpression(condition: string) {
-  const trimmed = condition.trim()
-  if (!trimmed) return false
-  if (/\b(?:and|or)\s*$/i.test(trimmed)) return true
-
-  const segments = condition
-    .split(/\b(?:and|or)\b/i)
-    .map((segment) => segment.trim())
-
-  return segments.some((segment) => {
-    if (!segment) return true
-
-    const match = segment.match(/^(.*?)\s*(>=|<=|!=|==|=|>|<)\s*(.*)$/)
-    if (!match) return true
-
-    const leftSide = (match[1] || "").trim()
-    const rightSide = (match[3] || "").trim()
-    return !leftSide || !rightSide || rightSide === "'" || rightSide === '"' || rightSide === "`"
-  })
-}
-
-function sortKeyMatches(options: KeyOption[], token: string) {
-  const normalizedToken = token.toLowerCase()
-  const matches = options.filter((option) => {
-    const value = option.value.toLowerCase()
-    const label = option.label.toLowerCase()
-    return (
-      value.startsWith(normalizedToken) ||
-      value.includes(normalizedToken) ||
-      label.includes(normalizedToken) ||
-      isSubsequence(normalizedToken, value)
-    )
-  })
-
-  return matches.sort((a, b) => {
-    const aValue = a.value.toLowerCase()
-    const bValue = b.value.toLowerCase()
-    const aStarts = aValue.startsWith(normalizedToken)
-    const bStarts = bValue.startsWith(normalizedToken)
-    if (aStarts !== bStarts) return aStarts ? -1 : 1
-    return a.value.localeCompare(b.value)
-  })
-}
-
-function isSubsequence(needle: string, value: string) {
-  if (!needle) return true
-  let index = 0
-  for (const char of value) {
-    if (char === needle[index]) index++
-    if (index === needle.length) return true
-  }
-  return false
 }
 
 function getSupportedCriteriaType(dataType: string): EligibilityCriteria["criteria_type"] | null {

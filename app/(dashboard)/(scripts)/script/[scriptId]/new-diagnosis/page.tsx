@@ -1,21 +1,29 @@
 import { Title } from "@/components/title";
-import { getScript } from "@/app/actions/scripts";
+import { getScript, listScreens } from "@/app/actions/scripts";
 import { Alert } from "@/components/alert";
 import { DiagnosisForm } from "../../../components/diagnoses/form";
 import { PageContainer } from "../../../components/page-container";
 
 type Props = {
-    params: { scriptId: string };
-    searchParams: { [key: string]: string; };
+    params: Promise<{ scriptId: string }>;
+    searchParams: Promise<{ [key: string]: string; }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewDiagnosisPage({ params: { scriptId, } }: Props) {
+export default async function NewDiagnosisPage(props: Props) {
+    const params = await props.params;
+
+    const {
+        scriptId
+    } = params;
+
     const [
         script,
+        screens,
     ] = await Promise.all([
         getScript({ scriptId, returnDraftIfExists: true, }),
+        listScreens({ scriptsIds: [scriptId], returnDraftsIfExist: true }),
     ]);
 
     if (!script.data) {
@@ -36,7 +44,7 @@ export default async function NewDiagnosisPage({ params: { scriptId, } }: Props)
                 title="New diagnosis"
                 backLink={`/script/${scriptId}?section=diagnoses`}
             >
-                <DiagnosisForm scriptId={scriptId} />
+                <DiagnosisForm scriptId={scriptId} script={script.data} screens={screens.data} />
             </PageContainer>
         </>
     )
