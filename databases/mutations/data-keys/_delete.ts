@@ -5,14 +5,15 @@ import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { type DataKey, _getDataKeys } from '@/databases/queries/data-keys';
-import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
+import { _getDiagnoses, _getProblems, _getScreens, _getScripts } from '@/databases/queries/scripts';
 import { buildDataKeysDeleteImpact, type DataKeyDeleteImpactItem } from '@/lib/data-key-delete-impact';
 import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-compatibility';
 import { getBlockedChildDeletions, getDataKeyParentTitle } from '@/lib/data-key-children';
-import { resolveScriptRemovalExclusions } from '@/lib/data-key-script-removals';
+import { resolveScriptRemovalExclusions, resolveScriptsOnlyPlan } from '@/lib/data-key-script-removals';
 import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
+import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 
 export type DeleteDataKeysParams = {
     dataKeysIds: string[];
@@ -33,6 +34,13 @@ export type DeleteDataKeysParams = {
      * action (replace).
      */
     scriptRemovals?: Record<string, string[]>;
+    /**
+     * "Selected scripts only": target uuid -> scriptIds the operation applies
+     * to. When set, the keys STAY in the library — only the selected scripts
+     * change (replaced, or removed where there is no replacement / the script
+     * is in `scriptRemovals`). Unselected scripts are never touched.
+     */
+    scriptsOnly?: Record<string, string[]>;
 };
 
 export type DeleteDataKeysResponse = {
@@ -55,6 +63,7 @@ async function applyRequiredDeletionReplacements({
     replacements,
     allowMissingReplacements,
     scriptRemovals,
+    excludeScriptIdsByAlias: excludeScriptIdsByAliasParam,
     userId,
     client,
 }: {
@@ -64,6 +73,8 @@ async function applyRequiredDeletionReplacements({
     replacements: Record<string, string>;
     allowMissingReplacements?: boolean;
     scriptRemovals?: Record<string, string[]>;
+    /** Overrides the exclusions derived from `scriptRemovals` (scripts-only mode). */
+    excludeScriptIdsByAlias?: Record<string, string[]>;
     userId?: string | null;
     client: Parameters<typeof _updateDataKeysRefs>[0]["client"];
 }) {
@@ -79,6 +90,7 @@ async function applyRequiredDeletionReplacements({
     const deletedIds = new Set(targets.map((target) => target.uuid));
     const aliasesByReplacementUniqueKey: Record<string, string[]> = {};
     const replacementKeysById = new Map<string, DataKey>();
+    const appliedReplacements: { target: DataKey; replacement: DataKey }[] = [];
 
     for (const target of usedTargets) {
         const replacementId = `${replacements?.[target.uuid] || ''}`.trim();
@@ -131,6 +143,7 @@ async function applyRequiredDeletionReplacements({
         aliasesByReplacementUniqueKey[replacement.uniqueKey] = uniqueValues([...aliases, target.uniqueKey]);
 
         replacementKeysById.set(replacement.uuid, replacement);
+        appliedReplacements.push({ target, replacement });
     }
 
     const replacementKeys = Array.from(replacementKeysById.values());
@@ -139,7 +152,7 @@ async function applyRequiredDeletionReplacements({
     // Per-script exceptions: references in these scripts are left for the strip
     // step to remove instead of being rewritten to the replacement. Unknown or
     // stale script ids are dropped so new usage gets the default action.
-    const excludeScriptIdsByAlias = resolveScriptRemovalExclusions({
+    const excludeScriptIdsByAlias = excludeScriptIdsByAliasParam || resolveScriptRemovalExclusions({
         impact,
         replacements: replacements || {},
         scriptRemovals: scriptRemovals || {},
@@ -161,6 +174,61 @@ async function applyRequiredDeletionReplacements({
     if (updateRes.errors?.length) {
         throw new Error(updateRes.errors[0]);
     }
+
+    // Conditions refer to keys by name, so a replacement with a different name
+    // would leave `$Old` behind. Rewrite them in the scripts that received it.
+    const renamesByScriptId: Record<string, { from: string; to: string }[]> = {};
+    for (const { target, replacement } of appliedReplacements) {
+        const excluded = new Set(excludeScriptIdsByAlias[target.uniqueKey] || []);
+        const scripts = impact.find((item) => item.dataKeyId === target.uuid)?.scripts || [];
+        for (const { scriptId } of scripts) {
+            if (excluded.has(scriptId)) continue;
+            (renamesByScriptId[scriptId] ||= []).push({ from: target.name || '', to: replacement.name || '' });
+        }
+    }
+
+    const conditionsRes = await _syncConditionRefsAfterReplacement({
+        renamesByScriptId,
+        userId: userId || undefined,
+        client,
+    });
+    if (conditionsRes.errors?.length) {
+        throw new Error(conditionsRes.errors[0]);
+    }
+}
+
+/**
+ * Drops the keys' drafts and queues the published rows for deletion on the
+ * next publish. Callers must already have cleared or replaced their references.
+ */
+export async function queueDataKeysDeletion({
+    dataKeysIds,
+    userId,
+    client,
+}: {
+    dataKeysIds: string[];
+    userId?: string | null;
+    client: NonNullable<Parameters<typeof _updateDataKeysRefs>[0]["client"]>;
+}) {
+    if (!dataKeysIds.length) return;
+
+    await client.delete(dataKeysDrafts).where(inArray(dataKeysDrafts.uuid, dataKeysIds));
+
+    const dataKeysArr = await client
+        .select({
+            dataKeyId: dataKeys.uuid,
+            pendingDeletion: pendingDeletion.dataKeyId,
+        })
+        .from(dataKeys)
+        .leftJoin(pendingDeletion, eq(pendingDeletion.dataKeyId, dataKeys.uuid))
+        .where(inArray(dataKeys.uuid, dataKeysIds));
+
+    const pendingDeletionInsertData = dataKeysArr.filter(s => !s.pendingDeletion).map(s => ({
+        dataKeyId: s.dataKeyId,
+        createdByUserId: userId,
+    }));
+
+    if (pendingDeletionInsertData.length) await client.insert(pendingDeletion).values(pendingDeletionInsertData);
 }
 
 export async function _deleteAllDataKeysDrafts(opts?: {
@@ -175,7 +243,7 @@ export async function _deleteAllDataKeysDrafts(opts?: {
 }
 
 export async function _deleteDataKeys(
-    { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, replacements = {}, allowMissingReplacements, scriptRemovals = {}, }: DeleteDataKeysParams,
+    { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, replacements = {}, allowMissingReplacements, scriptRemovals = {}, scriptsOnly, }: DeleteDataKeysParams,
 ) {
     const response: DeleteDataKeysResponse = { success: false, };
 
@@ -183,17 +251,19 @@ export async function _deleteDataKeys(
         const dataKeysIds = uniqueValues(dataKeysIdsParam);
 
         if (dataKeysIds.length) {
-            const [dataKeysRes, screensRes, diagnosesRes, problemsRes] = await Promise.all([
+            const [dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes] = await Promise.all([
                 _getDataKeys({ returnDraftsIfExist: true }),
                 _getScreens({ returnDraftsIfExist: true }),
                 _getDiagnoses({ returnDraftsIfExist: true }),
                 _getProblems({ returnDraftsIfExist: true }),
+                _getScripts({ returnDraftsIfExist: true }),
             ]);
             const loadErrors = [
                 ...(dataKeysRes.errors || []),
                 ...(screensRes.errors || []),
                 ...(diagnosesRes.errors || []),
                 ...(problemsRes.errors || []),
+                ...(scriptsRes.errors || []),
             ];
             if (loadErrors.length) throw new Error(loadErrors[0]);
 
@@ -229,8 +299,52 @@ export async function _deleteDataKeys(
                 screens: screensRes.data,
                 diagnoses: diagnosesRes.data,
                 problems: problemsRes.data,
+                scripts: scriptsRes.data,
                 dataKeysIds,
             });
+
+            if (scriptsOnly) {
+                const plan = resolveScriptsOnlyPlan({
+                    impact,
+                    replacements,
+                    scriptSelections: scriptsOnly,
+                    scriptRemovals,
+                });
+                if (!plan.selectedCount) {
+                    throw new Error('Select at least one script to apply this change to.');
+                }
+
+                // Only keys that change somewhere take part; the rest stay as they are.
+                const selectedKeys = new Set(Object.keys(plan.stripScriptIdsByUniqueKey));
+                const selectedTargets = targets.filter((target) => selectedKeys.has(target.uniqueKey));
+                const selectedReplacements = Object.fromEntries(Object.entries(replacements)
+                    .filter(([targetId]) => selectedTargets.some((target) => target.uuid === targetId)));
+
+                await db.transaction(async (tx) => {
+                    await applyRequiredDeletionReplacements({
+                        targets: selectedTargets,
+                        allDataKeys: dataKeysRes.data,
+                        impact,
+                        replacements: selectedReplacements,
+                        // Removal is the explicit choice for keys without a replacement.
+                        allowMissingReplacements: true,
+                        excludeScriptIdsByAlias: plan.replaceExclusionsByUniqueKey,
+                        userId,
+                        client: tx,
+                    });
+
+                    const res = await _deleteReferencedDataKeyOptions({
+                        userId: userId || undefined,
+                        uniqueKeys: Array.from(selectedKeys),
+                        scriptIdsByUniqueKey: plan.stripScriptIdsByUniqueKey,
+                        client: tx,
+                    });
+                    if (res.errors?.length) throw new Error(res.errors[0]);
+                });
+
+                response.success = true;
+                return response;
+            }
 
             await db.transaction(async (tx) => {
                 await applyRequiredDeletionReplacements({
@@ -257,25 +371,7 @@ export async function _deleteDataKeys(
                     }
                 }
 
-                // delete drafts
-                await tx.delete(dataKeysDrafts).where(inArray(dataKeysDrafts.uuid, dataKeysIds));
-
-                // insert data keys into pendingDeletion, we'll delete them when data is published
-                const dataKeysArr = await tx
-                    .select({
-                        dataKeyId: dataKeys.uuid,
-                        pendingDeletion: pendingDeletion.dataKeyId,
-                    })
-                    .from(dataKeys)
-                    .leftJoin(pendingDeletion, eq(pendingDeletion.dataKeyId, dataKeys.uuid))
-                    .where(inArray(dataKeys.uuid, dataKeysIds));
-
-                const pendingDeletionInsertData = dataKeysArr.filter(s => !s.pendingDeletion).map(s => ({
-                    dataKeyId: s.dataKeyId,
-                    createdByUserId: userId,
-                }));
-
-                if (pendingDeletionInsertData.length) await tx.insert(pendingDeletion).values(pendingDeletionInsertData);
+                await queueDataKeysDeletion({ dataKeysIds, userId, client: tx });
             });
         }
 
@@ -285,7 +381,9 @@ export async function _deleteDataKeys(
         response.errors = [e.message];
         logger.error('_deleteDataKeys ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'delete_data_keys');
+        if (!response?.errors?.length && broadcastAction) {
+            socket.emit('data_changed', scriptsOnly ? 'save_scripts' : 'delete_data_keys');
+        }
         return response;
     }
 }

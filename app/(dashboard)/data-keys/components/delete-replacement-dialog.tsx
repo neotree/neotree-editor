@@ -28,7 +28,11 @@ export type DataKeyDeleteSelection = {
     replacements: ReplacementMap;
     /** target uuid -> scriptIds whose references are removed instead of replaced */
     scriptRemovals: Record<string, string[]>;
+    /** "Selected scripts only": target uuid -> scriptIds the change applies to */
+    scriptSelections: Record<string, string[]>;
 };
+
+type DeleteScope = 'library' | 'scripts';
 
 type DataKeyDeleteReplacementDialogProps = {
     dataKeys: DataKey[];
@@ -57,12 +61,55 @@ type DataKeyDeleteReplacementDialogProps = {
      * confirmation step before this is called.
      */
     onDeleteAnyway?: (selection: DataKeyDeleteSelection) => Promise<boolean | void> | boolean | void;
+    /**
+     * Delete mode only: enables "Selected scripts only" — replace or remove the
+     * keys in the scripts the user picks, keeping them in the library.
+     */
+    onApplyToScripts?: (selection: DataKeyDeleteSelection) => Promise<boolean | void> | boolean | void;
 };
 
 function normalizeType(value?: string | null) {
     return `${value || ''}`.trim().toLowerCase();
 }
 
+
+type ImpactScript = DeleteImpactItem['scripts'][number];
+
+export type ScriptGroup = {
+    key: string;
+    title: string;
+    scriptIds: string[];
+    usages: Array<{ label: string; href: string }>;
+};
+
+// Scripts are listed by title: separate scripts can share a title (e.g. copies
+// for different sites), and repeating the same name reads as a duplicate. The
+// group still carries every scriptId, so actions apply to each of them.
+export function groupScriptsByTitle(scripts: ImpactScript[]): ScriptGroup[] {
+    const groups = new Map<string, ScriptGroup>();
+    for (const script of scripts) {
+        const title = `${script.scriptTitle || script.scriptId}`.trim();
+        const key = title.toLowerCase();
+        const group = groups.get(key) || { key, title, scriptIds: [], usages: [] };
+        group.scriptIds.push(script.scriptId);
+        const usages = script.usages?.length ? script.usages : [{ label: title, href: `/script/${script.scriptId}` }];
+        for (const usage of usages) {
+            if (!group.usages.some((existing) => existing.href === usage.href && existing.label === usage.label)) {
+                group.usages.push(usage);
+            }
+        }
+        groups.set(key, group);
+    }
+    return Array.from(groups.values());
+}
+
+function countScriptTitles(scripts: ImpactScript[]) {
+    return new Set(scripts.map((script) => `${script.scriptTitle || script.scriptId}`.trim().toLowerCase())).size;
+}
+
+function pluralizeScripts(count: number) {
+    return `${count} script${count === 1 ? '' : 's'}`;
+}
 
 function getImpactTitle(item: DeleteImpactItem) {
     return item.label || item.name || item.uniqueKey || 'Untitled data key';
@@ -141,9 +188,12 @@ export function DataKeyDeleteReplacementDialog({
     onOpenChange,
     onConfirm,
     onDeleteAnyway,
+    onApplyToScripts,
 }: DataKeyDeleteReplacementDialogProps) {
     const isUnlink = mode === 'unlink';
     const [confirmingDeleteAnyway, setConfirmingDeleteAnyway] = useState(false);
+    const [scope, setScope] = useState<DeleteScope>('library');
+    const scriptsOnly = !isUnlink && !!onApplyToScripts && scope === 'scripts';
 
     // Keep keyboard/screen-reader users oriented across the two steps: focus
     // lands on the safe action when entering the confirm step, and back on
@@ -176,21 +226,40 @@ export function DataKeyDeleteReplacementDialog({
     const isScriptRemoved = (dataKeyId: string, scriptId: string) =>
         (scriptRemovals[dataKeyId] || []).includes(scriptId);
 
-    const setScriptAction = (dataKeyId: string, scriptId: string, remove: boolean) => {
-        setScriptRemovals((current) => {
+    // Scripts-only mode: the scripts each key's change applies to. Nothing is
+    // preselected so every affected script is an explicit choice.
+    const [scriptSelections, setScriptSelections] = useState<Record<string, string[]>>({});
+
+    const isScriptSelected = (dataKeyId: string, scriptId: string) =>
+        (scriptSelections[dataKeyId] || []).includes(scriptId);
+
+    const setScriptSelected = (dataKeyId: string, scriptIds: string[], selected: boolean) => {
+        setScriptSelections((current) => {
             const existing = current[dataKeyId] || [];
-            const next = remove
-                ? Array.from(new Set([...existing, scriptId]))
-                : existing.filter((id) => id !== scriptId);
+            const next = selected
+                ? Array.from(new Set([...existing, ...scriptIds]))
+                : existing.filter((id) => !scriptIds.includes(id));
             return { ...current, [dataKeyId]: next };
         });
     };
 
-    const selection: DataKeyDeleteSelection = { replacements, scriptRemovals };
+    const setScriptAction = (dataKeyId: string, scriptIds: string[], remove: boolean) => {
+        setScriptRemovals((current) => {
+            const existing = current[dataKeyId] || [];
+            const next = remove
+                ? Array.from(new Set([...existing, ...scriptIds]))
+                : existing.filter((id) => !scriptIds.includes(id));
+            return { ...current, [dataKeyId]: next };
+        });
+    };
+
+    const selection: DataKeyDeleteSelection = { replacements, scriptRemovals, scriptSelections };
 
     const resetSelection = () => {
         setReplacements({});
         setScriptRemovals({});
+        setScriptSelections({});
+        setScope('library');
     };
 
     const candidatesByDataKeyId = useMemo(() => {
@@ -236,8 +305,17 @@ export function DataKeyDeleteReplacementDialog({
     // Which scripts lose the key's references instead of getting the
     // replacement: everything for parents and unreplaced keys, only the
     // excepted scripts for replaced keys.
+    const getSelectedScriptsForItem = (item: DeleteImpactItem) => !scriptsOnly
+        ? item.scripts
+        : item.scripts.filter((script) => isScriptSelected(item.dataKeyId, script.scriptId));
+
     const getRemovedScriptsForItem = (item: DeleteImpactItem) => {
         if (isUnlink) return replacements[item.dataKeyId] ? [] : item.scripts;
+        if (scriptsOnly) {
+            const selectedScripts = getSelectedScriptsForItem(item);
+            if (isParentItem(item) || !replacements[item.dataKeyId]) return selectedScripts;
+            return selectedScripts.filter((script) => isScriptRemoved(item.dataKeyId, script.scriptId));
+        }
         if (isParentItem(item) || !replacements[item.dataKeyId]) return item.scripts;
         return item.scripts.filter((script) => isScriptRemoved(item.dataKeyId, script.scriptId));
     };
@@ -248,6 +326,9 @@ export function DataKeyDeleteReplacementDialog({
 
     // Anything destructive goes through the receipt step before executing.
     const removalsExist = !isUnlink && !!strippedItems.length;
+
+    const selectedScriptCount = usedItems.reduce((sum, item) => sum + getSelectedScriptsForItem(item).length, 0);
+    const showScopeSwitch = !isUnlink && !!onApplyToScripts && !loading && !!usedItems.length;
 
     // With no replaceable keys at all (all parents), "Delete anyway" IS the
     // primary action; otherwise it sits beside the primary button.
@@ -295,6 +376,15 @@ export function DataKeyDeleteReplacementDialog({
         }
     };
 
+    const handleApplyToScripts = async () => {
+        if (!onApplyToScripts) return;
+        const success = await onApplyToScripts(selection);
+        if (success !== false) {
+            resetSelection();
+            setConfirmingDeleteAnyway(false);
+        }
+    };
+
     const handleOpenChange = (nextOpen: boolean) => {
         if (!nextOpen) {
             resetSelection();
@@ -318,8 +408,10 @@ export function DataKeyDeleteReplacementDialog({
                         {loading
                             ? 'Delete data keys'
                             : confirmingDeleteAnyway
-                                ? 'Confirm delete'
-                                : allUnused
+                                ? (scriptsOnly ? 'Confirm script changes' : 'Confirm delete')
+                                : scriptsOnly
+                                    ? 'Replace or remove in selected scripts'
+                                    : allUnused
                                     ? 'Delete data keys'
                                     : (title || (!isUnlink && !replaceableItems.length
                                         ? 'Data keys in use'
@@ -329,8 +421,12 @@ export function DataKeyDeleteReplacementDialog({
                         {loading
                             ? 'Checking where the selected keys are used…'
                             : confirmingDeleteAnyway
-                                ? 'Review what happens to each data key, then confirm.'
-                                : allUnused
+                                ? (scriptsOnly
+                                    ? 'Review what happens in each selected script, then confirm. The data keys stay in the library.'
+                                    : 'Review what happens to each data key, then confirm.')
+                                : scriptsOnly
+                                    ? 'Choose the scripts to change. In each one the key is replaced, or removed if there is no replacement. Other scripts and the library are not changed.'
+                                    : allUnused
                                     ? 'None of the selected keys are used in any script.'
                                     : (description || (isUnlink
                                         ? 'These options are used in scripts through this data key. Choose a fellow child key to take their place, or continue to remove them from the linked screens.'
@@ -361,20 +457,34 @@ export function DataKeyDeleteReplacementDialog({
                     </div>
                 ) : confirmingDeleteAnyway ? (
                     <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+                        {scriptsOnly && !strippedItems.length ? (
+                            <div role="status" className="rounded-md border border-border bg-muted/50 p-3 text-sm">
+                                <span className="font-semibold">References will be replaced in the selected scripts.</span>{' '}
+                                The data keys stay in the library.
+                            </div>
+                        ) : (
                         <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
                             <span className="font-semibold">
                                 {strippedItems.length === usedItems.length
                                     ? 'References will be removed, not replaced.'
                                     : 'Some references will be removed, not replaced.'}
                             </span>{' '}
-                            Fields and options using the removed keys will be deleted or unlinked in the affected scripts.
+                            Fields and options using the removed keys will be deleted or unlinked in the
+                            {scriptsOnly ? ' selected' : ' affected'} scripts.
+                            {scriptsOnly && ' The data keys stay in the library.'}
                         </div>
+                        )}
 
                         <div className="space-y-1">
                             {usedItems.map((item) => {
                                 const replacementTitle = getReplacementTitle(item);
+                                const selectedScripts = getSelectedScriptsForItem(item);
                                 const removedScripts = getRemovedScriptsForItem(item);
-                                const replacedCount = item.scripts.length - removedScripts.length;
+                                const removedIds = new Set(removedScripts.map((script) => script.scriptId));
+                                const replacedCount = countScriptTitles(selectedScripts.filter((script) => !removedIds.has(script.scriptId)));
+                                const removedCount = countScriptTitles(removedScripts);
+                                const selectedIds = new Set(selectedScripts.map((script) => script.scriptId));
+                                const unchangedCount = countScriptTitles(item.scripts.filter((script) => !selectedIds.has(script.scriptId)));
 
                                 return (
                                     <div
@@ -390,19 +500,26 @@ export function DataKeyDeleteReplacementDialog({
                                                 {replacementTitle && replacedCount > 0 && (
                                                     <span className="text-muted-foreground">
                                                         replaced by <span className="font-medium text-foreground">{replacementTitle}</span>
-                                                        {removedScripts.length ? ` in ${replacedCount} script${replacedCount === 1 ? '' : 's'}` : ''}
+                                                        {removedScripts.length ? ` in ${pluralizeScripts(replacedCount)}` : ''}
                                                     </span>
                                                 )}
                                                 {replacementTitle && replacedCount > 0 && !!removedScripts.length && ' · '}
-                                                {!!removedScripts.length && (
-                                                    `removed in ${removedScripts.length} script${removedScripts.length === 1 ? '' : 's'}`
+                                                {!!removedScripts.length && `removed in ${pluralizeScripts(removedCount)}`}
+                                                {scriptsOnly && !selectedScripts.length && (
+                                                    <span className="text-muted-foreground">no changes</span>
                                                 )}
                                             </div>
                                         </div>
 
+                                        {scriptsOnly && unchangedCount > 0 && !!selectedScripts.length && (
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                Not changed in {unchangedCount} other {unchangedCount === 1 ? 'script' : 'scripts'}.
+                                            </div>
+                                        )}
+
                                         {!!removedScripts.length && removedScripts.length < item.scripts.length && (
                                             <div className="mt-1 text-xs text-muted-foreground">
-                                                Removed in: {removedScripts.map((script) => script.scriptTitle).join(', ')}
+                                                Removed in: {groupScriptsByTitle(removedScripts).map((group) => group.title).join(', ')}
                                             </div>
                                         )}
                                     </div>
@@ -410,7 +527,7 @@ export function DataKeyDeleteReplacementDialog({
                             })}
                         </div>
 
-                        {!isUnlink && unusedCount > 0 && (
+                        {!isUnlink && !scriptsOnly && unusedCount > 0 && (
                             <p className="px-1 text-xs text-muted-foreground">
                                 {unusedCount} more selected data key{unusedCount === 1 ? ' is' : 's are'} not used in
                                 any script and will be deleted as well.
@@ -436,15 +553,62 @@ export function DataKeyDeleteReplacementDialog({
                     </div>
                 ) : (
                 <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+                    {showScopeSwitch && (
+                        <div
+                            role="radiogroup"
+                            aria-label="Where to apply"
+                            className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                        >
+                            {([
+                                {
+                                    value: 'library',
+                                    title: 'Delete from library',
+                                    caption: 'Applies to every script using the key.',
+                                },
+                                {
+                                    value: 'scripts',
+                                    title: 'Selected scripts only',
+                                    caption: 'The key stays in the library.',
+                                },
+                            ] as const).map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={scope === option.value}
+                                    disabled={deleting}
+                                    onClick={() => setScope(option.value)}
+                                    className={cn(
+                                        'rounded-md border px-3 py-2 text-left text-sm transition-colors',
+                                        scope === option.value
+                                            ? 'border-primary bg-primary/5'
+                                            : 'border-border hover:bg-accent/50',
+                                    )}
+                                >
+                                    <div className="font-medium">{option.title}</div>
+                                    <div className="text-xs text-muted-foreground">{option.caption}</div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     {usedItems.map((item) => {
                         const candidates = candidatesByDataKeyId.get(item.dataKeyId) || [];
                         const selectedReplacementId = replacements[item.dataKeyId] || '';
                         const dataTypeLabel = item.dataType || 'unknown type';
                         const parent = isParentItem(item);
 
+                        const selectedScripts = getSelectedScriptsForItem(item);
                         const removedScriptCount = !selectedReplacementId ? 0 : (scriptRemovals[item.dataKeyId] || [])
-                            .filter((scriptId) => item.scripts.some((script) => script.scriptId === scriptId))
+                            .filter((scriptId) => selectedScripts.some((script) => script.scriptId === scriptId))
                             .length;
+                        const allScriptsSelected = selectedScripts.length === item.scripts.length;
+                        const scriptGroups = groupScriptsByTitle(item.scripts);
+                        const selectedGroupCount = scriptGroups
+                            .filter((group) => group.scriptIds.every((scriptId) => isScriptSelected(item.dataKeyId, scriptId)))
+                            .length;
+                        const replacingGroupCount = countScriptTitles(selectedScripts.filter((script) => !isScriptRemoved(item.dataKeyId, script.scriptId)));
+                        const removingGroupCount = countScriptTitles(selectedScripts.filter((script) => isScriptRemoved(item.dataKeyId, script.scriptId)));
 
                         return (
                             <div
@@ -455,74 +619,114 @@ export function DataKeyDeleteReplacementDialog({
                                     <div className="font-semibold">{getImpactTitle(item)}</div>
                                     <Badge variant="secondary" className="font-normal">{dataTypeLabel}</Badge>
                                     {parent && <Badge variant="outline" className="font-normal">parent key</Badge>}
-                                    <div className="ml-auto text-xs text-muted-foreground">
-                                        {item.scripts.length} script{item.scripts.length === 1 ? '' : 's'}
+                                    <div className="ml-auto flex items-center gap-x-2 text-xs text-muted-foreground">
+                                        {scriptsOnly && `${selectedGroupCount} of `}
+                                        {pluralizeScripts(scriptGroups.length)}
+                                        {scriptsOnly && (
+                                            <button
+                                                type="button"
+                                                disabled={deleting}
+                                                className="text-primary hover:underline"
+                                                onClick={() => setScriptSelected(
+                                                    item.dataKeyId,
+                                                    item.scripts.map((script) => script.scriptId),
+                                                    !allScriptsSelected,
+                                                )}
+                                            >
+                                                {allScriptsSelected ? 'Clear' : 'Select all'}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
                                 {!!item.scripts.length && (
                                     <ul className="mt-3 max-h-40 space-y-0.5 overflow-y-auto rounded-md border border-border p-1">
-                                        {item.scripts.map((script) => {
+                                        {scriptGroups.map((group) => {
                                             // Per-script action toggle appears once a
                                             // replacement is chosen; before that every
                                             // script would be removed anyway.
-                                            const showToggle = !isUnlink && !parent && !!selectedReplacementId;
-                                            const removed = showToggle && isScriptRemoved(item.dataKeyId, script.scriptId);
+                                            const groupSelected = !scriptsOnly || group.scriptIds.every((scriptId) => isScriptSelected(item.dataKeyId, scriptId));
+                                            const showToggle = !isUnlink && !parent && !!selectedReplacementId && groupSelected;
+                                            const removed = showToggle && group.scriptIds.every((scriptId) => isScriptRemoved(item.dataKeyId, scriptId));
 
                                             return (
                                                 <li
-                                                    key={script.scriptId}
-                                                    className="flex items-center gap-x-2 rounded px-2 py-1 text-xs hover:bg-accent/50"
+                                                    key={group.key}
+                                                    className="rounded px-2 py-1 text-xs hover:bg-accent/50"
                                                 >
-                                                    <a
-                                                        href={script.usages?.[0]?.href || `/script/${script.scriptId}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex min-w-0 flex-1 items-center gap-x-1.5"
-                                                    >
-                                                        <span className="min-w-0 truncate">{script.scriptTitle}</span>
-                                                        {(script.usages?.length || 0) > 1 && (
-                                                            <span className="shrink-0 text-muted-foreground">×{script.usages!.length}</span>
+                                                    <div className="flex items-center gap-x-2">
+                                                        {scriptsOnly && (
+                                                            <input
+                                                                type="checkbox"
+                                                                className="h-3.5 w-3.5 shrink-0 accent-primary"
+                                                                aria-label={`Apply to ${group.title}`}
+                                                                checked={groupSelected}
+                                                                disabled={deleting}
+                                                                onChange={(e) => setScriptSelected(item.dataKeyId, group.scriptIds, e.target.checked)}
+                                                            />
                                                         )}
-                                                        <ExternalLinkIcon className="h-3 w-3 shrink-0 text-primary" />
-                                                    </a>
+                                                        <span className="min-w-0 flex-1 truncate font-medium">
+                                                            {group.title}
+                                                            {group.scriptIds.length > 1 && (
+                                                                <span className="ml-1.5 font-normal text-muted-foreground">
+                                                                    ({group.scriptIds.length} scripts with this title)
+                                                                </span>
+                                                            )}
+                                                        </span>
 
-                                                    {showToggle && (
-                                                        <div
-                                                            role="group"
-                                                            aria-label={`Action for ${script.scriptTitle}`}
-                                                            className="flex shrink-0 overflow-hidden rounded border border-border text-[10px] leading-none"
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                aria-pressed={!removed}
-                                                                disabled={deleting}
-                                                                className={cn(
-                                                                    'px-1.5 py-1 transition-colors',
-                                                                    !removed
-                                                                        ? 'bg-primary text-primary-foreground'
-                                                                        : 'text-muted-foreground hover:bg-accent',
-                                                                )}
-                                                                onClick={() => setScriptAction(item.dataKeyId, script.scriptId, false)}
+                                                        {showToggle && (
+                                                            <div
+                                                                role="group"
+                                                                aria-label={`Action for ${group.title}`}
+                                                                className="flex shrink-0 overflow-hidden rounded border border-border text-[10px] leading-none"
                                                             >
-                                                                Replace
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                aria-pressed={removed}
-                                                                disabled={deleting}
-                                                                className={cn(
-                                                                    'px-1.5 py-1 transition-colors',
-                                                                    removed
-                                                                        ? 'bg-destructive text-destructive-foreground'
-                                                                        : 'text-muted-foreground hover:bg-accent',
-                                                                )}
-                                                                onClick={() => setScriptAction(item.dataKeyId, script.scriptId, true)}
-                                                            >
-                                                                Remove
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                                                <button
+                                                                    type="button"
+                                                                    aria-pressed={!removed}
+                                                                    disabled={deleting}
+                                                                    className={cn(
+                                                                        'px-1.5 py-1 transition-colors',
+                                                                        !removed
+                                                                            ? 'bg-primary text-primary-foreground'
+                                                                            : 'text-muted-foreground hover:bg-accent',
+                                                                    )}
+                                                                    onClick={() => setScriptAction(item.dataKeyId, group.scriptIds, false)}
+                                                                >
+                                                                    Replace
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    aria-pressed={removed}
+                                                                    disabled={deleting}
+                                                                    className={cn(
+                                                                        'px-1.5 py-1 transition-colors',
+                                                                        removed
+                                                                            ? 'bg-destructive text-destructive-foreground'
+                                                                            : 'text-muted-foreground hover:bg-accent',
+                                                                    )}
+                                                                    onClick={() => setScriptAction(item.dataKeyId, group.scriptIds, true)}
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <ul className={cn('mt-0.5 space-y-0.5', scriptsOnly && 'pl-5')}>
+                                                        {group.usages.map((usage) => (
+                                                            <li key={`${usage.href}::${usage.label}`}>
+                                                                <a
+                                                                    href={usage.href}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="flex min-w-0 items-center gap-x-1 text-muted-foreground hover:text-foreground"
+                                                                >
+                                                                    <span className="min-w-0 truncate">{usage.label}</span>
+                                                                    <ExternalLinkIcon className="h-3 w-3 shrink-0 text-primary" />
+                                                                </a>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
                                                 </li>
                                             );
                                         })}
@@ -533,7 +737,9 @@ export function DataKeyDeleteReplacementDialog({
                                     <p className="mt-3 text-xs text-destructive">
                                         {isUnlink
                                             ? 'This option is a parent data key — it cannot be replaced. Unlinking removes it from screens linked to this data key.'
-                                            : 'Parent data keys cannot be replaced. Deleting removes its fields and options from the scripts above.'}
+                                            : (scriptsOnly
+                                                ? 'Parent data keys cannot be replaced. Its fields and options are removed from the selected scripts; its child keys stay in the library.'
+                                                : 'Parent data keys cannot be replaced. Deleting removes its fields and options from the scripts above.')}
                                     </p>
                                 ) : (
                                     <div className="mt-3">
@@ -557,13 +763,15 @@ export function DataKeyDeleteReplacementDialog({
                                             <p className={isUnlink ? 'mt-2 text-xs text-amber-600' : 'mt-2 text-xs text-destructive'}>
                                                 {isUnlink
                                                     ? 'No compatible fellow child key was found. This option will be removed from screens linked to this data key.'
-                                                    : `No compatible ${dataTypeLabel} replacement exists.${onDeleteAnyway ? ' You can still delete anyway to remove its references.' : ''}`}
+                                                    : (scriptsOnly
+                                                        ? `No compatible ${dataTypeLabel} replacement exists. It will be removed from the selected scripts.`
+                                                        : `No compatible ${dataTypeLabel} replacement exists.${onDeleteAnyway ? ' You can still delete anyway to remove its references.' : ''}`)}
                                             </p>
                                         )}
                                         {removedScriptCount > 0 && (
                                             <p className="mt-2 text-xs text-muted-foreground">
-                                                Replacing in {item.scripts.length - removedScriptCount} script{item.scripts.length - removedScriptCount === 1 ? '' : 's'}
-                                                {' '}· <span className="text-destructive">removing in {removedScriptCount}</span>
+                                                Replacing in {pluralizeScripts(replacingGroupCount)}
+                                                {' '}· <span className="text-destructive">removing in {removingGroupCount}</span>
                                             </p>
                                         )}
                                     </div>
@@ -575,7 +783,14 @@ export function DataKeyDeleteReplacementDialog({
                     {!isUnlink && unusedCount > 0 && (
                         <p className="px-1 text-xs text-muted-foreground">
                             {unusedCount} more selected data key{unusedCount === 1 ? ' is' : 's are'} not used in
-                            any script and will be deleted as well.
+                            any script and will {scriptsOnly ? 'not be changed' : 'be deleted as well'}.
+                        </p>
+                    )}
+
+                    {Object.values(replacements).some(Boolean) && (
+                        <p className="px-1 text-xs text-muted-foreground">
+                            Conditions that refer to a replaced key or option by name are updated in the
+                            scripts where it is replaced.
                         </p>
                     )}
                 </div>
@@ -597,10 +812,37 @@ export function DataKeyDeleteReplacementDialog({
                                 type="button"
                                 variant="destructive"
                                 disabled={deleting}
-                                onClick={handleReceiptConfirm}
+                                onClick={scriptsOnly ? handleApplyToScripts : handleReceiptConfirm}
                             >
-                                Delete
+                                {scriptsOnly ? 'Apply to scripts' : 'Delete'}
                             </Button>
+                        </div>
+                    ) : scriptsOnly ? (
+                        <div className="flex w-full flex-col gap-y-2">
+                            {!selectedScriptCount && (
+                                <p className="text-xs text-muted-foreground sm:text-right">
+                                    Select at least one script to continue.
+                                </p>
+                            )}
+                            <div className="flex justify-end gap-x-2">
+                                <Button
+                                    ref={cancelRef}
+                                    type="button"
+                                    variant="outline"
+                                    disabled={deleting}
+                                    onClick={() => handleOpenChange(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    disabled={deleting || !selectedScriptCount}
+                                    onClick={() => setConfirmingDeleteAnyway(true)}
+                                >
+                                    Continue
+                                </Button>
+                            </div>
                         </div>
                     ) : (
                         <div className="flex w-full flex-col gap-y-2">

@@ -23,6 +23,11 @@
         "test:data-key-integrity": "tsx tests/data-key-integrity.test.ts",
         "test:data-key-delete-impact": "tsx tests/data-key-delete-impact.test.ts",
         "test:data-key-children": "tsx tests/data-key-children.test.ts",
+        "test:data-key-script-removals": "tsx tests/data-key-script-removals.test.ts",
+        "test:data-key-condition-sync": "tsx tests/data-key-condition-sync.test.ts",
+        "test:data-key-merge-plan": "tsx tests/data-key-merge-plan.test.ts",
+        "test:data-key-merge-analysis": "tsx tests/data-key-merge-analysis.test.ts",
+        "test:e2e": "playwright test",
         "test:integrity-draft-origin": "tsx tests/integrity-draft-origin.test.ts",
         "test:integrity-scan-scope": "tsx tests/integrity-scan-scope.test.ts",
         "test:integrity-baseline": "tsx tests/integrity-baseline.test.ts",
@@ -115,6 +120,7 @@
         "zustand": "^4.5.4"
     },
     "devDependencies": {
+        "@playwright/test": "1.64.0",
         "@types/bcrypt": "^5.0.2",
         "@types/jsonwebtoken": "^9.0.7",
         "@types/node": "^20",

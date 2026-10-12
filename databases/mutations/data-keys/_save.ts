@@ -176,6 +176,7 @@ async function buildOptionUnlinkPlan({
             name: replacement.name || '',
             label: replacement.label || '',
             confidential: replacement.confidential,
+            replacedName: removed?.name || '',
         };
     }
 

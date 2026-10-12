@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { TrashIcon } from 'lucide-react';
+import Link from 'next/link';
+import { MergeIcon, TrashIcon } from 'lucide-react';
 
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { Button } from '@/components/ui/button';
@@ -45,6 +46,14 @@ export function DataKeysTableBottomActions({ disabled, }: {
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}
+                onApplyToScripts={async ({ replacements, scriptRemovals, scriptSelections }) => {
+                    const success = await deleteDataKeys(selected.map(s => s.uuid), replacements, {
+                        scriptRemovals,
+                        scriptsOnly: scriptSelections,
+                    });
+                    if (success) setShowReplacementDialog(false);
+                    return success;
+                }}
             />
             <ActionsBar>
                 <Button
@@ -57,6 +66,15 @@ export function DataKeysTableBottomActions({ disabled, }: {
                 <ExportModal
                     uuids={selected.map(s => s.uuid)}
                 />
+
+                {selected.length > 1 && (
+                    <Button asChild variant="outline">
+                        <Link href={`/data-keys/merge?ids=${selected.map(s => s.uuid).join(',')}`}>
+                            <MergeIcon className="w-4 h-4 mr-2" />
+                            Merge {selected.length} keys
+                        </Link>
+                    </Button>
+                )}
 
                 <Button
                     variant="destructive"

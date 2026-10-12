@@ -1,0 +1,1 @@
+"use strict";exports.id=19688,exports.ids=[19688],exports.modules={50126:a=>{function b(a){a.languages.git={comment:/^#.*/m,deleted:/^[-–].*/m,inserted:/^\+.*/m,string:/("|')(?:\\.|(?!\1)[^\\\r\n])*\1/,command:{pattern:/^.*\$ git .*$/m,inside:{parameter:/\s--?\w+/}},coord:/^@@.*@@$/m,"commit-sha1":/^commit \w{40}$/m}}a.exports=b,b.displayName="git",b.aliases=[]}};

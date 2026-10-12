@@ -1,0 +1,1 @@
+"use strict";exports.id=91156,exports.ids=[91156],exports.modules={64134:a=>{function b(a){a.languages.gcode={comment:/;.*|\B\(.*?\)\B/,string:{pattern:/"(?:""|[^"])*"/,greedy:!0},keyword:/\b[GM]\d+(?:\.\d+)?\b/,property:/\b[A-Z]/,checksum:{pattern:/(\*)\d+/,lookbehind:!0,alias:"number"},punctuation:/[:*]/}}a.exports=b,b.displayName="gcode",b.aliases=[]}};

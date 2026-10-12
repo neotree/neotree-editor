@@ -17,7 +17,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Alert } from "@/components/alert";
 import { dataKeysSortOpts } from "@/constants";
 import * as actions from '@/app/actions/data-keys';
-import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
+import { DeleteDataKeysParams, DeleteDataKeysResponse, MergeDataKeysParams, MergeDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
@@ -140,8 +140,13 @@ export type tDataKeysCtx = {
         opts?: {
             allowMissingReplacements?: boolean;
             scriptRemovals?: Record<string, string[]>;
+            /** Selected scripts only — the keys stay in the library. */
+            scriptsOnly?: Record<string, string[]>;
         },
     ) => Promise<boolean>;
+    /** Applies a merge; resolves to the recorded merge id, or null when it failed (the error is shown). */
+    mergeDataKeys: (params: Omit<MergeDataKeysParams, 'userId' | 'broadcastAction' | 'dryRun'>) => Promise<string | null>;
+    merging: boolean;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
     setSort: (value: string) => void;
     onSort: (value: string) => void;
@@ -456,6 +461,7 @@ export function DataKeysCtxProvider({
                     replacements,
                     allowMissingReplacements: opts?.allowMissingReplacements,
                     scriptRemovals: opts?.scriptRemovals,
+                    scriptsOnly: opts?.scriptsOnly,
                 } satisfies DeleteDataKeysParams,
             });
 
@@ -463,7 +469,8 @@ export function DataKeysCtxProvider({
 
             if (res.errors?.length) throw new Error(res.errors[0]);
 
-            await recordDeletionPendingChanges(keysToDelete);
+            // Scripts-only changes keep the keys, so nothing is queued for deletion.
+            if (!opts?.scriptsOnly) await recordDeletionPendingChanges(keysToDelete);
 
             setSelected([]);
 
@@ -473,9 +480,11 @@ export function DataKeysCtxProvider({
 
             alert({
                 title: 'Success',
-                message: replacements && Object.keys(replacements).length
-                    ? 'Data key replacements saved and deletion queued successfully!'
-                    : 'Data keys deleted successfully!',
+                message: opts?.scriptsOnly
+                    ? 'Selected scripts updated. The data keys remain in the library.'
+                    : (replacements && Object.keys(replacements).length
+                        ? 'Data key replacements saved and deletion queued successfully!'
+                        : 'Data keys deleted successfully!'),
                 variant: 'success',
             });
             return true;
@@ -492,6 +501,41 @@ export function DataKeysCtxProvider({
             return false;
         } finally {
             setDeleting(false);
+        }
+    }, [router.refresh, alert, loadDataKeys, allDataKeys, recordDeletionPendingChanges]);
+
+    /*****************************************************
+     ************ MERGE
+    ******************************************************/
+    const [merging, setMerging] = useState(false);
+
+    const mergeDataKeys: tDataKeysCtx['mergeDataKeys'] = useCallback(async (params) => {
+        try {
+            setMerging(true);
+
+            const response = await axios.post<MergeDataKeysResponse>('/api/data-keys/merge', params);
+            const res = response.data;
+            if (res.errors?.length || !res.mergeId) throw new Error(res.errors?.[0] || 'The merge could not be recorded.');
+
+            const deletedIds = new Set(res.preview?.deletedDataKeyIds || []);
+            if (deletedIds.size) {
+                await recordDeletionPendingChanges(allDataKeys.filter(key => key?.uuid && deletedIds.has(key.uuid)));
+            }
+
+            setSelected([]);
+            await loadDataKeys();
+            router.refresh();
+            return res.mergeId;
+        } catch (e: any) {
+            alert({
+                title: 'Error',
+                message: e.message,
+                variant: 'error',
+            });
+            await loadDataKeys();
+            return null;
+        } finally {
+            setMerging(false);
         }
     }, [router.refresh, alert, loadDataKeys, allDataKeys, recordDeletionPendingChanges]);
 
@@ -590,6 +634,8 @@ export function DataKeysCtxProvider({
                     setSearchValue,
                     extractDataKeys,
                     deleteDataKeys,
+                    mergeDataKeys,
+                    merging,
                     saveDataKeys,
                     exportDataKeys,
                     setCurrentDataKeyUuid,

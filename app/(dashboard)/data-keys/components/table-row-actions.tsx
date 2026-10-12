@@ -85,6 +85,14 @@ export function DataKeysTableRowActions({
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}
+                onApplyToScripts={async ({ replacements, scriptRemovals, scriptSelections }) => {
+                    const success = await deleteDataKeys([dataKey.uuid], replacements, {
+                        scriptRemovals,
+                        scriptsOnly: scriptSelections,
+                    });
+                    if (success) setShowReplacementDialog(false);
+                    return success;
+                }}
             />
 
             <DataKeyParentsIndicator parents={linkedParents} />

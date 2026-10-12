@@ -6,3 +6,6 @@ export * from './_preview_refs';
 export * from './_update_data_keys_refs';
 export * from './_delete-referenced-options';
 export * from './_assert-refs-cleared';
+export * from './_sync_condition_refs';
+export * from './_merge';
+export * from './_merge-history';

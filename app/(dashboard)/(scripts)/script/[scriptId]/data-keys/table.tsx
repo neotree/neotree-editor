@@ -757,6 +757,15 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                         </Link>
                     </DropdownMenuItem>
 
+                    {entry.kind === "duplicate_parent_data_key" && (
+                        <DropdownMenuItem asChild>
+                            <Link href="/data-keys/merge" target="_blank" rel="noreferrer">
+                                <ExternalLinkIcon className="mr-2 h-4 w-4" />
+                                Harmonise duplicate parents
+                            </Link>
+                        </DropdownMenuItem>
+                    )}
+
                     {(canSafeResolve || editHref || entry.status === "missing" || entry.status === "unmanaged") && (
                         <DropdownMenuSeparator />
                     )}
@@ -1489,7 +1498,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                                         : "Review issues from the row menu, or use bulk resolve for safe deterministic fixes in this script."}
                                 </div>
                             </div>
-                            <div>
+                            <div className="flex flex-wrap gap-2">
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -1498,6 +1507,16 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                                 >
                                     <Link href={getDataKeyIntegrityRulesHref(scriptId)}>
                                         Validation rules
+                                    </Link>
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    asChild
+                                >
+                                    <Link href="/data-keys/merge">
+                                        Harmonise data keys
                                     </Link>
                                 </Button>
                             </div>

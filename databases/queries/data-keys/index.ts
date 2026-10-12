@@ -4,3 +4,4 @@ export * from './_check-name';
 export * from './_get-refs';
 export * from './_get-pending-deletion';
 export * from './_get-unused';
+export * from './_merges';
