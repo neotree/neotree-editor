@@ -13,9 +13,13 @@ import { buildDataKeysMergePlan, getMergeKeyTitle, type ChildMergeAction } from 
 import {
     analyzeMergeOptionUsage,
     applyLegacyItemLinks,
+    applyOptionPlacements,
     findLegacyOptionItems,
+    findOptionPresence,
     type LegacyItemLink,
     type LegacyOptionItem,
+    type OptionPlacement,
+    type OptionPresence,
     type OptionUsage,
 } from '@/lib/data-key-merge-analysis';
 import { buildMergeReport, type MergeReport } from '@/lib/data-key-merge-report';
@@ -23,6 +27,7 @@ import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { _saveScreens } from '../scripts';
 import { _saveDataKeys } from './_save';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
+import { rebuildFieldItemsFromDataKeyOptions, rebuildScreenItemsFromDataKeyOptions } from './_update_data_keys_refs.helpers';
 import { _deleteReferencedDataKeyOptions, type UnlinkReplacementDataKey } from './_delete-referenced-options';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { queueDataKeysDeletion } from './_delete';
@@ -49,6 +54,12 @@ export type MergeDataKeysParams = {
     survivorLabel?: string | null;
     /** Confirmed links for legacy option items that have no data key. */
     legacyLinks?: LegacyItemLink[];
+    /**
+     * option uniqueKey -> where it shows after the merge. Options left out stay
+     * where they are: in the scripts they were in, with matched options taking
+     * over the scripts of the options they replaced.
+     */
+    optionPlacements?: Record<string, OptionPlacement>;
     /** Run everything, report what would change, then roll back. */
     dryRun?: boolean;
     userId?: string | null;
@@ -66,6 +77,8 @@ export type MergePreview = {
     conflicts: MergeConflict[];
     legacyItems: LegacyOptionItem[];
     optionUsage: Record<string, OptionUsage>;
+    /** Where each option of the kept key shows after the merge, before placements are applied. */
+    optionPresence: OptionPresence;
     scriptsChanged: number;
     addedOptions: string[];
     deletedDataKeyIds: string[];
@@ -142,6 +155,7 @@ export async function _mergeDataKeys({
     survivorOptionOrder,
     survivorLabel,
     legacyLinks = [],
+    optionPlacements = {},
     dryRun,
     userId,
     broadcastAction,
@@ -238,7 +252,12 @@ export async function _mergeDataKeys({
         // key itself changes (options or label) — the scripts already using it.
         const survivorChanges = !!plan.addedOptions.length || !!plan.survivorLabel
             || plan.nextSurvivorOptions.join(',') !== (survivor.options || []).join(',');
-        const scopeScriptIds = uniqueValues([...appliedScriptIds, ...(survivorChanges ? survivorScriptIds : [])]);
+        // Placements can add or remove items wherever the kept key is used.
+        const placements = Object.fromEntries(Object.entries(optionPlacements)
+            .filter(([uniqueKey]) => plan.nextSurvivorOptions.includes(uniqueKey)));
+        const hasPlacements = !!Object.keys(placements).length;
+        const scopeScriptIds = uniqueValues([...appliedScriptIds, ...((survivorChanges || hasPlacements) ? survivorScriptIds : [])]);
+        const presenceScriptIds = uniqueValues([...appliedScriptIds, ...survivorScriptIds]);
         const involvedKeys = uniqueValues([
             survivor.uniqueKey,
             ...mergedUniqueKeys,
@@ -413,6 +432,62 @@ export async function _mergeDataKeys({
                 });
                 if (conditionsRes.errors?.length) throw new Error(conditionsRes.errors[0]);
 
+                // 4b. Where each option shows. Read now — after the swaps and
+                // re-linking — so matched options already carry the scripts of
+                // the options they replaced; then apply the chosen placements.
+                const presenceScreens = !presenceScriptIds.length ? [] : await _getScreens({
+                    scriptsIds: presenceScriptIds,
+                    returnDraftsIfExist: true,
+                    client: tx,
+                });
+                if (!Array.isArray(presenceScreens) && presenceScreens.errors?.length) throw new Error(presenceScreens.errors[0]);
+                const screensNow = Array.isArray(presenceScreens) ? [] : presenceScreens.data;
+                const optionPresence = findOptionPresence({
+                    screens: screensNow,
+                    parentUniqueKey: survivorNow.uniqueKey,
+                    options: plan.nextSurvivorOptions,
+                });
+
+                if (hasPlacements) {
+                    const known = new Set(optionPresence.scripts.map((script) => script.scriptId));
+                    const validPlacements: Record<string, OptionPlacement> = Object.fromEntries(Object.entries(placements)
+                        .map(([uniqueKey, placement]) => [uniqueKey, placement.scope === 'all'
+                            ? placement
+                            : { scope: 'selected' as const, scriptIds: uniqueValues(placement.scriptIds).filter((id) => known.has(id)) }]));
+                    const optionKey = (uniqueKey: string) => {
+                        const child = byUniqueKey.get(uniqueKey);
+                        return child ? [{
+                            uniqueKey: child.uniqueKey,
+                            name: child.name || '',
+                            label: child.label || '',
+                            confidential: child.confidential,
+                            confidentialLabelOnly: child.confidentialLabelOnly,
+                            dataType: child.dataType,
+                        }] : [];
+                    };
+                    const patches = screensNow
+                        .map((screen) => applyOptionPlacements(screen, {
+                            parentUniqueKey: survivorNow.uniqueKey,
+                            poolOrder: plan.nextSurvivorOptions,
+                            placements: validPlacements,
+                            buildFieldItem: (uniqueKey) => rebuildFieldItemsFromDataKeyOptions({ optionDataKeys: optionKey(uniqueKey) })[0] || null,
+                            buildScreenItem: (uniqueKey, owner) => rebuildScreenItemsFromDataKeyOptions({
+                                optionDataKeys: optionKey(uniqueKey),
+                                screenType: owner.type,
+                            })[0] || null,
+                        }))
+                        .filter((patch): patch is NonNullable<typeof patch> => !!patch);
+                    if (patches.length) {
+                        const res = await _saveScreens({
+                            userId: userId || undefined,
+                            data: patches as Parameters<typeof _saveScreens>[0]['data'],
+                            draftOrigin: 'data_key_sync',
+                            client: tx,
+                        });
+                        if (res.errors?.length) throw new Error(res.errors[0]);
+                    }
+                }
+
                 const deletedDataKeyIds: string[] = [];
 
                 if (!scriptsOnly) {
@@ -468,6 +543,7 @@ export async function _mergeDataKeys({
                     conflicts,
                     legacyItems,
                     optionUsage,
+                    optionPresence,
                     scriptsChanged: report.scripts.length,
                     addedOptions: plan.addedOptions,
                     deletedDataKeyIds,
@@ -491,6 +567,7 @@ export async function _mergeDataKeys({
                         survivorOptionOrder: plan.nextSurvivorOptions,
                         survivorLabel: plan.survivorLabel,
                         legacyLinks,
+                        optionPlacements: placements,
                         mergedKeys: merged.map((dataKey) => ({ uniqueKey: dataKey.uniqueKey, name: dataKey.name, label: dataKey.label })),
                     },
                     report: { ...report, addedOptions: plan.addedOptions, deletedDataKeyIds },

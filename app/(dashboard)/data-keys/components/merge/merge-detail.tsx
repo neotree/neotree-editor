@@ -25,6 +25,7 @@ import { pendingChangesAPI } from '@/lib/indexed-db';
 import { PageContainer } from '@/app/(dashboard)/(scripts)/components/page-container';
 import type { DataKeyMergeDetail } from '@/databases/queries/data-keys';
 import type { ChildMergeAction } from '@/lib/data-key-merge-plan';
+import type { OptionPlacement } from '@/lib/data-key-merge-analysis';
 
 import { revertDataKeysMerge } from './api';
 import { MergeChangeTotals, MergeReport } from './merge-report';
@@ -52,6 +53,7 @@ export function MergeDetail({
     const childActions = Object.entries((request.childActions || {}) as Record<string, ChildMergeAction>);
     const mergedKeys: { uniqueKey: string; name?: string; label?: string }[] = request.mergedKeys
         || merge.mergedUniqueKeys.map((uniqueKey) => ({ uniqueKey }));
+    const placements = Object.entries((request.optionPlacements || {}) as Record<string, OptionPlacement>);
     const nameOf = (uniqueKey: string) => describeKey(byUniqueKey.get(uniqueKey)) || shortId(uniqueKey);
 
     const handleRevert = async () => {
@@ -134,6 +136,32 @@ export function MergeDetail({
                         </div>
                     </div>
                 </section>
+
+                {!!placements.length && (
+                    <>
+                        <Separator />
+                        <section className="space-y-3">
+                            <SectionTitle
+                                title="Where options show"
+                                description="Options set to show in all or selected scripts. Every other option stayed in the scripts it was in."
+                            />
+                            <ul className="divide-y divide-border rounded-md border border-border">
+                                {placements.map(([uniqueKey, placement]) => (
+                                    <li key={uniqueKey} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                                        <span className="min-w-0 flex-1">{nameOf(uniqueKey)}</span>
+                                        <span className="text-muted-foreground">
+                                            {placement.scope === 'all'
+                                                ? 'All scripts'
+                                                : placement.scriptIds.length
+                                                    ? pluralize(placement.scriptIds.length, 'selected script')
+                                                    : 'Taken out of every script'}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    </>
+                )}
 
                 {!!childActions.length && (
                     <>

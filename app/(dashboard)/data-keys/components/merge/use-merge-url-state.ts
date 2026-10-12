@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useQueryState } from 'nuqs';
 
 import type { ChildMergeAction } from '@/lib/data-key-merge-plan';
-import type { LegacyItemLink } from '@/lib/data-key-merge-analysis';
+import type { LegacyItemLink, OptionPlacement } from '@/lib/data-key-merge-analysis';
 
 import { decodeAction, encodeAction } from './shared';
 
@@ -29,6 +29,21 @@ function decodeLink(value: string): LegacyItemLink | null {
     };
 }
 
+// "<uniqueKey>=all" or "<uniqueKey>=in:<scriptId>.<scriptId>"
+function decodePlacement(entry: string): [string, OptionPlacement] | null {
+    const index = entry.indexOf('=');
+    if (index <= 0) return null;
+    const uniqueKey = entry.slice(0, index);
+    const value = entry.slice(index + 1);
+    if (value === 'all') return [uniqueKey, { scope: 'all' }];
+    if (value.startsWith('in:')) return [uniqueKey, { scope: 'selected', scriptIds: value.slice(3).split('.').filter(Boolean) }];
+    return null;
+}
+
+function encodePlacement(uniqueKey: string, placement: OptionPlacement) {
+    return `${uniqueKey}=${placement.scope === 'all' ? 'all' : `in:${placement.scriptIds.join('.')}`}`;
+}
+
 /**
  * Every decision on the merge page lives in the URL, so a plan can be shared
  * for review ("open this link and check") and survives a reload.
@@ -43,6 +58,7 @@ export function useMergeUrlState() {
     const [label, setLabel] = useQueryState('label', { ...options, defaultValue: '\u0000' });
     const [links, setLinks] = useQueryState('links', options);
     const [cleanup, setCleanup] = useQueryState('cleanup', options);
+    const [place, setPlace] = useQueryState('place', options);
 
     const childActions = useMemo(() => Object.fromEntries(splitList(actions)
         .map((entry) => {
@@ -50,6 +66,10 @@ export function useMergeUrlState() {
             return index > 0 ? [entry.slice(0, index), decodeAction(entry.slice(index + 1))] as const : null;
         })
         .filter((entry): entry is readonly [string, ChildMergeAction] => !!entry)), [actions]);
+
+    const optionPlacements = useMemo(() => Object.fromEntries(splitList(place)
+        .map(decodePlacement)
+        .filter((entry): entry is [string, OptionPlacement] => !!entry)), [place]);
 
     const legacyLinks = useMemo(
         () => splitList(links).map(decodeLink).filter((link): link is LegacyItemLink => !!link),
@@ -60,10 +80,11 @@ export function useMergeUrlState() {
         survivorId: keep,
         setSurvivorId: (id: string) => {
             setKeep(id || null);
-            // Suggestions, order and label depend on the kept key.
+            // Suggestions, order, label and placements depend on the kept key.
             setActions(null);
             setOrder(null);
             setLabel(null);
+            setPlace(null);
         },
         excludedIds: useMemo(() => splitList(exclude), [exclude]),
         setExcludedIds: (ids: string[]) => setExclude(ids.length ? ids.join(',') : null),
@@ -83,6 +104,16 @@ export function useMergeUrlState() {
         setSurvivorLabel: (value: string | null) => setLabel(value === null ? null : value),
         legacyLinks,
         setLegacyLinks: (next: LegacyItemLink[]) => setLinks(next.length ? next.map(encodeLink).join(',') : null),
+        optionPlacements,
+        /** null = back to "where it is now" */
+        setOptionPlacement: (uniqueKey: string, placement: OptionPlacement | null) => {
+            const next = { ...optionPlacements };
+            if (placement) next[uniqueKey] = placement;
+            else delete next[uniqueKey];
+            const entries = Object.entries(next).map(([key, value]) => encodePlacement(key, value));
+            setPlace(entries.length ? entries.join(',') : null);
+        },
+        clearOptionPlacements: () => setPlace(null),
         deleteUnusedChildren: cleanup === '1',
         setDeleteUnusedChildren: (value: boolean) => setCleanup(value ? '1' : null),
     };

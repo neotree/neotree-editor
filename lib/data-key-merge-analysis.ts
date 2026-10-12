@@ -268,3 +268,141 @@ export function analyzeMergeOptionUsage({
     }
     return usage;
 }
+
+/**
+ * Where an option of the kept key shows after the merge:
+ * - all: every script that uses the kept key;
+ * - selected: exactly these scripts.
+ * An option without a placement stays where it is.
+ */
+export type OptionPlacement =
+    | { scope: 'all' }
+    | { scope: 'selected'; scriptIds: string[] };
+
+// Collections that list a parent's options as items (same types the refs sync owns).
+const OPTION_SCREEN_TYPES = ['checklist', 'multi_select', 'single_select'];
+const OPTION_FIELD_TYPES = ['dropdown', 'multi_select'];
+
+export function ownsOptionCollection(kind: 'screen' | 'field', type: unknown) {
+    return (kind === 'screen' ? OPTION_SCREEN_TYPES : OPTION_FIELD_TYPES).includes(lower(type));
+}
+
+export type OptionPresence = {
+    /** Scripts that list the parent's options somewhere (the scripts a placement applies to). */
+    scripts: { scriptId: string; scriptTitle: string }[];
+    /** option uniqueKey -> scripts that show it */
+    byOption: Record<string, string[]>;
+};
+
+/** Which scripts show each option of `parentUniqueKey`, read from the screens' option items. */
+export function findOptionPresence({
+    screens,
+    parentUniqueKey,
+    options,
+}: {
+    screens: AnyRecord[];
+    parentUniqueKey: string;
+    options: string[];
+}): OptionPresence {
+    const scripts = new Map<string, string>();
+    const byOption = new Map<string, Set<string>>(options.map((option) => [option, new Set<string>()]));
+
+    for (const screen of screens) {
+        const scriptId = norm(screen.scriptId);
+        const collections: AnyRecord[][] = [];
+        if (norm(screen.keyId) === parentUniqueKey && ownsOptionCollection('screen', screen.type)) collections.push(screen.items || []);
+        for (const field of (screen.fields || []) as AnyRecord[]) {
+            if (norm(field.keyId) === parentUniqueKey && ownsOptionCollection('field', field.type)) collections.push(field.items || []);
+        }
+        if (!collections.length || !scriptId) continue;
+
+        scripts.set(scriptId, norm(screen.scriptTitle) || scriptId);
+        collections.flat().forEach((item) => byOption.get(norm(item?.keyId))?.add(scriptId));
+    }
+
+    return {
+        scripts: Array.from(scripts.entries())
+            .map(([scriptId, scriptTitle]) => ({ scriptId, scriptTitle }))
+            .sort((a, b) => a.scriptTitle.localeCompare(b.scriptTitle)),
+        byOption: Object.fromEntries(Array.from(byOption.entries()).map(([option, set]) => [option, Array.from(set)])),
+    };
+}
+
+/** True when the option should show in `scriptId` under `placement`. */
+export function isPlacedIn(placement: OptionPlacement, scriptId: string) {
+    return placement.scope === 'all' || placement.scriptIds.includes(scriptId);
+}
+
+/**
+ * Adds or removes the parent's option items in one screen so each placed
+ * option shows exactly where its placement says. Existing items keep their
+ * order and settings; an added item goes next to its neighbours in the pool
+ * order. Returns the screen patch, or null when nothing changes.
+ */
+export function applyOptionPlacements(
+    screen: AnyRecord,
+    {
+        parentUniqueKey,
+        poolOrder,
+        placements,
+        buildScreenItem,
+        buildFieldItem,
+    }: {
+        parentUniqueKey: string;
+        poolOrder: string[];
+        placements: Record<string, OptionPlacement>;
+        buildScreenItem: (uniqueKey: string, screen: AnyRecord) => AnyRecord | null;
+        buildFieldItem: (uniqueKey: string) => AnyRecord | null;
+    },
+): { screenId: string; scriptId: string; items?: AnyRecord[]; fields?: AnyRecord[] } | null {
+    const scriptId = norm(screen.scriptId);
+    const poolIndex = new Map(poolOrder.map((uniqueKey, index) => [uniqueKey, index]));
+    const entries = Object.entries(placements).filter(([uniqueKey]) => poolIndex.has(uniqueKey));
+    if (!entries.length) return null;
+
+    const place = (items: AnyRecord[], build: (uniqueKey: string) => AnyRecord | null): AnyRecord[] | null => {
+        let next = [...items];
+        let changed = false;
+        for (const [uniqueKey, placement] of entries) {
+            const wanted = isPlacedIn(placement, scriptId);
+            const present = next.some((item) => norm(item?.keyId) === uniqueKey);
+            if (!wanted && present) {
+                next = next.filter((item) => norm(item?.keyId) !== uniqueKey);
+                changed = true;
+            } else if (wanted && !present) {
+                const item = build(uniqueKey);
+                if (!item) continue;
+                const index = poolIndex.get(uniqueKey)!;
+                const before = next.findIndex((other) => (poolIndex.get(norm(other?.keyId)) ?? -1) > index);
+                next.splice(before < 0 ? next.length : before, 0, item);
+                changed = true;
+            }
+        }
+        return changed ? next : null;
+    };
+
+    const patch: { screenId: string; scriptId: string; items?: AnyRecord[]; fields?: AnyRecord[] } = {
+        screenId: norm(screen.screenId),
+        scriptId,
+    };
+
+    if (norm(screen.keyId) === parentUniqueKey && ownsOptionCollection('screen', screen.type)) {
+        const items = place(screen.items || [], (uniqueKey) => buildScreenItem(uniqueKey, screen));
+        if (items) {
+            // Screen items carry their position.
+            patch.items = items.map((item, index) => ({ ...item, position: index + 1 }));
+        }
+    }
+
+    let fieldsChanged = false;
+    const fields = (screen.fields || []).map((field: AnyRecord) => {
+        if (norm(field.keyId) !== parentUniqueKey || !ownsOptionCollection('field', field.type)) return field;
+        const items = place(field.items || [], buildFieldItem);
+        if (!items) return field;
+        fieldsChanged = true;
+        return { ...field, items };
+    });
+    if (fieldsChanged) patch.fields = fields;
+
+    return patch.items || patch.fields ? patch : null;
+}

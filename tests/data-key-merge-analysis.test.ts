@@ -3,7 +3,9 @@ import assert from "assert"
 import {
   analyzeMergeOptionUsage,
   applyLegacyItemLinks,
+  applyOptionPlacements,
   findLegacyOptionItems,
+  findOptionPresence,
 } from "../lib/data-key-merge-analysis"
 import { buildMergeReport } from "../lib/data-key-merge-report"
 import {
@@ -178,6 +180,64 @@ const children = [
       ["removed", "Exam > Head shape > Swelling", "Swell", ""],
     ],
   )
+}
+
+// ------------------------------------------------- option presence/placement
+{
+  // After the merge every collection points at the kept parent "feed".
+  const placementScreens = [
+    {
+      screenId: "a1", scriptId: "A", scriptTitle: "Admission", keyId: "", type: "form", items: [],
+      fields: [
+        { fieldId: "fa", key: "Feeding", type: "dropdown", keyId: "feed", items: [
+          { itemId: "1", keyId: "breast", value: "Breast" },
+          { itemId: "2", keyId: "formula", value: "Formula", condition: "$Age > 2" },
+        ] },
+        // a text field bound to the parent does not list options
+        { fieldId: "fx", key: "Feeding", type: "text", keyId: "feed", items: [] },
+      ],
+    },
+    {
+      screenId: "b1", scriptId: "B", scriptTitle: "Discharge", keyId: "feed", type: "single_select",
+      items: [{ itemId: "3", keyId: "breast", id: "Breast", position: 1 }],
+      fields: [],
+    },
+    { screenId: "c1", scriptId: "C", scriptTitle: "Other", keyId: "", type: "form", items: [], fields: [{ key: "x", type: "dropdown", keyId: "other", items: [] }] },
+  ]
+  const pool = ["breast", "mixed", "formula"]
+
+  const presence = findOptionPresence({ screens: placementScreens, parentUniqueKey: "feed", options: pool })
+  assert.deepStrictEqual(presence.scripts, [{ scriptId: "A", scriptTitle: "Admission" }, { scriptId: "B", scriptTitle: "Discharge" }])
+  assert.deepStrictEqual(presence.byOption, { breast: ["A", "B"], mixed: [], formula: ["A"] })
+
+  const build = (uniqueKey: string) => ({ itemId: `new-${uniqueKey}`, keyId: uniqueKey, value: uniqueKey })
+  const placements = {
+    mixed: { scope: "all" as const },
+    formula: { scope: "selected" as const, scriptIds: ["B"] },
+  }
+  const apply = (screen: any) => applyOptionPlacements(screen, {
+    parentUniqueKey: "feed",
+    poolOrder: pool,
+    placements,
+    buildFieldItem: build,
+    buildScreenItem: (uniqueKey) => ({ ...build(uniqueKey), id: uniqueKey }),
+  })
+
+  // Admission: "mixed" goes between breast and formula; formula is removed.
+  const a = apply(placementScreens[0])!
+  assert.deepStrictEqual(a.fields![0].items.map((item: any) => item.keyId), ["breast", "mixed"])
+  assert.strictEqual(a.fields![1], placementScreens[0].fields[1])
+  assert.strictEqual(a.items, undefined)
+
+  // Discharge screen items: both added after "breast", positions renumbered.
+  const b = apply(placementScreens[1])!
+  assert.deepStrictEqual(b.items!.map((item: any) => [item.keyId, item.position]), [["breast", 1], ["mixed", 2], ["formula", 3]])
+
+  // Unrelated screens, or no placements: nothing to save.
+  assert.strictEqual(apply(placementScreens[2]), null)
+  assert.strictEqual(applyOptionPlacements(placementScreens[0], {
+    parentUniqueKey: "feed", poolOrder: pool, placements: {}, buildFieldItem: build, buildScreenItem: build,
+  }), null)
 }
 
 console.log("data-key-merge-analysis tests passed")

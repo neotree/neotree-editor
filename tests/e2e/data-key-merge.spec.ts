@@ -53,6 +53,28 @@ test('the merge page previews the changes and keeps the plan in the URL', async 
     await expect(page.getByText('Select at least one script to merge in.')).toBeVisible();
 });
 
+test('choose where an option shows, and reset it', async ({ page }) => {
+    const [href] = await reviewLinks(page);
+    await page.goto(href);
+    await waitForPreview(page);
+
+    // Each option of the kept key has a "Shows in" button: "All 8 scripts", "3 of 8 scripts"…
+    const showsIn = page.getByRole('button', { name: /^(All \d+ scripts?|\d+ of \d+ scripts?|Not shown)/ }).first();
+    await expect(showsIn).toBeVisible();
+    await showsIn.click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText(/^Where “.+” shows$/)).toBeVisible();
+    await dialog.getByRole('radio', { name: /^All scripts/ }).check();
+    await dialog.getByRole('button', { name: 'Save' }).click();
+
+    await expect(page).toHaveURL(/place=/);
+    await expect(page.getByRole('button', { name: /changed/ }).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Reset where options show' }).click();
+    await expect(page).not.toHaveURL(/place=/);
+});
+
 test('merge a group, read its report, then revert it', async ({ page }) => {
     const hrefs = await reviewLinks(page);
 
@@ -113,5 +135,6 @@ test('the batch page checks clean groups before merging', async ({ page }) => {
 
     const statuses = page.getByText(/^(Ready|Has unlinked options|Someone else is editing|Error)$/);
     const empty = page.getByText('No clean groups', { exact: false });
-    await expect(statuses.first().or(empty)).toBeVisible();
+    // Statuses appear once every clean group has been dry-run, which takes a while.
+    await expect(statuses.first().or(empty)).toBeVisible({ timeout: 170_000 });
 });

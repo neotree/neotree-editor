@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { arrayMoveImmutable } from 'array-move';
-import { CheckIcon, ExternalLinkIcon, Loader2Icon, MergeIcon, RefreshCwIcon } from 'lucide-react';
+import { CheckIcon, ChevronDownIcon, ExternalLinkIcon, Loader2Icon, MergeIcon, RefreshCwIcon } from 'lucide-react';
 
 import { useDataKeysCtx, type DataKey } from '@/contexts/data-keys';
 import { ActionsBar } from '@/components/actions-bar';
@@ -17,6 +17,14 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -41,7 +49,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PageContainer } from '@/app/(dashboard)/(scripts)/components/page-container';
 import type { MergeDataKeysResponse } from '@/databases/mutations/data-keys';
 import { normalizeDataKeyType } from '@/lib/data-key-types';
-import type { LegacyItemLink, LegacyOptionItem } from '@/lib/data-key-merge-analysis';
+import type { LegacyItemLink, LegacyOptionItem, OptionPlacement, OptionPresence } from '@/lib/data-key-merge-analysis';
+import { CHANGELOG_ACTION_BADGE_CLASSES } from '@/lib/changelog-utils';
 import {
     buildDataKeysMergePlan,
     getMergeKeyTitle,
@@ -170,6 +179,8 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
         survivorOptionOrder: orderChanged ? plan.nextSurvivorOptions : undefined,
         survivorLabel: state.survivorLabel,
         legacyLinks: state.legacyLinks,
+        optionPlacements: Object.fromEntries(Object.entries(state.optionPlacements)
+            .filter(([uniqueKey]) => plan.nextSurvivorOptions.includes(uniqueKey))),
     };
     const requestKey = JSON.stringify(request);
 
@@ -201,6 +212,10 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
     }, [requestKey, canMerge, !!impact, planBlockers.length, refreshCount]);
 
     const previewData = preview.key === requestKey ? preview.data : null;
+    // Where options show does not depend on the placements themselves, so the
+    // last preview's answer stays valid while a new one runs.
+    const presence = previewData?.optionPresence || preview.data?.optionPresence || null;
+    const placedCount = Object.keys(request.optionPlacements).length;
     const previewReady = !!previewData && !preview.loading && !preview.error;
     const conflicts = previewData?.conflicts || [];
     const blockers = [
@@ -380,8 +395,8 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                             )}
 
                             {survivor && (
-                                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-                                    <div className="min-w-0 space-y-2">
+                                <div className="space-y-4">
+                                    <div className="max-w-md space-y-2">
                                         <Label htmlFor="merge-survivor-label">Label of the kept key</Label>
                                         <Input
                                             id="merge-survivor-label"
@@ -402,14 +417,48 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                                             onSort={(oldIndex: number, newIndex: number) => {
                                                 state.setSurvivorOptionOrder(arrayMoveImmutable([...plan.nextSurvivorOptions], oldIndex, newIndex));
                                             }}
-                                            headerActions={orderChanged ? (
-                                                <Button size="sm" variant="ghost" onClick={() => state.setSurvivorOptionOrder([])}>
-                                                    Reset order
-                                                </Button>
-                                            ) : null}
+                                            headerActions={(
+                                                <div className="flex items-center gap-2">
+                                                    {!!placedCount && (
+                                                        <Button size="sm" variant="ghost" onClick={() => state.clearOptionPlacements()}>
+                                                            Reset where options show
+                                                        </Button>
+                                                    )}
+                                                    {orderChanged && (
+                                                        <Button size="sm" variant="ghost" onClick={() => state.setSurvivorOptionOrder([])}>
+                                                            Reset order
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
                                             columns={[
                                                 { name: 'Key' },
                                                 { name: 'Label' },
+                                                {
+                                                    name: 'Shows in',
+                                                    cellRenderer({ rowIndex }) {
+                                                        const uniqueKey = plan.nextSurvivorOptions[rowIndex];
+                                                        if (!presence) {
+                                                            return canMerge && !preview.error
+                                                                ? <Skeleton className="h-4 w-24" />
+                                                                : <span className="text-muted-foreground">—</span>;
+                                                        }
+                                                        return (
+                                                            <PlacementButton
+                                                                option={byUniqueKey.get(uniqueKey)}
+                                                                uniqueKey={uniqueKey}
+                                                                survivorTitle={getMergeKeyTitle(survivor)}
+                                                                presence={presence}
+                                                                placement={state.optionPlacements[uniqueKey]}
+                                                                matchedFrom={plan.children
+                                                                    .filter((row) => row.action.action === 'match' && row.action.to === uniqueKey)
+                                                                    .map((row) => row.name || shortId(row.uniqueKey))}
+                                                                disabled={merging || !canMerge}
+                                                                onChange={(placement) => state.setOptionPlacement(uniqueKey, placement)}
+                                                            />
+                                                        );
+                                                    },
+                                                },
                                                 {
                                                     name: '',
                                                     align: 'right',
@@ -431,10 +480,14 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                                             ]}
                                             data={plan.nextSurvivorOptions.map((uniqueKey) => {
                                                 const child = byUniqueKey.get(uniqueKey);
-                                                return [child?.name || shortId(uniqueKey), child?.label || '', ''];
+                                                return [child?.name || shortId(uniqueKey), child?.label || '', '', ''];
                                             })}
                                             noDataMessage="No options"
                                         />
+                                        <div className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+                                            Options stay in the scripts they are in now; a matched option takes over the scripts of
+                                            the option it replaces. Use “Shows in” to add an option to more scripts or take it out of some.
+                                        </div>
                                         {!!plan.droppedChildren.length && (
                                             <div className="border-t border-border px-4 py-2 text-xs text-destructive">
                                                 Removed from the scripts: {plan.droppedChildren.map((key) => byUniqueKey.get(key)?.name || shortId(key)).join(', ')}
@@ -604,6 +657,7 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                             Keep <span className="text-foreground">{describeKey(survivor)}</span>
                             {' · '}merge {pluralize(plan.merged.length, 'key')}
                             {' · '}{counts.match} matched, {counts.add} new, {counts.drop} removed
+                            {!!placedCount && <> · {pluralize(placedCount, 'option')} placed</>}
                             {previewData && <> · {pluralize(previewData.scriptsChanged, 'script')}</>}
                         </>
                     ) : 'Choose the data key to keep'}
@@ -633,6 +687,7 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                                     {!!counts.add && <li>{pluralize(counts.add, 'option')} added to the kept key</li>}
                                     {!!counts.drop && <li className="text-destructive">{pluralize(counts.drop, 'option')} removed from the scripts</li>}
                                     {!!state.legacyLinks.length && <li>{pluralize(state.legacyLinks.length, 'unlinked option')} linked</li>}
+                                    {!!placedCount && <li>{pluralize(placedCount, 'option')} shown in all or selected scripts</li>}
                                     <li>
                                         {scriptsOnly
                                             ? 'The merged keys stay in the library.'
@@ -659,6 +714,156 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                 </AlertDialogContent>
             </AlertDialog>
         </PageContainer>
+    );
+}
+
+function placementSummary(placement: OptionPlacement | undefined, current: string[], total: number) {
+    const count = !placement ? current.length : placement.scope === 'all' ? total : placement.scriptIds.length;
+    if (!total) return 'No scripts';
+    if (count === total) return `All ${pluralize(total, 'script')}`;
+    if (!count) return 'Not shown';
+    return `${count} of ${pluralize(total, 'script')}`;
+}
+
+function PlacementButton({
+    option,
+    uniqueKey,
+    survivorTitle,
+    presence,
+    placement,
+    matchedFrom,
+    disabled,
+    onChange,
+}: {
+    option?: DataKey;
+    uniqueKey: string;
+    survivorTitle: string;
+    presence: OptionPresence;
+    placement?: OptionPlacement;
+    /** Names of the merged options this option replaces. */
+    matchedFrom: string[];
+    disabled?: boolean;
+    onChange: (placement: OptionPlacement | null) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [choice, setChoice] = useState<'current' | 'all' | 'selected'>('current');
+    const [selected, setSelected] = useState<string[]>([]);
+
+    const current = presence.byOption[uniqueKey] || [];
+    const total = presence.scripts.length;
+    const titleCounts = new Map<string, number>();
+    presence.scripts.forEach((script) => titleCounts.set(script.scriptTitle, (titleCounts.get(script.scriptTitle) || 0) + 1));
+
+    const openDialog = () => {
+        setChoice(!placement ? 'current' : placement.scope);
+        setSelected(placement?.scope === 'selected' ? placement.scriptIds : current);
+        setOpen(true);
+    };
+
+    const save = () => {
+        onChange(choice === 'current' ? null : choice === 'all' ? { scope: 'all' } : { scope: 'selected', scriptIds: selected });
+        setOpen(false);
+    };
+
+    const choices = [
+        {
+            value: 'current',
+            title: 'Where it is now',
+            caption: `${placementSummary(undefined, current, total)} — the scripts it is already in${matchedFrom.length ? `, including those of ${matchedFrom.join(', ')}` : ''}.`,
+        },
+        { value: 'all', title: 'All scripts', caption: `Added to every script that uses “${survivorTitle}”.` },
+        { value: 'selected', title: 'Selected scripts only', caption: 'Added to or taken out of scripts to match your selection.' },
+    ] as const;
+
+    return (
+        <>
+            <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 w-auto gap-x-1.5"
+                disabled={disabled}
+                onClick={openDialog}
+            >
+                {placementSummary(placement, current, total)}
+                {placement && <Badge variant="outline" className={cn('font-normal', CHANGELOG_ACTION_BADGE_CLASSES.update)}>changed</Badge>}
+                <ChevronDownIcon className="h-3.5 w-3.5 text-muted-foreground" />
+            </Button>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Where “{describeKey(option) || shortId(uniqueKey)}” shows</DialogTitle>
+                        <DialogDescription>
+                            The {pluralize(total, 'script')} that use “{survivorTitle}” after the merge.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <RadioGroup value={choice} onValueChange={(value) => {
+                        setChoice(value as typeof choice);
+                        if (value === 'selected' && !selected.length) setSelected(current);
+                    }} className="gap-2">
+                        {choices.map((item) => (
+                            <Label
+                                key={item.value}
+                                htmlFor={`placement-${uniqueKey}-${item.value}`}
+                                className={cn(
+                                    'flex cursor-pointer items-start gap-x-3 rounded-md border p-3 font-normal',
+                                    choice === item.value ? 'border-primary bg-primary/5' : 'border-border',
+                                )}
+                            >
+                                <RadioGroupItem id={`placement-${uniqueKey}-${item.value}`} value={item.value} className="mt-0.5" />
+                                <span>
+                                    <span className="block text-sm font-medium">{item.title}</span>
+                                    <span className="block text-xs text-muted-foreground">{item.caption}</span>
+                                </span>
+                            </Label>
+                        ))}
+                    </RadioGroup>
+
+                    {choice === 'selected' && (
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-x-2 text-sm">
+                                <span className="text-muted-foreground">{selected.length} of {pluralize(total, 'script')} selected</span>
+                                <Button size="sm" variant="ghost" onClick={() => setSelected(presence.scripts.map((script) => script.scriptId))}>Select all</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Button>
+                            </div>
+                            <ul className="max-h-64 divide-y divide-border overflow-y-auto rounded-md border border-border">
+                                {presence.scripts.map((script) => {
+                                    const id = `placement-${uniqueKey}-${script.scriptId}`;
+                                    return (
+                                        <li key={script.scriptId} className="flex items-center gap-x-2 px-3 py-2 text-sm">
+                                            <Checkbox
+                                                id={id}
+                                                checked={selected.includes(script.scriptId)}
+                                                onCheckedChange={(value) => setSelected((list) => value === true
+                                                    ? [...list, script.scriptId]
+                                                    : list.filter((scriptId) => scriptId !== script.scriptId))}
+                                            />
+                                            <Label htmlFor={id} className="min-w-0 flex-1 cursor-pointer truncate font-normal">
+                                                {script.scriptTitle}
+                                                {(titleCounts.get(script.scriptTitle) || 0) > 1 && (
+                                                    <span className="ml-1.5 font-mono text-xs text-muted-foreground">{shortId(script.scriptId)}</span>
+                                                )}
+                                            </Label>
+                                            {current.includes(script.scriptId) && <span className="text-xs text-muted-foreground">shows now</span>}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                            {!selected.length && (
+                                <div className="text-xs text-destructive">With no script selected the option is taken out of every script.</div>
+                            )}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button onClick={save}>Save</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
 
