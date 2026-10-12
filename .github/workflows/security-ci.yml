@@ -20,13 +20,13 @@ concurrency:
 
 jobs:
   security:
-    uses: neotree/security-ci/.github/workflows/security-ci.yml@020aa53f59f10cc9e2c3802034ae5d2f809734a6
+    uses: neotree/security-ci/.github/workflows/security-ci.yml@8c4c9fab9f6f6c1c9bdac7ce29eb1e34506292d6
     permissions:
       contents: read
       security-events: write
       packages: read
     with:
-      security-ci-ref: 020aa53f59f10cc9e2c3802034ae5d2f809734a6
+      security-ci-ref: 8c4c9fab9f6f6c1c9bdac7ce29eb1e34506292d6
       node-version: "22"
       # CodeQL runs from GitHub's Code Scanning *default setup* on this repository and has
       # been uploading results on every push, pull request and schedule. Default setup
@@ -38,3 +38,12 @@ jobs:
       enable-codeql: false
       # upload-sarif stays enabled: this repository is public, so the OSV and Semgrep
       # SARIF uploads work normally.
+      # Hosts this project's build needs beyond the npm registry:
+      #   binaries.prisma.sh - `prisma generate` (ci:prepare) downloads its engines here,
+      #     because install runs with scripts disabled so Prisma's postinstall never fetches them.
+      #   fonts.googleapis.com, fonts.gstatic.com - next/font/google in app/layout.tsx
+      #     downloads Roboto at build time; `next build` fails if it cannot.
+      extra-egress-endpoints: |
+        binaries.prisma.sh:443
+        fonts.googleapis.com:443
+        fonts.gstatic.com:443

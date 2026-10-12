@@ -29,7 +29,7 @@ type Tag =
 const TAG_NOTE: Record<Tag, string> = {
   LEGACY_NOT: 'legacy "!" negation — deprecated, editor warns',
   EXCLUDES_ANY: "BROKEN: runtime never negates `excludes`, evaluates as `includes`",
-  MEMBERSHIP_MULTI_VALUE: "BROKEN: 2+ values emit bare and/or, eval() throws, silently false",
+  MEMBERSHIP_MULTI_VALUE: "BROKEN: 2+ values emit bare and/or, the runtime evaluator throws, silently false",
   MEMBERSHIP_NOT_ALONE: "BROKEN: membership combined with other logic — runtime drops the rest of the line",
   OR_UNDERSCORE: "or_excludes/or_includes — mobile-only, not in the editor grammar",
   NEQ_OR_TAUTOLOGY: "ALWAYS TRUE: != on one key chained with `or` (needs `and`)",
