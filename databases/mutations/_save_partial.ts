@@ -74,10 +74,19 @@ export async function savePartial({
             const res = await _saveScripts({
                 userId,
                 broadcastAction,
-                data: scripts.data.map(s => ({
-                    ...s,
-                    ...(scriptsParam.find(script => script.scriptId === s.scriptId)?.data as typeof s),
-                })),
+                data: scripts.data.map(s => {
+                    const {
+                        _nuidSearchFields = [],
+                        ...partialData
+                    } = scriptsParam.find(script => script.scriptId === s.scriptId)?.data as (typeof s & {
+                        _nuidSearchFields: IndexedPatch[];
+                    });
+                    return {
+                        ...s,
+                        ...partialData,
+                        nuidSearchFields: applyIndexedPatches(s.nuidSearchFields, _nuidSearchFields),
+                    };
+                }),
             });
 
             if (res.errors) errors = [...errors, ...res.errors];

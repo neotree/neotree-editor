@@ -23,6 +23,10 @@ export type DiagnosticCode =
   | "MEMBERSHIP_BRACKETS"
   | "MEMBERSHIP_EMPTY"
   | "STANDALONE_EXPRESSION"
+  | "ALWAYS_TRUE"
+  | "LEGACY_MEMBERSHIP_OP"
+  | "COLLECTION_COMPARISON"
+  | "ARRAY_COMPARISON"
   | "MISSING_KEY"
   // Semantic (needs the script key context)
   | "UNKNOWN_KEY"

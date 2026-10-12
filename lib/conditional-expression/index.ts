@@ -2,6 +2,7 @@ import type { Diagnostic, ValidationContext, ValidationResult } from "./ast";
 import { parse } from "./parser";
 import { analyze } from "./semantics";
 import { findLegacyNegationDiagnostics } from "./legacy";
+import { findAlwaysTrueDiagnostics } from "./degenerate";
 
 export type {
   ConditionKey,
@@ -67,6 +68,38 @@ export {
   type ScriptConditionEntityRef,
 } from "./collect";
 
+/**
+ * `or_includes` / `or_excludes` are legacy, mobile-only operators that this
+ * grammar does not know. The runtime still honours them, so these are warnings
+ * rather than errors — but they cannot be validated here, and `or_includes` is
+ * now exactly `includes`.
+ *
+ * No quick fix is offered for `or_excludes`: it means "at least one is absent",
+ * which is NOT what `excludes` ("none of these") means, so swapping it would
+ * silently change the logic.
+ */
+function findLegacyMembershipOperators(input: string): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const pattern = /\bor_(includes|excludes)\b/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(input)) !== null) {
+    const isIncludes = match[1].toLowerCase() === "includes";
+    diagnostics.push({
+      severity: "warning",
+      code: "LEGACY_MEMBERSHIP_OP",
+      message: isIncludes
+        ? '"or_includes" is deprecated. Use "includes", which already means "any of these".'
+        : '"or_excludes" is deprecated. It means "at least one is absent"; use "excludes" only if you mean "none of these".',
+      start: match.index,
+      end: match.index + match[0].length,
+      suggestion: isIncludes ? "includes" : undefined,
+    });
+  }
+
+  return diagnostics;
+}
+
 /** Flags trailing whitespace on each non-empty line of the expression. */
 function findTrailingWhitespace(input: string): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -101,9 +134,11 @@ export function validateCondition(input: string, ctx: ValidationContext): Valida
   const { ast, diagnostics: syntax } = parse(src);
   const semantic = analyze(ast, ctx, src);
   const legacy = findLegacyNegationDiagnostics(ast, src);
+  const alwaysTrue = findAlwaysTrueDiagnostics(ast, src);
+  const legacyOps = findLegacyMembershipOperators(src);
   const whitespace = findTrailingWhitespace(src);
 
-  const diagnostics: Diagnostic[] = [...syntax, ...legacy, ...semantic, ...whitespace].sort(
+  const diagnostics: Diagnostic[] = [...syntax, ...legacy, ...alwaysTrue, ...legacyOps, ...semantic, ...whitespace].sort(
     (a, b) => a.start - b.start || (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1),
   );
 

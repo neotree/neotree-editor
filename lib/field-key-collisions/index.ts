@@ -35,12 +35,21 @@ export {
  * There, provably exclusive fields render correctly and only share a storage slot.
  */
 
+export interface CollisionOption {
+  /** Field options identify themselves by `value`; screen items by `id`. */
+  id?: string | null;
+  value?: string | null;
+  label?: string | null;
+}
+
 export interface CollisionField {
   fieldId?: string | null;
   key?: string | null;
   label?: string | null;
   type?: string | null;
   condition?: string | null;
+  /** Loosely typed: callers pass the editor's richer option rows straight in. */
+  items?: readonly any[] | null;
 }
 
 export interface CollisionScreen {
@@ -52,6 +61,8 @@ export interface CollisionScreen {
   type?: string | null;
   repeatable?: boolean | null;
   fields?: CollisionField[] | null;
+  /** A single/multi select screen carries its options here instead. */
+  items?: readonly any[] | null;
 }
 
 export interface CollisionScript {
@@ -66,7 +77,16 @@ export interface FieldKeyCollisionMember {
   screenId?: string;
   screenTitle: string;
   fieldId?: string;
+  /**
+   * The field's row index on the screen — what the editor highlights. For a
+   * collision between two OPTIONS this is the index of the field that owns
+   * them (every member shares it), never the option's own position: the
+   * fields table looks warnings up by row, so an option index here lights up
+   * whichever unrelated field happens to sit at that row.
+   */
   fieldIndex: number;
+  /** The option's position in its list, when the collision is between options. */
+  optionIndex?: number;
   label: string;
   condition: string;
 }
@@ -173,18 +193,158 @@ function groupFieldsByKey(fields: CollisionField[]): Map<string, { field: Collis
  * Collisions inside a single screen. Safe to call on unsaved editor form state —
  * it touches nothing but the fields it is given.
  */
+
+/**
+ * The answer an option actually stores. A field option carries it in `value`,
+ * a screen-level option in `id` — the app saves that, never the label.
+ */
+function optionValueOf(option: CollisionOption): string {
+  const raw = option?.value ?? option?.id;
+  return `${raw ?? ""}`.trim();
+}
+
+function optionLabelOf(option: CollisionOption, index: number): string {
+  const label = `${option?.label ?? ""}`.trim();
+  return label || optionValueOf(option) || `option ${index + 1}`;
+}
+
+/**
+ * Two options in one list whose stored values clash.
+ *
+ * Two distinct faults, deliberately reported apart because the consequences
+ * differ and so does the fix:
+ *
+ *  - identical values: the app saves the value, not the label, so the two are
+ *    one answer in the data and no later reader can separate them;
+ *  - values differing only by case ("Pn" / "PN"): these stay distinct when
+ *    saved and exported, but the runtime lowercases a condition before
+ *    evaluating it, so no conditional expression can tell them apart.
+ *
+ * Neither stops the screen rendering, so both are warnings. Grouping them
+ * together would mislabel genuinely different options — "Chewa" and
+ * "Chinyanja", or "Pain" and "Pneumonia" — as the same answer.
+ */
+function findOptionValueCollisions(
+  options: CollisionOption[],
+  context: { location: string; screenId?: string; screenTitle: string; owner: string; ownerKey?: unknown; fieldId?: string; fieldIndex: number },
+): FieldKeyCollision[] {
+  const byExactValue = new Map<string, { option: CollisionOption; index: number }[]>();
+
+  options.forEach((option, index) => {
+    const value = optionValueOf(option);
+    if (!value) return;
+    const group = byExactValue.get(value) || [];
+    group.push({ option, index });
+    byExactValue.set(value, group);
+  });
+
+  const collisions: FieldKeyCollision[] = [];
+
+  const toMembers = (group: { option: CollisionOption; index: number }[]) => group.map(({ option, index }) => ({
+    screenId: context.screenId,
+    screenTitle: context.screenTitle,
+    fieldId: context.fieldId,
+    fieldIndex: context.fieldIndex,
+    optionIndex: index,
+    label: optionLabelOf(option, index),
+    condition: "",
+  }));
+
+  // Keyed by the field that owns the options, not by the option value: the
+  // field editor looks collisions up by its own key, so an option value here
+  // would both miss this field and match any unrelated field whose key happens
+  // to equal that value.
+  const ownerKey = normalizeFieldKey(context.ownerKey);
+
+  // Identical values.
+  byExactValue.forEach((group, value) => {
+    if (group.length < 2) return;
+    const members = toMembers(group);
+    collisions.push({
+      kind: "duplicate_option_value",
+      severity: "warning",
+      key: ownerKey,
+      displayKey: value,
+      verdict: "overlapping",
+      location: context.location,
+      screenId: context.screenId,
+      message:
+        `${context.owner} has ${group.length} options that all store "${value}" (${quoteLabels(members)}). ` +
+        `The app saves the value, not the label, so these are one answer in the data and nothing can tell them apart afterwards.`,
+      members,
+    });
+  });
+
+  // Values that differ only by case. Reported once per set, and only when the
+  // set holds more than one distinct spelling.
+  const byFoldedValue = new Map<string, Map<string, { option: CollisionOption; index: number }[]>>();
+  byExactValue.forEach((group, value) => {
+    const folded = value.toLowerCase();
+    const spellings = byFoldedValue.get(folded) || new Map();
+    spellings.set(value, group);
+    byFoldedValue.set(folded, spellings);
+  });
+
+  byFoldedValue.forEach((spellings, folded) => {
+    if (spellings.size < 2) return;
+    const members = [...spellings.values()].flatMap(toMembers);
+    const written = [...spellings.keys()].map((v) => `"${v}"`).join(" and ");
+    collisions.push({
+      kind: "option_value_case_variant",
+      severity: "warning",
+      key: ownerKey,
+      displayKey: [...spellings.keys()][0],
+      verdict: "overlapping",
+      location: context.location,
+      screenId: context.screenId,
+      message:
+        `${context.owner} has options stored as ${written} (${quoteLabels(members)}). ` +
+        `They stay separate in the saved data, but the app lowercases a condition before evaluating it, so no conditional expression can distinguish them.`,
+      members,
+    });
+  });
+
+  return collisions;
+}
+
 export function findScreenFieldKeyCollisions(
   screen: CollisionScreen,
   opts?: { keys?: ConditionKey[] | null; screenIndex?: number },
 ): FieldKeyCollision[] {
   const fields = (screen?.fields || []) as CollisionField[];
-  if (fields.length < 2) return [];
 
   const screenTitle = screenTitleOf(screen, opts?.screenIndex ?? 0);
   const screenId = `${screen?.screenId || ""}` || undefined;
   const repeatable = !!screen?.repeatable;
-  const keys = keysForScreen(fields, opts?.keys);
   const collisions: FieldKeyCollision[] = [];
+
+  // Option lists are checked first and unconditionally: a single/multi select
+  // screen keeps its options on the screen itself and may have no fields at
+  // all, so this must run before the two-fields-or-more shortcut below.
+  collisions.push(...findOptionValueCollisions((screen?.items || []) as CollisionOption[], {
+    location: `Screen "${screenTitle}"`,
+    screenId,
+    screenTitle,
+    owner: `Screen "${screenTitle}"`,
+    ownerKey: screen?.key,
+    fieldIndex: -1,
+  }));
+
+  fields.forEach((field, index) => {
+    collisions.push(...findOptionValueCollisions((field?.items || []) as CollisionOption[], {
+      location: `Screen "${screenTitle}" > field "${fieldLabelOf(field, index)}"`,
+      screenId,
+      screenTitle,
+      owner: `Field "${fieldLabelOf(field, index)}"`,
+      ownerKey: field?.key,
+      fieldId: `${field?.fieldId || ""}` || undefined,
+      fieldIndex: index,
+    }));
+  });
+
+  if (fields.length < 2) return collisions;
+
+  const keys = keysForScreen(fields, opts?.keys);
 
   groupFieldsByKey(fields).forEach((group, key) => {
     if (group.length < 2) return;

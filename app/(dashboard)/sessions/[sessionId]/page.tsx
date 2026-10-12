@@ -6,13 +6,19 @@ import { Alert } from "@/components/alert";
 import { SessionForm } from "../components/session-form";
 
 type Props = {
-    params: { sessionId: string; },
-    searchParams: { [key: string]: string; };
+    params: Promise<{ sessionId: string; }>,
+    searchParams: Promise<{ [key: string]: string; }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function SessionsPage({ params: { sessionId, } }: Props) {
+export default async function SessionsPage(props: Props) {
+    const params = await props.params;
+
+    const {
+        sessionId
+    } = params;
+
     const [session] = await Promise.all([
         getSession(Number(sessionId)),
     ]);

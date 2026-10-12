@@ -20,7 +20,7 @@
  * report in the background.
  */
 
-export const CONDITION_REPORT_SIGNATURE_VERSION = "r2";
+export const CONDITION_REPORT_SIGNATURE_VERSION = "r3";
 
 /**
  * Versions a stored report may still carry from an earlier deploy.
@@ -39,8 +39,13 @@ export const CONDITION_REPORT_SIGNATURE_VERSION = "r2";
  *
  * r1 -> r2: case-variant keys (`$RESUS` / `$Resus`) stopped being reported as
  * wrong-casing errors with bogus unknown-option errors behind them.
+ * r2 -> r3: NEOAPP-1514. Comparing `$Diagnoses` / `$Problems` with `=`, `!=` or
+ * an ordering operator became an error, as did comparing any key against a
+ * list literal; `!=` chained with `or`, the legacy `or_includes` /
+ * `or_excludes` operators, and membership on keys older app builds cannot
+ * evaluate became warnings.
  */
-export const SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS = ["r1"] as const;
+export const SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS = ["r1", "r2"] as const;
 
 /**
  * True when a stored signature is this exact signature from an earlier rule set —

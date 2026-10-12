@@ -6,20 +6,21 @@ import { DraftReviewWorkspace } from "../components/draft-review-workspace"
 
 export const dynamic = "force-dynamic"
 
-export default async function PendingChangesPage({
-  searchParams,
-}: {
-  searchParams?: {
-    scope?: string
-    tab?: string
-    q?: string
-    entityType?: string
-    creator?: string
-    sort?: string
-    groupBy?: string
-    page?: string
+export default async function PendingChangesPage(
+  props: {
+    searchParams?: Promise<{
+      scope?: string
+      tab?: string
+      q?: string
+      entityType?: string
+      creator?: string
+      sort?: string
+      groupBy?: string
+      page?: string
+    }>
   }
-}) {
+) {
+  const searchParams = await props.searchParams;
   const pendingDraftQueue = await getPendingDraftQueue({
     scope: searchParams?.scope === "all" ? "all" : "mine",
     tab: searchParams?.tab as any,

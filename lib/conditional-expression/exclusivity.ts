@@ -19,10 +19,13 @@ import { parse } from "./parser";
  * - The runtime lowercases the whole parsed condition, so values compare
  *   case-insensitively: `'M'` and `'m'` are the same value, never an exclusive pair.
  * - Comparison uses `==`, so `'5'` and `5` are the same value.
- * - `excludes` is never used to refute: its negation is commented out in the
- *   runtime (src/contexts/script/index.tsx), where it currently evaluates
- *   exactly like `includes`. Dropping a conjunct can only make a formula easier
- *   to satisfy, so ignoring it keeps the verdict on the safe side.
+ * - `excludes` is never used to refute. It used to evaluate exactly like
+ *   `includes` in the runtime because its negation sat commented out; that is
+ *   fixed (NEOAPP-1514) and both runtimes now share ./membership-runtime.ts.
+ *   It is still ignored here only because dropping a conjunct can only make a
+ *   formula easier to satisfy, which keeps the verdict on the safe side.
+ *   Teaching this check to refute on `excludes` would tighten it, and needs its
+ *   own tests.
  */
 
 export type ExclusivityVerdict = "exclusive" | "overlapping" | "unknown";

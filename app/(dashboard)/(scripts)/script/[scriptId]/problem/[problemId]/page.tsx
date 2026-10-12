@@ -6,13 +6,20 @@ import { ProblemForm } from "../../../../components/problems/form";
 import { PageContainer } from "../../../../components/page-container";
 
 type Props = {
-    params: { problemId: string; scriptId: string; };
-    searchParams: { [key: string]: string; };
+    params: Promise<{ problemId: string; scriptId: string; }>;
+    searchParams: Promise<{ [key: string]: string; }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function Problems({ params: { problemId, scriptId } }: Props) {
+export default async function Problems(props: Props) {
+    const params = await props.params;
+
+    const {
+        problemId,
+        scriptId
+    } = params;
+
     const [problem, script, screens] = await Promise.all([
         getProblem({ problemId, returnDraftIfExists: true, }),
         getScript({ scriptId, returnDraftIfExists: true, }),

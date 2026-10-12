@@ -1,6 +1,6 @@
 // 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import axios from "axios";
@@ -29,8 +29,9 @@ import { useAppContext } from "@/contexts/app";
 import { ErrorCard } from "@/components/error-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { OverlayInfoCard } from "@/components/overlay-info-card";
-import { BROADCAST_ACTIONS_IN_PROGRESS } from "@/lib/in-progress";
+import { BROADCAST_ACTIONS_IN_PROGRESS, IMPORT_JOB_COMPLETE_EVENT } from "@/lib/in-progress";
 import { SocketEventsListener } from "@/components/socket-events-listener";
+import socket  from '@/lib/socket';
 
 const getDefaultFormFields = (overWriteScriptWithId?: string) => ({
     siteId: '',
@@ -51,7 +52,7 @@ export function ScriptsImportModal({
     onOpenChange: (open: boolean) => void;
     onImportSuccess?: () => void;
 }) {
-    const [requestKey] = useState(Math.random().toString(12).substring(2));
+    const [requestKey, setRequestKey] = useState(Math.random().toString(12).substring(2));
 
     const router = useRouter();
     const routeParams = useParams();
@@ -86,33 +87,11 @@ export function ScriptsImportModal({
     const overwriteDataKeys = watch('overwriteDataKeys');
     const overwriteDrugsLibraryItems = watch('overwriteDrugsLibraryItems');
 
-    const importScripts = handleSubmit(async (data) => {
+    // Handles the final result of an import, whichever way it arrived: an
+    // immediate failure from the POST itself (auth/validation), or the
+    // background job's result delivered later over the socket channel.
+    const handleImportResult = (res: Awaited<ReturnType<typeof copyScripts>>) => {
         try {
-            if (!data.siteId) throw new Error('Please select a site!');
-            if (!data.scriptId) throw new Error('Please provide a script ID!');
-            if (overWriteScriptWithId && !data.confirmed) throw new Error('Please confirm that you want to overwrite this script!');
-
-            setLoading(true);
-
-            // const res = await copyScripts({ 
-            //     fromRemoteSiteId: data.siteId, 
-            //     scriptsIds: [data.scriptId], 
-            //     overWriteScriptWithId: overWriteScriptWithId,
-            //     broadcastAction: true,
-            // });
-
-            // TODO: Replace this with server action
-            const response = await axios.post('/api/scripts/copy', { 
-                requestKey,
-                fromRemoteSiteId: data.siteId, 
-                overwriteDrugsLibraryItems: data.overwriteDrugsLibraryItems, 
-                overwriteDataKeys: data.overwriteDataKeys, 
-                scriptsIds: [data.scriptId], 
-                overWriteScriptWithId: overWriteScriptWithId,
-                broadcastAction: true,
-            });
-            const res = response.data as Awaited<ReturnType<typeof copyScripts>>;
-
             if (!res.success) throw new Error(res.errors?.join(', ') || 'Failed to import script');
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 
@@ -140,7 +119,7 @@ export function ScriptsImportModal({
                     onOpenChange(false);
                 },
             });
-        } catch(e: any) {
+        } catch (e: any) {
             alert({
                 variant: 'error',
                 title: 'Error',
@@ -148,6 +127,94 @@ export function ScriptsImportModal({
             });
         } finally {
             setLoading(false);
+        }
+    };
+
+    // The import runs in the background on the server (it can take minutes
+    // for large scripts) — the POST only acks that it started. The actual
+    // result arrives over the same per-requestKey socket channel already
+    // used for progress. As a safety net against a dropped socket event, we
+    // also poll by re-POSTing the identical request every 45s; the endpoint
+    // is idempotent on requestKey, so a poll either returns the
+    // already-finished result (if the socket event was missed) or another
+    // "still running" ack (a cheap no-op — it does NOT re-run the import,
+    // see lib/import-jobs.ts's coalescing). This is a repeating poll rather
+    // than a one-shot check specifically so it keeps recovering regardless
+    // of how long the import actually takes, not just within one fixed
+    // window.
+    const waitForImportCompletion = (requestBody: Record<string, any>) => {
+        let settled = false;
+
+        const stopWaiting = () => {
+            settled = true;
+            socket.off(requestBody.requestKey, onSignal);
+            clearInterval(pollTimer);
+        };
+
+        // The socket event is only a "check now" signal — it never carries
+        // the import result itself (the socket.io relay is an unauthenticated,
+        // global broadcast, so the result must only ever travel over this
+        // authenticated HTTP endpoint instead). This same check also serves
+        // as the periodic fallback poll below, for a socket event that never
+        // arrives.
+        const checkStatus = async () => {
+            if (settled) return;
+            try {
+                const response = await axios.post('/api/scripts/copy', requestBody);
+                const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof copyScripts>>;
+                if (!res.started && !settled) {
+                    stopWaiting();
+                    handleImportResult(res);
+                }
+            } catch {
+                // Ignore — the next signal or poll will still resolve it.
+            }
+        };
+
+        const onSignal = (key: string) => {
+            if (key !== IMPORT_JOB_COMPLETE_EVENT || settled) return;
+            checkStatus();
+        };
+
+        socket.on(requestBody.requestKey, onSignal);
+
+        const pollTimer = setInterval(checkStatus, 45 * 1000);
+    };
+
+    const importScripts = handleSubmit(async (data) => {
+        try {
+            if (!data.siteId) throw new Error('Please select a site!');
+            if (!data.scriptId) throw new Error('Please provide a script ID!');
+            if (overWriteScriptWithId && !data.confirmed) throw new Error('Please confirm that you want to overwrite this script!');
+
+            setLoading(true);
+
+            const requestBody = {
+                requestKey,
+                fromRemoteSiteId: data.siteId,
+                overwriteDrugsLibraryItems: data.overwriteDrugsLibraryItems,
+                overwriteDataKeys: data.overwriteDataKeys,
+                scriptsIds: [data.scriptId],
+                overWriteScriptWithId: overWriteScriptWithId,
+                broadcastAction: true,
+            };
+
+            const response = await axios.post('/api/scripts/copy', requestBody);
+            const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof copyScripts>>;
+
+            if (!res.started) {
+                handleImportResult(res);
+                return;
+            }
+
+            waitForImportCompletion(requestBody);
+        } catch(e: any) {
+            setLoading(false);
+            alert({
+                variant: 'error',
+                title: 'Error',
+                message: 'Failed to import script: ' + e.message,
+            });
         }
     });
 
@@ -247,7 +314,7 @@ export function ScriptsImportModal({
 
             {open && (
                 <ImportInfo 
-                    show={loading} 
+                    loading={loading} 
                     site={selectedSite}
                     overwriteDataKeys={overwriteDataKeys}
                     overwriteDrugsLibraryItems={overwriteDrugsLibraryItems}
@@ -260,6 +327,7 @@ export function ScriptsImportModal({
                 onOpenChange={() => {
                     onOpenChange(false);
                     resetForm(getDefaultFormFields(overWriteScriptWithId));
+                    setRequestKey(Math.random().toString(12).substring(2));
                 }}
                 title={isOverwriteImport ? "Import and overwrite script" : "Import script"}
                 actions={(
@@ -487,30 +555,86 @@ export function ScriptsImportModal({
 
 function ImportInfo({ 
     requestKey,
-    show: showProp, 
+    loading, 
     site, 
     overwriteDataKeys,
     overwriteDrugsLibraryItems,
 }: {
-    show: boolean;
+    loading: boolean;
     site?: ReturnType<typeof useAppContext>['sites'][0];
     overwriteDataKeys?: boolean;
     overwriteDrugsLibraryItems?: boolean;
     requestKey: string;
 }) {
+    const { getSocketEvent, removeSocketEvent } = useAppContext();
     const [show, setShow] = useState(false);
 
-    useEffect(() => { if (showProp) setShow(true); }, [showProp]);
+    useEffect(() => { if (loading) setShow(true); }, [loading]);
+
+    // Elapsed-time clock: gives users something concrete to watch while a
+    // slow step (e.g. propagating an overwritten data key/drug item to every
+    // script that references it) runs in the background.
+    const startedAtRef = useRef<number | null>(null);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+    useEffect(() => {
+        if (!show) {
+            startedAtRef.current = null;
+            setElapsedSeconds(0);
+            return;
+        }
+
+        startedAtRef.current = Date.now();
+        setElapsedSeconds(0);
+
+        const interval = setInterval(() => {
+            if (startedAtRef.current) setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [show]);
+
+    const formatElapsed = (totalSeconds: number) => {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+    };
 
     const actionsInProgress = useMemo(() => {
         return [
             ...(!site ? [{ 
                 key: BROADCAST_ACTIONS_IN_PROGRESS.loading_local_data, 
                 label: 'Loading data', 
-            }] : [{ 
-                key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_data, 
-                label: 'Loading data from ' + site.name, 
-            }]),
+            }] : [
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_datakeys, 
+                    label: 'Loading data keys from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_scripts, 
+                    label: 'Loading scripts from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_screens, 
+                    label: 'Loading screens from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_diagnoses, 
+                    label: 'Loading diagnoses from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_problems, 
+                    label: 'Loading problems from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_dff, 
+                    label: 'Loading drugs library from ' + site.name, 
+                },
+                { 
+                    key: BROADCAST_ACTIONS_IN_PROGRESS.uploading_remote_files, 
+                    label: 'Uploading files from ' + site.name, 
+                },
+            ]),
 
             { 
                 key: BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, 
@@ -533,35 +657,61 @@ function ImportInfo({
         overwriteDrugsLibraryItems,
     ]);
 
-    const [completed, setCompleted] = useState<string[]>([]);
+    const [events, setEvents] = useState<Record<string, boolean>>({});
+    const [latestEvent, setLatestEvent] = useState('');
 
     useEffect(() => {
-        setCompleted([actionsInProgress[0].key + '__true']);
-    }, [actionsInProgress]);
+        socket.on(requestKey, (key: string, value: boolean) => {
+            setLatestEvent(key);
+            setEvents(prev => ({
+                ...prev,
+                [key]: value,
+            }));
+        });
+    }, [requestKey]);
 
-    const current = completed[completed.length - 1];
+    const getSocketEventTimeout = useRef<null | ReturnType<typeof setTimeout>>(null);
+
+    useEffect(() => {  
+        if (!loading && getSocketEventTimeout.current) {
+            clearTimeout(getSocketEventTimeout.current);
+            removeSocketEvent(requestKey);
+        }
+
+        if (loading && !getSocketEventTimeout.current) {
+            const fn = async () => {
+                const res: string[] = await getSocketEvent(requestKey);
+                const evts = (res || []).map(e => e.split('__'));
+                const lastEvent = evts[evts.length - 1] || [];
+                setLatestEvent(lastEvent[0] || actionsInProgress[0]?.key || '');
+                setEvents(prev => evts.reduce((acc, e) => ({
+                    ...prev,
+                    ...acc,
+                    [e[0]]: e[1] === 'true',
+                }), {} as Record<string, boolean>));
+                getSocketEventTimeout.current = setTimeout(fn, 5 * 1000);
+            };
+            setLatestEvent(actionsInProgress[0]?.key || '');
+            fn();
+        }
+    }, [requestKey, loading, actionsInProgress, getSocketEvent, removeSocketEvent]);
 
     return (
         <>
-            <SocketEventsListener
-                events={[
-                    {
-                        name: requestKey,
-                        onEvent: {
-                            callback: (...args) => setCompleted(prev => [...prev, args.join('__')]),
-                        },
-                    },
-                ]}
-            />
-
-            <OverlayInfoCard 
+            <OverlayInfoCard
                 show={show}
                 // onClose={() => setShow(false)}
             >
+                <div className="text-xs text-muted-foreground mb-2">
+                    Running for {formatElapsed(elapsedSeconds)}
+                </div>
+
                 <div className="flex flex-col gap-y-1">
                     {actionsInProgress.map(a => {
-                        const inProgress = current === `${a.key}__true`;
-                        const isCompleted = completed.includes(`${a.key}__false`);
+                        const inProgress = latestEvent === a.key;
+                        let isCompleted = events[a.key] === false;
+
+                        if (loading && latestEvent && !events[latestEvent] && inProgress) isCompleted = false;
 
                         let className = 'opacity-50';
 

@@ -442,6 +442,7 @@ export const files = pgTable("nt_files", {
 })
 
 export const filesRelations = relations(files, ({ many, one }) => ({
+  aliases: many(filesAliases),
   owner: one(users, {
     fields: [files.ownerId],
     references: [users.userId],
@@ -463,6 +464,13 @@ export const filesAliases = pgTable("nt_files_aliases", {
   fileId: uuid("file_id").references(() => files.fileId, { onDelete: "cascade" }),
   alias: text("alias").notNull(),
 });
+
+export const filesAliasesRelations = relations(filesAliases, ({ one }) => ({
+  owner: one(files, {
+    fields: [filesAliases.fileId],
+    references: [files.fileId],
+  }),
+}))
 
 // CONFIG KEYS
 export const configKeys = pgTable(

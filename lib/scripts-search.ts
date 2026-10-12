@@ -27,6 +27,7 @@ export type ScriptsSearchResultsItem = {
         fieldIndex?: number;
         fieldItemIndex?: number;
         fieldValue: string;
+        type?: string;
     }[];
     screens: {
         title: string;
@@ -112,6 +113,28 @@ export function parseScriptsSearchResults({
                 fieldValue: s.printTitle,
             });
         }
+
+        const nuidSearchFields = (s.nuidSearchFields || []) as ScriptField[];
+
+        nuidSearchFields.forEach((f, i) => {
+            if (`${f.key || ''}`.match(searchRegex)) {
+                matches.push({
+                    field: 'nuidSearchField_key',
+                    fieldValue: f.key,
+                    fieldIndex: i,
+                    type: 'NUID Search field'
+                });
+            }
+
+            if (`${f.label || ''}`.match(searchRegex)) {
+                matches.push({
+                    field: 'nuidSearchField_label',
+                    fieldValue: f.label,
+                    fieldIndex: i,
+                    type: 'NUID Search field'
+                });
+            }
+        });
 
         if (matches.length) {
             resultsMap[s.scriptId] = {
@@ -848,6 +871,8 @@ export const scriptsSearchResultsFilters = [
 export type ScriptsSearchResultsFilter = ArrayElement<typeof scriptsSearchResultsFilters>['value'];
 
 const matchedFieldFilterMap: Record<string, string> = {
+    nuidSearchField_key: 'data_key',
+    nuidSearchField_label: 'label',
     key: 'data_key',
     field_key: 'data_key',
     field_refKey: 'data_key',

@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { screens, screensDrafts, pendingDeletion, scriptsDrafts, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 
@@ -12,6 +13,7 @@ export type DeleteScreensData = {
     confirmDeleteAll?: boolean;
     userId?: string | null;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
+    client?: DbOrTransaction;
 };
 
 export type DeleteScreensResponse = { 
@@ -35,19 +37,21 @@ export async function _deleteScreens(
         screensIds = [], 
         scriptsIds = [], 
         confirmDeleteAll,
-        broadcastAction, 
+        broadcastAction,
         userId,
         draftOrigin = "editor",
+        client,
     }: DeleteScreensData,
 ) {
     const response: DeleteScreensResponse = { success: false, };
+    const executor = client || db;
 
     try {
         const shouldConfirmDeleteAll = !scriptsIds.length && !screensIds.length && !confirmDeleteAll;
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the screens, please confirm this action!');
 
         // delete drafts
-        await db.delete(screensDrafts).where(and(
+        await executor.delete(screensDrafts).where(and(
             !screensIds.length ? undefined : inArray(screensDrafts.screenDraftId, screensIds),
             !scriptsIds.length ? undefined : or(
                 inArray(screensDrafts.scriptId, scriptsIds),
@@ -56,7 +60,7 @@ export async function _deleteScreens(
         ));
 
         // insert config keys into pendingDeletion, we'll delete them when data is published
-        const screensArr = await db
+        const screensArr = await executor
             .select({
                 screenId: screens.screenId,
                 screenScriptId: screens.scriptId,
@@ -79,7 +83,7 @@ export async function _deleteScreens(
             createdByUserId: userId,
         }));
         
-        if (pendingDeletionInsertData.length) await db.insert(pendingDeletion).values(pendingDeletionInsertData);
+        if (pendingDeletionInsertData.length) await executor.insert(pendingDeletion).values(pendingDeletionInsertData);
 
         response.success = true;
     } catch(e: any) {

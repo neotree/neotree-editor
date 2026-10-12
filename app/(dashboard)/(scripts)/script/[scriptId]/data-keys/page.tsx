@@ -4,12 +4,13 @@ import { ScriptDataKeysTable } from "./table";
 import { Alert } from "@/components/alert";
 
 type Props = {
-    params: { scriptId: string; };
-    searchParams: { [key: string]: string | string[] | undefined; };
+    params: Promise<{ scriptId: string; }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined; }>;
 };
 
-export default async function ScriptDataKeys({ params, searchParams }: Props) {
-    const { scriptId } = await params;
+export default async function ScriptDataKeys(props: Props) {
+    const searchParams = await props.searchParams;
+    const { scriptId } = await props.params;
     // The publish blocker can deep-link into this page with a focused
     // "newly introduced issues" view so users land on the exact blocking set.
     const focusParam = Array.isArray(searchParams?.focus) ? searchParams.focus[0] : searchParams?.focus;

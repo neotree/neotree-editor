@@ -59,6 +59,7 @@ export const EXCLUDED_MATCH_FIELDS = [
     'item_id', 'item_key',
     'field_item_key', 'field_item_id',
     'diagnosis_symptom_key', 'problem_symptom_key',
+    'nuidSearchField_key',
 ];
 
 /** Prefixes that say which list a match came from, longest first. */
@@ -68,6 +69,7 @@ const MATCH_FIELD_PREFIXES = [
     'field_item_',
     'field_',
     'item_',
+    'nuidSearchField_',
 ];
 
 /**
@@ -207,10 +209,23 @@ export function buildSavePayload(items: ReplaceItem[]) {
     return {
         scripts: items
             .filter(s => s.type === 'script')
-            .map(s => ({
-                scriptId: s.id,
-                data: s.matches.reduce((acc, m) => ({ ...acc, [m.field]: m.newValue }), {} as Record<string, any>),
-            })),
+            .map(s => {
+                const nuidSearchFields: IndexedPatch[] = [];
+
+                s.matches.forEach(m => {
+                    if (m.fieldIndex) {
+                        collectPatch(nuidSearchFields, m.fieldIndex, unprefixMatchField(m.field), m.newValue);
+                    }
+                });
+                
+                return {
+                    scriptId: s.id,
+                    data: {
+                        ...s.matches.reduce((acc, m) => ({ ...acc, [m.field]: m.newValue }), {} as Record<string, any>),
+                        _nuidSearchFields: nuidSearchFields,
+                    },
+                };
+            }),
 
         screens: items
             .filter(s => s.type === 'screen')

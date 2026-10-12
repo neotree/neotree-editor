@@ -6,6 +6,7 @@ import { AlertCircleIcon, AlertTriangleIcon, Wand2Icon } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { mergeConditionKeys, type ConditionKey, type Diagnostic } from "@/lib/conditional-expression";
+import { canApplySuggestion } from "@/lib/conditional-expression/quick-fix";
 import {
   getConditionValueMatches,
   getTokenAtCursor,
@@ -237,27 +238,6 @@ export function ConditionEditor({
     moveCursorAfterChange(diagnostic.start + diagnostic.suggestion.length);
   };
 
-  // Codes whose suggestion is a drop-in replacement for its own span. A code
-  // may still omit the suggestion case by case (e.g. no close option match, or
-  // a membership that needs restructuring), hence the presence check.
-  const canApplySuggestion = (diagnostic: Diagnostic) => (
-    diagnostic.suggestion !== undefined
-    && [
-      "LEGACY_NEGATION",
-      "LEGACY_REVERSED_COMPARISON",
-      "SPACED_NOT_EQUAL",
-      "MISMATCHED_QUOTED_VALUE",
-      "DOUBLED_QUOTED_VALUE",
-      "KEY_CASE",
-      "UNKNOWN_KEY",
-      "UNKNOWN_OPTION",
-      "UNQUOTED_VALUE",
-      "VALUE_WHITESPACE",
-      "TRAILING_WHITESPACE",
-      "DUPLICATE_VALUE",
-      "MEMBERSHIP_BRACKETS",
-    ].includes(diagnostic.code)
-  );
 
   return (
     <div className="space-y-2">

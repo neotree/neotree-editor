@@ -18,6 +18,7 @@ export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResult
             uploadDateGTE,
             uploadDateLTE,
             withData,
+            withAliases,
         } = { ...params };
 
         const aliases = !_filesIds.length ? [] : await db.query.filesAliases.findMany({
@@ -67,7 +68,10 @@ export async function _getFiles(params?: GetFilesParams): Promise<GetFilesResult
                 size: true,
                 metadata: true,
                 createdAt: true,
-                data: withData,
+                data: withData === true ? true : undefined,
+            },
+            with: {
+                aliases: withAliases === true ? true : undefined,
             },
         });
 

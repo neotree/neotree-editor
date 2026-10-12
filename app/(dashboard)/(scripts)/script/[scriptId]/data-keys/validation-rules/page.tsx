@@ -5,7 +5,7 @@ import { getScriptsWithItems } from "@/app/actions/scripts";
 import { PageContainer } from "../../../../components/page-container";
 
 type Props = {
-    params: { scriptId: string; };
+    params: Promise<{ scriptId: string; }>;
 };
 
 export default async function ScriptDataKeyValidationRules({ params }: Props) {

@@ -8,7 +8,8 @@ import { DataKeyForm } from '../../../components/form';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditDataKeyPage({ params }: { params: { dataKeyId: string; }; }) {
+export default async function EditDataKeyPage(props: { params: Promise<{ dataKeyId: string; }>; }) {
+    const params = await props.params;
     const [{ isSuperUser }] = await Promise.all([
         getAuthenticatedUserWithRoles(),
     ]);

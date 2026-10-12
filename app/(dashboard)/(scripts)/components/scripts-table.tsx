@@ -143,7 +143,27 @@ export function ScriptsTable(props: Props) {
                         const s = scriptsArr[rowIndex];
                         const searchResults = search.results.find(r => r?.scriptId === s?.scriptId);
 
+                        const nuidSearchFields = !searchResults ? [] : searchResults.matches.filter(f => f.field.includes('nuidSearchField'))
+
+                        const scriptLink = !searchResults ? '' : `/script/${searchResults.scriptId}`;
+
                         const items = !searchResults ? [] : [
+                            {
+                                id: searchResults.scriptId,
+                                title: searchResults.title,
+                                type: 'script',
+                                link: scriptLink,
+                                fields: nuidSearchFields.map(f => {
+                                    return {
+                                        id: f.field,
+                                        title: f.fieldValue,
+                                        type: f.type,
+                                        link: scriptLink+`?nuidSearchField=${f.fieldIndex}`,
+                                        fields: [],
+                                    };
+                                }),
+                            },
+
                             ...searchResults.screens.map(s => {
                                 const link = `/script/${searchResults.scriptId}/screen/${s.screenId}`;
                                 return {
@@ -242,7 +262,7 @@ export function ScriptsTable(props: Props) {
                                                                                 {
                                                                                     name: '',
                                                                                     align: 'right',
-                                                                                    cellClassName: 'w-20 text-right',
+                                                                                    cellClassName: 'w-30 text-right',
                                                                                     thClassName: 'hidden',
                                                                                     cellRenderer({ rowIndex }) {
                                                                                         const _item = item.fields[rowIndex];
@@ -251,7 +271,7 @@ export function ScriptsTable(props: Props) {
                                                                                             <Link
                                                                                                 href={_item.link}
                                                                                                 target="_blank"
-                                                                                                className="flex items-center gap-x-1"
+                                                                                                className="flex items-center gap-x-1 justify-end"
                                                                                             >
                                                                                                 {_item.type}
                                                                                                 <ExternalLink className="h-3 w-3" />

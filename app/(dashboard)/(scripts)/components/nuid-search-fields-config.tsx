@@ -4,10 +4,10 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { arrayMoveImmutable } from "array-move";
 import { useQueryState } from "nuqs";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Settings, Trash, MoreVertical, Edit2, Plus, ArrowUp, ArrowDown } from "lucide-react";
+import { Settings, Trash, MoreVertical, Edit2, Plus, ArrowUp, ArrowDown, ExternalLink } from "lucide-react";
 
+import { useNavigation } from "@/hooks/use-navigation-hook";
 import {
     Sheet,
     SheetClose,
@@ -67,13 +67,26 @@ export function NuidSearchFieldsConfig({
         getDefaultNuidSearchFields,
     },
 }: Props) {
+    const { router, searchParams, } = useNavigation();
+
     const fields = watch('nuidSearchFields');
     const nuidSearchEnabled = watch('nuidSearchEnabled');
+
+    const initialField = useMemo(() => {
+        const index = Number(searchParams.nuidSearchField) >= 0 ? Number(searchParams.nuidSearchField) : -1;
+        const field = fields[index];
+        if (field) {
+            return {
+                field,
+                index,
+            };
+        }
+    }, [fields, searchParams]);
     
-    const [selectedField, setSelectedField] = useState<{ index: number; field: ScriptField; }>();
+    const [selectedField, setSelectedField] = useState(initialField);
     const [_nuidSearchEnabled, _setNuidSearchEnabled] = useState(nuidSearchEnabled);
     const [selectedNewFieldType, setSelectedNewFieldType] = useState<typeof fields[0]['type']>();
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(!!initialField);
 
     // The data key registry links here with ?nuidSearchField=<fieldId|index> when a NUID
     // reference needs attention, so open the sheet on that field.
@@ -105,7 +118,6 @@ export function NuidSearchFieldsConfig({
     }, [deepLinkedField, fields, setDeepLinkedField]);
 
     const { confirm } = useConfirmModal();
-    const router = useRouter();
     const { extractDataKeys, allDataKeys, saveDataKeys, loadingDataKeys } = useDataKeysCtx();
 
     const { conditionKeys, keysReady, nuidFieldKeys, hasIssues } = useNuidConfigIssues(fields, nuidSearchEnabled);
@@ -278,49 +290,6 @@ export function NuidSearchFieldsConfig({
                 </Modal>
             )}
 
-            {!!selectedField && (
-                <Field
-                    open
-                    disabled={disabled}
-                    field={selectedField?.field}
-                    fieldType={selectedField?.field?.type!}
-                    extraKeys={nuidFieldKeys}
-                    onClose={() => setSelectedField(undefined)}
-                    onChange={field => {
-                        setValue(
-                            'nuidSearchFields',
-                            fields.map((f, i) => {
-                                if (i === selectedField?.index) return { ...f, ...field, };
-                                return f;
-                            }),
-                            { shouldDirty: true, }
-                        );
-                        setSelectedField(undefined);
-                    }}
-                />
-            )}
-
-            {!!selectedNewFieldType && (
-                <Field
-                    open
-                    disabled={disabled}
-                    fieldType={selectedNewFieldType}
-                    extraKeys={nuidFieldKeys}
-                    onClose={() => setSelectedNewFieldType(undefined)}
-                    onChange={field => {
-                        setValue(
-                            'nuidSearchFields',
-                            [...fields, {
-                                ...field,
-                                type: selectedNewFieldType,
-                            }],
-                            { shouldDirty: true, }
-                        );
-                        setSelectedNewFieldType(undefined);
-                    }}
-                />
-            )}
-
             <Sheet
                 open={open}
                 onOpenChange={open => {
@@ -447,6 +416,18 @@ export function NuidSearchFieldsConfig({
                                                             Edit
                                                         </DropdownMenuItem>
 
+                                                        {!!f.keyId && (
+                                                            <DropdownMenuItem 
+                                                                asChild
+                                                                className="focus:text-primary focus:bg-primary/20"
+                                                            >
+                                                                <Link target="_blank" href={`/data-keys/edit/${f.keyId}`}>
+                                                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                                                    View data key
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                        )}
+
                                                         <DropdownMenuItem
                                                             className="focus:text-primary focus:bg-primary/20"
                                                             disabled={disabled || (rowIndex === 0)}
@@ -523,6 +504,49 @@ export function NuidSearchFieldsConfig({
                     </div>
                 </SheetContent>
             </Sheet>
+
+            {!!selectedField && (
+                <Field
+                    open
+                    disabled={disabled}
+                    field={selectedField?.field}
+                    fieldType={selectedField?.field?.type!}
+                    extraKeys={nuidFieldKeys}
+                    onClose={() => setSelectedField(undefined)}
+                    onChange={field => {
+                        setValue(
+                            'nuidSearchFields',
+                            fields.map((f, i) => {
+                                if (i === selectedField?.index) return { ...f, ...field, };
+                                return f;
+                            }),
+                            { shouldDirty: true, }
+                        );
+                        setSelectedField(undefined);
+                    }}
+                />
+            )}
+
+            {!!selectedNewFieldType && (
+                <Field
+                    open
+                    disabled={disabled}
+                    fieldType={selectedNewFieldType}
+                    extraKeys={nuidFieldKeys}
+                    onClose={() => setSelectedNewFieldType(undefined)}
+                    onChange={field => {
+                        setValue(
+                            'nuidSearchFields',
+                            [...fields, {
+                                ...field,
+                                type: selectedNewFieldType,
+                            }],
+                            { shouldDirty: true, }
+                        );
+                        setSelectedNewFieldType(undefined);
+                    }}
+                />
+            )}
         </>
     );
 }
@@ -747,7 +771,8 @@ export function Field({
                     <div>
                         <Label error={!disabled && !label} htmlFor="label">Label *</Label>
                         <Input
-                            {...register('label', { required: true, disabled, })}
+                            disabled
+                            {...register('label', { required: true, disabled: true, })}
                             error={!disabled && !label}
                         />
                         <span className="text-xs text-muted-foreground">

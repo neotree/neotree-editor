@@ -1,10 +1,10 @@
 'use server';
 
 import { v4 } from "uuid";
-import queryString from "query-string";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { screens, diagnoses, problems, screensDrafts, diagnosesDrafts, problemsDrafts, pendingDeletion, scripts as scriptsTable, scriptsDrafts } from "@/databases/pg/schema";
 import * as mutations from "@/databases/mutations/scripts";
 import * as queries from "@/databases/queries/scripts";
@@ -15,12 +15,10 @@ import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
-import { isValidUrl } from "@/lib/urls";
-import { processImage } from "@/lib/process-image";
-import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
+import { _getDataKeys } from "@/databases/queries/data-keys";
 import { _getConfigKeys } from "@/databases/queries/config-keys";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
-import { dataKeyToJSON, parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
+import { parseImportedDataKeys, scrapDataKeys } from "@/lib/data-keys";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
 import { getIntegrityPolicyState } from "@/lib/integrity-policy";
 import { createIntegrityImportSnapshot } from "./integrity-imports";
@@ -48,10 +46,11 @@ import {
 } from "@/lib/field-key-collisions";
 import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
 import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
-import { parseFileReferences } from "@/lib/file-references";
 import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastActionInProgress } from "@/lib/in-progress";
+import { loadRemoteDataKeys, loadRemoteScriptsWithItems, uploadRemoteFiles } from "./remote";
+import { uploadReferencedFileIfMissing } from "@/lib/files";
 
-export const getScriptsMetadata: typeof queries._getScriptsMetadata = (...args) => {
+export const getScriptsMetadata: typeof queries._getScriptsMetadata = async (...args) => {
     return queries._getScriptsMetadata(...args);
 };
 
@@ -200,7 +199,10 @@ async function saveScreensInternal(
             ...params,
             userId: session.user?.userId,
         });
-        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        // Skip when running inside a caller-managed transaction (params.client):
+        // the write isn't committed yet, so a recompute here would read stale
+        // data. The caller is responsible for recomputing once it commits.
+        if (res?.success !== false && !params?.client) void recomputeScriptsConditionErrors(affectedScriptIds);
         return res;
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
@@ -334,7 +336,8 @@ async function saveDiagnosesInternal(
         }
         if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
         const res = await saveOutcomeEntityWithReferenceRewrite("diagnosis", params, session.user?.userId);
-        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        // See saveScreensInternal: skip while inside a caller-managed transaction.
+        if (res?.success !== false && !params?.client) void recomputeScriptsConditionErrors(affectedScriptIds);
         return res;
     } catch (e: any) {
         logger.error('saveDiagnoses ERROR', e.message);
@@ -370,7 +373,8 @@ async function saveProblemsInternal(
         }
         if (collisions.length) return { success: false, errors: collisions.map((collision) => collision.message) };
         const res = await saveOutcomeEntityWithReferenceRewrite("problem", params, session.user?.userId);
-        if (res?.success !== false) void recomputeScriptsConditionErrors(affectedScriptIds);
+        // See saveScreensInternal: skip while inside a caller-managed transaction.
+        if (res?.success !== false && !params?.client) void recomputeScriptsConditionErrors(affectedScriptIds);
         return res;
     } catch (e: any) {
         logger.error('saveProblems ERROR', e.message);
@@ -426,7 +430,8 @@ export const saveScripts: typeof mutations._saveScripts = async params => {
             ...params,
             userId: session.user?.userId,
         });
-        if (res?.success !== false) void recomputeScriptsConditionErrors(((params as any)?.data || []).map((d: any) => d?.scriptId));
+        // See saveScreensInternal: skip while inside a caller-managed transaction.
+        if (res?.success !== false && !(params as any)?.client) void recomputeScriptsConditionErrors(((params as any)?.data || []).map((d: any) => d?.scriptId));
         return res;
     } catch (e: any) {
         logger.error('saveScripts ERROR', e.message);
@@ -1318,7 +1323,18 @@ export async function getScriptsConditionKeys(
         const draftMatch = (scriptCol: any, scriptDraftCol: any) =>
             or(inArray(scriptCol, ids), inArray(scriptDraftCol, ids));
 
-        const [pubScreens, draftScreens, pubDiag, draftDiag, pubProb, draftProb, dataKeysRes, configurationKeysRes] = await Promise.all([
+        const [
+            scripts,
+            pubScreens, 
+            draftScreens, 
+            pubDiag, 
+            draftDiag, 
+            pubProb, 
+            draftProb, 
+            dataKeysRes, 
+            configurationKeysRes
+        ] = await Promise.all([
+            getScripts({ scriptsIds: ids, }),
             db.select({
                 scriptId: screens.scriptId, screenId: screens.screenId, key: screens.key,
                 label: screens.label, title: screens.title, type: screens.type,
@@ -1380,6 +1396,7 @@ export async function getScriptsConditionKeys(
             : [];
 
         const dataKeys = await scrapDataKeys({
+            scripts: scripts.data || [],
             dataKeys: dataKeysRes.data || [],
             screens: mergedScreens as any,
             diagnoses: mergedDiagnoses as any,
@@ -1890,6 +1907,10 @@ export async function getScriptsWithFieldKeyCollisions(opts?: { scriptIds?: stri
                 condition: screens.condition,
                 repeatable: screens.repeatable,
                 fields: screens.fields,
+                // A single/multi select screen keeps its options here rather
+                // than on a field, so without this its duplicate option values
+                // are invisible to the badge and to the publish gate.
+                items: screens.items,
             })
                 .from(screens)
                 .leftJoin(pendingDeletion, eq(pendingDeletion.screenId, screens.screenId))
@@ -2162,11 +2183,20 @@ async function saveScriptScreens({
     scriptId,
     preserveScreensIds,
     draftOrigin,
+    uploadedFiles = {},
+    oldScriptId,
+    client,
 }: {
     preserveScreensIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     screens: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['screens'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    // Pass this when the caller already knows it (e.g. it just saved the
+    // script in the same transaction) to skip a redundant lookup that, inside
+    // an open transaction, would race the not-yet-committed script insert.
+    oldScriptId?: string | null;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2176,17 +2206,15 @@ async function saveScriptScreens({
         let saved = 0;
         const errors: string[] = [];
 
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        if (oldScriptId === undefined) {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            oldScriptId = script.data.oldScriptId;
+        }
 
-        const images: { data: string; }[] = [];
-
-        screens.forEach(s => {
-            if (s.image1) images.push(s.image1);
-            if (s.image2) images.push(s.image2);
-            if (s.image3) images.push(s.image3);
-        });
+        const incomingScreens: any[] = [];
+        const collisionBaselineScreens: any[] = [];
 
         for (const screen of screens) {
             const {
@@ -2198,7 +2226,7 @@ async function saveScriptScreens({
                 isDeleted,
                 deletedAt,
                 version,
-                oldScriptId,
+                oldScriptId: _ignoreOldScriptId,
                 oldScreenId,
                 screenId: _ignoreScreenId,
                 scriptId: _ignoreScriptId,
@@ -2214,43 +2242,69 @@ async function saveScriptScreens({
 
             try {
                 if (s.image1) {
-                    const res = await processImage(s.image1);
-                    s.image1 = res.image;
+                    if (uploadedFiles[s.image1.fileId || s.image1.data]) {
+                        s.image1 = uploadedFiles[s.image1.fileId || s.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image1);
+                        s.image1 = res.file;
+                    }
                 }
                 if (s.image2) {
-                    const res = await processImage(s.image2);
-                    s.image2 = res.image;
+                    if (uploadedFiles[s.image2.fileId || s.image2.data]) {
+                        s.image2 = uploadedFiles[s.image2.fileId || s.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image2);
+                        s.image2 = res.file;
+                    }
                 }
                 if (s.image3) {
-                    const res = await processImage(s.image3);
-                    s.image3 = res.image;
+                    if (uploadedFiles[s.image3.fileId || s.image3.data]) {
+                        s.image3 = uploadedFiles[s.image3.fileId || s.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.image3);
+                        s.image3 = res.file;
+                    }
+                }
+                if (s.contentTextImage) {
+                    if (uploadedFiles[s.contentTextImage.fileId || s.contentTextImage.data]) {
+                        s.contentTextImage = uploadedFiles[s.contentTextImage.fileId || s.contentTextImage.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(s.contentTextImage);
+                        s.contentTextImage = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
             }
 
-            const incomingScreen = {
+            incomingScreens.push({
                 ...s,
                 scriptId,
-                oldScriptId: script.data.oldScriptId,
+                oldScriptId,
                 screenId,
                 version: 1,
-            };
+            });
+            // Rebase the trusted source onto the minted id so unchanged
+            // legacy collisions retain the same stable path identity.
+            collisionBaselineScreens.push({ ...screen, scriptId, screenId });
+        }
+
+        if (errors.length) return { errors, saved: 0, success: false, };
+
+        if (incomingScreens.length) {
             const res = await saveScreensInternal(
-                { data: [incomingScreen], draftOrigin },
-                // Rebase the trusted source onto the minted id so unchanged
-                // legacy collisions retain the same stable path identity.
-                { screens: [{ ...screen, scriptId, screenId }] },
+                { data: incomingScreens, draftOrigin, client },
+                { screens: collisionBaselineScreens },
             );
 
-            res.errors?.forEach(e => errors.push(`(screenId=${_ignoreScreenId}) ${e || ''}`));
+            res.errors?.forEach(e => errors.push(e || ''));
 
-            if (!res.errors?.length) saved++;
+            if (!res.errors?.length) saved = incomingScreens.length;
         }
 
         if (errors.length) return { errors, saved, success: false, };
 
-        void recomputeScriptConditionErrors(scriptId);
+        if (!client) void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptScreens ERROR', e.message);
@@ -2263,11 +2317,17 @@ async function saveScriptDiagnoses({
     scriptId,
     preserveDiagnosesIds,
     draftOrigin,
+    uploadedFiles = {},
+    oldScriptId,
+    client,
 }: {
     preserveDiagnosesIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     diagnoses: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['diagnoses'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    oldScriptId?: string | null;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2277,9 +2337,15 @@ async function saveScriptDiagnoses({
         let saved = 0;
         const errors: string[] = [];
 
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        if (oldScriptId === undefined) {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            oldScriptId = script.data.oldScriptId;
+        }
+
+        const incomingDiagnoses: any[] = [];
+        const collisionBaselineDiagnoses: any[] = [];
 
         for (const diagnosis of diagnoses) {
             const {
@@ -2306,41 +2372,59 @@ async function saveScriptDiagnoses({
 
             try {
                 if (d.image1) {
-                    const res = await processImage(d.image1);
-                    d.image1 = res.image;
+                    if (uploadedFiles[d.image1.fileId || d.image1.data]) {
+                        d.image1 = uploadedFiles[d.image1.fileId || d.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image1);
+                        d.image1 = res.file;
+                    }
                 }
                 if (d.image2) {
-                    const res = await processImage(d.image2);
-                    d.image2 = res.image;
+                    if (uploadedFiles[d.image2.fileId || d.image2.data]) {
+                        d.image2 = uploadedFiles[d.image2.fileId || d.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image2);
+                        d.image2 = res.file;
+                    }
                 }
                 if (d.image3) {
-                    const res = await processImage(d.image3);
-                    d.image3 = res.image;
+                    if (uploadedFiles[d.image3.fileId || d.image3.data]) {
+                        d.image3 = uploadedFiles[d.image3.fileId || d.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image3);
+                        d.image3 = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
             }
 
-            const incomingDiagnosis = {
+            incomingDiagnoses.push({
                 ...d,
                 scriptId,
-                oldScriptId: script.data.oldScriptId,
+                oldScriptId,
                 diagnosisId,
                 version: 1,
-            };
+            });
+            collisionBaselineDiagnoses.push({ ...diagnosis, scriptId, diagnosisId });
+        }
+
+        if (errors.length) return { errors, saved: 0, success: false, };
+
+        if (incomingDiagnoses.length) {
             const res = await saveDiagnosesInternal(
-                { data: [incomingDiagnosis], draftOrigin },
-                { diagnoses: [{ ...diagnosis, scriptId, diagnosisId }] },
+                { data: incomingDiagnoses, draftOrigin, client },
+                { diagnoses: collisionBaselineDiagnoses },
             );
 
-            res.errors?.forEach(e => errors.push(`(diagnosisId=${_ignoreDiagnosisId}) ${e || ''}`));
+            res.errors?.forEach(e => errors.push(e || ''));
 
-            if (!res.errors?.length) saved++;
+            if (!res.errors?.length) saved = incomingDiagnoses.length;
         }
 
         if (errors.length) return { errors, saved, success: false, };
 
-        void recomputeScriptConditionErrors(scriptId);
+        if (!client) void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptDiagnoses ERROR', e.message);
@@ -2353,11 +2437,17 @@ async function saveScriptProblems({
     scriptId,
     preserveProblemsIds,
     draftOrigin,
+    uploadedFiles = {},
+    oldScriptId,
+    client,
 }: {
     preserveProblemsIds?: boolean;
     scriptId: string;
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
     problems: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['problems'];
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    oldScriptId?: string | null;
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2367,9 +2457,15 @@ async function saveScriptProblems({
         let saved = 0;
         const errors: string[] = [];
 
-        const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
-        if (script.errors?.length) throw new Error(script.errors.join(', '));
-        if (!script.data) throw new Error('Script not found');
+        if (oldScriptId === undefined) {
+            const script = await queries._getScript({ scriptId, returnDraftIfExists: true, });
+            if (script.errors?.length) throw new Error(script.errors.join(', '));
+            if (!script.data) throw new Error('Script not found');
+            oldScriptId = script.data.oldScriptId;
+        }
+
+        const incomingProblems: any[] = [];
+        const collisionBaselineProblems: any[] = [];
 
         for (const problem of problems) {
             const {
@@ -2395,41 +2491,59 @@ async function saveScriptProblems({
 
             try {
                 if (d.image1) {
-                    const res = await processImage(d.image1);
-                    d.image1 = res.image;
+                    if (uploadedFiles[d.image1.fileId || d.image1.data]) {
+                        d.image1 = uploadedFiles[d.image1.fileId || d.image1.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image1);
+                        d.image1 = res.file;
+                    }
                 }
                 if (d.image2) {
-                    const res = await processImage(d.image2);
-                    d.image2 = res.image;
+                    if (uploadedFiles[d.image2.fileId || d.image2.data]) {
+                        d.image2 = uploadedFiles[d.image2.fileId || d.image2.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image2);
+                        d.image2 = res.file;
+                    }
                 }
                 if (d.image3) {
-                    const res = await processImage(d.image3);
-                    d.image3 = res.image;
+                    if (uploadedFiles[d.image3.fileId || d.image3.data]) {
+                        d.image3 = uploadedFiles[d.image3.fileId || d.image3.data];
+                    } else {
+                        const res = await uploadReferencedFileIfMissing(d.image3);
+                        d.image3 = res.file;
+                    }
                 }
             } catch (e: any) {
                 logger.error('process image', e.message);
             }
 
-            const incomingProblem = {
+            incomingProblems.push({
                 ...d,
                 scriptId,
-                oldScriptId: script.data.oldScriptId,
+                oldScriptId,
                 problemId,
                 version: 1,
-            };
+            });
+            collisionBaselineProblems.push({ ...problem, scriptId, problemId });
+        }
+
+        if (errors.length) return { errors, saved: 0, success: false, };
+
+        if (incomingProblems.length) {
             const res = await saveProblemsInternal(
-                { data: [incomingProblem], draftOrigin },
-                { problems: [{ ...problem, scriptId, problemId }] },
+                { data: incomingProblems, draftOrigin, client },
+                { problems: collisionBaselineProblems },
             );
 
-            res.errors?.forEach(e => errors.push(`(problemId=${_ignoreProblemId}) ${e || ''}`));
+            res.errors?.forEach(e => errors.push(e || ''));
 
-            if (!res.errors?.length) saved++;
+            if (!res.errors?.length) saved = incomingProblems.length;
         }
 
         if (errors.length) return { errors, saved, success: false, };
 
-        void recomputeScriptConditionErrors(scriptId);
+        if (!client) void recomputeScriptConditionErrors(scriptId);
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptProblems ERROR', e.message);
@@ -2437,9 +2551,10 @@ async function saveScriptProblems({
     }
 }
 
-export async function deleteScriptsItems({ scriptsIds, draftOrigin, }: {
+export async function deleteScriptsItems({ scriptsIds, draftOrigin, client, }: {
     scriptsIds: string[];
     draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
+    client?: DbOrTransaction;
 }): Promise<{
     errors?: string[];
     success: boolean;
@@ -2447,13 +2562,13 @@ export async function deleteScriptsItems({ scriptsIds, draftOrigin, }: {
     try {
         const errors: string[] = [];
 
-        const delScreens = await deleteScreens({ scriptsIds, draftOrigin });
+        const delScreens = await deleteScreens({ scriptsIds, draftOrigin, client });
         delScreens.errors?.forEach(e => errors.push(e));
 
-        const delDiagnoses = await deleteDiagnoses({ scriptsIds, draftOrigin });
+        const delDiagnoses = await deleteDiagnoses({ scriptsIds, draftOrigin, client });
         delDiagnoses.errors?.forEach(e => errors.push(e));
 
-        const delProblems = await deleteProblems({ scriptsIds, draftOrigin });
+        const delProblems = await deleteProblems({ scriptsIds, draftOrigin, client });
         delProblems.errors?.forEach(e => errors.push(e));
 
         if (errors.length) return { errors, success: false, };
@@ -2474,7 +2589,8 @@ const saveScriptsWithItemsInfo = {
     dataKeys: 0,
 };
 
-export async function saveScriptsWithItems({ data, }: {
+export async function saveScriptsWithItems({ data, uploadedFiles, }: {
+    uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
         draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
@@ -2503,15 +2619,6 @@ export async function saveScriptsWithItems({ data, }: {
             if (overWriteScriptWithId && !overWriteScript?.data) {
                 errors.push('Overwrite script was not found');
                 continue;
-            }
-
-            if (overWriteScript?.data) {
-                const res = await deleteScriptsItems({
-                    scriptsIds: [overWriteScript.data.scriptId],
-                    draftOrigin,
-                });
-                res.errors?.forEach(e => errors.push(e));
-                if (errors.length) continue;
             }
 
             const {
@@ -2569,42 +2676,97 @@ export async function saveScriptsWithItems({ data, }: {
 
             const scriptId = overWriteScript?.data?.scriptId || v4();
 
-            const res = await saveScripts({
-                data: [{
-                    ...s,
-                    scriptId,
-                    version: 1,
-                    printSections: printSections.map(s => ({
-                        ...s,
-                        screensIds: s.screensIds.map((id: string) => oldScreensIdsMap[id]).filter((id: string | undefined | null): id is string => !!id),
-                    })),
-                    reviewConfigurations: reviewConfigurations.map(c => ({
-                        ...c,
-                        screen: oldScreensIdsMap[c.screen],
-                    })).filter((c): c is typeof c & { screen: string } => !!c.screen),
-                }],
-                draftOrigin,
-            });
+            // Everything below writes to the DB for this one script (its
+            // overwrite-delete, the script row, and its screens/diagnoses/
+            // problems). Run it as a single transaction so a failure partway
+            // through doesn't leave the script half-saved — either all of it
+            // lands, or none of it does. Other scripts in this same import
+            // are unaffected either way, matching the existing behavior of
+            // `continue`-ing past a failed script.
+            try {
+                // Counts are only applied to `info`/`savedScriptIds` after this
+                // resolves successfully (see below) — mutating them from inside
+                // the callback would overcount if a later step in the same
+                // transaction fails and rolls everything back.
+                const txInfo = await db.transaction(async (tx) => {
+                    if (overWriteScript?.data) {
+                        const delRes = await deleteScriptsItems({
+                            scriptsIds: [overWriteScript.data.scriptId],
+                            draftOrigin,
+                            client: tx,
+                        });
+                        if (delRes.errors?.length) throw new Error(delRes.errors.join(', '));
+                    }
 
-            res.errors?.forEach(e => errors.push(e));
-            if (errors.length) continue;
+                    const res = await saveScripts({
+                        data: [{
+                            ...s,
+                            scriptId,
+                            version: 1,
+                            printSections: printSections.map(s => ({
+                                ...s,
+                                screensIds: s.screensIds.map((id: string) => oldScreensIdsMap[id]).filter((id: string | undefined | null): id is string => !!id),
+                            })),
+                            reviewConfigurations: reviewConfigurations.map(c => ({
+                                ...c,
+                                screen: oldScreensIdsMap[c.screen],
+                            })).filter((c): c is typeof c & { screen: string } => !!c.screen),
+                        }],
+                        draftOrigin,
+                        client: tx,
+                    });
 
-            const saveScreens = await saveScriptScreens({ preserveScreensIds: true, scriptId, screens, draftOrigin });
-            saveScreens.errors?.forEach(e => errors.push(e));
-            info.screens += saveScreens.saved;
+                    if (res.errors?.length) throw new Error(res.errors.join(', '));
 
-            const saveDiagnoses = await saveScriptDiagnoses({ preserveDiagnosesIds: true, scriptId, diagnoses, draftOrigin });
-            saveDiagnoses.errors?.forEach(e => errors.push(e));
-            info.diagnoses += saveDiagnoses.saved;
+                    const saveScreens = await saveScriptScreens({
+                        preserveScreensIds: true,
+                        scriptId,
+                        screens,
+                        draftOrigin,
+                        uploadedFiles,
+                        oldScriptId,
+                        client: tx,
+                    });
+                    if (saveScreens.errors?.length) throw new Error(saveScreens.errors.join(', '));
 
-            const saveProblems = await saveScriptProblems({ preserveProblemsIds: true, scriptId, problems, draftOrigin });
-            saveProblems.errors?.forEach(e => errors.push(e));
-            info.problems += saveProblems.saved;
+                    const saveDiagnoses = await saveScriptDiagnoses({
+                        preserveDiagnosesIds: true,
+                        scriptId,
+                        diagnoses,
+                        draftOrigin,
+                        uploadedFiles,
+                        oldScriptId,
+                        client: tx,
+                    });
+                    if (saveDiagnoses.errors?.length) throw new Error(saveDiagnoses.errors.join(', '));
 
-            if (errors.length) continue;
+                    const saveProblems = await saveScriptProblems({
+                        preserveProblemsIds: true,
+                        scriptId,
+                        problems,
+                        draftOrigin,
+                        uploadedFiles,
+                        oldScriptId,
+                        client: tx,
+                    });
+                    if (saveProblems.errors?.length) throw new Error(saveProblems.errors.join(', '));
 
-            info.scripts++;
-            savedScriptIds.push(scriptId);
+                    return {
+                        screens: saveScreens.saved,
+                        diagnoses: saveDiagnoses.saved,
+                        problems: saveProblems.saved,
+                    };
+                });
+
+                info.screens += txInfo.screens;
+                info.diagnoses += txInfo.diagnoses;
+                info.problems += txInfo.problems;
+                info.scripts++;
+                savedScriptIds.push(scriptId);
+            } catch (e: any) {
+                errors.push(e.message);
+                continue;
+            }
         }
 
         if (errors.length) return { success: false, errors, info, savedScriptIds, };
@@ -2667,6 +2829,7 @@ export async function copyScripts(params?: {
         let importedDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
         let scrappedDataKeys: Awaited<ReturnType<typeof scrapDataKeys>> = [];
         let importedDataKeyAffectedScriptIds: string[] = [];
+        let importedFiles: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'] = {};
 
         if (!scriptsIds.length && !confirmCopyAll) throw new Error('You&apos;re about copy all the scripts, please confirm this action!');
 
@@ -2676,36 +2839,51 @@ export async function copyScripts(params?: {
 
         if (scripts.errors) return { success: false, errors: scripts.errors, info, };
 
+        if (!fromRemoteSiteId && scriptsIds.length && !scripts.data.length) {
+            return { success: false, errors: [`Script(s) not found: ${scriptsIds.join(', ')}`], info, };
+        }
+
         let siteUrl: undefined | string = undefined;
 
         if (fromRemoteSiteId) {
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_data, true);
-
-            const remoteFetchStartedAt = Date.now();
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
 
             siteUrl = axiosClient.defaults.baseURL;
 
-            const { data: importedDataKeysRes } = await axiosClient.get<Awaited<ReturnType<typeof _getDataKeys>>>('/api/data-keys?' + queryString.stringify({
-                returnDraftsIfExist: false,
-            }));
+            const importedDataKeysRes = await loadRemoteDataKeys({
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+                axiosClient,
+            });
             importedDataKeys = importedDataKeysRes.data;
 
-            const res = await axiosClient.get('/api/scripts/with-items?' + queryString.stringify({
-                scriptsIds: JSON.stringify(scriptsIds),
-                data: JSON.stringify({
-                    returnDraftsIfExist: false,
-                }),
-            }));
-            const resData = res.data as Awaited<ReturnType<typeof getScriptsWithItems>>;
+            const res = await loadRemoteScriptsWithItems({
+                dataKeys: importedDataKeys,
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+                axiosClient,
+                scriptsIds,
+            });
 
-            if (resData.errors) return { success: false, errors: resData.errors, info, };
+            if (res.errors?.length) return { success: false, errors: res.errors, info, };
 
-            scripts = resData;
-            markTiming('remote_fetch', remoteFetchStartedAt);
+            scripts = res;
 
+            if (scriptsIds.length && !scripts.data.length) {
+                return { success: false, errors: [`Script(s) not found on the source site: ${scriptsIds.join(', ')}`], info, };
+            }
 
-            scripts.data.forEach(({ dataKeys, drugsLibrary }, i) => {
+            const uploadRes = await uploadRemoteFiles({
+                files: res.files, 
+                requestKey,
+                remoteSiteId: fromRemoteSiteId,
+            });
+
+            importedFiles = uploadRes.data;
+
+            timings['remote_fetch'] = importedDataKeysRes.time + res.time;
+
+            scripts.data.forEach(({ dataKeys, drugsLibrary }) => {
                 scrappedDataKeys = [...scrappedDataKeys, ...dataKeys];
                 dffItemsToSave = [...dffItemsToSave, ...drugsLibrary];
             });
@@ -2736,8 +2914,6 @@ export async function copyScripts(params?: {
             }
 
             markTiming('parse_imported_data_keys', parseImportedStartedAt);
-
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_data, false);
         }
 
         let response: Awaited<ReturnType<typeof saveScriptsWithItems>> & {
@@ -2769,15 +2945,9 @@ export async function copyScripts(params?: {
                 response = res.data as Awaited<ReturnType<typeof saveScriptsWithItems>>;
                 markTiming('remote_save', remoteSaveStartedAt);
             } else {
-                const { files, scripts: scriptsWithParsedFiles, } = parseFileReferences({ 
-                    siteUrl, 
-                    scripts: scripts.data, 
-                });
-
-                scripts.data = scriptsWithParsedFiles as typeof scripts.data;
-
                 const saveScriptsStartedAt = Date.now();
                 response = await saveScriptsWithItems({
+                    uploadedFiles: importedFiles,
                     data: scripts.data.map(s => ({
                         ...s,
                         overWriteScriptWithId,
@@ -2804,7 +2974,12 @@ export async function copyScripts(params?: {
                 await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId: session.user?.userId, })
                 :
                 await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId: session.user?.userId, });
-            if (res.success) response.info.dffItems = dffItemsToSave.length;
+            if (res.success) {
+                response.info.dffItems = dffItemsToSave.length;
+            } else {
+                response.success = false;
+                response.errors = [...(response.errors || []), ...(res.errors || ['Failed to save drugs library items'])];
+            }
             markTiming('save_drugs_library_items', saveDrugsStartedAt);
         }
 
@@ -2825,6 +3000,9 @@ export async function copyScripts(params?: {
                 importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])
                     .map((script: { scriptId?: string | null }) => script.scriptId)
                     .filter((value): value is string => !!value);
+            } else {
+                response.success = false;
+                response.errors = [...(response.errors || []), ...(res.errors || ['Failed to save data keys'])];
             }
             markTiming('save_data_keys', saveDataKeysStartedAt);
         }
