@@ -3,12 +3,13 @@ import { SessionsTable } from './components/table';
 import { Title } from "@/components/title";
 
 type Props = {
-    searchParams: { [key: string]: string; };
+    searchParams: Promise<{ [key: string]: string; }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function SessionsPage({ searchParams }: Props) {
+export default async function SessionsPage(props: Props) {
+    const searchParams = await props.searchParams;
     const [sessions] = await Promise.all([
         getSessions(searchParams),
     ]);

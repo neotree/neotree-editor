@@ -1,7 +1,7 @@
 import { getHeaders } from "@/lib/header";
 
-const getLocalSites = () => {
-    const headers = getHeaders();
+const getLocalSites = async () => {
+    const headers = await getHeaders();
     return {
         webeditor: {
             name: 'Local editor',

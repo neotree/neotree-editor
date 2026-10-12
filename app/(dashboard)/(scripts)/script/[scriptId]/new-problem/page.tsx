@@ -5,13 +5,19 @@ import { ProblemForm } from "../../../components/problems/form";
 import { PageContainer } from "../../../components/page-container";
 
 type Props = {
-    params: { scriptId: string };
-    searchParams: { [key: string]: string; };
+    params: Promise<{ scriptId: string }>;
+    searchParams: Promise<{ [key: string]: string; }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewProblemPage({ params: { scriptId, } }: Props) {
+export default async function NewProblemPage(props: Props) {
+    const params = await props.params;
+
+    const {
+        scriptId
+    } = params;
+
     const [
         script,
         screens,

@@ -12,9 +12,9 @@ import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getHeaders } from "@/lib/header";
 
 interface IParams {
-    params: {
+    params: Promise<{
         deviceId: string;
-    };
+    }>;
 }
 
 type ReqBody = {
@@ -37,17 +37,23 @@ const data = {
     configKeys: [] as GetConfigKeysResults['data'],
 };
 
-export async function POST(req: NextRequest, { params: { deviceId } }: IParams) {
+export async function POST(req: NextRequest, props: IParams) {
+    const params = await props.params;
+
+    const {
+        deviceId
+    } = params;
+
     const responseData = { ...data, deviceId, };
 
-	try {
+    try {
         logger.log(`[POST] /api/app/device/${deviceId}`);
         
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], data: responseData, });
 
-        const { bearerToken } = getHeaders();
+        const { bearerToken } = await getHeaders();
 
         let isLoggedIn = false;
         if (bearerToken) {

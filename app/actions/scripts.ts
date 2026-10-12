@@ -50,7 +50,7 @@ import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastA
 import { loadRemoteDataKeys, loadRemoteScriptsWithItems, uploadRemoteFiles } from "./remote";
 import { uploadReferencedFileIfMissing } from "@/lib/files";
 
-export const getScriptsMetadata: typeof queries._getScriptsMetadata = (...args) => {
+export const getScriptsMetadata: typeof queries._getScriptsMetadata = async (...args) => {
     return queries._getScriptsMetadata(...args);
 };
 
