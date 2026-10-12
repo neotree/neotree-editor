@@ -27,6 +27,7 @@ import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
 import { Separator } from "@/components/ui/separator";
 import { ScriptsTableSearch } from "./scripts-table-search";
+import { ScriptsMetadataDownloadButton } from "./scripts-metadata-download-button";
 
 type Props = UseScriptsTableParams;
 
@@ -115,7 +116,15 @@ export function ScriptsTable(props: Props) {
             <ScriptsFab disabled={disabled} />
 
             <div className="flex flex-col gap-y-4">
-                <div className="pt-4 px-4 text-2xl">Scripts</div>
+                <div className="pt-4 px-4 flex items-center gap-x-2">
+                    <div className="text-2xl">Scripts</div>
+
+                    {!!scriptsArr.length && (
+                        <div className="ml-auto">
+                            <ScriptsMetadataDownloadButton label="Download all metadata" />
+                        </div>
+                    )}
+                </div>
 
                 <div className="px-4">
                     <ScriptsTableSearch 
@@ -128,7 +137,7 @@ export function ScriptsTable(props: Props) {
                 <DataTable 
                     selectedIndexes={selected}
                     onSelect={setSelected}
-                    selectable={!disabled}
+                    selectable
                     sortable={!disabled && !search.value}
                     loading={loading}
                     maxRows={25}
@@ -409,8 +418,10 @@ export function ScriptsTable(props: Props) {
 
             <ScriptsTableBottomActions 
                 selected={selected}
-                onDelete={() => onDelete(selected.map(i => scriptsArr[i].scriptId).filter(s => s))}
-                setScriptsIdsToExport={() => setScriptsIdsToExport(selected.map(i => scriptsArr[i].scriptId).filter(s => s))}
+                disabled={disabled}
+                selectedScriptsIds={selected.map(i => scriptsArr[i]?.scriptId).filter(s => s)}
+                onDelete={() => onDelete(selected.map(i => scriptsArr[i]?.scriptId).filter(s => s))}
+                setScriptsIdsToExport={() => setScriptsIdsToExport(selected.map(i => scriptsArr[i]?.scriptId).filter(s => s))}
             />
         </>
     )
