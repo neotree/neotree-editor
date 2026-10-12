@@ -27,7 +27,6 @@ import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
 import { Separator } from "@/components/ui/separator";
 import { ScriptsTableSearch } from "./scripts-table-search";
-import { ScriptsMetadataDownloadButton } from "./scripts-metadata-download-button";
 
 type Props = UseScriptsTableParams;
 
@@ -118,12 +117,6 @@ export function ScriptsTable(props: Props) {
             <div className="flex flex-col gap-y-4">
                 <div className="pt-4 px-4 flex items-center gap-x-2">
                     <div className="text-2xl">Scripts</div>
-
-                    {!!scriptsArr.length && (
-                        <div className="ml-auto">
-                            <ScriptsMetadataDownloadButton label="Download all metadata" />
-                        </div>
-                    )}
                 </div>
 
                 <div className="px-4">
