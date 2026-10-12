@@ -1,0 +1,19 @@
+name: Scheduled Security Scan
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scheduled:
+    uses: neotree/security-ci/.github/workflows/scheduled-security.yml@020aa53f59f10cc9e2c3802034ae5d2f809734a6
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+    with:
+      security-ci-ref: 020aa53f59f10cc9e2c3802034ae5d2f809734a6

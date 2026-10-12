@@ -21,5 +21,6 @@ namespace NodeJS {
         NEXTAUTH_SECRET: string;
         JWT_SECRET: string;
         API_KEY: string;
+        CORS_ALLOWED_ORIGINS: string;
     }
 }
