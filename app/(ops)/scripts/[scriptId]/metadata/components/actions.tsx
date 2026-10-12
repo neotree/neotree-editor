@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useRef } from "react";
-import * as XLSX from 'xlsx';
 
 import { Button } from "@/components/ui/button";
 import { GetScriptsMetadataResponse } from "@/databases/queries/scripts";
 import { buildScriptScreenMetadataRows } from "@/lib/scripts/metadata-export";
+import { downloadExcel as writeExcelFile, ExcelSheet } from "@/lib/excel-export";
 
 export function ScriptMetaActions({ data }: {
     data: GetScriptsMetadataResponse['data'];
@@ -13,13 +13,12 @@ export function ScriptMetaActions({ data }: {
     const downloadJSONRef = useRef<HTMLAnchorElement>(null);
 
     const downloadExcel = useCallback(async () => {
-        const workbook = XLSX.utils.book_new();
+        const sheets: ExcelSheet[] = [];
 
         data.forEach(script => {
             const worksheetData = buildScriptScreenMetadataRows(script);
 
-            const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-            XLSX.utils.book_append_sheet(workbook, worksheet, `Screens - ${script.title || ''}`.substring(0, 31));
+            sheets.push({ name: `Screens - ${script.title || ''}`.substring(0, 31), rows: worksheetData, });
         });
 
         data.forEach(script => {
@@ -81,11 +80,10 @@ export function ScriptMetaActions({ data }: {
                 });
             });
 
-            const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-            XLSX.utils.book_append_sheet(workbook, worksheet, `Diagnoses - ${script.title || ''}`.substring(0, 31));
+            sheets.push({ name: `Diagnoses - ${script.title || ''}`.substring(0, 31), rows: worksheetData, });
         });
 
-        XLSX.writeFile(workbook, "metadata.xlsx");
+        await writeExcelFile(sheets, "metadata.xlsx");
     }, [data]);
 
     const downloadJSON = useCallback(async () => {
