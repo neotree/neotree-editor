@@ -1565,6 +1565,7 @@ export const exportDataKeys = async ({
                     data: dataKeys.data,
                     user: remoteUser.data,
                     broadcastAction: true,
+                    draftOrigin: 'remote_export',
                 } satisfies Parameters<typeof saveDataKeysUpdateIfExist>[0]);
 
                 if (res.data.errors) errors = res.data.errors;
@@ -1573,6 +1574,7 @@ export const exportDataKeys = async ({
                     data: dataKeys.data,
                     user: remoteUser.data,
                     broadcastAction: true,
+                    draftOrigin: 'remote_export',
                 } satisfies Parameters<typeof saveDataKeysIfNotExist>[0]);
 
                 if (res.data.errors) errors = res.data.errors;
