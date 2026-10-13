@@ -1,6 +1,6 @@
 'use client';
 
-import * as XLSX from 'xlsx';
+import { downloadExcel } from "@/lib/excel-export";
 
 import { DrugsLibraryMetadataItem } from "@/databases/queries/drugs-library/_get-drugs-library-metadata";
 
@@ -55,10 +55,7 @@ export function downloadDrugsLibraryMetadataExcel(
     data: DrugsLibraryMetadataItem[],
     filename = 'drugs-library-metadata.xlsx',
 ) {
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(data.map(toWorksheetRow));
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'DFF Metadata');
-    XLSX.writeFile(workbook, filename);
+    return downloadExcel([{ name: 'DFF Metadata', rows: data.map(toWorksheetRow), }], filename);
 }
 
 export function downloadDrugsLibraryMetadataJSON(

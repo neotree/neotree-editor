@@ -56,7 +56,7 @@ export function ScriptsMetadataDownloadButton({
             const filename = `scripts-metadata-${date}`;
 
             if (format === 'excel') {
-                downloadScriptsMetadataExcel(data, `${filename}.xlsx`);
+                await downloadScriptsMetadataExcel(data, `${filename}.xlsx`);
             } else {
                 downloadScriptsMetadataJSON(data, `${filename}.json`);
             }

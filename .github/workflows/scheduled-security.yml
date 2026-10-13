@@ -10,10 +10,10 @@ permissions:
 
 jobs:
   scheduled:
-    uses: neotree/security-ci/.github/workflows/scheduled-security.yml@020aa53f59f10cc9e2c3802034ae5d2f809734a6
+    uses: neotree/security-ci/.github/workflows/scheduled-security.yml@ddd5eca85e6296dafc2dadc8b3242c05d165a76d
     permissions:
       contents: read
       security-events: write
       packages: read
     with:
-      security-ci-ref: 020aa53f59f10cc9e2c3802034ae5d2f809734a6
+      security-ci-ref: ddd5eca85e6296dafc2dadc8b3242c05d165a76d
