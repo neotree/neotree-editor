@@ -18,6 +18,8 @@ import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from 
 import socket from '@/lib/socket';
 import { buildDataKeysDeleteImpact } from '@/lib/data-key-delete-impact';
 import { recomputeScriptsConditionErrors } from '@/app/actions/scripts';
+import { getUser } from "@/app/actions/users";
+import { _getUser } from '@/databases/queries/users';
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
@@ -304,9 +306,13 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
     }
 }
 
-export const saveDataKeysIfNotExist: typeof _saveDataKeysIfNotExist = async params => {
+export const saveDataKeysIfNotExist = async (
+    { user, ...params }: Parameters<typeof _saveDataKeysIfNotExist>[0] & {
+        user?: Awaited<ReturnType<typeof _getUser>>;
+    }
+): ReturnType<typeof _saveDataKeysIfNotExist> => {
     try {
-        const session = await isAllowed();
+        const session = user ? { user } : await isAllowed();
         await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysIfNotExist({
             ...params,
@@ -318,9 +324,13 @@ export const saveDataKeysIfNotExist: typeof _saveDataKeysIfNotExist = async para
     }
 };
 
-export const saveDataKeysUpdateIfExist: typeof _saveDataKeysUpdateIfExist = async params => {
+export const saveDataKeysUpdateIfExist  = async (
+    { user, ...params }: Parameters<typeof _saveDataKeysUpdateIfExist>[0] & {
+        user?: Awaited<ReturnType<typeof _getUser>>;
+    }
+): ReturnType<typeof _saveDataKeysUpdateIfExist> => {
     try {
-        const session = await isAllowed();
+        const session = user ? { user } : await isAllowed();
         await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysUpdateIfExist({
             ...params,
@@ -1520,6 +1530,7 @@ export const exportDataKeys = async ({
     uuids: string[];
     siteId: string;
     overwriteExisting?: boolean;
+    requestKey?: string;
 }): Promise<{
     success: boolean;
     errors?: string[];
@@ -1542,12 +1553,17 @@ export const exportDataKeys = async ({
             };
         }
 
+        const remoteUser = await axiosClient.get<Awaited<ReturnType<typeof getUser>>>(`/api/users/${session.user?.email}`);
+
+        if (!remoteUser.data?.email) throw new Error(`User "${session.user?.email}" was not found on remote site`);
+
         let errors: string[] = [];
 
         if (dataKeys.data.length) {
             if (overwriteExisting) {
                 const res = await axiosClient.post<Awaited<ReturnType<typeof saveDataKeysUpdateIfExist>>>('/api/data-keys/save-and-update-if-exist', {
                     data: dataKeys.data,
+                    user: remoteUser.data,
                     broadcastAction: true,
                 } satisfies Parameters<typeof saveDataKeysUpdateIfExist>[0]);
 
@@ -1555,6 +1571,7 @@ export const exportDataKeys = async ({
             } else {
                 const res = await axiosClient.post<Awaited<ReturnType<typeof saveDataKeysIfNotExist>>>('/api/data-keys/save-if-not-exist', {
                     data: dataKeys.data,
+                    user: remoteUser.data,
                     broadcastAction: true,
                 } satisfies Parameters<typeof saveDataKeysIfNotExist>[0]);
 
