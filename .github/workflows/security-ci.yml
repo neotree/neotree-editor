@@ -1,0 +1,51 @@
+name: Security CI
+
+# Thin caller. All logic lives in neotree/security-ci, pinned by SHA.
+# Update the SHA in BOTH the `uses:` line and `security-ci-ref` together - Dependabot
+# opens a pull request for the `uses:` line, and the gate fails loudly if they disagree.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  security:
+    uses: neotree/security-ci/.github/workflows/security-ci.yml@ddd5eca85e6296dafc2dadc8b3242c05d165a76d
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+    with:
+      security-ci-ref: ddd5eca85e6296dafc2dadc8b3242c05d165a76d
+      node-version: "22"
+      # CodeQL runs from GitHub's Code Scanning *default setup* on this repository and has
+      # been uploading results on every push, pull request and schedule. Default setup
+      # rejects SARIF produced by an advanced configuration, so this pipeline's own CodeQL
+      # jobs could not upload and failed. Disabling them here leaves default setup as the
+      # single CodeQL source instead of two configurations fighting; scanning coverage is
+      # unchanged. To move CodeQL into this pipeline instead, turn off default setup under
+      # Settings > Security > Code scanning (needs repo admin) and delete this line.
+      enable-codeql: false
+      # upload-sarif stays enabled: this repository is public, so the OSV and Semgrep
+      # SARIF uploads work normally.
+      # Hosts this project's build needs beyond the npm registry:
+      #   binaries.prisma.sh - `prisma generate` (ci:prepare) downloads its engines here,
+      #     because install runs with scripts disabled so Prisma's postinstall never fetches them.
+      #   fonts.googleapis.com, fonts.gstatic.com - next/font/google in app/layout.tsx
+      #     downloads Roboto at build time; `next build` fails if it cannot.
+      # Folded (`>-`) on purpose: harden-runner splits this list on spaces only, so a
+      # literal block (`|`) arrives as one malformed entry and every host is blocked.
+      extra-egress-endpoints: >-
+        binaries.prisma.sh:443
+        fonts.googleapis.com:443
+        fonts.gstatic.com:443

@@ -1,1 +1,4 @@
-{"version":1,"functions":{"/authorize/[token]":{},"/":{},"/script/[scriptId]/diagnosis/[diagnosisId]":{},"/script/[scriptId]/new-problem":{},"/script/[scriptId]/new-screen":{},"/login":{},"/script/[scriptId]":{},"/script/[scriptId]/screen/[screenId]":{},"/account":{},"/script/[scriptId]/problem/[problemId]":{},"/new-script":{},"/changelogs":{},"/changelogs/pending":{},"/configuration":{},"/data-keys/edit/[dataKeyId]":{},"/data-keys/new":{},"/data-keys":{},"/data-keys/[dataKeyId]/metadata":{},"/changelogs/pending/[entryId]":{},"/script/[scriptId]/new-diagnosis":{},"/data-keys/metadata":{},"/drugs-fluids-and-feeds":{},"/sessions":{},"/hospitals":{},"/settings":{},"/settings/data":{},"/settings/logs":{},"/settings/sys":{},"/users/add":{},"/users/edit/[uuid]":{},"/diagnoses":{},"/users":{},"/drugs-fluids-and-feeds/metadata":{},"/screens":{},"/scripts/[scriptId]/metadata":{},"/sessions/[sessionId]":{},"/settings/app":{},"/drugs-fluids-and-feeds/[itemId]/metadata":{}}}
+{
+  "version": 1,
+  "functions": {}
+}

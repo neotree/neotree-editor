@@ -5,12 +5,18 @@ import { getDataKeysWithUsage } from "../../metadata/get-data-keys-with-usage";
 export const dynamic = 'force-dynamic';
 
 type Props = {
-    params: {
+    params: Promise<{
         dataKeyId: string;
-    };
+    }>;
 };
 
-export default async function DataKeyMetadataPage({ params: { dataKeyId } }: Props) {
+export default async function DataKeyMetadataPage(props: Props) {
+    const params = await props.params;
+
+    const {
+        dataKeyId
+    } = params;
+
     const metadata = await getDataKeys({
         dataKeysIds: [dataKeyId],
         returnDraftsIfExist: true,

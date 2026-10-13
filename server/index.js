@@ -1,5 +1,7 @@
 require('./env');
 
+const logger = require('./logger');
+
 const { createServer } = require("node:http");
 const next = require("next");
 const { Server } = require("socket.io");
@@ -25,7 +27,7 @@ app.prepare().then(() => {
     });
 
     io.on("connection", (socket) => {
-        console.log('Client connected');
+        logger.log('Client connected');
 
         const onEvent = (eventName, ...args) => {
             const cb = args.filter(arg => typeof arg === 'function')[0];
@@ -49,10 +51,10 @@ app.prepare().then(() => {
 
     httpServer
         .once("error", (err) => {
-            console.error(err);
+            logger.error(err);
             process.exit(1);
         })
         .listen(port, () => {
-            console.log(`> Ready on http://${hostname}:${port}`);
+            logger.log(`> Ready on http://${hostname}:${port}`);
         });
 });

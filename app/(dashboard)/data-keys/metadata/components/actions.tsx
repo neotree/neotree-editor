@@ -44,9 +44,8 @@ export function DataKeysMetaActions({ data }: Props) {
                 throw new Error(res.errors?.join(', ') || 'Failed to generate usage export');
             }
 
-            downloadDataKeysUsageExcel(res.data);
+            await downloadDataKeysUsageExcel(res.data);
         } catch (e: any) {
-            console.error('downloadUsageExcel ERROR', e.message);
             alert(`Failed to download usage export: ${e.message}`);
         } finally {
             setDownloadingUsage(false);

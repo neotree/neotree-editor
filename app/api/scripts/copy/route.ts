@@ -39,8 +39,6 @@ export async function POST(req: NextRequest) {
             run: () => copyScripts({ ...body, requestKey, }),
         });
 
-        console.log(job);
-
         if (job.status === 'pending') {
             return NextResponse.json({ success: true, started: true, requestKey, });
         }

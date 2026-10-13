@@ -1,6 +1,18 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import {
+    getCorsResponseHeaders,
+    isApiPath,
+    parseAllowedOrigins,
+    resolveAllowedOrigin,
+} from '@/lib/cors'
+
+function applyCorsHeaders(headers: Headers, allowedOrigin: string) {
+    const corsHeaders = getCorsResponseHeaders(allowedOrigin);
+    Object.entries(corsHeaders).forEach(([key, value]) => headers.set(key, value));
+}
+
 export async function middleware(request: NextRequest) {
     const requestHeaders = new Headers(request.headers);
 
@@ -15,15 +27,34 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set('x-next-url-username', request.nextUrl.username);
     requestHeaders.set('x-next-url-locale', request.nextUrl.locale);
     requestHeaders.set('x-next-url-origin', request.nextUrl.origin);
-    requestHeaders.set('x-geo-city', request.geo?.city || '');
-    requestHeaders.set('x-geo-country', request.geo?.country || '');
-    requestHeaders.set('x-geo-region', request.geo?.region || '');
-    requestHeaders.set('x-geo-latitude', request.geo?.latitude || '');
-    requestHeaders.set('x-geo-longitude', request.geo?.longitude || '');
+    // request.geo was removed in Next 15 (it was only ever populated on Vercel, so these were always empty here).
+    // Keep overwriting them so client-supplied x-geo-* headers can't reach the app.
+    requestHeaders.set('x-geo-city', '');
+    requestHeaders.set('x-geo-country', '');
+    requestHeaders.set('x-geo-region', '');
+    requestHeaders.set('x-geo-latitude', '');
+    requestHeaders.set('x-geo-longitude', '');
 
-    return NextResponse.next({
+    const isApi = isApiPath(request.nextUrl.pathname);
+    const allowedOrigin = !isApi ? null : resolveAllowedOrigin(
+        request.headers.get('origin'),
+        parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS, process.env.NEXT_PUBLIC_APP_URL),
+    );
+
+    // Answer the preflight here so a disallowed origin never reaches a route handler.
+    if (isApi && request.method === 'OPTIONS') {
+        const preflight = new NextResponse(null, { status: 204 });
+        if (allowedOrigin) applyCorsHeaders(preflight.headers, allowedOrigin);
+        return preflight;
+    }
+
+    const response = NextResponse.next({
         request: {
             headers: requestHeaders,
         },
     });
+
+    if (allowedOrigin) applyCorsHeaders(response.headers, allowedOrigin);
+
+    return response;
 }
