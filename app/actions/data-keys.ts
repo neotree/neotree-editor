@@ -313,7 +313,6 @@ export const saveDataKeysIfNotExist = async (
 ): ReturnType<typeof _saveDataKeysIfNotExist> => {
     try {
         const session = user ? { user } : await isAllowed();
-        console.log('session.user', session.user);
         await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysIfNotExist({
             ...params,
@@ -332,7 +331,6 @@ export const saveDataKeysUpdateIfExist  = async (
 ): ReturnType<typeof _saveDataKeysUpdateIfExist> => {
     try {
         const session = user ? { user } : await isAllowed();
-        console.log('session.user', session.user);
         await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysUpdateIfExist({
             ...params,
