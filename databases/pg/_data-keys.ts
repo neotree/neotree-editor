@@ -11,7 +11,7 @@ import {
     uuid,
 } from "drizzle-orm/pg-core";
 
-export type DataKeyDraftOrigin = "data_key_sync" | "editor" | "import" | "other";
+export type DataKeyDraftOrigin = "data_key_sync" | "editor" | "import" | "remote_export" | "other";
 
 // DATA KEYS
 export const dataKeys = pgTable(
