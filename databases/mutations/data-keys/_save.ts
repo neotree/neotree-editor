@@ -378,6 +378,7 @@ export async function _saveDataKeys({
 }
 
 export async function _saveDataKeysIfNotExist({
+    userId,
     data,
 }: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     try {
@@ -403,6 +404,7 @@ export async function _saveDataKeysIfNotExist({
                 publishDate: undefined,
                 deletedAt: undefined,
                 version: undefined,
+                createdByUserId: userId,
             })),
         });
 
@@ -416,6 +418,7 @@ export async function _saveDataKeysIfNotExist({
 }
 
 export async function _saveDataKeysUpdateIfExist({
+    userId,
     data,
 }: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     try {
@@ -436,6 +439,7 @@ export async function _saveDataKeysUpdateIfExist({
                     publishDate: existing?.publishDate,
                     deletedAt: existing?.deletedAt,
                     version: existing?.version,
+                    createdByUserId: userId,
                 };
             }),
         });
