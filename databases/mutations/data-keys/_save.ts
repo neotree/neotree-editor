@@ -405,7 +405,7 @@ export async function _saveDataKeysIfNotExist({
                 publishDate: undefined,
                 deletedAt: undefined,
                 version: undefined,
-                createdByUserId: userId,
+                createdByUserId: params.userId,
             })),
         });
 
@@ -441,7 +441,7 @@ export async function _saveDataKeysUpdateIfExist({
                     publishDate: existing?.publishDate,
                     deletedAt: existing?.deletedAt,
                     version: existing?.version,
-                    createdByUserId: userId,
+                    createdByUserId: params.userId,
                 };
             }),
         });
