@@ -6,14 +6,18 @@ import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
     try {
-        const isAuthorised = await isAuthenticated();
-
-        if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
-            
         const body = await req.json();
+        let user: null | Awaited<ReturnType<typeof isAuthenticated>>['user'] = body.user || null;
+
+        if (!body.user) {
+            const isAuthorised = await isAuthenticated();
+            user = isAuthorised.user;
+            if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
+        }
         
         const res = await saveDataKeysIfNotExist({
             ...body,
+            user,
         });
 
         return NextResponse.json(res);
