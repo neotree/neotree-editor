@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Roboto } from "next/font/google";
+import localFont from "next/font/local";
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 
 import '@/lib/resize-observer-polyfill';
@@ -22,9 +22,41 @@ import * as socketEventsActions from '@/app/actions/socket-events';
 
 import "@/app/globals.css";
 
-const roboto = Roboto({
-    subsets: ['latin'],
-    weight: ['100', '300', '400', '500', '700', '900'],
+const roboto = localFont({
+    src: [
+        {
+            path: './fonts/Roboto/Roboto.ttf',
+            weight: '100',
+            style: 'normal',
+        },
+        {
+            path: './fonts/Roboto/Roboto.ttf',
+            weight: '300',
+            style: 'normal',
+        },
+        {
+            path: './fonts/Roboto/Roboto.ttf',
+            weight: '400',
+            style: 'normal',
+        },
+        {
+            path: './fonts/Roboto/Roboto.ttf',
+            weight: '500',
+            style: 'normal',
+        },
+        {
+            path: './fonts/Roboto/Roboto.ttf',
+            weight: '700',
+            style: 'normal',
+        },
+        {
+            path: './fonts/Roboto/Roboto.ttf',
+            weight: '900',
+            style: 'normal',
+        },
+    ],
+    // subsets: ['latin'],
+    // weight: ['100', '300', '400', '500', '700', '900'],
 }); 
 
 export const dynamic = 'force-dynamic';
