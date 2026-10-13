@@ -7,14 +7,13 @@ import { startOrJoinImportJob, buildImportContentKey } from "@/lib/import-jobs";
 
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json();
-        let user: null | Awaited<ReturnType<typeof isAuthenticated>>['user'] = body.user || null;
+        const isAuthorised = await isAuthenticated();
 
-        if (!body.user) {
-            const isAuthorised = await isAuthenticated();
-            user = isAuthorised.user;
-            if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
-        }
+        if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
+
+        const body = await req.json();
+
+        const user = isAuthorised.user;
 
         const requestKey: string = body.requestKey || '';
         if (!requestKey) return NextResponse.json({ errors: ['Missing requestKey'], });
@@ -32,7 +31,11 @@ export async function POST(req: NextRequest) {
         });
 
         if (job.status === 'pending') {
-            return NextResponse.json({ success: true, started: true, requestKey, });
+            return NextResponse.json({ 
+                success: true, 
+                started: true, 
+                requestKey,
+            });
         }
 
         return NextResponse.json(job.result);

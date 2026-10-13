@@ -483,79 +483,61 @@ export function DataKeysCtxProvider({
     const [exporting, setExporting] = useState(false);
     const [exportRequestKey, setExportRequestKey] = useState(Math.random().toString(12).substring(2));
 
-    const waitForImportCompletion = (requestBody: Record<string, any>) => {
-        let settled = false;
-
-        const stopWaiting = () => {
-            settled = true;
-            clearInterval(pollTimer);
-        };
-
-        const checkStatus = async () => {
-            if (settled) return;
-            try {
-                const response = await axios.post('/api/data-keys/export', requestBody);
-                const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof actions.exportDataKeys>>;
-                if (!res.started && !settled) {
-                    stopWaiting();
-                }
-            } catch {
-                // Ignore — the next signal or poll will still resolve it.
-            }
-        };
-
-        const pollTimer = setInterval(checkStatus, 45 * 1000);
-    };
-
-    const handleExportDataKeysResults = useCallback(async (res: Awaited<ReturnType<typeof actions.exportDataKeys>>) => {
-        try {
-            if (res.errors?.length) throw new Error(res.errors[0]);
-
-            await loadDataKeys();
-
-            setSelected([]);
-
-            alert({
-                title: 'Success',
-                message: 'Data exported successfully!',
-                variant: 'success',
-            });
-        } catch(e: any) {
-            alert({
-                title: 'Error',
-                message: e.message,
-                variant: 'error',
-            });
-        } finally {
-            setExporting(false);
-        }
-    }, [loadDataKeys, alert]);
-
-    const exportDataKeys: tDataKeysCtx['exportDataKeys'] = useCallback(async (data) => {
+    const exportDataKeys = useCallback(async (
+        data: Parameters<tDataKeysCtx['exportDataKeys']>[0],
+    ) => {
         try {
             setExporting(true);
 
             const payload = { ...data, requestKey: exportRequestKey, };
 
-            const response = await axios.post<
-                { started?: boolean; } & Awaited<ReturnType<typeof actions.exportDataKeys>>
-            >(`/api/data-keys/export`, payload);
-            const res = response.data;
+            let res = null as (Awaited<ReturnType<typeof actions.exportDataKeys>> & {
+                started?: boolean;
+            }) | null;
 
-            if (!res.started) {
-                handleExportDataKeysResults(res);
-                return;
+            await new Promise<any>(resolve => {
+                (async () => {
+                    const exportFn = async () => {
+                        const response = await axios.post<
+                            { started?: boolean; } & Awaited<ReturnType<typeof actions.exportDataKeys>>
+                        >(`/api/data-keys/export`, payload);
+                        return response.data;
+                    };
+
+                    res = await exportFn();
+
+                    let exportInterval = setInterval(() => {
+                        (async () => {
+                            res = await exportFn();
+                            if (!res?.started) {
+                                resolve(null);
+                                clearInterval(exportInterval);
+                            }
+                        })();
+                    }, 10000);
+                })();
+            });
+
+            if (res && !res?.started) {
+                if (res.errors?.length) throw new Error(res.errors[0]);
+
+                await loadDataKeys();
+
+                setSelected([]);
+
+                alert({
+                    title: 'Success',
+                    message: 'Data exported successfully!',
+                    variant: 'success',
+                });
             }
-
-            waitForImportCompletion(payload);
         } catch(e: any) {
+            setExporting(false);
             alert({
                 title: 'Error',
                 message: e.message,
                 variant: 'error',
             });
-        } finally {
-            setExporting(false);
         }
     }, [exportRequestKey, alert]);
 
