@@ -532,12 +532,13 @@ export function DataKeysCtxProvider({
                 });
             }
         } catch(e: any) {
-            setExporting(false);
             alert({
                 title: 'Error',
                 message: e.message,
                 variant: 'error',
             });
+        } finally {
+            setExporting(false);
         }
     }, [exportRequestKey, alert]);
 
