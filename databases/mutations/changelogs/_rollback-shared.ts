@@ -136,8 +136,10 @@ export function normalizeSnapshot(snapshot: any) {
   return snapshot ?? {}
 }
 
-// SQL condition mirroring isMeaningfulSnapshot for use in target-selection queries
-export const nonEmptySnapshotCondition = sql`${changeLogs.fullSnapshot} <> '{}'::jsonb`
+// SQL condition mirroring isMeaningfulSnapshot for use in target-selection queries.
+// Rows written before the drizzle 0.45 upgrade store jsonb as a JSON-encoded string, so an empty
+// snapshot is the jsonb string "{}" rather than the object {}; both forms must be excluded.
+export const nonEmptySnapshotCondition = sql`(${changeLogs.fullSnapshot} <> '{}'::jsonb AND ${changeLogs.fullSnapshot} <> to_jsonb('{}'::text))`
 
 // Empty baselines ({}) are valid changelog rows but must never be restored as entity state
 export function isMeaningfulSnapshot(snapshot: any): boolean {
