@@ -1,5 +1,6 @@
 'use client';
 
+import axios from "axios";
 import { useState } from "react";
 import { UploadIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -35,7 +36,7 @@ export function ExportModal({ uuids, }: {
     uuids: string[];
 }) {
     const [open, setOpen] = useState(false);
-    const { dataKeys, exporting, exportDataKeys, extractDataKeys, } = useDataKeysCtx();
+    const { dataKeys, exporting, setExportRequestKey, exportDataKeys, extractDataKeys, } = useDataKeysCtx();
 
     const { sites: _sites } = useAppContext();
     const sites = _sites.filter(s => s.type === 'webeditor');
@@ -80,6 +81,7 @@ export function ExportModal({ uuids, }: {
                 onOpenChange={open => {
                     resetForm();
                     setOpen(open);
+                    setExportRequestKey(Math.random().toString(12).substring(2));
                 }}
             >
                 <DialogTrigger asChild>
