@@ -1198,7 +1198,7 @@
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/etlua.js": {
     "id": 72333,
     "files": [
-      "static/chunks/react-syntax-highlighter_languages_refractor_etlua.5a5c0da35008c68a.js"
+      "static/chunks/react-syntax-highlighter_languages_refractor_etlua.688b1ea25438b182.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/excel-formula.js": {
@@ -1640,9 +1640,9 @@
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/lua.js": {
-    "id": 25977,
+    "id": 48358,
     "files": [
-      "static/chunks/react-syntax-highlighter_languages_refractor_lua.620756479da369cd.js"
+      "static/chunks/react-syntax-highlighter_languages_refractor_lua.0a517370fa2ee93b.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/async-languages/prism.js -> refractor/lang/magma.js": {
@@ -2432,7 +2432,7 @@
   "node_modules/react-syntax-highlighter/dist/esm/prism-async-light.js -> refractor/core": {
     "id": 72424,
     "files": [
-      "static/chunks/react-syntax-highlighter/refractor-core-import.799a5ec4289fdb53.js"
+      "static/chunks/react-syntax-highlighter/refractor-core-import.b2d7b712f2f36e12.js"
     ]
   },
   "node_modules/react-syntax-highlighter/dist/esm/prism-async.js -> refractor": {
