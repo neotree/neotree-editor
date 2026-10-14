@@ -543,6 +543,7 @@ export async function _saveDataKeys({
 
 export async function _saveDataKeysIfNotExist({
     data,
+    ...params
 }: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     try {
         const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
@@ -558,6 +559,7 @@ export async function _saveDataKeysIfNotExist({
         });
 
         const res = await _saveDataKeys({
+            ...params,
             data: data.map(item => ({
                 ...item,
                 uuid: undefined,
@@ -567,6 +569,7 @@ export async function _saveDataKeysIfNotExist({
                 publishDate: undefined,
                 deletedAt: undefined,
                 version: undefined,
+                createdByUserId: params.userId,
             })),
         });
 
@@ -581,6 +584,7 @@ export async function _saveDataKeysIfNotExist({
 
 export async function _saveDataKeysUpdateIfExist({
     data,
+    ...params
 }: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     try {
         const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
@@ -588,6 +592,7 @@ export async function _saveDataKeysUpdateIfExist({
         const saved = await _getDataKeys({ uniqueKeys, });
 
         const res = await _saveDataKeys({
+            ...params,
             data: data.map(item => {
                 const existing = saved.data.find(dk => dk.uniqueKey === item.uniqueKey);
 
@@ -600,6 +605,7 @@ export async function _saveDataKeysUpdateIfExist({
                     publishDate: existing?.publishDate,
                     deletedAt: existing?.deletedAt,
                     version: existing?.version,
+                    createdByUserId: params.userId,
                 };
             }),
         });
