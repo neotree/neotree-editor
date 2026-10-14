@@ -7,8 +7,10 @@ import { useEffect, useRef } from "react";
 const titles: { value: string; }[] = [];
 let headObserver: MutationObserver | null = null;
 
+const normalizeTitle = (title: string) => title.replace(/[\t\n\f\r ]+/g, ' ').trim();
+
 function applyTitle() {
-    const title = titles[titles.length - 1]?.value ?? (process.env.NEXT_PUBLIC_APP_NAME || '');
+    const title = normalizeTitle(titles[titles.length - 1]?.value ?? (process.env.NEXT_PUBLIC_APP_NAME || ''));
     if (document.title !== title) document.title = title;
 }
 
