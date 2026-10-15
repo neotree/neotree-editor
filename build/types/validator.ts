@@ -317,6 +317,33 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../app/(dashboard)/data-keys/merge/batch/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/data-keys/merge/batch">> = Specific
+  const handler = {} as typeof import("../../app/(dashboard)/data-keys/merge/batch/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/(dashboard)/data-keys/merge/history/[mergeId]/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/data-keys/merge/history/[mergeId]">> = Specific
+  const handler = {} as typeof import("../../app/(dashboard)/data-keys/merge/history/[mergeId]/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/(dashboard)/data-keys/merge/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/data-keys/merge">> = Specific
+  const handler = {} as typeof import("../../app/(dashboard)/data-keys/merge/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../app/(dashboard)/data-keys/metadata/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/data-keys/metadata">> = Specific
@@ -839,10 +866,73 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../app/api/data-keys/delete/preview/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/delete/preview">> = Specific
+  const handler = {} as typeof import("../../app/api/data-keys/delete/preview/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/data-keys/duplicates/dismissals/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/duplicates/dismissals">> = Specific
+  const handler = {} as typeof import("../../app/api/data-keys/duplicates/dismissals/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../app/api/data-keys/export/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/export">> = Specific
   const handler = {} as typeof import("../../app/api/data-keys/export/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/data-keys/merge/[mergeId]/revert/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/merge/[mergeId]/revert">> = Specific
+  const handler = {} as typeof import("../../app/api/data-keys/merge/[mergeId]/revert/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/data-keys/merge/batch/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/merge/batch">> = Specific
+  const handler = {} as typeof import("../../app/api/data-keys/merge/batch/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/data-keys/merge/preview/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/merge/preview">> = Specific
+  const handler = {} as typeof import("../../app/api/data-keys/merge/preview/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/data-keys/merge/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/merge">> = Specific
+  const handler = {} as typeof import("../../app/api/data-keys/merge/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/data-keys/pending-deletion/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/pending-deletion">> = Specific
+  const handler = {} as typeof import("../../app/api/data-keys/pending-deletion/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check
@@ -888,6 +978,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/save-if-not-exist">> = Specific
   const handler = {} as typeof import("../../app/api/data-keys/save-if-not-exist/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/data-keys/save/preview/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/data-keys/save/preview">> = Specific
+  const handler = {} as typeof import("../../app/api/data-keys/save/preview/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

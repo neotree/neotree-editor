@@ -91,6 +91,14 @@
       "namedRegex": "^/api/changelogs/history/(?<nxtPentityId>[^/]+?)(?:/)?$"
     },
     {
+      "page": "/api/data-keys/merge/[mergeId]/revert",
+      "regex": "^/api/data\\-keys/merge/([^/]+?)/revert(?:/)?$",
+      "routeKeys": {
+        "nxtPmergeId": "nxtPmergeId"
+      },
+      "namedRegex": "^/api/data\\-keys/merge/(?<nxtPmergeId>[^/]+?)/revert(?:/)?$"
+    },
+    {
       "page": "/api/files/[fileId]",
       "regex": "^/api/files/([^/]+?)(?:/)?$",
       "routeKeys": {
@@ -186,6 +194,14 @@
         "nxtPdataKeyId": "nxtPdataKeyId"
       },
       "namedRegex": "^/data\\-keys/edit/(?<nxtPdataKeyId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/data-keys/merge/history/[mergeId]",
+      "regex": "^/data\\-keys/merge/history/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPmergeId": "nxtPmergeId"
+      },
+      "namedRegex": "^/data\\-keys/merge/history/(?<nxtPmergeId>[^/]+?)(?:/)?$"
     },
     {
       "page": "/data-keys/[dataKeyId]/metadata",
@@ -403,6 +419,18 @@
       "regex": "^/data\\-keys(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/data\\-keys(?:/)?$"
+    },
+    {
+      "page": "/data-keys/merge",
+      "regex": "^/data\\-keys/merge(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/data\\-keys/merge(?:/)?$"
+    },
+    {
+      "page": "/data-keys/merge/batch",
+      "regex": "^/data\\-keys/merge/batch(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/data\\-keys/merge/batch(?:/)?$"
     },
     {
       "page": "/data-keys/metadata",
