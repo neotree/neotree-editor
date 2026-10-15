@@ -1,1 +1,0 @@
-"use strict";exports.id=70452,exports.ids=[70452],exports.modules={14540:a=>{function b(a){a.languages.hsts={directive:{pattern:/\b(?:includeSubDomains|max-age|preload)(?=[\s;=]|$)/i,alias:"property"},operator:/=/,punctuation:/;/}}a.exports=b,b.displayName="hsts",b.aliases=[]}};

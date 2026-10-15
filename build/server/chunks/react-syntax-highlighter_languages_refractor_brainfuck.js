@@ -1,1 +1,0 @@
-"use strict";exports.id=99101,exports.ids=[99101],exports.modules={26017:a=>{function b(a){a.languages.brainfuck={pointer:{pattern:/<|>/,alias:"keyword"},increment:{pattern:/\+/,alias:"inserted"},decrement:{pattern:/-/,alias:"deleted"},branching:{pattern:/\[|\]/,alias:"important"},operator:/[.,]/,comment:/\S+/}}a.exports=b,b.displayName="brainfuck",b.aliases=[]}};
