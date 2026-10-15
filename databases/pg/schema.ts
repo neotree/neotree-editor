@@ -2077,3 +2077,52 @@ export const integrityImportSnapshotsRelations = relations(integrityImportSnapsh
     relationName: "integrityImportSnapshotAcceptedBy",
   }),
 }))
+
+export const dataKeyMergeStatusEnum = pgEnum("data_key_merge_status", ["applied", "reverted"])
+
+// One row per recorded data key operation (merge, delete/replace, replace or
+// remove in selected scripts, unlink from a parent): what was asked, what
+// changed (report) and the draft rows before/after it (snapshot), which is what
+// makes a revert possible until it is published. "survivor" is the key the
+// operation is about; "merged" are the keys it removed or replaced.
+export const dataKeyMerges = pgTable(
+  "nt_data_key_merges",
+  {
+    id: serial("id").primaryKey(),
+    mergeId: uuid("merge_id").notNull().unique().defaultRandom(),
+    // merge | delete (library delete/replace) | scripts (replace/remove in selected scripts) | unlink
+    kind: text("kind").$type<"merge" | "delete" | "scripts" | "unlink">().notNull().default("merge"),
+    title: text("title").notNull().default(""),
+    status: dataKeyMergeStatusEnum("status").notNull().default("applied"),
+    scope: text("scope").$type<"library" | "scripts">().notNull(),
+    survivorUniqueKey: text("survivor_unique_key").notNull(),
+    survivorName: text("survivor_name").notNull().default(""),
+    mergedUniqueKeys: jsonb("merged_unique_keys").$type<string[]>().default([]).notNull(),
+    scriptIds: jsonb("script_ids").$type<string[]>().default([]).notNull(),
+    request: jsonb("request").$type<any>().default({}).notNull(),
+    report: jsonb("report").$type<any>().default({}).notNull(),
+    snapshot: jsonb("snapshot").$type<any>().default({}).notNull(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    revertedByUserId: uuid("reverted_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    revertedAt: timestamp("reverted_at"),
+  },
+  (table) => ({
+    statusIndex: index("data_key_merges_status_index").on(table.status),
+    createdAtIndex: index("data_key_merges_created_at_index").on(table.createdAt),
+  }),
+)
+
+// Duplicate groups a user marked as "not a duplicate", keyed by the sorted
+// uniqueKeys of the group so the same group stays hidden.
+export const dataKeyDuplicateDismissals = pgTable(
+  "nt_data_key_duplicate_dismissals",
+  {
+    id: serial("id").primaryKey(),
+    groupKey: text("group_key").notNull().unique(),
+    uniqueKeys: jsonb("unique_keys").$type<string[]>().default([]).notNull(),
+    reason: text("reason").notNull().default(""),
+    createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+)

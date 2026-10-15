@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, Controller } from 'react-hook-form';
-import { ExternalLinkIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
+import { EditIcon, ExternalLinkIcon, EyeIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 import { arrayMoveImmutable } from "array-move";
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
+import { useQueryState } from "nuqs";
 
 import { LockStatus } from '@/components/lock-status';
 import { type DataKeyFormData, useDataKeysCtx } from '@/contexts/data-keys';
@@ -46,6 +47,23 @@ import { useAppContext } from "@/contexts/app";
 import { cn } from "@/lib/utils";
 import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
 import type { UpdateDataKeysRefsResponse } from "@/databases/mutations/data-keys/_update_data_keys_refs";
+import type { DataKey } from '@/contexts/data-keys';
+import { buildDataKeyParentIndex, getDataKeyParentTitle, wouldCreateDataKeyCycle } from '@/lib/data-key-children';
+import { normalizeDataKeyType } from '@/lib/data-key-types';
+import { fetchDataKeyUnlinkImpact, type DeleteImpactItem } from './delete-confirmation';
+import { DataKeyDeleteReplacementDialog } from './delete-replacement-dialog';
+import { MergeChangeTotals, MergeReport } from './merge/merge-report';
+import { Callout } from './merge/shared';
+import type { OperationPreview } from '@/databases/mutations/data-keys';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type SaveRefsImpact = NonNullable<NonNullable<SaveDataKeysResponse['info']>['refs']>;
 
@@ -65,6 +83,7 @@ function Form({
     disabled?: boolean;
 }) {
     const { dataKeyId, } = useParams();
+    const router = useRouter();
     const searchParams = useSearchParams();
 
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, getLatestDataKeys } = useDataKeysCtx();
@@ -116,6 +135,7 @@ function Form({
             metadata: dataKey?.metadata || {},
             version: dataKey?.version || 1,
             deletedUniqueKeys: [] as string[],
+            optionReplacements: {} as Record<string, string>,
         },
     });
 
@@ -128,12 +148,30 @@ function Form({
     const confidentialLabelOnly = !!watch('confidentialLabelOnly');
     const optionsSignature = useMemo(() => JSON.stringify(options || []), [options]);
     const savedOptionsSignature = useMemo(() => JSON.stringify(dataKey?.options || []), [dataKey?.options]);
-    const deletedUniqueKeys = watch('deletedUniqueKeys');
 
     const [previewingImpact, setPreviewingImpact] = useState(false);
     const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
     const [impactPreviewStats, setImpactPreviewStats] = useState<UpdateDataKeysRefsResponse['info']>();
     const [saveImpact, setSaveImpact] = useState<SaveRefsImpact>();
+    // Saving unlinks rewrites the parent's screens: it is previewed first, and
+    // the saved change is recorded so it can be reviewed and reverted.
+    const [unlinkReview, setUnlinkReview] = useState<{
+        payload: DataKeyFormData;
+        loading: boolean;
+        preview: OperationPreview | null;
+        error: string;
+    } | null>(null);
+    // In the URL: saving reloads the library, which remounts this form.
+    const [savedUnlinkOperationId, setSavedUnlinkOperationId] = useQueryState('change', {
+        defaultValue: '',
+        clearOnDefault: true,
+        shallow: true,
+    });
+    const [preparingUnlink, setPreparingUnlink] = useState(false);
+    const [unlinkDialog, setUnlinkDialog] = useState<null | {
+        children: DataKey[];
+        impact: DeleteImpactItem[];
+    }>(null);
 
     const dataTypeInfo = dataKeyTypes.find(t => t.value === dataType);
 
@@ -255,13 +293,43 @@ function Form({
         if (uniqueKey) {
             setValue("uniqueKey" as any, uniqueKey);
         }
-        const res = await saveDataKeys([{ ...(payload as unknown as DataKeyFormData) }]);
+
+        if ((getValues('deletedUniqueKeys') || []).length) {
+            await reviewUnlinks(payload as unknown as DataKeyFormData);
+            return;
+        }
+        await performSave(payload as unknown as DataKeyFormData);
+    });
+
+    const performSave = async (payload: DataKeyFormData) => {
+        const res = await saveDataKeys([{ ...payload }]);
         await getLatestDataKeys();
         setShouldResetForm(true);
         if (res && 'info' in res) {
             setSaveImpact(res.info?.refs);
         }
-    });
+        if (res && !res.errors?.length) {
+            setValue('deletedUniqueKeys', []);
+            setValue('optionReplacements', {});
+            if ('operationId' in res && res.operationId) setSavedUnlinkOperationId(res.operationId);
+        }
+        return res;
+    };
+
+    const reviewUnlinks = async (payload: DataKeyFormData) => {
+        setUnlinkReview({ payload, loading: true, preview: null, error: '' });
+        try {
+            const response = await axios.post<SaveDataKeysResponse>('/api/data-keys/save/preview', { data: [payload] });
+            setUnlinkReview((current) => current && ({
+                ...current,
+                loading: false,
+                preview: response.data.preview || null,
+                error: response.data.errors?.[0] || '',
+            }));
+        } catch (e: any) {
+            setUnlinkReview((current) => current && ({ ...current, loading: false, error: e.message || 'Preview failed.' }));
+        }
+    };
 
     const isFormDisabled = isReadOnly || saving;
 
@@ -269,7 +337,137 @@ function Form({
         return options.map(o => dataKeys.find(k => k.uniqueKey === o)!).filter(k => k);
     }, [dataKeys, options]);
 
-    const displayLoader = loadingDataKeys || saving;
+    // Parents that link this key as a child option — shown so users understand
+    // why the key cannot be deleted from the library and where to unlink it.
+    const linkedParents = useMemo(() => {
+        if (!dataKey?.uniqueKey) return [];
+        return buildDataKeyParentIndex(dataKeys).get(dataKey.uniqueKey) || [];
+    }, [dataKeys, dataKey?.uniqueKey]);
+
+    // Only keys that keep the option pool healthy are offered: no self-link, no
+    // circular references, and — once the pool has a single type — only keys of
+    // that same type, so every child always has valid replacement candidates.
+    // The description tells users WHY a key they searched for may be missing.
+    const { addableDataKeys, addableDescription } = useMemo(() => {
+        const parentUniqueKey = `${dataKey?.uniqueKey || uniqueKeyValue || ''}`.trim();
+        const childTypes = new Set(children.map(k => normalizeDataKeyType(k.dataType)).filter(Boolean));
+        const requiredType = childTypes.size === 1 ? Array.from(childTypes)[0] : null;
+        const requiredTypeLabel = requiredType ? (children[0]?.dataType || requiredType) : '';
+
+        const filtered = dataKeys.filter(k => {
+            if (!k.uniqueKey || options.includes(k.uniqueKey)) return false;
+            if (parentUniqueKey && k.uniqueKey === parentUniqueKey) return false;
+            if (requiredType && normalizeDataKeyType(k.dataType) !== requiredType) return false;
+            if (parentUniqueKey && wouldCreateDataKeyCycle({
+                dataKeys,
+                parentUniqueKey,
+                childUniqueKey: k.uniqueKey,
+            })) return false;
+            return true;
+        });
+
+        return {
+            addableDataKeys: filtered,
+            addableDescription: requiredType
+                ? `Only ${requiredTypeLabel} data keys are listed, to match the existing options. Already-linked keys and keys that would create circular references are hidden.`
+                : 'Already-linked keys and keys that would create circular references are hidden.',
+        };
+    }, [dataKeys, options, children, dataKey?.uniqueKey, uniqueKeyValue]);
+
+    // Removing an option UNLINKS the child from this data key — the child stays
+    // in the library. Only children that were part of the last-saved options are
+    // recorded for server-side screen sync; unsaved additions are dropped locally.
+    const unlinkOption = useCallback((child: DataKey, replacementUniqueKey?: string) => {
+        const currentOptions = getValues('options') || [];
+        setValue('options', currentOptions.filter(o => o !== child.uniqueKey));
+
+        const isSavedOption = (dataKey?.options || []).includes(child.uniqueKey);
+        if (!isSavedOption) return;
+
+        const currentDeleted = getValues('deletedUniqueKeys') || [];
+        setValue('deletedUniqueKeys', Array.from(new Set([...currentDeleted, child.uniqueKey])));
+
+        if (replacementUniqueKey) {
+            setValue('optionReplacements', {
+                ...(getValues('optionReplacements') || {}),
+                [child.uniqueKey]: replacementUniqueKey,
+            });
+        }
+    }, [getValues, setValue, dataKey?.options]);
+
+    const handleUnlinkOptions = useCallback(async (childrenToUnlink: DataKey[]) => {
+        if (!childrenToUnlink.length) return;
+
+        const savedChildren = childrenToUnlink.filter(child => (
+            !!dataKey?.uniqueKey && (dataKey?.options || []).includes(child.uniqueKey)
+        ));
+
+        if (savedChildren.length) {
+            try {
+                setPreparingUnlink(true);
+                const impact = await fetchDataKeyUnlinkImpact(
+                    dataKey!.uniqueKey,
+                    savedChildren.map(child => child.uniqueKey),
+                );
+                if (impact.some(item => item.scripts.length > 0)) {
+                    setUnlinkDialog({ children: childrenToUnlink, impact });
+                    return;
+                }
+            } catch (e: any) {
+                alert({
+                    title: 'Error',
+                    message: `Failed to check option usage: ${e.message}`,
+                    variant: 'error',
+                });
+                return;
+            } finally {
+                setPreparingUnlink(false);
+            }
+        }
+
+        const titles = childrenToUnlink
+            .map(child => `"${child.name || child.label || child.uniqueKey}"`)
+            .join(', ');
+
+        confirm(() => childrenToUnlink.forEach(child => unlinkOption(child)), {
+            title: childrenToUnlink.length === 1 ? 'Unlink option' : `Unlink ${childrenToUnlink.length} options`,
+            message: `${titles} will be unlinked from this data key. ${childrenToUnlink.length === 1 ? 'It' : 'They'} will NOT be deleted from the library.`,
+            positiveLabel: 'Unlink',
+            danger: true,
+        });
+    }, [dataKey, alert, confirm, unlinkOption]);
+
+    // Queued unlinks are applied on save — this keeps them reviewable (and
+    // undoable) instead of invisible between removal and save.
+    const pendingUnlinkKeys = watch('deletedUniqueKeys');
+    const pendingReplacementsMap = watch('optionReplacements');
+    const pendingUnlinks = useMemo(() => {
+        return (pendingUnlinkKeys || []).map(uniqueKey => {
+            const child = dataKeys.find(k => k.uniqueKey === uniqueKey);
+            const replacementKey = (pendingReplacementsMap || {})[uniqueKey] || '';
+            const replacement = !replacementKey ? undefined : dataKeys.find(k => k.uniqueKey === replacementKey);
+            return {
+                uniqueKey,
+                title: child?.name || child?.label || uniqueKey,
+                replacementTitle: !replacementKey ? '' : (replacement?.name || replacement?.label || replacementKey),
+            };
+        });
+    }, [pendingUnlinkKeys, pendingReplacementsMap, dataKeys]);
+
+    const undoUnlink = useCallback((uniqueKey: string) => {
+        setValue('deletedUniqueKeys', (getValues('deletedUniqueKeys') || []).filter(k => k !== uniqueKey));
+
+        const replacementsLeft = { ...(getValues('optionReplacements') || {}) };
+        delete replacementsLeft[uniqueKey];
+        setValue('optionReplacements', replacementsLeft);
+
+        const currentOptions = getValues('options') || [];
+        if (!currentOptions.includes(uniqueKey)) {
+            setValue('options', [...currentOptions, uniqueKey]);
+        }
+    }, [getValues, setValue]);
+
+    const displayLoader = loadingDataKeys || saving || preparingUnlink;
 
     const renderAffectedTables = useCallback((affected?: UpdateDataKeysRefsResponse['affected']) => {
         if (!affected) return null;
@@ -467,6 +665,25 @@ function Form({
         <>
             {displayLoader && <Loader overlay />}
 
+            <DataKeyDeleteReplacementDialog
+                mode="unlink"
+                open={!!unlinkDialog}
+                impact={unlinkDialog?.impact || []}
+                dataKeys={children.filter(k => !(unlinkDialog?.children || []).some(c => c.uniqueKey === k.uniqueKey))}
+                title="Choose replacements before unlinking"
+                onOpenChange={(open) => {
+                    if (!open) setUnlinkDialog(null);
+                }}
+                onConfirm={({ replacements }) => {
+                    (unlinkDialog?.children || []).forEach(child => {
+                        const replacementUuid = replacements[child.uuid];
+                        const replacement = dataKeys.find(k => k.uuid === replacementUuid);
+                        unlinkOption(child, replacement?.uniqueKey);
+                    });
+                    setUnlinkDialog(null);
+                }}
+            />
+
             <Card>
                 <CardContent>
                     <CardHeader>
@@ -650,12 +867,44 @@ function Form({
                                             title="Options"
                                             headerActions={optionsLocked ? null : (
                                                 <>
-                                                    <SelectModal 
+                                                    {children.length > 1 && (
+                                                        <SelectModal
+                                                            multiple
+                                                            search={{
+                                                                placeholder: 'Search options',
+                                                            }}
+                                                            description="Selected options will be unlinked from this data key — they stay in the library."
+                                                            options={children.map(k => ({
+                                                                value: k.uniqueKey,
+                                                                label: k.name,
+                                                                caption: k.dataType || '',
+                                                                description: k.label,
+                                                            }))}
+                                                            trigger={(
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    className="w-auto h-auto text-destructive hover:text-destructive"
+                                                                >
+                                                                    <TrashIcon className="w-4 h-4 mr-2" />
+                                                                    Unlink
+                                                                </Button>
+                                                            )}
+                                                            onSelect={(selectedOptions) => {
+                                                                const chosen = selectedOptions
+                                                                    .map(o => children.find(k => k.uniqueKey === `${o.value}`)!)
+                                                                    .filter(k => k);
+                                                                if (chosen.length) setTimeout(() => handleUnlinkOptions(chosen), 0);
+                                                            }}
+                                                        />
+                                                    )}
+
+                                                    <SelectModal
                                                         multiple
                                                         search={{
                                                             placeholder: 'Search data keys',
                                                         }}
-                                                        options={dataKeys.filter(k => !options.includes(k.uniqueKey)).map(k => ({
+                                                        description={addableDescription}
+                                                        options={addableDataKeys.map(k => ({
                                                             label: k.name,
                                                             value: k.uniqueKey,
                                                             caption: k.dataType || '',
@@ -671,7 +920,18 @@ function Form({
                                                             </Button>
                                                         )}
                                                         onSelect={(keys) => {
-                                                            onChange([...value, ...keys.map(k => k.value)]);
+                                                            const added = keys.map(k => `${k.value}`);
+                                                            onChange([...value, ...added]);
+
+                                                            // Re-adding a child cancels its pending unlink.
+                                                            const addedSet = new Set(added);
+                                                            const currentDeleted = getValues('deletedUniqueKeys') || [];
+                                                            if (currentDeleted.some(k => addedSet.has(k))) {
+                                                                setValue('deletedUniqueKeys', currentDeleted.filter(k => !addedSet.has(k)));
+                                                                const currentReplacements = { ...(getValues('optionReplacements') || {}) };
+                                                                added.forEach(k => delete currentReplacements[k]);
+                                                                setValue('optionReplacements', currentReplacements);
+                                                            }
                                                         }}
                                                     />
                                                 </>
@@ -697,9 +957,12 @@ function Form({
                                                     align: 'right',
                                                     cellClassName: 'w-20',
                                                     cellRenderer({ rowIndex }) {
-                                                        const child = value[rowIndex];
+                                                        // Rows render from `children` (resolved keys), so index into
+                                                        // that — indexing into `options` would drift when an option
+                                                        // is missing from the library.
+                                                        const child = children[rowIndex];
 
-                                                        if (!child || optionsLocked) return null;
+                                                        if (!child) return null;
 
                                                         return (
                                                             <>
@@ -709,28 +972,32 @@ function Form({
                                                                     </DropdownMenuTrigger>
 
                                                                     <DropdownMenuContent>
-                                                                        <DropdownMenuItem 
-                                                                            className="text-destructive"
-                                                                            onClick={() => setTimeout(() => confirm(
-                                                                                () => {
-                                                                                    setValue(
-                                                                                        'options',
-                                                                                        options.filter((_, i) => i !== rowIndex),
-                                                                                    );
-                                                                                    setValue(
-                                                                                        'deletedUniqueKeys',
-                                                                                        [...deletedUniqueKeys, children[rowIndex].uniqueKey]
-                                                                                    );
-                                                                                },
-                                                                                {
-                                                                                    title: 'Delete',
-                                                                                    message: 'Are you sure you want to delete data key option?',
-                                                                                    danger: true,
-                                                                                },
-                                                                            ), 0)}
-                                                                        >
-                                                                            <TrashIcon className="h-4 w-4 mr-2" /> Delete
+                                                                        <DropdownMenuItem asChild>
+                                                                            <Link
+                                                                                href={`/data-keys/edit/${child.uuid}`}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                            >
+                                                                                {isReadOnly ? (
+                                                                                    <>
+                                                                                        <EyeIcon className="h-4 w-4 mr-2" /> View
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <EditIcon className="h-4 w-4 mr-2" /> Edit
+                                                                                    </>
+                                                                                )}
+                                                                            </Link>
                                                                         </DropdownMenuItem>
+
+                                                                        {!optionsLocked && (
+                                                                            <DropdownMenuItem
+                                                                                className="text-destructive"
+                                                                                onClick={() => setTimeout(() => handleUnlinkOptions([child]), 0)}
+                                                                            >
+                                                                                <TrashIcon className="h-4 w-4 mr-2" /> Unlink
+                                                                            </DropdownMenuItem>
+                                                                        )}
                                                                     </DropdownMenuContent>
                                                                 </DropdownMenu>
                                                             </>
@@ -754,6 +1021,134 @@ function Form({
                     <br />
 
                     <div className="px-4 space-y-4">
+                        {!!savedUnlinkOperationId && !pendingUnlinks.length && (
+                            <Callout variant="info" className="flex flex-wrap items-center gap-x-2">
+                                <span>Unlinks saved as drafts. You can review exactly what changed, and revert it until it is published.</span>
+                                <Link href={`/data-keys/merge/history/${savedUnlinkOperationId}`} className="text-primary hover:underline">
+                                    View changes
+                                </Link>
+                            </Callout>
+                        )}
+
+                        <Dialog open={!!unlinkReview} onOpenChange={(open) => !open && !saving && setUnlinkReview(null)}>
+                            <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                    <DialogTitle>Review changes before saving</DialogTitle>
+                                    <DialogDescription>
+                                        Unlinking {pendingUnlinks.length === 1 ? 'an option' : `${pendingUnlinks.length} options`} updates
+                                        the screens linked to this data key. This is exactly what will change.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+                                    {unlinkReview?.loading ? (
+                                        <div role="status" aria-live="polite" className="space-y-2">
+                                            <span className="sr-only">Preparing preview…</span>
+                                            <Skeleton className="h-9 w-full" />
+                                            <Skeleton className="h-9 w-full" />
+                                        </div>
+                                    ) : unlinkReview?.error ? (
+                                        <Callout variant="error">{unlinkReview.error}</Callout>
+                                    ) : unlinkReview?.preview ? (
+                                        <>
+                                            {!!unlinkReview.preview.conflicts.length && (
+                                                <Callout variant="error">
+                                                    <div className="font-medium">Other people have unpublished changes here.</div>
+                                                    <ul className="mt-1 list-inside list-disc">
+                                                        {unlinkReview.preview.conflicts.map((conflict, index) => (
+                                                            <li key={`${conflict.title}-${index}`}>
+                                                                {conflict.userName} — {conflict.kind === 'script' ? 'script' : 'data key'} “{conflict.title}”
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                    <div className="mt-1">Save after those changes are published or discarded.</div>
+                                                </Callout>
+                                            )}
+                                            <MergeChangeTotals totals={unlinkReview.preview.report.totals} />
+                                            <MergeReport report={unlinkReview.preview.report} emptyMessage="No script changes." />
+                                            <div className="text-xs text-muted-foreground">
+                                                Saved as drafts; you can revert it from the data key history until it is published.
+                                            </div>
+                                        </>
+                                    ) : null}
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" disabled={saving} onClick={() => setUnlinkReview(null)}>
+                                        Back
+                                    </Button>
+                                    <Button
+                                        disabled={saving || !unlinkReview || unlinkReview.loading || !!unlinkReview.error
+                                            || !unlinkReview.preview || !!unlinkReview.preview.conflicts.length}
+                                        onClick={async () => {
+                                            if (!unlinkReview) return;
+                                            const res = await performSave(unlinkReview.payload);
+                                            if (res && !res.errors?.length) setUnlinkReview(null);
+                                        }}
+                                    >
+                                        Save
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        {!!pendingUnlinks.length && !isReadOnly && (
+                            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-3">
+                                <div className="font-medium text-amber-950">
+                                    Pending unlinks ({pendingUnlinks.length})
+                                </div>
+                                <div className="text-sm text-amber-900">
+                                    Applied when you save. Linked screens will be updated accordingly; cancelling discards these.
+                                </div>
+                                <div className="space-y-1">
+                                    {pendingUnlinks.map(item => (
+                                        <div
+                                            key={item.uniqueKey}
+                                            className="flex items-center justify-between gap-x-2 rounded border border-amber-200 bg-white px-2 py-1 text-sm"
+                                        >
+                                            <div className="min-w-0 truncate">
+                                                <span className="font-medium">{item.title}</span>
+                                                <span className="text-muted-foreground">
+                                                    {item.replacementTitle
+                                                        ? <> — replaced by <span className="font-medium text-foreground">{item.replacementTitle}</span></>
+                                                        : ' — removed from linked screens'}
+                                                </span>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                className="h-auto w-auto px-2 py-1 text-xs"
+                                                onClick={() => undoUnlink(item.uniqueKey)}
+                                            >
+                                                Undo
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {!!linkedParents.length && (
+                            <div className="rounded-md border border-border p-3 space-y-3">
+                                <div className="font-medium">Linked parents ({linkedParents.length})</div>
+                                <div className="text-sm text-muted-foreground">
+                                    This data key is a child option of the data keys below. It cannot be deleted from the library while linked — unlink it from each parent first.
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    {linkedParents.map(parent => (
+                                        <Link
+                                            key={parent.uniqueKey}
+                                            href={`/data-keys/edit/${parent.uuid}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-primary hover:bg-primary/10"
+                                        >
+                                            <span>{getDataKeyParentTitle(parent)}</span>
+                                            <ExternalLinkIcon className="h-3 w-3" />
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {(!!dataKey || !!saveImpact?.affected) && (
                             <div className="rounded-md border border-border p-3 space-y-3">
                                 <div className="flex items-center justify-between gap-x-2">
@@ -812,10 +1207,21 @@ function Form({
                         <div className="ml-auto" />
 
                         <Button
-                            asChild
                             variant="ghost"
+                            onClick={() => {
+                                if (pendingUnlinks.length && !isReadOnly) {
+                                    confirm(() => router.push('/data-keys'), {
+                                        title: 'Discard pending unlinks?',
+                                        message: `You have ${pendingUnlinks.length} pending unlink${pendingUnlinks.length === 1 ? '' : 's'} that will be lost if you leave without saving.`,
+                                        positiveLabel: 'Leave',
+                                        danger: true,
+                                    });
+                                    return;
+                                }
+                                router.push('/data-keys');
+                            }}
                         >
-                            <Link href="/data-keys">Cancel</Link>
+                            Cancel
                         </Button>
 
                         {!isReadOnly && (

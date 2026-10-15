@@ -959,8 +959,9 @@ export function ScreenForm(props: Props) {
                         <TooltipProvider delayDuration={0}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <button
-                                        type="button"
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
                                         className="flex-1 flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
                                         onClick={() =>
                                             alert({
@@ -969,6 +970,15 @@ export function ScreenForm(props: Props) {
                                                 variant: "info",
                                             })
                                         }
+                                        onKeyDown={(event) => {
+                                            if (event.key !== "Enter" && event.key !== " ") return;
+                                            event.preventDefault();
+                                            alert({
+                                                title: "Confidentiality is managed in Data Keys",
+                                                message: "Change this in the Data Key. Screens inherit confidential status automatically.",
+                                                variant: "info",
+                                            });
+                                        }}
                                     >
                                         <Switch
                                             id="confidential"
@@ -976,7 +986,7 @@ export function ScreenForm(props: Props) {
                                             disabled
                                         />
                                         <Label secondary htmlFor="confidential">Confidential</Label>
-                                    </button>
+                                    </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <div className="flex flex-col gap-y-1">
@@ -999,8 +1009,9 @@ export function ScreenForm(props: Props) {
                         <TooltipProvider delayDuration={0}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <button
-                                        type="button"
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
                                         className="flex-1 flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
                                         onClick={() =>
                                             alert({
@@ -1009,6 +1020,15 @@ export function ScreenForm(props: Props) {
                                                 variant: "info",
                                             })
                                         }
+                                        onKeyDown={(event) => {
+                                            if (event.key !== "Enter" && event.key !== " ") return;
+                                            event.preventDefault();
+                                            alert({
+                                                title: "Confidentiality is managed in Data Keys",
+                                                message: "Change this in the Data Key. Screens inherit confidential status automatically.",
+                                                variant: "info",
+                                            });
+                                        }}
                                     >
                                         <Switch
                                             id="confidentialLabelOnly"
@@ -1016,7 +1036,7 @@ export function ScreenForm(props: Props) {
                                             disabled
                                         />
                                         <Label secondary htmlFor="confidentialLabelOnly">Confidential (label only)</Label>
-                                    </button>
+                                    </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <div className="flex flex-col gap-y-1">

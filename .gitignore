@@ -50,3 +50,6 @@ deploy.command
 #zencoder
 .zencoder
 .zenflow
+# Playwright
+/test-results/
+/playwright-report/

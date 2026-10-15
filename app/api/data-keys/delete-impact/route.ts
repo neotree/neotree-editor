@@ -11,10 +11,12 @@ export async function GET(req: NextRequest) {
 
         const dataKeysIds = JSON.parse(req.nextUrl.searchParams.get('dataKeysIds') || '[]') as string[];
         const uniqueKeys = JSON.parse(req.nextUrl.searchParams.get('uniqueKeys') || '[]') as string[];
+        const scopeParentUniqueKey = req.nextUrl.searchParams.get('scopeParentUniqueKey') || undefined;
 
         const res = await getDataKeysDeleteImpact({
             dataKeysIds,
             uniqueKeys,
+            scopeParentUniqueKey,
         });
         return NextResponse.json(res);
     } catch (e: any) {

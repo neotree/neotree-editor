@@ -17,11 +17,12 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Alert } from "@/components/alert";
 import { dataKeysSortOpts } from "@/constants";
 import * as actions from '@/app/actions/data-keys';
-import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
+import { DeleteDataKeysParams, DeleteDataKeysResponse, MergeDataKeysParams, MergeDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
 import { useAppContext } from "@/contexts/app";
+import { buildDataKeyParentIndex } from "@/lib/data-key-children";
 import { matchesDataKeySearch } from "@/lib/data-keys-search";
 import { SocketEventsListener } from "@/components/socket-events-listener";
 import { boolean } from "drizzle-orm/gel-core";
@@ -136,7 +137,19 @@ export type tDataKeysCtx = {
         data: DataKeyFormData[],
         cb?: ((error?: string) => void)
     ) => Promise<Awaited<ReturnType<typeof actions.saveDataKeys>>>;
-    deleteDataKeys: (data: string[], replacements?: Record<string, string>) => Promise<boolean>;
+    deleteDataKeys: (
+        data: string[],
+        replacements?: Record<string, string>,
+        opts?: {
+            allowMissingReplacements?: boolean;
+            scriptRemovals?: Record<string, string[]>;
+            /** Selected scripts only — the keys stay in the library. */
+            scriptsOnly?: Record<string, string[]>;
+        },
+    ) => Promise<boolean>;
+    /** Applies a merge; resolves to the recorded merge id, or null when it failed (the error is shown). */
+    mergeDataKeys: (params: Omit<MergeDataKeysParams, 'userId' | 'broadcastAction' | 'dryRun'>) => Promise<string | null>;
+    merging: boolean;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
     setSort: (value: string) => void;
     onSort: (value: string) => void;
@@ -300,8 +313,15 @@ export function DataKeysCtxProvider({
         if (filter) {
             if (filter === 'published') {
                 filtered = filtered.filter(dataKey => !dataKey?.isDraft);
-            } else if (filter === 'drafts') {
+            } else if (filter === 'draft' || filter === 'drafts') {
                 filtered = filtered.filter(dataKey => !!dataKey?.isDraft);
+            } else if (filter === 'parentKeys') {
+                filtered = filtered.filter(dataKey => !!(dataKey?.options || []).length);
+            } else if (filter === 'childKeys') {
+                const parentIndex = buildDataKeyParentIndex(allDataKeys);
+                filtered = filtered.filter(dataKey => (
+                    !!dataKey?.uniqueKey && !!(parentIndex.get(dataKey.uniqueKey) || []).length
+                ));
             } else {
                 filtered = filtered.filter(dataKey => dataKey?.dataType === filter);
             }
@@ -381,8 +401,11 @@ export function DataKeysCtxProvider({
             } else {
                 await loadDataKeys();
                 router.refresh();
+                const conditionsRewritten = ("info" in res ? res.info?.conditionsRewritten : 0) || 0;
                 alert({
-                    message: "Data key saved!",
+                    message: conditionsRewritten
+                        ? `Data key saved! ${conditionsRewritten} condition${conditionsRewritten === 1 ? ' was' : 's were'} updated to the new name in the scripts using it.`
+                        : "Data key saved!",
                     variant: 'success',
                     onClose: () => cb?.(),
                 });
@@ -431,7 +454,7 @@ export function DataKeysCtxProvider({
         }
     }, [authenticatedUser?.userId, authenticatedUser?.displayName]);
 
-    const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data, replacements) => {
+    const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data, replacements, opts) => {
         const keysToDelete = allDataKeys.filter(key => key?.uuid && data.includes(key.uuid));
 
         try {
@@ -442,6 +465,9 @@ export function DataKeysCtxProvider({
                     dataKeysIds: data,
                     broadcastAction: true,
                     replacements,
+                    allowMissingReplacements: opts?.allowMissingReplacements,
+                    scriptRemovals: opts?.scriptRemovals,
+                    scriptsOnly: opts?.scriptsOnly,
                 } satisfies DeleteDataKeysParams,
             });
 
@@ -449,7 +475,8 @@ export function DataKeysCtxProvider({
 
             if (res.errors?.length) throw new Error(res.errors[0]);
 
-            await recordDeletionPendingChanges(keysToDelete);
+            // Scripts-only changes keep the keys, so nothing is queued for deletion.
+            if (!opts?.scriptsOnly) await recordDeletionPendingChanges(keysToDelete);
 
             setSelected([]);
 
@@ -457,11 +484,19 @@ export function DataKeysCtxProvider({
 
             router.refresh();
 
+            // A change that touched scripts opens its report, where it can also be reverted.
+            if (res.operationId && res.preview?.scriptsChanged) {
+                router.push(`/data-keys/merge/history/${res.operationId}?merged=1`);
+                return true;
+            }
+
             alert({
                 title: 'Success',
-                message: replacements && Object.keys(replacements).length
-                    ? 'Data key replacements saved and deletion queued successfully!'
-                    : 'Data keys deleted successfully!',
+                message: opts?.scriptsOnly
+                    ? 'Selected scripts updated. The data keys remain in the library.'
+                    : (replacements && Object.keys(replacements).length
+                        ? 'Data key replacements saved and deletion queued successfully!'
+                        : 'Data keys deleted successfully!'),
                 variant: 'success',
             });
             return true;
@@ -471,9 +506,48 @@ export function DataKeysCtxProvider({
                 message: e.message,
                 variant: 'error',
             });
+            // A rejected delete usually means the local list is stale (e.g. the
+            // key became a child option elsewhere) — resync so the UI reflects
+            // the state the server enforced.
+            await loadDataKeys();
             return false;
         } finally {
             setDeleting(false);
+        }
+    }, [router.refresh, alert, loadDataKeys, allDataKeys, recordDeletionPendingChanges]);
+
+    /*****************************************************
+     ************ MERGE
+    ******************************************************/
+    const [merging, setMerging] = useState(false);
+
+    const mergeDataKeys: tDataKeysCtx['mergeDataKeys'] = useCallback(async (params) => {
+        try {
+            setMerging(true);
+
+            const response = await axios.post<MergeDataKeysResponse>('/api/data-keys/merge', params);
+            const res = response.data;
+            if (res.errors?.length || !res.mergeId) throw new Error(res.errors?.[0] || 'The merge could not be recorded.');
+
+            const deletedIds = new Set(res.preview?.deletedDataKeyIds || []);
+            if (deletedIds.size) {
+                await recordDeletionPendingChanges(allDataKeys.filter(key => key?.uuid && deletedIds.has(key.uuid)));
+            }
+
+            setSelected([]);
+            await loadDataKeys();
+            router.refresh();
+            return res.mergeId;
+        } catch (e: any) {
+            alert({
+                title: 'Error',
+                message: e.message,
+                variant: 'error',
+            });
+            await loadDataKeys();
+            return null;
+        } finally {
+            setMerging(false);
         }
     }, [router.refresh, alert, loadDataKeys, allDataKeys, recordDeletionPendingChanges]);
 
@@ -605,6 +679,8 @@ export function DataKeysCtxProvider({
                     setSearchValue,
                     extractDataKeys,
                     deleteDataKeys,
+                    mergeDataKeys,
+                    merging,
                     saveDataKeys,
                     exportDataKeys,
                     setCurrentDataKeyUuid,

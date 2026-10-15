@@ -2,6 +2,7 @@ import { and, eq, gt, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { dataKeys, dataKeysDrafts, pendingDeletion, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { Pagination } from "@/types";
@@ -23,6 +24,7 @@ export type GetDataKeysParams = {
     }[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    client?: DbOrTransaction;
     pagination?: {
         limit: number;
         page: number;
@@ -69,15 +71,18 @@ export async function _getDataKeys(
     params?: GetDataKeysParams
 ): Promise<GetDataKeysResults> {
     try {
-        const { 
+        const {
             keys = [],
-            dataKeysIds: _dataKeysIds, 
+            dataKeysIds: _dataKeysIds,
             names: namesParam = [],
             uniqueKeys: uniqueKeysParam = [],
-            returnDraftsIfExist = true, 
+            returnDraftsIfExist = true,
+            client,
             pagination: paginationParam,
             dateAfter: _dateAfter = null,
         } = { ...params };
+
+        const executor = client || db;
 
         let dataKeysIds = _dataKeysIds || [];
         const names = namesParam.map(n => `${n || ''}`.toLowerCase()).filter(n => n);
@@ -98,7 +103,7 @@ export async function _getDataKeys(
         let drafts: typeof dataKeysDrafts.$inferSelect[] = [];
 
         if (keys.length) {
-            drafts = await db.query.dataKeysDrafts.findMany({
+            drafts = await executor.query.dataKeysDrafts.findMany({
                 where: whereDraftsDateAfter,
             });
 
@@ -139,7 +144,7 @@ export async function _getDataKeys(
                     inArray(dataKeysDrafts.uniqueKey, uniqueKeys),
             ].filter(q => q);
 
-            drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
+            drafts = !returnDraftsIfExist ? [] : await executor.query.dataKeysDrafts.findMany({
                 where: !whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
             });
         }
@@ -180,7 +185,7 @@ export async function _getDataKeys(
                 inArray(dataKeys.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
-        const publishedRes = await db
+        const publishedRes = await executor
             .select({
                 dataKey: dataKeys,
                 pendingDeletion: pendingDeletion,

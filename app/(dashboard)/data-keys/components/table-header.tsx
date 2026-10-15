@@ -1,6 +1,6 @@
 'use client';
 
-import { PlusIcon } from 'lucide-react';
+import { HistoryIcon, PlusIcon } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { useDataKeysCtx } from '@/contexts/data-keys';
 import { useAppContext } from '@/contexts/app';
 import { dataKeysSortOpts, dataKeysStatuses, dataKeyTypes, } from "@/constants";
 import { ExportMetadataButton } from './export-metadata-button';
+import { DuplicateParentsButton } from './duplicate-parents-button';
 import { 
     Select, 
     SelectGroup,
@@ -102,6 +103,14 @@ export function DataKeysTableHeader() {
                                     <SelectSeparator />
 
                                     <SelectGroup>
+                                        <SelectLabel>Links</SelectLabel>
+                                        <SelectItem value="parentKeys">Parent keys</SelectItem>
+                                        <SelectItem value="childKeys">Child keys</SelectItem>
+                                    </SelectGroup>
+
+                                    <SelectSeparator />
+
+                                    <SelectGroup>
                                         <SelectLabel>Types</SelectLabel>
                                         {dataKeyTypes.map(o => {
                                             return (
@@ -145,6 +154,17 @@ export function DataKeysTableHeader() {
                         >
                             {unusedDataKeys.show ? 'Show all keys' : 'Show unused keys'}
                         </Button>
+
+                        {isSuperUser && <DuplicateParentsButton />}
+
+                        {isSuperUser && (
+                            <Button asChild variant="outline" className="w-auto h-auto">
+                                <Link href="/data-keys/merge?tab=history">
+                                    <HistoryIcon className="size-4 mr-2" />
+                                    History
+                                </Link>
+                            </Button>
+                        )}
 
                         <ExportMetadataButton />
                     </div>
