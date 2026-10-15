@@ -97,7 +97,7 @@ test('merge a group, read its report, then revert it', async ({ page }) => {
     await dialog.getByRole('button', { name: 'Merge' }).click();
 
     await expect(page).toHaveURL(/\/data-keys\/merge\/history\/[0-9a-f-]+\?merged=1/);
-    await expect(page.getByText(/Merge of “/)).toBeVisible();
+    await expect(page.getByText(/^Merge into “/).first()).toBeVisible();
     await expect(page.getByText('The merge is saved as drafts.', { exact: false })).toBeVisible();
     await expect(page.getByText('Changes', { exact: true })).toBeVisible();
 
@@ -137,4 +137,103 @@ test('the batch page checks clean groups before merging', async ({ page }) => {
     const empty = page.getByText('No clean groups', { exact: false });
     // Statuses appear once every clean group has been dry-run, which takes a while.
     await expect(statuses.first().or(empty)).toBeVisible({ timeout: 170_000 });
+});
+
+/** Waits for a dialog's dry-run preview; true when it is clear to go ahead, false when other users' changes block it. */
+async function waitForDialogPreview(page: Page) {
+    const dialog = page.getByRole('dialog');
+    const report = dialog.getByText(/^\d+ changes?$/).or(dialog.getByText('No script changes.'));
+    const conflict = dialog.getByText('Other people have unpublished changes here.');
+    await expect(report.first().or(conflict)).toBeVisible({ timeout: 120_000 });
+    return !(await conflict.isVisible());
+}
+
+test('deleting a used key previews the exact changes, then can be reverted', async ({ page }) => {
+    await page.goto('/data-keys');
+    await page.getByPlaceholder('Search data keys').fill('AntenatalCare');
+    await page.getByPlaceholder('Search data keys').press('Enter');
+    const row = page.getByRole('row').filter({ hasText: /^AntenatalCare/ }).first();
+    await expect(row).toBeVisible({ timeout: 90_000 });
+    await row.getByRole('checkbox').check();
+    await page.getByRole('button', { name: /^Delete/ }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Delete anyway' }).click();
+    await expect(dialog.getByText('Exact changes')).toBeVisible();
+    const clear = await waitForDialogPreview(page);
+    const confirm = dialog.getByRole('button', { name: 'Delete', exact: true });
+
+    if (!clear) {
+        // Someone else's unpublished changes are in scope: nothing can be overwritten.
+        await expect(confirm).toBeDisabled();
+        return;
+    }
+
+    await confirm.click();
+    await expect(page).toHaveURL(/\/data-keys\/merge\/history\/[0-9a-f-]+\?merged=1/, { timeout: 120_000 });
+    await expect(page.getByText(/^Delete “AntenatalCare”/).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Revert change' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Revert' }).click();
+    await expect(page.getByText('Change reverted')).toBeVisible();
+});
+
+test('unlinking an option is reviewed before saving, then can be reverted', async ({ page }) => {
+    // Unlink, preview, save, report and revert: several dry runs under `next dev`.
+    test.setTimeout(420_000);
+    await page.goto('/data-keys');
+    await page.getByPlaceholder('Search data keys').fill('HIV_Meds');
+    await page.getByPlaceholder('Search data keys').press('Enter');
+    const row = page.getByRole('row').filter({ hasText: /^HIV_Meds/ }).first();
+    await expect(row).toBeVisible({ timeout: 90_000 });
+    await row.getByRole('button').last().click();
+    await page.getByRole('menuitem', { name: /^(Edit|View)$/ }).click();
+    await expect(page).toHaveURL(/\/data-keys\/edit\//);
+
+    // First option's row menu -> Unlink.
+    const optionMenu = page.locator('table').filter({ hasText: 'Data type' }).last().getByRole('row').nth(1).getByRole('button').last();
+    await expect(optionMenu).toBeVisible({ timeout: 60_000 });
+    await optionMenu.click();
+    await page.getByRole('menuitem', { name: 'Unlink' }).click();
+
+    // Used options open the replacement dialog; unused ones a simple confirm.
+    const replacementDialog = page.getByRole('dialog').filter({ hasText: /replacement|Unlink/ });
+    const confirmUnlink = page.getByRole('alertdialog').getByRole('button', { name: 'Unlink' });
+    await expect(replacementDialog.or(confirmUnlink).first()).toBeVisible();
+    if (await confirmUnlink.isVisible()) {
+        await confirmUnlink.click();
+    } else {
+        const picker = replacementDialog.getByRole('button', { name: /replacement/ });
+        if (await picker.isVisible() && await picker.isEnabled()) {
+            await picker.click();
+            await page.getByRole('dialog').last().getByRole('button').nth(1).click();
+        }
+        await replacementDialog.getByRole('button', { name: /Replace and unlink|Continue/ }).click();
+    }
+    await expect(page.getByText(/^Pending unlinks \(\d+\)$/)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    const review = page.getByRole('dialog').filter({ hasText: 'Review changes before saving' });
+    await expect(review).toBeVisible();
+    const clear = await waitForDialogPreview(page);
+    const save = review.getByRole('button', { name: 'Save', exact: true });
+    if (!clear) {
+        await expect(save).toBeDisabled();
+        return;
+    }
+
+    await save.click();
+    await expect(page.getByText('Data key saved!')).toBeVisible({ timeout: 120_000 });
+    await page.getByRole('button', { name: 'Ok' }).click();
+    const viewChanges = page.getByRole('link', { name: 'View changes' });
+    await expect(viewChanges).toBeVisible({ timeout: 120_000 });
+    // The form re-mounts while the library reloads after saving; let that
+    // settle, then open the link's target directly.
+    await page.waitForLoadState('networkidle');
+    const reportHref = await viewChanges.getAttribute('href');
+    expect(reportHref).toMatch(/^\/data-keys\/merge\/history\/[0-9a-f-]+$/);
+    await page.goto(reportHref!);
+    await expect(page.getByText(/^Unlink \d+ options? from “HIV_Meds”/).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Revert change' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Revert' }).click();
+    await expect(page.getByText('Change reverted')).toBeVisible();
 });

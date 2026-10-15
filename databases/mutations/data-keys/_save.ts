@@ -6,12 +6,14 @@ import db from '@/databases/pg/drizzle';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
-import { _getDataKeys } from '@/databases/queries/data-keys';
+import { _getDataKeys, _getDataKeysRefs } from '@/databases/queries/data-keys';
 import { normalizeIncomingDataKeyPatch } from '@/lib/data-key-save';
 import { validateDataKeyOptionsAddition } from '@/lib/data-key-children';
 import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
 import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
+import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
+import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
 import type { DataKeyDraftOrigin } from '@/databases/pg/_data-keys';
 import {
     _deleteReferencedDataKeyOptions,
@@ -37,6 +39,12 @@ export type SaveDataKeysParams = {
     draftOrigin?: DataKeyDraftOrigin;
     propagatedDraftOrigin?: Extract<DataKeyDraftOrigin, "data_key_sync" | "import">;
     client?: DbOrTransaction;
+    /**
+     * Run the save, report what it would change in the scripts, then roll back.
+     * Saves that unlink options from a parent are always recorded this way, so
+     * they can be previewed and reverted.
+     */
+    dryRun?: boolean;
 };
 
 export type SaveDataKeysResponse = {
@@ -44,8 +52,16 @@ export type SaveDataKeysResponse = {
     errors?: string[];
     info?: {
         refs?: Pick<Awaited<ReturnType<typeof _updateDataKeysRefs>>, 'info' | 'affected'>;
+        /** Conditions rewritten because a key or option was renamed. */
+        conditionsRewritten?: number;
     };
+    /** What changes (dry run) or changed (recorded unlink) in each script. */
+    preview?: OperationPreview;
+    /** The recorded operation, for its report and revert. */
+    operationId?: string;
 };
+
+const uniqueValues = (values: string[]) => Array.from(new Set(values.map((value) => `${value || ''}`.trim()).filter(Boolean)));
 
 async function createNewUniqueKey(executor: DbOrTransaction, uniqueKey?: string): Promise<string> {
     uniqueKey = `${uniqueKey || ''}`.trim();
@@ -195,6 +211,7 @@ export async function _saveDataKeys({
     draftOrigin = "editor",
     propagatedDraftOrigin,
     client,
+    dryRun,
 }: SaveDataKeysParams) {
     const response: SaveDataKeysResponse = { success: false, };
 
@@ -204,6 +221,13 @@ export async function _saveDataKeys({
         const executeSave = async (executor: DbOrTransaction) => {
             const errors: string[] = [];
             const propagationMatchUniqueKeysByDataKey: Record<string, string[]> = {};
+            // Name changes (old -> new): scripts follow them, so conditions must too.
+            const nameRenames: { from: string; to: string }[] = [];
+            const trackRename = (from?: string | null, to?: string | null) => {
+                const previous = `${from || ''}`.trim();
+                const next = `${to || ''}`.trim();
+                if (previous && next && previous.toLowerCase() !== next.toLowerCase()) nameRenames.push({ from: previous, to: next });
+            };
 
             const resolveConfidential = ({
                 incoming,
@@ -399,6 +423,7 @@ export async function _saveDataKeys({
                                     uniqueKey: data.uniqueKey,
                                     draftOrigin,
                                 }).where(eq(dataKeysDrafts.uuid, dataKeyUuid));
+                            trackRename(draft.data?.name, data.name);
 
                             if (data.uniqueKey) {
                                 propagationMatchUniqueKeysByDataKey[data.uniqueKey] = Array.from(new Set([
@@ -445,6 +470,7 @@ export async function _saveDataKeys({
                                 draftOrigin,
                                 createdByUserId: userId,
                             });
+                            trackRename(published?.name, data.name);
 
                             if (data.uniqueKey) {
                                 propagationMatchUniqueKeysByDataKey[data.uniqueKey] = Array.from(new Set([
@@ -515,13 +541,98 @@ export async function _saveDataKeys({
                         affected: updateRefsRes.affected,
                     },
                 };
+
+                // The refs sync renamed field keys and option values in these
+                // scripts; bring their conditions along ($Old, $Parent = 'Old').
+                // Each rename is only applied where the script itself shows it.
+                const affectedScriptIds = (updateRefsRes.affected?.scripts || []).map((script) => script.scriptId).filter(Boolean);
+                if (nameRenames.length && affectedScriptIds.length) {
+                    const conditionsRes = await _syncConditionRefsAfterReplacement({
+                        renamesByScriptId: Object.fromEntries(affectedScriptIds.map((scriptId) => [scriptId, nameRenames])),
+                        userId,
+                        client: executor,
+                    });
+                    if (conditionsRes.errors?.length) throw new Error(conditionsRes.errors.join(', '));
+                    response.info = { ...response.info, conditionsRewritten: conditionsRes.rewritten };
+                }
             }
         };
+
+        // Unlinking options from a parent rewrites the scripts that use it:
+        // record it (preview, conflict check, revert) like merges and deletes.
+        const unlinkItems = dataParam.filter((item) => (item.deletedUniqueKeys || []).some((key) => `${key || ''}`.trim()));
+        const recorded = !client && (dryRun || unlinkItems.length > 0);
 
         // Run atomically: either every draft write, unlink sync, and refs update
         // lands, or none do. When a client is provided we join its transaction.
         if (client) {
             await executeSave(client);
+        } else if (recorded) {
+            const parentKeys = uniqueValues(dataParam.map((item) => item.uniqueKey || ''));
+            const childKeys = uniqueValues(unlinkItems.flatMap((item) => [
+                ...(item.deletedUniqueKeys || []),
+                ...Object.values(item.optionReplacements || {}),
+            ]));
+            const involved = await _getDataKeys({ uniqueKeys: uniqueValues([...parentKeys, ...childKeys]) });
+            if (involved.errors?.length) throw new Error(involved.errors[0]);
+            const byUniqueKey = new Map(involved.data.map((dataKey) => [dataKey.uniqueKey, dataKey]));
+            const byId = new Map(involved.data.map((dataKey) => [dataKey.uuid, dataKey]));
+
+            // The save rewrites the scripts that reference the saved keys.
+            const refs = !parentKeys.length ? { data: [] as { refType: string; data: any }[] } : await _getDataKeysRefs({ uniqueKeys: parentKeys });
+            const scriptTitles = new Map<string, string>();
+            const scriptIds = uniqueValues(refs.data.map((ref) => {
+                const scriptId = `${ref.data?.scriptId || ref.data?.scriptDraftId || ''}`;
+                if (scriptId && ref.data?.scriptTitle) scriptTitles.set(scriptId, ref.data.scriptTitle);
+                return scriptId;
+            }));
+
+            const parent = byUniqueKey.get(parentKeys[0]);
+            const parentTitle = parent?.name || parent?.label || parentKeys[0] || 'data key';
+            const unlinkedCount = uniqueValues(unlinkItems.flatMap((item) => item.deletedUniqueKeys || [])).length;
+
+            const outcome = await runRecordedDataKeyOperation({
+                dryRun,
+                userId,
+                snapshotScope: {
+                    scriptIds,
+                    dataKeyIds: uniqueValues([...dataParam.map((item) => item.uuid || ''), ...involved.data.map((dataKey) => dataKey.uuid)]),
+                    dataKeyUniqueKeys: uniqueValues([...parentKeys, ...childKeys]),
+                },
+                titles: {
+                    script: (id) => scriptTitles.get(id) || 'a script',
+                    dataKey: (id) => byId.get(id)?.name || 'a data key',
+                },
+                describeKey: reportKeyDescriber(byUniqueKey),
+                run: (tx) => executeSave(tx),
+                record: () => ({
+                    kind: 'unlink',
+                    title: `Unlink ${unlinkedCount} option${unlinkedCount === 1 ? '' : 's'} from “${parentTitle}”`,
+                    scope: 'library',
+                    subjectUniqueKey: parentKeys[0] || '',
+                    subjectName: parentTitle,
+                    affectedUniqueKeys: uniqueValues(unlinkItems.flatMap((item) => item.deletedUniqueKeys || [])),
+                    scriptIds,
+                    request: {
+                        parentUniqueKey: parentKeys[0],
+                        deletedUniqueKeys: uniqueValues(unlinkItems.flatMap((item) => item.deletedUniqueKeys || [])),
+                        optionReplacements: Object.assign({}, ...unlinkItems.map((item) => item.optionReplacements || {})),
+                        unlinkedKeys: childKeys.map((uniqueKey) => {
+                            const key = byUniqueKey.get(uniqueKey);
+                            return { uniqueKey, name: key?.name || '', label: key?.label || '' };
+                        }),
+                    },
+                    reportExtras: { deletedDataKeyIds: [] },
+                }),
+            });
+
+            response.preview = outcome.preview;
+            response.operationId = outcome.operationId;
+
+            if (!dryRun) {
+                socket.emit('data_changed', 'save_data_keys');
+                if (broadcastAction && refsSaved) socket.emit('data_changed', 'save_scripts');
+            }
         } else {
             await db.transaction(executeSave);
 

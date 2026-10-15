@@ -334,8 +334,9 @@ export function Item<P = {}>({
                     <TooltipProvider delayDuration={0}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
-                            type="button"
+                          <div
+                            role="button"
+                            tabIndex={0}
                             className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
                             onClick={() =>
                               alert({
@@ -344,12 +345,21 @@ export function Item<P = {}>({
                                 variant: "info",
                               })
                             }
+                            onKeyDown={(event) => {
+                                if (event.key !== "Enter" && event.key !== " ") return;
+                                event.preventDefault();
+                                alert({
+                                title: "Confidentiality is managed in Data Keys",
+                                message: "Change this in the Data Key. Items inherit confidential status automatically.",
+                                variant: "info",
+                              });
+                            }}
                           >
                             <Switch id="confidential" checked={inheritedConfidential} disabled />
                             <Label secondary htmlFor="confidential">
                               Confidential
                             </Label>
-                          </button>
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="flex flex-col gap-y-1">
@@ -372,8 +382,9 @@ export function Item<P = {}>({
                     <TooltipProvider delayDuration={0}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
-                            type="button"
+                          <div
+                            role="button"
+                            tabIndex={0}
                             className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
                             onClick={() =>
                               alert({
@@ -382,12 +393,21 @@ export function Item<P = {}>({
                                 variant: "info",
                               })
                             }
+                            onKeyDown={(event) => {
+                                if (event.key !== "Enter" && event.key !== " ") return;
+                                event.preventDefault();
+                                alert({
+                                title: "Confidentiality is managed in Data Keys",
+                                message: "Change this in the Data Key. Items inherit confidential status automatically.",
+                                variant: "info",
+                              });
+                            }}
                           >
                             <Switch id="confidentialLabelOnly" checked={inheritedConfidentialLabelOnly} disabled />
                             <Label secondary htmlFor="confidentialLabelOnly">
                               Confidential (label only)
                             </Label>
-                          </button>
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="flex flex-col gap-y-1">

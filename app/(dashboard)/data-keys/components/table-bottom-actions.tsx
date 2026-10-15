@@ -10,7 +10,7 @@ import { ActionsBar } from '@/components/actions-bar';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { getBlockedChildDeletions, getDataKeyParentTitle } from '@/lib/data-key-children';
 import { ExportModal } from './export-modal';
-import { fetchDataKeyDeleteImpact, type DeleteImpactItem } from './delete-confirmation';
+import { fetchDataKeyDeleteImpact, previewDataKeyDelete, type DeleteImpactItem } from './delete-confirmation';
 import { DataKeyDeleteReplacementDialog } from './delete-replacement-dialog';
 
 export function DataKeysTableBottomActions({ disabled, }: {
@@ -46,6 +46,13 @@ export function DataKeysTableBottomActions({ disabled, }: {
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}
+                onPreview={({ replacements, scriptRemovals, scriptSelections }, action) => previewDataKeyDelete({
+                    dataKeysIds: selected.map(s => s.uuid),
+                    replacements,
+                    scriptRemovals,
+                    ...(action === 'scripts' ? { scriptsOnly: scriptSelections } : {}),
+                    ...(action === 'deleteAnyway' ? { allowMissingReplacements: true } : {}),
+                })}
                 onApplyToScripts={async ({ replacements, scriptRemovals, scriptSelections }) => {
                     const success = await deleteDataKeys(selected.map(s => s.uuid), replacements, {
                         scriptRemovals,

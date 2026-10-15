@@ -79,10 +79,21 @@ export async function captureMergeDraftRows(client: DbOrTransaction, scope: Merg
     return toJson(Object.fromEntries(Object.entries(rows).map(([name, list]) => [name, sortById(list)])) as MergeDraftRows);
 }
 
-/** True when both captures hold exactly the same rows. */
+// Key order is not meaningful: jsonb re-sorts object keys when the snapshot is
+// stored, while drafts written as JSON strings (older drizzle versions) keep
+// theirs. Compare content with keys sorted at every level.
+function canonical(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.keys(value as AnyRecord).sort().map((key) => [key, canonical((value as AnyRecord)[key])]));
+    }
+    return value;
+}
+
+/** True when both captures hold the same rows (same content, whatever the key order). */
 export function sameMergeDraftRows(a: MergeDraftRows, b: MergeDraftRows) {
     return (Object.keys(TABLES) as (keyof MergeDraftRows)[])
-        .every((name) => JSON.stringify(sortById(a[name] || [])) === JSON.stringify(sortById(b[name] || [])));
+        .every((name) => JSON.stringify(canonical(sortById(a[name] || []))) === JSON.stringify(canonical(sortById(b[name] || []))));
 }
 
 // JSON turned timestamps into strings; give date columns their Date back.

@@ -1,10 +1,5 @@
-import { inArray } from 'drizzle-orm';
-
 import logger from '@/lib/logger';
-import db from '@/databases/pg/drizzle';
 import socket from '@/lib/socket';
-import type { DbOrTransaction } from '@/databases/pg/db-client';
-import { dataKeyMerges, users } from '@/databases/pg/schema';
 import { _getDataKeys, _getDataKeysRefs } from '@/databases/queries/data-keys';
 import { _getDiagnoses, _getProblems, _getScreens, _getScripts } from '@/databases/queries/scripts';
 import { buildDataKeysDeleteImpact } from '@/lib/data-key-delete-impact';
@@ -22,7 +17,7 @@ import {
     type OptionPresence,
     type OptionUsage,
 } from '@/lib/data-key-merge-analysis';
-import { buildMergeReport, type MergeReport } from '@/lib/data-key-merge-report';
+import type { MergeReport } from '@/lib/data-key-merge-report';
 import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { _saveScreens } from '../scripts';
 import { _saveDataKeys } from './_save';
@@ -31,7 +26,8 @@ import { rebuildFieldItemsFromDataKeyOptions, rebuildScreenItemsFromDataKeyOptio
 import { _deleteReferencedDataKeyOptions, type UnlinkReplacementDataKey } from './_delete-referenced-options';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { queueDataKeysDeletion } from './_delete';
-import { captureMergeDraftRows, type MergeDraftRows, type MergeSnapshotScope } from './_merge-snapshot';
+import type { MergeSnapshotScope } from './_merge-snapshot';
+import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationConflict } from './_recorded-operation';
 
 export type MergeDataKeysParams = {
     /** The parent data key that is kept. */
@@ -66,11 +62,7 @@ export type MergeDataKeysParams = {
     broadcastAction?: boolean;
 };
 
-export type MergeConflict = {
-    kind: 'data_key' | 'script';
-    title: string;
-    userName: string;
-};
+export type MergeConflict = OperationConflict;
 
 export type MergePreview = {
     report: MergeReport;
@@ -93,58 +85,6 @@ export type MergeDataKeysResponse = {
 };
 
 const uniqueValues = (values: string[]) => Array.from(new Set(values.map((value) => `${value || ''}`.trim()).filter(Boolean)));
-
-/** Thrown inside the transaction to roll a dry run back while keeping its result. */
-class DryRunRollback extends Error {
-    constructor(public preview: MergePreview) {
-        super('dry run');
-    }
-}
-
-async function describeConflicts({
-    client,
-    rows,
-    userId,
-    scriptIds,
-    dataKeyIds,
-    titles,
-}: {
-    client: DbOrTransaction;
-    rows: MergeDraftRows;
-    userId?: string | null;
-    scriptIds: Set<string>;
-    dataKeyIds: Set<string>;
-    titles: { script: (id: string) => string; dataKey: (id: string) => string };
-}): Promise<MergeConflict[]> {
-    const others = (row: Record<string, any>) => !!row.createdByUserId && row.createdByUserId !== userId;
-    const found: { kind: MergeConflict['kind']; title: string; userId: string }[] = [];
-
-    const scriptRows = [...rows.scriptsDrafts, ...rows.screensDrafts, ...rows.diagnosesDrafts, ...rows.problemsDrafts]
-        .filter((row) => others(row) && (scriptIds.has(row.scriptId) || scriptIds.has(row.scriptDraftId)));
-    const seenScripts = new Set<string>();
-    for (const row of scriptRows) {
-        const scriptId = scriptIds.has(row.scriptId) ? row.scriptId : row.scriptDraftId;
-        const key = `${scriptId}:${row.createdByUserId}`;
-        if (seenScripts.has(key)) continue;
-        seenScripts.add(key);
-        found.push({ kind: 'script', title: titles.script(scriptId), userId: row.createdByUserId });
-    }
-
-    for (const row of rows.dataKeysDrafts) {
-        const keyId = row.dataKeyId || row.uuid;
-        if (!others(row) || !dataKeyIds.has(keyId)) continue;
-        found.push({ kind: 'data_key', title: titles.dataKey(keyId), userId: row.createdByUserId });
-    }
-
-    if (!found.length) return [];
-    const people = await client
-        .select({ userId: users.userId, displayName: users.displayName })
-        .from(users)
-        .where(inArray(users.userId, uniqueValues(found.map((item) => item.userId))));
-    const nameOf = new Map(people.map((person) => [person.userId, person.displayName]));
-
-    return found.map((item) => ({ kind: item.kind, title: item.title, userName: nameOf.get(item.userId) || 'another user' }));
-}
 
 export async function _mergeDataKeys({
     survivorId,
@@ -294,45 +234,16 @@ export async function _mergeDataKeys({
             if (entity.scriptId && entity.scriptTitle) scriptTitles.set(entity.scriptId, entity.scriptTitle);
         });
 
-        let mergeId: string | undefined;
-        let preview: MergePreview | undefined;
-
-        try {
-            await db.transaction(async (tx) => {
-                const loadScripts = async () => {
-                    const [screens, diagnoses, problems] = [
-                        await _getScreens({ scriptsIds: scopeScriptIds, returnDraftsIfExist: true, client: tx }),
-                        await _getDiagnoses({ scriptsIds: scopeScriptIds, returnDraftsIfExist: true, client: tx }),
-                        await _getProblems({ scriptsIds: scopeScriptIds, returnDraftsIfExist: true, client: tx }),
-                    ];
-                    const errors = [...(screens.errors || []), ...(diagnoses.errors || []), ...(problems.errors || [])];
-                    if (errors.length) throw new Error(errors[0]);
-                    return { screens: screens.data, diagnoses: diagnoses.data, problems: problems.data };
-                };
-
-                const rowsBefore = await captureMergeDraftRows(tx, snapshotScope);
-                const conflicts = await describeConflicts({
-                    client: tx,
-                    rows: rowsBefore,
-                    userId,
-                    scriptIds: new Set(scopeScriptIds),
-                    dataKeyIds: new Set(snapshotScope.dataKeyIds),
-                    titles: {
-                        script: (id) => scriptTitles.get(id) || 'a script',
-                        dataKey: (id) => getMergeKeyTitle(byId.get(id)),
-                    },
-                });
-                if (conflicts.length && !dryRun) {
-                    const first = conflicts[0];
-                    throw new Error(
-                        `${first.userName} has unpublished changes to ${first.kind === 'script' ? 'the script' : 'the data key'} "${first.title}"` +
-                        `${conflicts.length > 1 ? ` (and ${conflicts.length - 1} more)` : ''}. ` +
-                        'Merge after those changes are published or discarded.',
-                    );
-                }
-
-                const before = scopeScriptIds.length ? await loadScripts() : { screens: [], diagnoses: [], problems: [] };
-
+        const { preview: base, result, operationId } = await runRecordedDataKeyOperation({
+            dryRun,
+            userId,
+            snapshotScope,
+            titles: {
+                script: (id) => scriptTitles.get(id) || 'a script',
+                dataKey: (id) => getMergeKeyTitle(byId.get(id)),
+            },
+            describeKey: reportKeyDescriber(byUniqueKey),
+            run: async (tx, { before }) => {
                 // 0. Confirmed links for legacy option items without a data key.
                 if (legacyLinks.length) {
                     const parentOptions = new Map(merged.map((dataKey) => [dataKey.uniqueKey, new Set(dataKey.options || [])]));
@@ -526,59 +437,41 @@ export async function _mergeDataKeys({
                     }
                 }
 
-                const after = scopeScriptIds.length ? await loadScripts() : { screens: [], diagnoses: [], problems: [] };
-                const report = buildMergeReport({
-                    before,
-                    after,
-                    describeKey: (uniqueKey) => {
-                        const dataKey = byUniqueKey.get(uniqueKey);
-                        // Duplicates share a name, so the short key tells them apart.
-                        const name = dataKey ? `${dataKey.name}${dataKey.label && dataKey.label !== dataKey.name ? ` — ${dataKey.label}` : ''}` : '';
-                        return name ? `${name} [${uniqueKey.slice(0, 8)}]` : uniqueKey;
-                    },
-                });
+                return { deletedDataKeyIds, optionPresence };
+            },
+            record: ({ deletedDataKeyIds }, report) => ({
+                kind: 'merge',
+                title: `Merge into “${getMergeKeyTitle(survivor)}”`,
+                scope: scriptsOnly ? 'scripts' : 'library',
+                subjectUniqueKey: survivor.uniqueKey,
+                subjectName: getMergeKeyTitle(survivor),
+                affectedUniqueKeys: mergedUniqueKeys,
+                scriptIds: appliedScriptIds,
+                request: {
+                    survivorId: survivor.uuid,
+                    mergedIds,
+                    childActions: Object.fromEntries(plan.children.map((row) => [row.uniqueKey, row.action])),
+                    scriptIds: scriptsOnly ? appliedScriptIds : undefined,
+                    deleteUnusedChildren: !!deleteUnusedChildren,
+                    survivorOptionOrder: plan.nextSurvivorOptions,
+                    survivorLabel: plan.survivorLabel,
+                    legacyLinks,
+                    optionPlacements: placements,
+                    mergedKeys: merged.map((dataKey) => ({ uniqueKey: dataKey.uniqueKey, name: dataKey.name, label: dataKey.label })),
+                },
+                reportExtras: { addedOptions: plan.addedOptions, deletedDataKeyIds },
+            }),
+        });
 
-                preview = {
-                    report,
-                    conflicts,
-                    legacyItems,
-                    optionUsage,
-                    optionPresence,
-                    scriptsChanged: report.scripts.length,
-                    addedOptions: plan.addedOptions,
-                    deletedDataKeyIds,
-                };
-
-                if (dryRun) throw new DryRunRollback(preview);
-
-                const rowsAfter = await captureMergeDraftRows(tx, snapshotScope);
-                const [record] = await tx.insert(dataKeyMerges).values({
-                    scope: scriptsOnly ? 'scripts' : 'library',
-                    survivorUniqueKey: survivor.uniqueKey,
-                    survivorName: getMergeKeyTitle(survivor),
-                    mergedUniqueKeys,
-                    scriptIds: appliedScriptIds,
-                    request: {
-                        survivorId: survivor.uuid,
-                        mergedIds,
-                        childActions: Object.fromEntries(plan.children.map((row) => [row.uniqueKey, row.action])),
-                        scriptIds: scriptsOnly ? appliedScriptIds : undefined,
-                        deleteUnusedChildren: !!deleteUnusedChildren,
-                        survivorOptionOrder: plan.nextSurvivorOptions,
-                        survivorLabel: plan.survivorLabel,
-                        legacyLinks,
-                        optionPlacements: placements,
-                        mergedKeys: merged.map((dataKey) => ({ uniqueKey: dataKey.uniqueKey, name: dataKey.name, label: dataKey.label })),
-                    },
-                    report: { ...report, addedOptions: plan.addedOptions, deletedDataKeyIds },
-                    snapshot: { scope: snapshotScope, before: rowsBefore, after: rowsAfter },
-                    createdByUserId: userId || null,
-                }).returning({ mergeId: dataKeyMerges.mergeId });
-                mergeId = record.mergeId;
-            });
-        } catch (e) {
-            if (!(e instanceof DryRunRollback)) throw e;
-        }
+        const preview: MergePreview = {
+            ...base,
+            legacyItems,
+            optionUsage,
+            optionPresence: result.optionPresence,
+            addedOptions: plan.addedOptions,
+            deletedDataKeyIds: result.deletedDataKeyIds,
+        };
+        const mergeId = operationId;
 
         response.success = true;
         response.preview = preview;

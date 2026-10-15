@@ -1,6 +1,6 @@
 'use client';
 
-import { PlusIcon } from 'lucide-react';
+import { HistoryIcon, PlusIcon } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -156,6 +156,15 @@ export function DataKeysTableHeader() {
                         </Button>
 
                         {isSuperUser && <DuplicateParentsButton />}
+
+                        {isSuperUser && (
+                            <Button asChild variant="outline" className="w-auto h-auto">
+                                <Link href="/data-keys/merge?tab=history">
+                                    <HistoryIcon className="size-4 mr-2" />
+                                    History
+                                </Link>
+                            </Button>
+                        )}
 
                         <ExportMetadataButton />
                     </div>

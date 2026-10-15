@@ -20,7 +20,7 @@ import { Clipboard } from "@/components/clipboard";
 import { Loader } from '@/components/loader';
 import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
-import { fetchDataKeyDeleteImpact, type DeleteImpactItem } from './delete-confirmation';
+import { fetchDataKeyDeleteImpact, previewDataKeyDelete, type DeleteImpactItem } from './delete-confirmation';
 import { DataKeyDeleteReplacementDialog } from './delete-replacement-dialog';
 
 export function DataKeysTableRowActions({
@@ -85,6 +85,13 @@ export function DataKeysTableRowActions({
                     if (success) setShowReplacementDialog(false);
                     return success;
                 }}
+                onPreview={({ replacements, scriptRemovals, scriptSelections }, action) => previewDataKeyDelete({
+                    dataKeysIds: [dataKey.uuid],
+                    replacements,
+                    scriptRemovals,
+                    ...(action === 'scripts' ? { scriptsOnly: scriptSelections } : {}),
+                    ...(action === 'deleteAnyway' ? { allowMissingReplacements: true } : {}),
+                })}
                 onApplyToScripts={async ({ replacements, scriptRemovals, scriptSelections }) => {
                     const success = await deleteDataKeys([dataKey.uuid], replacements, {
                         scriptRemovals,

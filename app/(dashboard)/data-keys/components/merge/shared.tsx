@@ -51,6 +51,24 @@ export function ActionBadge({ action, className }: { action: ChildMergeAction['a
     return <Badge variant="outline" className={cn('whitespace-nowrap font-normal', badge.className, className)}>{badge.label}</Badge>;
 }
 
+// Each kind of recorded change, with the changelog colour it reads as.
+const OPERATION_KIND_BADGES: Record<string, { label: string; className: string; }> = {
+    merge: { label: 'Merge', className: CHANGELOG_ACTION_BADGE_CLASSES.merge },
+    delete: { label: 'Delete', className: CHANGELOG_ACTION_BADGE_CLASSES.delete },
+    scripts: { label: 'Selected scripts', className: CHANGELOG_ACTION_BADGE_CLASSES.update },
+    unlink: { label: 'Unlink', className: CHANGELOG_ACTION_BADGE_CLASSES.restore },
+};
+
+export function OperationKindBadge({ kind }: { kind: string; }) {
+    const badge = OPERATION_KIND_BADGES[kind] || OPERATION_KIND_BADGES.merge;
+    return <Badge variant="outline" className={cn('whitespace-nowrap font-normal', badge.className)}>{badge.label}</Badge>;
+}
+
+/** A history entry's title; merges recorded before titles existed fall back to the kept key. */
+export function operationTitle(entry: { kind?: string; title?: string; survivorName: string; }) {
+    return entry.title || `Merge into “${entry.survivorName}”`;
+}
+
 export const MATCH_REASON_LABELS: Record<ChildMatchReason, string> = {
     same: 'same option',
     name: 'same name',
@@ -58,13 +76,13 @@ export const MATCH_REASON_LABELS: Record<ChildMatchReason, string> = {
     similar: 'similar name',
 };
 
-export function MergeStatusBadge({ status }: { status: 'applied' | 'reverted'; }) {
+export function MergeStatusBadge({ status, kind = 'merge' }: { status: 'applied' | 'reverted'; kind?: string; }) {
     return (
         <Badge
             variant="outline"
             className={cn('font-normal', status === 'reverted' ? CHANGELOG_ACTION_BADGE_CLASSES.rollback : CHANGELOG_ACTION_BADGE_CLASSES.merge)}
         >
-            {status === 'reverted' ? 'Reverted' : 'Merged'}
+            {status === 'reverted' ? 'Reverted' : (kind === 'merge' ? 'Merged' : 'Applied')}
         </Badge>
     );
 }

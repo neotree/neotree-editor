@@ -38,7 +38,7 @@ import {
 
 import { dismissDuplicateGroup, restoreDuplicateGroup } from './api';
 import { isCleanGroup, useScriptUsage } from './groups';
-import { Callout, MergeStatusBadge, describeKey, pluralize, shortId, useMergePermission } from './shared';
+import { Callout, MergeStatusBadge, OperationKindBadge, describeKey, operationTitle, pluralize, shortId, useMergePermission } from './shared';
 
 type Group = {
     key: string;
@@ -84,6 +84,7 @@ export function MergeOverview({
     // Scripts-only merges leave the merged key in the library: show where a
     // group was already partly merged.
     const partialMerges = (group: Group) => merges.filter((merge) => (
+        merge.kind === 'merge' &&
         merge.status === 'applied' &&
         merge.scope === 'scripts' &&
         merge.mergedUniqueKeys.some((uniqueKey) => group.keys.some((dataKey) => dataKey.uniqueKey === uniqueKey))
@@ -253,16 +254,19 @@ export function MergeOverview({
                     </TabsContent>
 
                     <TabsContent value="history" className="mt-4">
+                        <div className="mb-3 text-sm text-muted-foreground">
+                            Merges, deletes, replacements and unlinks. Each one can be reviewed, and reverted until it is published.
+                        </div>
                         {!merges.length ? (
-                            <div className="py-12 text-center text-muted-foreground">No merges yet.</div>
+                            <div className="py-12 text-center text-muted-foreground">No changes recorded yet.</div>
                         ) : (
                             <div className="rounded-md border border-border">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Date</TableHead>
-                                            <TableHead>Kept key</TableHead>
-                                            <TableHead>Merged</TableHead>
+                                            <TableHead>Change</TableHead>
+                                            <TableHead>Type</TableHead>
                                             <TableHead>Applied to</TableHead>
                                             <TableHead>By</TableHead>
                                             <TableHead>Status</TableHead>
@@ -276,13 +280,13 @@ export function MergeOverview({
                                                 onClick={() => router.push(`/data-keys/merge/history/${merge.mergeId}`)}
                                             >
                                                 <TableCell className="whitespace-nowrap text-sm">{format(new Date(merge.createdAt), 'PP p')}</TableCell>
-                                                <TableCell>{merge.survivorName}</TableCell>
-                                                <TableCell className="text-sm">{pluralize(merge.mergedUniqueKeys.length, 'key')}</TableCell>
+                                                <TableCell>{operationTitle(merge)}</TableCell>
+                                                <TableCell><OperationKindBadge kind={merge.kind} /></TableCell>
                                                 <TableCell className="text-sm">
                                                     {merge.scope === 'library' ? 'All scripts' : pluralize(merge.scriptIds.length, 'selected script')}
                                                 </TableCell>
                                                 <TableCell className="text-sm text-muted-foreground">{merge.createdByName || '—'}</TableCell>
-                                                <TableCell><MergeStatusBadge status={merge.status} /></TableCell>
+                                                <TableCell><MergeStatusBadge status={merge.status} kind={merge.kind} /></TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

@@ -241,3 +241,32 @@ const children = [
 }
 
 console.log("data-key-merge-analysis tests passed")
+
+// A removed field is reported as removed — never compared with the field that moved into its place.
+{
+  const screen = (fields: any[]) => ({ screenId: "s", scriptId: "x", scriptTitle: "X", title: "Exam", keyId: "", items: [], fields })
+  const before = [screen([
+    { fieldId: "f1", key: "ANC", label: "ANC visits", keyId: "anc", condition: "", items: [] },
+    { fieldId: "f2", key: "Weight", label: "Weight", keyId: "w", condition: "$ANC > 2", items: [] },
+  ])]
+  const after = [screen([
+    { fieldId: "f2", key: "Weight", label: "Weight", keyId: "w", condition: "$ANC > 2", items: [] },
+  ])]
+  const report = buildMergeReport({
+    before: { screens: before, diagnoses: [], problems: [] },
+    after: { screens: after, diagnoses: [], problems: [] },
+    describeKey: (k) => k,
+  })
+  assert.deepStrictEqual(report.totals, { relinked: 0, renamed: 0, removed: 1, added: 0, condition: 0 })
+  assert.deepStrictEqual(report.scripts[0].changes.map((c) => [c.kind, c.location, c.before]), [["removed", "Exam > ANC visits", "ANC"]])
+
+  // Fields without ids, edited in place, still pair by position.
+  const strip = (list: any[]) => list.map(({ fieldId, ...rest }) => rest)
+  const inPlace = buildMergeReport({
+    before: { screens: [screen(strip([before[0].fields[1]]))], diagnoses: [], problems: [] },
+    after: { screens: [screen(strip([{ ...before[0].fields[1], key: "WeightKg", keyId: "wk" }]))], diagnoses: [], problems: [] },
+    describeKey: (k) => k,
+  })
+  assert.deepStrictEqual(inPlace.totals, { relinked: 1, renamed: 1, removed: 0, added: 0, condition: 0 })
+}
+console.log("report pairing tests passed")

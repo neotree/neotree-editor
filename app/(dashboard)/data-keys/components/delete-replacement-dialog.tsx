@@ -20,6 +20,9 @@ import { isDataKeyReplacementCompatible } from '@/lib/data-key-option-compatibil
 import { cn } from '@/lib/utils';
 
 import type { DeleteImpactItem } from './delete-confirmation';
+import { MergeChangeTotals, MergeReport } from './merge/merge-report';
+import { Callout } from './merge/shared';
+import type { OperationPreview } from '@/databases/mutations/data-keys';
 
 type ReplacementMap = Record<string, string>;
 
@@ -33,6 +36,11 @@ export type DataKeyDeleteSelection = {
 };
 
 type DeleteScope = 'library' | 'scripts';
+
+/** Which action the confirm step performs (and previews). */
+export type DeleteAction = 'confirm' | 'deleteAnyway' | 'scripts';
+
+export type DeletePreviewResult = { preview?: OperationPreview; errors?: string[] };
 
 type DataKeyDeleteReplacementDialogProps = {
     dataKeys: DataKey[];
@@ -66,6 +74,11 @@ type DataKeyDeleteReplacementDialogProps = {
      * keys in the scripts the user picks, keeping them in the library.
      */
     onApplyToScripts?: (selection: DataKeyDeleteSelection) => Promise<boolean | void> | boolean | void;
+    /**
+     * Runs the action as a dry run and returns exactly what it would change.
+     * When given, every change to scripts is confirmed against this preview.
+     */
+    onPreview?: (selection: DataKeyDeleteSelection, action: DeleteAction) => Promise<DeletePreviewResult>;
 };
 
 function normalizeType(value?: string | null) {
@@ -189,6 +202,7 @@ export function DataKeyDeleteReplacementDialog({
     onConfirm,
     onDeleteAnyway,
     onApplyToScripts,
+    onPreview,
 }: DataKeyDeleteReplacementDialogProps) {
     const isUnlink = mode === 'unlink';
     const [confirmingDeleteAnyway, setConfirmingDeleteAnyway] = useState(false);
@@ -336,6 +350,29 @@ export function DataKeyDeleteReplacementDialog({
     const showDeleteAnywaySecondary = !isUnlink && !!onDeleteAnyway && showReplaceButton && !!unreplacedReplaceableItems.length;
     const showDeleteAnywayPrimary = !isUnlink && !!onDeleteAnyway && !showReplaceButton && !!usedItems.length;
 
+    // The confirm step performs one of three actions; preview exactly that one.
+    const receiptAction: DeleteAction = scriptsOnly
+        ? 'scripts'
+        : (unreplacedReplaceableItems.length || (!replaceableItems.length && usedItems.length)) ? 'deleteAnyway' : 'confirm';
+
+    const [preview, setPreview] = useState<{ key: string; loading: boolean; data: OperationPreview | null; error: string }>({
+        key: '', loading: false, data: null, error: '',
+    });
+    const previewKey = JSON.stringify([receiptAction, selection]);
+    useEffect(() => {
+        if (!open || !confirmingDeleteAnyway || !onPreview) return;
+        let cancelled = false;
+        setPreview({ key: previewKey, loading: true, data: null, error: '' });
+        onPreview(selection, receiptAction)
+            .then((res) => !cancelled && setPreview({ key: previewKey, loading: false, data: res.preview || null, error: res.errors?.[0] || '' }))
+            .catch((e: any) => !cancelled && setPreview({ key: previewKey, loading: false, data: null, error: e.message || 'Preview failed.' }));
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, confirmingDeleteAnyway, previewKey]);
+    const previewData = preview.key === previewKey ? preview.data : null;
+    const previewConflicts = previewData?.conflicts || [];
+    const previewBlocked = !!onPreview && (preview.loading || preview.key !== previewKey || !!preview.error || !previewData || !!previewConflicts.length);
+
     const executeConfirm = async () => {
         const success = await onConfirm(selection);
         if (success !== false) {
@@ -347,9 +384,9 @@ export function DataKeyDeleteReplacementDialog({
     const handleConfirm = async () => {
         if (missingReplacement || hasCandidateGap) return;
 
-        // Fully-replaced deletes execute directly; anything that removes
-        // references pauses on the receipt step first.
-        if (removalsExist && !confirmingDeleteAnyway) {
+        // Anything that changes scripts pauses on the confirm step first: always
+        // when an exact preview is available, otherwise when references are removed.
+        if ((removalsExist || (!!onPreview && !!usedItems.length)) && !confirmingDeleteAnyway) {
             setConfirmingDeleteAnyway(true);
             return;
         }
@@ -457,10 +494,12 @@ export function DataKeyDeleteReplacementDialog({
                     </div>
                 ) : confirmingDeleteAnyway ? (
                     <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-                        {scriptsOnly && !strippedItems.length ? (
+                        {!strippedItems.length ? (
                             <div role="status" className="rounded-md border border-border bg-muted/50 p-3 text-sm">
-                                <span className="font-semibold">References will be replaced in the selected scripts.</span>{' '}
-                                The data keys stay in the library.
+                                <span className="font-semibold">
+                                    References will be replaced in the {scriptsOnly ? 'selected' : 'affected'} scripts.
+                                </span>{' '}
+                                {scriptsOnly ? 'The data keys stay in the library.' : 'The replaced keys are deleted from the library on the next publish.'}
                             </div>
                         ) : (
                         <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
@@ -538,6 +577,45 @@ export function DataKeyDeleteReplacementDialog({
                             Screens that lose a key are flagged by the data key integrity checks and may need
                             repair before the next publish.
                         </p>
+
+                        {!!onPreview && (
+                            <div className="space-y-2 border-t border-border pt-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <div className="text-sm font-medium">Exact changes</div>
+                                    {previewData && <MergeChangeTotals totals={previewData.report.totals} />}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    The change is run against the current drafts and rolled back, so this is exactly what will
+                                    happen. It can be reverted from the data key history until it is published.
+                                </div>
+                                {preview.loading || preview.key !== previewKey ? (
+                                    <div role="status" aria-live="polite" className="space-y-2">
+                                        <span className="sr-only">Preparing preview…</span>
+                                        <Skeleton className="h-9 w-full" />
+                                        <Skeleton className="h-9 w-full" />
+                                    </div>
+                                ) : preview.error ? (
+                                    <Callout variant="error">{preview.error}</Callout>
+                                ) : previewData ? (
+                                    <>
+                                        {!!previewConflicts.length && (
+                                            <Callout variant="error">
+                                                <div className="font-medium">Other people have unpublished changes here.</div>
+                                                <ul className="mt-1 list-inside list-disc">
+                                                    {previewConflicts.map((conflict, index) => (
+                                                        <li key={`${conflict.title}-${index}`}>
+                                                            {conflict.userName} — {conflict.kind === 'script' ? 'script' : 'data key'} “{conflict.title}”
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                                <div className="mt-1">Try again after those changes are published or discarded.</div>
+                                            </Callout>
+                                        )}
+                                        <MergeReport report={previewData.report} emptyMessage="No script changes." />
+                                    </>
+                                ) : null}
+                            </div>
+                        )}
                     </div>
                 ) : allUnused ? (
                     <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
@@ -811,7 +889,7 @@ export function DataKeyDeleteReplacementDialog({
                             <Button
                                 type="button"
                                 variant="destructive"
-                                disabled={deleting}
+                                disabled={deleting || previewBlocked}
                                 onClick={scriptsOnly ? handleApplyToScripts : handleReceiptConfirm}
                             >
                                 {scriptsOnly ? 'Apply to scripts' : 'Delete'}

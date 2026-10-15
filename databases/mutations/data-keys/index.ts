@@ -9,3 +9,4 @@ export * from './_assert-refs-cleared';
 export * from './_sync_condition_refs';
 export * from './_merge';
 export * from './_merge-history';
+export * from './_recorded-operation';

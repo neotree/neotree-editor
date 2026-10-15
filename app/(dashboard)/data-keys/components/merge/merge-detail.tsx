@@ -29,7 +29,7 @@ import type { OptionPlacement } from '@/lib/data-key-merge-analysis';
 
 import { revertDataKeysMerge } from './api';
 import { MergeChangeTotals, MergeReport } from './merge-report';
-import { ActionBadge, Callout, MergeStatusBadge, SectionTitle, describeKey, pluralize, shortId, useMergePermission } from './shared';
+import { ActionBadge, Callout, MergeStatusBadge, OperationKindBadge, SectionTitle, describeKey, operationTitle, pluralize, shortId, useMergePermission } from './shared';
 
 export function MergeDetail({
     merge,
@@ -55,6 +55,11 @@ export function MergeDetail({
         || merge.mergedUniqueKeys.map((uniqueKey) => ({ uniqueKey }));
     const placements = Object.entries((request.optionPlacements || {}) as Record<string, OptionPlacement>);
     const nameOf = (uniqueKey: string) => describeKey(byUniqueKey.get(uniqueKey)) || shortId(uniqueKey);
+    const kind = merge.kind || 'merge';
+    const isMerge = kind === 'merge';
+    const noun = isMerge ? 'merge' : 'change';
+    const Noun = isMerge ? 'Merge' : 'Change';
+    const byUuid = new Map(allDataKeys.map((dataKey) => [dataKey.uuid, dataKey]));
 
     const handleRevert = async () => {
         try {
@@ -64,7 +69,7 @@ export function MergeDetail({
             await Promise.all((report.deletedDataKeyIds || []).map((id: string) => pendingChangesAPI.clearEntityChanges(id, 'data_key')));
             await loadDataKeys();
             router.refresh();
-            alert({ title: 'Merge reverted', message: 'The drafts are back to how they were before the merge.', variant: 'success' });
+            alert({ title: `${Noun} reverted`, message: `The drafts are back to how they were before the ${noun}.`, variant: 'success' });
         } catch (e: any) {
             alert({ title: 'Error', message: e.message, variant: 'error' });
         } finally {
@@ -75,12 +80,12 @@ export function MergeDetail({
 
     return (
         <PageContainer
-            title={`Merge of “${merge.survivorName}”`}
+            title={operationTitle(merge)}
             backLink="/data-keys/merge?tab=history"
             actions={canMerge && merge.status === 'applied' && merge.revertible && (
                 <Button variant="outline" size="sm" disabled={reverting} onClick={() => setConfirming(true)}>
                     <Undo2Icon className="mr-2 h-4 w-4" />
-                    Revert merge
+                    Revert {noun}
                 </Button>
             )}
         >
@@ -88,9 +93,10 @@ export function MergeDetail({
 
             <div className="min-w-0 space-y-6 px-4 pb-6">
                 <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <MergeStatusBadge status={merge.status} />
+                    <OperationKindBadge kind={kind} />
+                    <MergeStatusBadge status={merge.status} kind={kind} />
                     <span>
-                        Merged {format(new Date(merge.createdAt), 'PP p')}
+                        {isMerge ? 'Merged' : 'Made'} {format(new Date(merge.createdAt), 'PP p')}
                         {merge.createdByName && ` by ${merge.createdByName}`}
                         {' · '}{merge.scope === 'library' ? 'all scripts' : `${pluralize(merge.scriptIds.length, 'selected script')}`}
                     </span>
@@ -106,16 +112,17 @@ export function MergeDetail({
 
                 {justMerged && merge.status === 'applied' && (
                     <Callout variant="info">
-                        The merge is saved as drafts. Review the changes below, check data key integrity for the changed
+                        The {noun} is saved as drafts. Review the changes below, check data key integrity for the changed
                         scripts, then publish. You can revert it until it is published.
                     </Callout>
                 )}
                 {merge.status === 'applied' && !merge.revertible && (
                     <Callout variant="info">
-                        This merge can no longer be reverted: its changes have been published, discarded or edited since.
+                        This {noun} can no longer be reverted: its changes have been published, discarded or edited since.
                     </Callout>
                 )}
 
+                {isMerge ? (
                 <section className="space-y-3">
                     <SectionTitle title="Data keys" />
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -136,6 +143,48 @@ export function MergeDetail({
                         </div>
                     </div>
                 </section>
+                ) : (
+                    <section className="space-y-3">
+                        <SectionTitle title={kind === 'unlink' ? `Options unlinked from “${merge.survivorName}”` : 'Data keys'} />
+                        <ul className="divide-y divide-border rounded-md border border-border">
+                            {kind === 'unlink'
+                                ? (request.deletedUniqueKeys || []).map((uniqueKey: string) => {
+                                    const unlinked = (request.unlinkedKeys || []).find((key: { uniqueKey: string }) => key.uniqueKey === uniqueKey);
+                                    const replacement = request.optionReplacements?.[uniqueKey];
+                                    return (
+                                        <li key={uniqueKey} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                                            <span className="min-w-0 flex-1">{describeKey(unlinked) || nameOf(uniqueKey)}</span>
+                                            <span className="text-muted-foreground">
+                                                {replacement
+                                                    ? <>replaced by <span className="text-foreground">{describeKey((request.unlinkedKeys || []).find((key: { uniqueKey: string }) => key.uniqueKey === replacement)) || nameOf(replacement)}</span></>
+                                                    : 'removed from the linked screens'}
+                                            </span>
+                                        </li>
+                                    );
+                                })
+                                : (request.targetKeys || merge.mergedUniqueKeys.map((uniqueKey) => ({ uniqueKey }))).map((target: { uuid?: string; uniqueKey: string; name?: string; label?: string }) => {
+                                    const replacementId = target.uuid ? request.replacements?.[target.uuid] : undefined;
+                                    const replacement = replacementId
+                                        ? ((request.replacementKeys || []).find((key: { uuid: string }) => key.uuid === replacementId) || byUuid.get(replacementId))
+                                        : undefined;
+                                    return (
+                                        <li key={target.uniqueKey} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                                            <span className="min-w-0 flex-1">
+                                                {describeKey(target) || nameOf(target.uniqueKey)}
+                                                <span className="ml-1.5 font-mono text-xs text-muted-foreground">{shortId(target.uniqueKey)}</span>
+                                            </span>
+                                            <span className="text-muted-foreground">
+                                                {replacement
+                                                    ? <>replaced by <span className="text-foreground">{describeKey(replacement)}</span></>
+                                                    : (kind === 'delete' ? 'references removed' : 'removed from the selected scripts')}
+                                                {kind === 'delete' && ' · deleted from the library'}
+                                            </span>
+                                        </li>
+                                    );
+                                })}
+                        </ul>
+                    </section>
+                )}
 
                 {!!placements.length && (
                     <>
@@ -188,7 +237,7 @@ export function MergeDetail({
                 <section className="space-y-3">
                     <SectionTitle
                         title="Changes"
-                        description="What the merge changed in each script. Use the integrity check before publishing."
+                        description={`What the ${noun} changed in each script. Use the integrity check before publishing.`}
                         aside={<MergeChangeTotals totals={report.totals} />}
                     />
                     <MergeReport
@@ -210,10 +259,11 @@ export function MergeDetail({
             <AlertDialog open={confirming} onOpenChange={(open) => !reverting && setConfirming(open)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Revert this merge?</AlertDialogTitle>
+                        <AlertDialogTitle>Revert this {noun}?</AlertDialogTitle>
                         <AlertDialogDescription>
                             The drafts of the {pluralize(report.scripts.length, 'changed script')} and the data keys go back to
-                            exactly how they were before the merge, and the merged keys stay in the library.
+                            exactly how they were before the {noun}
+                            {(isMerge || kind === 'delete') ? `, and the ${isMerge ? 'merged' : 'deleted'} keys stay in the library` : ''}.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

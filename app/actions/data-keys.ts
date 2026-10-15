@@ -295,7 +295,7 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
         // so the sweep cannot be limited to the refs this save happened to
         // touch. It runs in the background: one bounded pass per library save,
         // rather than a cost paid on the next page load.
-        if (res?.success !== false) {
+        if (res?.success !== false && !params.dryRun) {
             const affected = (res as any)?.info?.refs?.affected?.scripts as { scriptId?: string }[] | undefined;
             void sweepAllScriptsConditionErrors(affected?.map((s) => s?.scriptId));
         }

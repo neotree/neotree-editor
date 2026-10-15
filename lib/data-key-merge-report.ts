@@ -112,6 +112,48 @@ export function buildMergeReport({
         });
     };
 
+    /**
+     * Pairs entries (fields, symptoms) before and after: by id, then by key,
+     * then — only when nothing was added or removed — by position. Pairing by
+     * position after a removal would compare unrelated entries, so leftovers
+     * are reported as removed or added instead.
+     */
+    const pairUp = (prevList: AnyRecord[] = [], nextList: AnyRecord[] = [], idKey: string) => {
+        const pairs: Array<[AnyRecord, AnyRecord | null, number]> = [];
+        const usedNext = new Set<number>();
+        const unpaired: number[] = [];
+
+        prevList.forEach((entry, index) => {
+            const id = norm(entry?.[idKey]);
+            const byId = id ? nextList.findIndex((other, i) => !usedNext.has(i) && norm(other?.[idKey]) === id) : -1;
+            const byKey = byId < 0 && norm(entry?.key)
+                ? nextList.findIndex((other, i) => !usedNext.has(i) && norm(other?.key) === norm(entry?.key) && (!id || !norm(other?.[idKey])))
+                : -1;
+            const match = byId >= 0 ? byId : byKey;
+            if (match >= 0) {
+                usedNext.add(match);
+                pairs.push([entry, nextList[match], index]);
+            } else {
+                unpaired.push(index);
+            }
+        });
+
+        const leftoverNext = nextList.map((_, i) => i).filter((i) => !usedNext.has(i));
+        if (unpaired.length && unpaired.length === leftoverNext.length) {
+            unpaired.forEach((index, n) => {
+                usedNext.add(leftoverNext[n]);
+                pairs.push([prevList[index], nextList[leftoverNext[n]], index]);
+            });
+        } else {
+            unpaired.forEach((index) => pairs.push([prevList[index], null, index]));
+        }
+
+        return {
+            pairs: pairs.sort((a, b) => a[2] - b[2]),
+            added: nextList.filter((_, i) => !usedNext.has(i)),
+        };
+    };
+
     const screensAfter = new Map(after.screens.map((screen) => [norm(screen.screenId), screen]));
     for (const prev of before.screens) {
         const next = screensAfter.get(norm(prev.screenId));
@@ -124,19 +166,27 @@ export function buildMergeReport({
         compareText(prev, 'condition', `${title} (skip to condition)`, href, prev.skipToCondition, next.skipToCondition);
         compareItems(prev, title, href, prev.items, next.items, 'id');
 
-        const nextFields: AnyRecord[] = next.fields || [];
-        (prev.fields || []).forEach((field: AnyRecord, fieldIndex: number) => {
-            const nextField = nextFields.find((other) => !!norm(field.fieldId) && norm(other.fieldId) === norm(field.fieldId))
-                || nextFields[fieldIndex];
-            if (!nextField) return;
+        const fields = pairUp(prev.fields, next.fields, 'fieldId');
+        fields.pairs.forEach(([field, nextField, fieldIndex]) => {
             const fieldTitle = `${title} > ${norm(field.label) || norm(field.key) || `field ${fieldIndex + 1}`}`;
             const fieldHref = `${href}?field=${field.fieldId || fieldIndex}`;
+            if (!nextField) {
+                push(prev, { kind: 'removed', location: fieldTitle, before: norm(field.key) || norm(field.label), after: '', href: fieldHref });
+                return;
+            }
             compareKey(prev, fieldTitle, fieldHref, field, nextField);
             compareText(prev, 'renamed', `${fieldTitle} (key)`, fieldHref, field.key, nextField.key);
             compareText(prev, 'condition', `${fieldTitle} (condition)`, fieldHref, field.condition, nextField.condition);
             compareText(prev, 'condition', `${fieldTitle} (calculation)`, fieldHref, field.calculation, nextField.calculation);
             compareItems(prev, fieldTitle, fieldHref, field.items, nextField.items, 'value');
         });
+        fields.added.forEach((field) => push(prev, {
+            kind: 'added',
+            location: `${title} > ${norm(field.label) || norm(field.key) || 'field'}`,
+            before: '',
+            after: norm(field.key) || norm(field.label),
+            href: `${href}?field=${field.fieldId || ''}`,
+        }));
     }
 
     const compareOutcomes = (prevList: AnyRecord[], nextList: AnyRecord[], idKey: 'diagnosisId' | 'problemId', path: string, noun: string) => {
@@ -148,12 +198,16 @@ export function buildMergeReport({
             const href = `/script/${prev.scriptId}/${path}/${prev[idKey]}`;
             compareKey(prev, title, href, prev, next);
             compareText(prev, 'condition', `${title} (expression)`, href, prev.expression, next.expression);
-            const nextSymptoms: AnyRecord[] = next.symptoms || [];
-            (prev.symptoms || []).forEach((symptom: AnyRecord, index: number) => {
-                const other = nextSymptoms.find((candidate) => !!norm(symptom.symptomId) && norm(candidate.symptomId) === norm(symptom.symptomId))
-                    || nextSymptoms[index];
-                if (!other) return;
+            const symptoms = pairUp(prev.symptoms, next.symptoms, 'symptomId');
+            symptoms.added.forEach((symptom) => push(prev, {
+                kind: 'added', location: `${title} > ${norm(symptom.name) || norm(symptom.key) || 'symptom'}`, before: '', after: norm(symptom.key), href,
+            }));
+            symptoms.pairs.forEach(([symptom, other, index]) => {
                 const symptomTitle = `${title} > ${norm(symptom.name) || norm(symptom.key) || `symptom ${index + 1}`}`;
+                if (!other) {
+                    push(prev, { kind: 'removed', location: symptomTitle, before: norm(symptom.key) || norm(symptom.name), after: '', href });
+                    return;
+                }
                 compareKey(prev, symptomTitle, href, symptom, other);
                 compareText(prev, 'condition', `${symptomTitle} (expression)`, href, symptom.expression, other.expression);
             });

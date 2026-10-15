@@ -11,6 +11,8 @@ const revertedBy = alias(users, 'reverted_by');
 
 const listColumns = {
     mergeId: dataKeyMerges.mergeId,
+    kind: dataKeyMerges.kind,
+    title: dataKeyMerges.title,
     status: dataKeyMerges.status,
     scope: dataKeyMerges.scope,
     survivorUniqueKey: dataKeyMerges.survivorUniqueKey,
@@ -23,8 +25,14 @@ const listColumns = {
     revertedByName: revertedBy.displayName,
 };
 
+export type DataKeyOperationKind = 'merge' | 'delete' | 'scripts' | 'unlink';
+
 export type DataKeyMergeListItem = {
     mergeId: string;
+    /** merge | delete (library delete/replace) | scripts (replace/remove in selected scripts) | unlink */
+    kind: DataKeyOperationKind;
+    /** Readable summary; empty on merges recorded before titles existed. */
+    title: string;
     status: 'applied' | 'reverted';
     scope: 'library' | 'scripts';
     survivorUniqueKey: string;

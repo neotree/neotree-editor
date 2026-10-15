@@ -13,6 +13,7 @@ import { resolveScriptRemovalExclusions, resolveScriptsOnlyPlan } from '@/lib/da
 import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
+import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 
 export type DeleteDataKeysParams = {
@@ -41,11 +42,17 @@ export type DeleteDataKeysParams = {
      * is in `scriptRemovals`). Unselected scripts are never touched.
      */
     scriptsOnly?: Record<string, string[]>;
+    /** Run everything, report what would change, then roll back. */
+    dryRun?: boolean;
 };
 
 export type DeleteDataKeysResponse = {
     success: boolean;
     errors?: string[];
+    /** What changes (dry run) or changed (real run) in each script. */
+    preview?: OperationPreview & { deletedDataKeyIds: string[] };
+    /** The recorded operation, for its report and revert (real runs only). */
+    operationId?: string;
 };
 
 function getDataKeyTitle(dataKey?: Pick<DataKey, 'name' | 'label' | 'uniqueKey'> | null) {
@@ -243,7 +250,7 @@ export async function _deleteAllDataKeysDrafts(opts?: {
 }
 
 export async function _deleteDataKeys(
-    { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, replacements = {}, allowMissingReplacements, scriptRemovals = {}, scriptsOnly, }: DeleteDataKeysParams,
+    { dataKeysIds: dataKeysIdsParam, broadcastAction, userId, replacements = {}, allowMissingReplacements, scriptRemovals = {}, scriptsOnly, dryRun, }: DeleteDataKeysParams,
 ) {
     const response: DeleteDataKeysResponse = { success: false, };
 
@@ -303,6 +310,24 @@ export async function _deleteDataKeys(
                 dataKeysIds,
             });
 
+            const byUniqueKey = new Map(dataKeysRes.data.map((dataKey) => [dataKey.uniqueKey, dataKey]));
+            const byId = new Map(dataKeysRes.data.map((dataKey) => [dataKey.uuid, dataKey]));
+            const scriptTitles = new Map<string, string>();
+            impact.forEach((item) => item.scripts.forEach((script) => scriptTitles.set(script.scriptId, script.scriptTitle)));
+            const replacementIds = uniqueValues(Object.values(replacements || {}));
+            const replacementKeys = dataKeysRes.data.filter((dataKey) => replacementIds.includes(dataKey.uuid));
+            const titleOf = (dataKey?: DataKey) => getDataKeyTitle(dataKey);
+            const subject = targets.length === 1 ? `“${titleOf(targets[0])}”` : `${targets.length} data keys`;
+            const operationParams = {
+                dryRun,
+                userId,
+                titles: {
+                    script: (id: string) => scriptTitles.get(id) || 'a script',
+                    dataKey: (id: string) => titleOf(byId.get(id)),
+                },
+                describeKey: reportKeyDescriber(byUniqueKey),
+            };
+
             if (scriptsOnly) {
                 const plan = resolveScriptsOnlyPlan({
                     impact,
@@ -319,60 +344,119 @@ export async function _deleteDataKeys(
                 const selectedTargets = targets.filter((target) => selectedKeys.has(target.uniqueKey));
                 const selectedReplacements = Object.fromEntries(Object.entries(replacements)
                     .filter(([targetId]) => selectedTargets.some((target) => target.uuid === targetId)));
+                const selectedScriptIds = uniqueValues(Object.values(plan.stripScriptIdsByUniqueKey).flat());
 
-                await db.transaction(async (tx) => {
-                    await applyRequiredDeletionReplacements({
-                        targets: selectedTargets,
-                        allDataKeys: dataKeysRes.data,
-                        impact,
-                        replacements: selectedReplacements,
-                        // Removal is the explicit choice for keys without a replacement.
-                        allowMissingReplacements: true,
-                        excludeScriptIdsByAlias: plan.replaceExclusionsByUniqueKey,
-                        userId,
-                        client: tx,
-                    });
+                const outcome = await runRecordedDataKeyOperation({
+                    ...operationParams,
+                    snapshotScope: {
+                        scriptIds: selectedScriptIds,
+                        dataKeyIds: uniqueValues([...selectedTargets.map((key) => key.uuid), ...replacementIds]),
+                        dataKeyUniqueKeys: uniqueValues([...selectedTargets.map((key) => key.uniqueKey), ...replacementKeys.map((key) => key.uniqueKey)]),
+                    },
+                    run: async (tx) => {
+                        await applyRequiredDeletionReplacements({
+                            targets: selectedTargets,
+                            allDataKeys: dataKeysRes.data,
+                            impact,
+                            replacements: selectedReplacements,
+                            // Removal is the explicit choice for keys without a replacement.
+                            allowMissingReplacements: true,
+                            excludeScriptIdsByAlias: plan.replaceExclusionsByUniqueKey,
+                            userId,
+                            client: tx,
+                        });
 
-                    const res = await _deleteReferencedDataKeyOptions({
-                        userId: userId || undefined,
-                        uniqueKeys: Array.from(selectedKeys),
-                        scriptIdsByUniqueKey: plan.stripScriptIdsByUniqueKey,
-                        client: tx,
-                    });
-                    if (res.errors?.length) throw new Error(res.errors[0]);
+                        const res = await _deleteReferencedDataKeyOptions({
+                            userId: userId || undefined,
+                            uniqueKeys: Array.from(selectedKeys),
+                            scriptIdsByUniqueKey: plan.stripScriptIdsByUniqueKey,
+                            client: tx,
+                        });
+                        if (res.errors?.length) throw new Error(res.errors[0]);
+                    },
+                    record: () => ({
+                        kind: 'scripts',
+                        title: `${Object.keys(selectedReplacements).length ? 'Replace or remove' : 'Remove'} ${subject} in selected scripts`,
+                        scope: 'scripts',
+                        subjectUniqueKey: selectedTargets[0]?.uniqueKey || '',
+                        subjectName: titleOf(selectedTargets[0]),
+                        affectedUniqueKeys: selectedTargets.map((key) => key.uniqueKey),
+                        scriptIds: selectedScriptIds,
+                        request: {
+                            dataKeysIds,
+                            replacements: selectedReplacements,
+                            scriptRemovals,
+                            scriptsOnly,
+                            replacementKeys: replacementKeys.map((key) => ({ uuid: key.uuid, uniqueKey: key.uniqueKey, name: key.name, label: key.label })),
+                            targetKeys: selectedTargets.map((key) => ({ uuid: key.uuid, uniqueKey: key.uniqueKey, name: key.name, label: key.label })),
+                        },
+                        reportExtras: { deletedDataKeyIds: [] },
+                    }),
                 });
 
+                response.preview = { ...outcome.preview, deletedDataKeyIds: [] };
+                response.operationId = outcome.operationId;
                 response.success = true;
                 return response;
             }
 
-            await db.transaction(async (tx) => {
-                await applyRequiredDeletionReplacements({
-                    targets,
-                    allDataKeys: dataKeysRes.data,
-                    impact,
-                    replacements,
-                    allowMissingReplacements,
-                    scriptRemovals,
-                    userId,
-                    client: tx,
-                });
-
-                const deletedUniqueKeys = uniqueValues(targets.map((dataKey) => dataKey.uniqueKey || ''));
-                if (deletedUniqueKeys.length) {
-                    const deleteReferencedOptionsRes = await _deleteReferencedDataKeyOptions({
-                        userId: userId || undefined,
-                        uniqueKeys: deletedUniqueKeys,
+            const impactedScriptIds = uniqueValues(impact.flatMap((item) => item.scripts.map((script) => script.scriptId)));
+            const outcome = await runRecordedDataKeyOperation({
+                ...operationParams,
+                snapshotScope: {
+                    scriptIds: impactedScriptIds,
+                    dataKeyIds: uniqueValues([...dataKeysIds, ...replacementIds]),
+                    dataKeyUniqueKeys: uniqueValues([...targets.map((key) => key.uniqueKey), ...replacementKeys.map((key) => key.uniqueKey)]),
+                },
+                run: async (tx) => {
+                    await applyRequiredDeletionReplacements({
+                        targets,
+                        allDataKeys: dataKeysRes.data,
+                        impact,
+                        replacements,
+                        allowMissingReplacements,
+                        scriptRemovals,
+                        userId,
                         client: tx,
                     });
 
-                    if (deleteReferencedOptionsRes.errors?.length) {
-                        throw new Error(deleteReferencedOptionsRes.errors[0]);
-                    }
-                }
+                    const deletedUniqueKeys = uniqueValues(targets.map((dataKey) => dataKey.uniqueKey || ''));
+                    if (deletedUniqueKeys.length) {
+                        const deleteReferencedOptionsRes = await _deleteReferencedDataKeyOptions({
+                            userId: userId || undefined,
+                            uniqueKeys: deletedUniqueKeys,
+                            client: tx,
+                        });
 
-                await queueDataKeysDeletion({ dataKeysIds, userId, client: tx });
+                        if (deleteReferencedOptionsRes.errors?.length) {
+                            throw new Error(deleteReferencedOptionsRes.errors[0]);
+                        }
+                    }
+
+                    await queueDataKeysDeletion({ dataKeysIds, userId, client: tx });
+                },
+                record: () => ({
+                    kind: 'delete',
+                    title: `${replacementIds.length ? 'Replace and delete' : 'Delete'} ${subject}`,
+                    scope: 'library',
+                    subjectUniqueKey: targets[0]?.uniqueKey || '',
+                    subjectName: titleOf(targets[0]),
+                    affectedUniqueKeys: targets.map((key) => key.uniqueKey),
+                    scriptIds: impactedScriptIds,
+                    request: {
+                        dataKeysIds,
+                        replacements,
+                        allowMissingReplacements: !!allowMissingReplacements,
+                        scriptRemovals,
+                        replacementKeys: replacementKeys.map((key) => ({ uuid: key.uuid, uniqueKey: key.uniqueKey, name: key.name, label: key.label })),
+                        targetKeys: targets.map((key) => ({ uuid: key.uuid, uniqueKey: key.uniqueKey, name: key.name, label: key.label })),
+                    },
+                    reportExtras: { deletedDataKeyIds: dataKeysIds },
+                }),
             });
+
+            response.preview = { ...outcome.preview, deletedDataKeyIds: dataKeysIds };
+            response.operationId = outcome.operationId;
         }
 
         response.success = true;
@@ -381,7 +465,7 @@ export async function _deleteDataKeys(
         response.errors = [e.message];
         logger.error('_deleteDataKeys ERROR', e.message);
     } finally {
-        if (!response?.errors?.length && broadcastAction) {
+        if (!response?.errors?.length && broadcastAction && !dryRun) {
             socket.emit('data_changed', scriptsOnly ? 'save_scripts' : 'delete_data_keys');
         }
         return response;

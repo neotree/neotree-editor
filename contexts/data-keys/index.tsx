@@ -401,8 +401,11 @@ export function DataKeysCtxProvider({
             } else {
                 await loadDataKeys();
                 router.refresh();
+                const conditionsRewritten = ("info" in res ? res.info?.conditionsRewritten : 0) || 0;
                 alert({
-                    message: "Data key saved!",
+                    message: conditionsRewritten
+                        ? `Data key saved! ${conditionsRewritten} condition${conditionsRewritten === 1 ? ' was' : 's were'} updated to the new name in the scripts using it.`
+                        : "Data key saved!",
                     variant: 'success',
                     onClose: () => cb?.(),
                 });
@@ -480,6 +483,12 @@ export function DataKeysCtxProvider({
             await loadDataKeys();
 
             router.refresh();
+
+            // A change that touched scripts opens its report, where it can also be reverted.
+            if (res.operationId && res.preview?.scriptsChanged) {
+                router.push(`/data-keys/merge/history/${res.operationId}?merged=1`);
+                return true;
+            }
 
             alert({
                 title: 'Success',

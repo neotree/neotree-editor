@@ -8,6 +8,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
+import { useQueryState } from "nuqs";
 
 import { LockStatus } from '@/components/lock-status';
 import { type DataKeyFormData, useDataKeysCtx } from '@/contexts/data-keys';
@@ -51,6 +52,18 @@ import { buildDataKeyParentIndex, getDataKeyParentTitle, wouldCreateDataKeyCycle
 import { normalizeDataKeyType } from '@/lib/data-key-types';
 import { fetchDataKeyUnlinkImpact, type DeleteImpactItem } from './delete-confirmation';
 import { DataKeyDeleteReplacementDialog } from './delete-replacement-dialog';
+import { MergeChangeTotals, MergeReport } from './merge/merge-report';
+import { Callout } from './merge/shared';
+import type { OperationPreview } from '@/databases/mutations/data-keys';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type SaveRefsImpact = NonNullable<NonNullable<SaveDataKeysResponse['info']>['refs']>;
 
@@ -140,6 +153,20 @@ function Form({
     const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
     const [impactPreviewStats, setImpactPreviewStats] = useState<UpdateDataKeysRefsResponse['info']>();
     const [saveImpact, setSaveImpact] = useState<SaveRefsImpact>();
+    // Saving unlinks rewrites the parent's screens: it is previewed first, and
+    // the saved change is recorded so it can be reviewed and reverted.
+    const [unlinkReview, setUnlinkReview] = useState<{
+        payload: DataKeyFormData;
+        loading: boolean;
+        preview: OperationPreview | null;
+        error: string;
+    } | null>(null);
+    // In the URL: saving reloads the library, which remounts this form.
+    const [savedUnlinkOperationId, setSavedUnlinkOperationId] = useQueryState('change', {
+        defaultValue: '',
+        clearOnDefault: true,
+        shallow: true,
+    });
     const [preparingUnlink, setPreparingUnlink] = useState(false);
     const [unlinkDialog, setUnlinkDialog] = useState<null | {
         children: DataKey[];
@@ -266,7 +293,16 @@ function Form({
         if (uniqueKey) {
             setValue("uniqueKey" as any, uniqueKey);
         }
-        const res = await saveDataKeys([{ ...(payload as unknown as DataKeyFormData) }]);
+
+        if ((getValues('deletedUniqueKeys') || []).length) {
+            await reviewUnlinks(payload as unknown as DataKeyFormData);
+            return;
+        }
+        await performSave(payload as unknown as DataKeyFormData);
+    });
+
+    const performSave = async (payload: DataKeyFormData) => {
+        const res = await saveDataKeys([{ ...payload }]);
         await getLatestDataKeys();
         setShouldResetForm(true);
         if (res && 'info' in res) {
@@ -275,8 +311,25 @@ function Form({
         if (res && !res.errors?.length) {
             setValue('deletedUniqueKeys', []);
             setValue('optionReplacements', {});
+            if ('operationId' in res && res.operationId) setSavedUnlinkOperationId(res.operationId);
         }
-    });
+        return res;
+    };
+
+    const reviewUnlinks = async (payload: DataKeyFormData) => {
+        setUnlinkReview({ payload, loading: true, preview: null, error: '' });
+        try {
+            const response = await axios.post<SaveDataKeysResponse>('/api/data-keys/save/preview', { data: [payload] });
+            setUnlinkReview((current) => current && ({
+                ...current,
+                loading: false,
+                preview: response.data.preview || null,
+                error: response.data.errors?.[0] || '',
+            }));
+        } catch (e: any) {
+            setUnlinkReview((current) => current && ({ ...current, loading: false, error: e.message || 'Preview failed.' }));
+        }
+    };
 
     const isFormDisabled = isReadOnly || saving;
 
@@ -968,6 +1021,75 @@ function Form({
                     <br />
 
                     <div className="px-4 space-y-4">
+                        {!!savedUnlinkOperationId && !pendingUnlinks.length && (
+                            <Callout variant="info" className="flex flex-wrap items-center gap-x-2">
+                                <span>Unlinks saved as drafts. You can review exactly what changed, and revert it until it is published.</span>
+                                <Link href={`/data-keys/merge/history/${savedUnlinkOperationId}`} className="text-primary hover:underline">
+                                    View changes
+                                </Link>
+                            </Callout>
+                        )}
+
+                        <Dialog open={!!unlinkReview} onOpenChange={(open) => !open && !saving && setUnlinkReview(null)}>
+                            <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                    <DialogTitle>Review changes before saving</DialogTitle>
+                                    <DialogDescription>
+                                        Unlinking {pendingUnlinks.length === 1 ? 'an option' : `${pendingUnlinks.length} options`} updates
+                                        the screens linked to this data key. This is exactly what will change.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+                                    {unlinkReview?.loading ? (
+                                        <div role="status" aria-live="polite" className="space-y-2">
+                                            <span className="sr-only">Preparing preview…</span>
+                                            <Skeleton className="h-9 w-full" />
+                                            <Skeleton className="h-9 w-full" />
+                                        </div>
+                                    ) : unlinkReview?.error ? (
+                                        <Callout variant="error">{unlinkReview.error}</Callout>
+                                    ) : unlinkReview?.preview ? (
+                                        <>
+                                            {!!unlinkReview.preview.conflicts.length && (
+                                                <Callout variant="error">
+                                                    <div className="font-medium">Other people have unpublished changes here.</div>
+                                                    <ul className="mt-1 list-inside list-disc">
+                                                        {unlinkReview.preview.conflicts.map((conflict, index) => (
+                                                            <li key={`${conflict.title}-${index}`}>
+                                                                {conflict.userName} — {conflict.kind === 'script' ? 'script' : 'data key'} “{conflict.title}”
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                    <div className="mt-1">Save after those changes are published or discarded.</div>
+                                                </Callout>
+                                            )}
+                                            <MergeChangeTotals totals={unlinkReview.preview.report.totals} />
+                                            <MergeReport report={unlinkReview.preview.report} emptyMessage="No script changes." />
+                                            <div className="text-xs text-muted-foreground">
+                                                Saved as drafts; you can revert it from the data key history until it is published.
+                                            </div>
+                                        </>
+                                    ) : null}
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" disabled={saving} onClick={() => setUnlinkReview(null)}>
+                                        Back
+                                    </Button>
+                                    <Button
+                                        disabled={saving || !unlinkReview || unlinkReview.loading || !!unlinkReview.error
+                                            || !unlinkReview.preview || !!unlinkReview.preview.conflicts.length}
+                                        onClick={async () => {
+                                            if (!unlinkReview) return;
+                                            const res = await performSave(unlinkReview.payload);
+                                            if (res && !res.errors?.length) setUnlinkReview(null);
+                                        }}
+                                    >
+                                        Save
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
                         {!!pendingUnlinks.length && !isReadOnly && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-3">
                                 <div className="font-medium text-amber-950">

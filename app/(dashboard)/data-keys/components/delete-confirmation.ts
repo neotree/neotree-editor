@@ -2,6 +2,8 @@
 
 import axios from "axios";
 
+import type { DeleteDataKeysParams, DeleteDataKeysResponse } from "@/databases/mutations/data-keys";
+
 export type DeleteImpactItem = {
     dataKeyId: string;
     uniqueKey: string;
@@ -56,4 +58,10 @@ export async function fetchDataKeyUnlinkImpact(parentUniqueKey: string, childUni
     }
 
     return response.data.data || [];
+}
+
+/** Dry run of a delete/replace: what it would change in each script, and any conflicts. */
+export async function previewDataKeyDelete(params: Omit<DeleteDataKeysParams, 'userId' | 'broadcastAction' | 'dryRun'>) {
+    const response = await axios.post<DeleteDataKeysResponse>('/api/data-keys/delete/preview', params);
+    return { preview: response.data.preview, errors: response.data.errors };
 }

@@ -1572,14 +1572,19 @@ export const integrityImportSnapshotsRelations = relations(integrityImportSnapsh
 
 export const dataKeyMergeStatusEnum = pgEnum("data_key_merge_status", ["applied", "reverted"])
 
-// One row per data key merge: what was asked, what changed (report) and the
-// draft rows before/after it (snapshot), which is what makes a revert possible
-// until the merge is published.
+// One row per recorded data key operation (merge, delete/replace, replace or
+// remove in selected scripts, unlink from a parent): what was asked, what
+// changed (report) and the draft rows before/after it (snapshot), which is what
+// makes a revert possible until it is published. "survivor" is the key the
+// operation is about; "merged" are the keys it removed or replaced.
 export const dataKeyMerges = pgTable(
   "nt_data_key_merges",
   {
     id: serial("id").primaryKey(),
     mergeId: uuid("merge_id").notNull().unique().defaultRandom(),
+    // merge | delete (library delete/replace) | scripts (replace/remove in selected scripts) | unlink
+    kind: text("kind").$type<"merge" | "delete" | "scripts" | "unlink">().notNull().default("merge"),
+    title: text("title").notNull().default(""),
     status: dataKeyMergeStatusEnum("status").notNull().default("applied"),
     scope: text("scope").$type<"library" | "scripts">().notNull(),
     survivorUniqueKey: text("survivor_unique_key").notNull(),
