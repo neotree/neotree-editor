@@ -113,7 +113,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "/home/farai/Workbench/Neotree/neotree-editor",
+    "outputFileTracingRoot": "/home/wilson/development/neotree/neotree-editor",
     "experimental": {
       "useSkewCookie": false,
       "cacheLife": {
@@ -172,7 +172,7 @@
       "middlewarePrefetch": "flexible",
       "optimisticClientCache": true,
       "manualClientBasePath": false,
-      "cpus": 11,
+      "cpus": 19,
       "memoryBasedWorkersCount": false,
       "imgOptConcurrency": null,
       "imgOptTimeoutInSeconds": 7,
@@ -302,7 +302,7 @@
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.mjs",
     "turbopack": {
-      "root": "/home/farai/Workbench/Neotree/neotree-editor"
+      "root": "/home/wilson/development/neotree/neotree-editor"
     },
     "_originalRewrites": {
       "beforeFiles": [],
@@ -339,7 +339,7 @@
       "fallback": []
     }
   },
-  "appDir": "/home/farai/Workbench/Neotree/neotree-editor",
+  "appDir": "/home/wilson/development/neotree/neotree-editor",
   "relativeAppDir": "",
   "files": [
     "build/routes-manifest.json",
