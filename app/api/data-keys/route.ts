@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import queryString from "query-string";
 
 import logger from "@/lib/logger";
+import { reportedScriptIds, sweepAllScriptsConditionErrors } from "@/lib/server/condition-errors-sweep";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { GetDataKeysParams, GetDataKeysResults, _getDataKeys } from "@/databases/queries/data-keys";
 import { _deleteDataKeys } from "@/databases/mutations/data-keys";
@@ -71,6 +72,8 @@ export async function DELETE(req: NextRequest) {
             ...params,
             userId: isAuthorised.user?.userId,
         });
+
+        if (res.success && !params.dryRun) void sweepAllScriptsConditionErrors(reportedScriptIds(res));
 
 		return NextResponse.json(res);
 	} catch(e: any) {

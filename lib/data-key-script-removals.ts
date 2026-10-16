@@ -51,6 +51,8 @@ export function resolveScriptRemovalExclusions({
 export type ScriptsOnlyPlan = {
     /** alias uniqueKey -> scriptIds the replace step must skip */
     replaceExclusionsByUniqueKey: Record<string, string[]>;
+    /** alias uniqueKey -> the only scriptIds the replace step may rewrite (fail-safe include-list) */
+    replaceScriptIdsByUniqueKey: Record<string, string[]>;
     /** deleted uniqueKey -> scriptIds the strip step may touch */
     stripScriptIdsByUniqueKey: Record<string, string[]>;
     /** Number of (key, script) pairs the operation applies to. */
@@ -86,6 +88,7 @@ export function resolveScriptsOnlyPlan({
     scriptRemovals: Record<string, string[]>;
 }): ScriptsOnlyPlan {
     const replaceExclusionsByUniqueKey: Record<string, string[]> = {};
+    const replaceScriptIdsByUniqueKey: Record<string, string[]> = {};
     const stripScriptIdsByUniqueKey: Record<string, string[]> = {};
     let selectedCount = 0;
 
@@ -105,6 +108,8 @@ export function resolveScriptsOnlyPlan({
             const removed = new Set((scriptRemovals[targetId] || []).map((scriptId) => `${scriptId || ''}`.trim()));
             const excluded = impactedScriptIds.filter((scriptId) => !requested.has(scriptId) || removed.has(scriptId));
             if (excluded.length) replaceExclusionsByUniqueKey[uniqueKey] = excluded;
+            // Also as an include-list, so a usage missing from the impact is never rewritten.
+            replaceScriptIdsByUniqueKey[uniqueKey] = selected.filter((scriptId) => !removed.has(scriptId));
         }
 
         if (!selected.length) continue;
@@ -115,6 +120,7 @@ export function resolveScriptsOnlyPlan({
 
     return {
         replaceExclusionsByUniqueKey,
+        replaceScriptIdsByUniqueKey,
         stripScriptIdsByUniqueKey,
         selectedCount,
     };

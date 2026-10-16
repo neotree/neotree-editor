@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import logger from '@/lib/logger';
@@ -8,6 +8,7 @@ import { dataKeyDuplicateDismissals, dataKeyMerges, users } from '@/databases/pg
 import { isMergeRevertible, type MergeSnapshot } from '@/databases/mutations/data-keys/_merge-snapshot';
 
 const revertedBy = alias(users, 'reverted_by');
+const publishedBy = alias(users, 'published_by');
 
 const listColumns = {
     mergeId: dataKeyMerges.mergeId,
@@ -21,8 +22,12 @@ const listColumns = {
     scriptIds: dataKeyMerges.scriptIds,
     createdAt: dataKeyMerges.createdAt,
     revertedAt: dataKeyMerges.revertedAt,
+    publishedAt: dataKeyMerges.publishedAt,
+    publishedDataVersion: dataKeyMerges.publishedDataVersion,
+    discardedAt: dataKeyMerges.discardedAt,
     createdByName: users.displayName,
     revertedByName: revertedBy.displayName,
+    publishedByName: publishedBy.displayName,
 };
 
 export type DataKeyOperationKind = 'merge' | 'delete' | 'scripts' | 'unlink';
@@ -33,7 +38,8 @@ export type DataKeyMergeListItem = {
     kind: DataKeyOperationKind;
     /** Readable summary; empty on merges recorded before titles existed. */
     title: string;
-    status: 'applied' | 'reverted';
+    /** applied = saved as drafts, not yet published. */
+    status: 'applied' | 'reverted' | 'published' | 'discarded';
     scope: 'library' | 'scripts';
     survivorUniqueKey: string;
     survivorName: string;
@@ -41,8 +47,12 @@ export type DataKeyMergeListItem = {
     scriptIds: string[];
     createdAt: Date;
     revertedAt: Date | null;
+    publishedAt: Date | null;
+    publishedDataVersion: number | null;
+    discardedAt: Date | null;
     createdByName: string | null;
     revertedByName: string | null;
+    publishedByName: string | null;
 };
 
 export type DataKeyMergeDetail = DataKeyMergeListItem & {
@@ -51,6 +61,11 @@ export type DataKeyMergeDetail = DataKeyMergeListItem & {
     revertible: boolean;
 };
 
+/**
+ * Operations waiting to be published and the published history. Reverted and
+ * discarded ones never reached the app, so they are left out (their own pages
+ * still open from a direct link).
+ */
 export async function _listDataKeyMerges({ limit = 200 }: { limit?: number; } = {}): Promise<{ data: DataKeyMergeListItem[]; errors?: string[] }> {
     try {
         const rows = await db
@@ -58,6 +73,8 @@ export async function _listDataKeyMerges({ limit = 200 }: { limit?: number; } = 
             .from(dataKeyMerges)
             .leftJoin(users, eq(users.userId, dataKeyMerges.createdByUserId))
             .leftJoin(revertedBy, eq(revertedBy.userId, dataKeyMerges.revertedByUserId))
+            .leftJoin(publishedBy, eq(publishedBy.userId, dataKeyMerges.publishedByUserId))
+            .where(inArray(dataKeyMerges.status, ['applied', 'published']))
             .orderBy(desc(dataKeyMerges.createdAt))
             .limit(limit);
         return { data: rows as DataKeyMergeListItem[] };
@@ -74,6 +91,7 @@ export async function _getDataKeyMerge(mergeId: string): Promise<{ data: DataKey
             .from(dataKeyMerges)
             .leftJoin(users, eq(users.userId, dataKeyMerges.createdByUserId))
             .leftJoin(revertedBy, eq(revertedBy.userId, dataKeyMerges.revertedByUserId))
+            .leftJoin(publishedBy, eq(publishedBy.userId, dataKeyMerges.publishedByUserId))
             .where(eq(dataKeyMerges.mergeId, mergeId));
         if (!row) return { data: null };
 

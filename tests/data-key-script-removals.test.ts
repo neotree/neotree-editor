@@ -36,6 +36,7 @@ const impact = [
 
   assert.deepStrictEqual(plan.stripScriptIdsByUniqueKey, { weight: ["s1", "s3"] })
   assert.deepStrictEqual(plan.replaceExclusionsByUniqueKey, { weight: ["s2"] })
+  assert.deepStrictEqual(plan.replaceScriptIdsByUniqueKey, { weight: ["s1", "s3"] })
   assert.strictEqual(plan.selectedCount, 2)
 }
 
@@ -49,6 +50,7 @@ const impact = [
   })
 
   assert.deepStrictEqual(plan.replaceExclusionsByUniqueKey, { weight: ["s2", "s3"] })
+  assert.deepStrictEqual(plan.replaceScriptIdsByUniqueKey, { weight: ["s1"] })
   assert.deepStrictEqual(plan.stripScriptIdsByUniqueKey, { weight: ["s1", "s3"] })
 }
 
@@ -65,6 +67,8 @@ const impact = [
     weight: ["s1", "s3"],
     length: ["s1", "s4"],
   })
+  // nothing selected for "length": the include-list is empty, so it is rewritten nowhere
+  assert.deepStrictEqual(plan.replaceScriptIdsByUniqueKey, { weight: ["s2"], length: [] })
   assert.deepStrictEqual(plan.stripScriptIdsByUniqueKey, { weight: ["s2"] })
 }
 
@@ -78,6 +82,7 @@ const impact = [
   })
 
   assert.deepStrictEqual(plan.replaceExclusionsByUniqueKey, {})
+  assert.deepStrictEqual(plan.replaceScriptIdsByUniqueKey, {})
   assert.deepStrictEqual(plan.stripScriptIdsByUniqueKey, { feeding: ["s2"], length: ["s4"] })
   assert.strictEqual(plan.selectedCount, 2)
 }

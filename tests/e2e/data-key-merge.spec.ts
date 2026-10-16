@@ -8,8 +8,8 @@ test.beforeEach(async ({ page }) => {
     await signIn(page);
 });
 
-async function reviewLinks(page: Page) {
-    await page.goto('/data-keys/merge');
+async function reviewLinks(page: Page, query = '') {
+    await page.goto(`/data-keys/merge${query}`);
     await expect(page.getByText('Harmonise data keys').first()).toBeVisible();
     const links = page.getByRole('link', { name: /Review & merge/ });
     await expect(links.first()).toBeVisible();
@@ -18,7 +18,7 @@ async function reviewLinks(page: Page) {
 
 /** Waits until the merge page's dry run has finished (or failed). */
 async function waitForPreview(page: Page) {
-    await expect(page.getByText('4. Preview the changes')).toBeVisible();
+    await expect(page.getByText(/^\d\. Preview the changes$/)).toBeVisible();
     // Next's route announcer is also an alert; only the page's own callouts count.
     const callout = page.locator('[role="alert"]:not(#__next-route-announcer__)');
     await expect(page.getByText(/\d+ scripts? change$/).or(callout).first()).toBeVisible();
@@ -38,7 +38,8 @@ test('overview lists duplicate groups, with tabs in the URL', async ({ page }) =
 });
 
 test('the merge page previews the changes and keeps the plan in the URL', async ({ page }) => {
-    const [href] = await reviewLinks(page);
+    // A parent group, where "selected scripts only" applies (option keys are merged in all scripts).
+    const [href] = await reviewLinks(page, '?kind=parent');
     await page.goto(href);
 
     await expect(page.getByText('1. Choose the data key to keep')).toBeVisible();
@@ -54,7 +55,8 @@ test('the merge page previews the changes and keeps the plan in the URL', async 
 });
 
 test('choose where an option shows, and reset it', async ({ page }) => {
-    const [href] = await reviewLinks(page);
+    // Placement applies to keys with options.
+    const [href] = await reviewLinks(page, '?kind=parent');
     await page.goto(href);
     await waitForPreview(page);
 
@@ -107,6 +109,50 @@ test('merge a group, read its report, then revert it', async ({ page }) => {
     await page.keyboard.press('Escape');
     await page.reload();
     await expect(page.getByText('Reverted', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Revert merge' })).toHaveCount(0);
+});
+
+test('a merge shows in the publish bar at once, and discarding its drafts drops it from the history', async ({ page }) => {
+    const hrefs = await reviewLinks(page);
+
+    const merge = page.getByRole('button', { name: 'Merge data keys' });
+    let found = false;
+    for (const href of hrefs.slice(0, 8)) {
+        await page.goto(href);
+        await waitForPreview(page);
+        if (await merge.isEnabled()) {
+            found = true;
+            break;
+        }
+    }
+    test.skip(!found, 'Every group checked has conflicting drafts by other users.');
+
+    await merge.click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Merge' }).click();
+    await expect(page).toHaveURL(/\/data-keys\/merge\/history\/[0-9a-f-]+\?merged=1/);
+    const mergeId = page.url().match(/history\/([0-9a-f-]+)/)![1];
+
+    // Without a reload, the publish bar picks up the new drafts.
+    const discard = page.getByRole('button', { name: 'Discard changes' });
+    await expect(discard).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Not published', { exact: true }).first()).toBeVisible();
+
+    // Unpublished operations have their own list until they are published or discarded.
+    await page.goto('/data-keys/merge?tab=history');
+    await expect(page.getByText(/^Not yet published \(\d+\)$/)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Discard changes' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Discard data' }).click();
+    await expect(page.getByText('Data discarded successfully!')).toBeVisible({ timeout: 60_000 });
+
+    await page.goto('/data-keys/merge?tab=history');
+    await expect(page.getByText(/^Published \(\d+\)$/)).toBeVisible();
+    await expect(page.getByText(/^Not yet published/)).toHaveCount(0);
+
+    // Its page still opens from a link, and says what happened.
+    await page.goto(`/data-keys/merge/history/${mergeId}`);
+    await expect(page.getByText('Discarded', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/were discarded .*before it was published/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Revert merge' })).toHaveCount(0);
 });
 
@@ -236,4 +282,34 @@ test('unlinking an option is reviewed before saving, then can be reverted', asyn
     await page.getByRole('button', { name: 'Revert change' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Revert' }).click();
     await expect(page.getByText('Change reverted')).toBeVisible();
+});
+
+test('merging duplicate option keys updates the parents that offer them', async ({ page }) => {
+    test.setTimeout(420_000);
+    const hrefs = await reviewLinks(page, '?kind=option');
+    const merge = page.getByRole('button', { name: 'Merge data keys' });
+    const notice = page.getByText(/offer “.+” instead — in the library and in their screens/);
+
+    let found = false;
+    for (const href of hrefs.slice(0, 8)) {
+        await page.goto(href);
+        await waitForPreview(page);
+        if (await notice.isVisible() && await merge.isEnabled()) {
+            found = true;
+            break;
+        }
+    }
+    test.skip(!found, 'No option group without conflicting drafts by other users.');
+
+    // A parent's option pool is shared by every script, so selected scripts are not offered.
+    await expect(page.getByRole('radio', { name: /Selected scripts only/ })).toBeDisabled();
+
+    await merge.click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Merge' }).click();
+    await expect(page).toHaveURL(/\/data-keys\/merge\/history\/[0-9a-f-]+\?merged=1/, { timeout: 120_000 });
+    await expect(page.getByText('Parents now offering the kept key')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Revert merge' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Revert' }).click();
+    await expect(page.getByText('Merge reverted')).toBeVisible();
 });

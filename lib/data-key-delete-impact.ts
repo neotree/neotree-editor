@@ -185,8 +185,10 @@ export function buildDataKeysDeleteImpact({
         href: string;
     }) => {
         const normalizedScriptId = `${scriptId || ''}`.trim();
-        const normalizedScriptTitle = `${scriptTitle || ''}`.trim();
-        if (!normalizedScriptId || !normalizedScriptTitle) return;
+        // An untitled script is still a usage: dropping it would leave it out of previews, conflicts and
+        // selected-scripts exclusions.
+        const normalizedScriptTitle = `${scriptTitle || ''}`.trim() || normalizedScriptId;
+        if (!normalizedScriptId) return;
 
         const normalizedKeyId = `${keyId || ''}`.trim();
         const match = normalizedKeyId && scriptsByTarget.has(normalizedKeyId)

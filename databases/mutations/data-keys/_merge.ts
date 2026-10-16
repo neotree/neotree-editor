@@ -3,7 +3,7 @@ import socket from '@/lib/socket';
 import { _getDataKeys, _getDataKeysRefs } from '@/databases/queries/data-keys';
 import { _getDiagnoses, _getProblems, _getScreens, _getScripts } from '@/databases/queries/scripts';
 import { buildDataKeysDeleteImpact } from '@/lib/data-key-delete-impact';
-import { buildDataKeyParentIndex, getBlockedChildDeletions, getDataKeyParentTitle } from '@/lib/data-key-children';
+import { buildDataKeyParentIndex } from '@/lib/data-key-children';
 import { buildDataKeysMergePlan, getMergeKeyTitle, type ChildMergeAction } from '@/lib/data-key-merge-plan';
 import {
     analyzeMergeOptionUsage,
@@ -60,6 +60,36 @@ export type MergeDataKeysParams = {
     dryRun?: boolean;
     userId?: string | null;
     broadcastAction?: boolean;
+    /** Stops a preview nobody is waiting for any more (the request was aborted). */
+    signal?: AbortSignal;
+    /** Library and scripts already loaded (a batch dry run reuses one load for every group). */
+    sources?: MergeSources;
+};
+
+export type MergeSources = Awaited<ReturnType<typeof loadMergeSources>>;
+
+/** Everything a merge plans against: the library and every script entity, drafts included. */
+export async function loadMergeSources() {
+    const [dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes] = await Promise.all([
+        _getDataKeys({ returnDraftsIfExist: true }),
+        _getScreens({ returnDraftsIfExist: true }),
+        _getDiagnoses({ returnDraftsIfExist: true }),
+        _getProblems({ returnDraftsIfExist: true }),
+        _getScripts({ returnDraftsIfExist: true }),
+    ]);
+    const loadErrors = [
+        ...(dataKeysRes.errors || []),
+        ...(screensRes.errors || []),
+        ...(diagnosesRes.errors || []),
+        ...(problemsRes.errors || []),
+        ...(scriptsRes.errors || []),
+    ];
+    if (loadErrors.length) throw new Error(loadErrors[0]);
+    return { dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes };
+}
+
+const throwIfAborted = (signal?: AbortSignal) => {
+    if (signal?.aborted) throw new Error('The preview was cancelled.');
 };
 
 export type MergeConflict = OperationConflict;
@@ -99,26 +129,16 @@ export async function _mergeDataKeys({
     dryRun,
     userId,
     broadcastAction,
+    signal,
+    sources,
 }: MergeDataKeysParams): Promise<MergeDataKeysResponse> {
     const response: MergeDataKeysResponse = { success: false };
     const scriptsOnly = Array.isArray(scriptIds);
 
     try {
-        const [dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes] = await Promise.all([
-            _getDataKeys({ returnDraftsIfExist: true }),
-            _getScreens({ returnDraftsIfExist: true }),
-            _getDiagnoses({ returnDraftsIfExist: true }),
-            _getProblems({ returnDraftsIfExist: true }),
-            _getScripts({ returnDraftsIfExist: true }),
-        ]);
-        const loadErrors = [
-            ...(dataKeysRes.errors || []),
-            ...(screensRes.errors || []),
-            ...(diagnosesRes.errors || []),
-            ...(problemsRes.errors || []),
-            ...(scriptsRes.errors || []),
-        ];
-        if (loadErrors.length) throw new Error(loadErrors[0]);
+        // Only a dry run may plan against data loaded earlier; a real merge always plans against fresh data.
+        const { dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes } = (dryRun && sources) || await loadMergeSources();
+        throwIfAborted(signal);
 
         const allDataKeys = dataKeysRes.data;
         const plan = buildDataKeysMergePlan({
@@ -143,20 +163,15 @@ export async function _mergeDataKeys({
             throw new Error(`NUID Search data keys cannot be merged: ${managed.map(getMergeKeyTitle).join(', ')}.`);
         }
 
-        // A merged parent that is itself an option of another parent would leave
-        // that parent with a dangling option once it is deleted.
-        if (!scriptsOnly) {
-            const blocked = getBlockedChildDeletions({
-                dataKeys: allDataKeys,
-                targets: allDataKeys.filter((dataKey) => mergedIds.includes(dataKey.uuid)),
-            });
-            if (blocked.length) {
-                const item = blocked[0];
-                throw new Error(
-                    `"${item.name || item.label || item.uniqueKey}" is an option of ${item.parents.map((parent) => `"${getDataKeyParentTitle(parent)}"`).join(', ')}. ` +
-                    'Unlink it there first, or merge in selected scripts only.',
-                );
-            }
+        // Merged keys that other parents offer as options are replaced by the
+        // kept key in those parents — library-wide by nature, since a parent's
+        // option pool is shared by every script that uses it.
+        if (scriptsOnly && plan.parentOptionRewrites.length) {
+            const parents = plan.parentOptionRewrites.map((rewrite) => `"${rewrite.parentTitle}"`);
+            throw new Error(
+                `The keys being merged are options of ${parents.slice(0, 3).join(', ')}${parents.length > 3 ? ` and ${parents.length - 3} more` : ''}. ` +
+                'Those parents offer the kept key instead, which applies to every script — merge in all scripts.',
+            );
         }
 
         const impact = buildDataKeysDeleteImpact({
@@ -180,12 +195,17 @@ export async function _mergeDataKeys({
         }
 
         // Unselected scripts keep their references to the merged parents.
+        // The include-list is the fail-safe: a usage missing from the impact is never rewritten.
         const excludeScriptIdsByAlias: Record<string, string[]> = {};
-        if (scriptsOnly) {
+        const onlyScriptIdsByAlias: Record<string, string[]> | undefined = scriptsOnly ? {} : undefined;
+        if (onlyScriptIdsByAlias) {
             for (const item of mergedImpact) {
-                const excluded = item.scripts.map((script) => script.scriptId).filter((scriptId) => !isApplied(scriptId));
+                const scriptIdsOfItem = item.scripts.map((script) => script.scriptId);
+                const excluded = scriptIdsOfItem.filter((scriptId) => !isApplied(scriptId));
                 if (excluded.length) excludeScriptIdsByAlias[item.uniqueKey] = excluded;
+                onlyScriptIdsByAlias[item.uniqueKey] = scriptIdsOfItem.filter(isApplied);
             }
+            for (const uniqueKey of mergedUniqueKeys) onlyScriptIdsByAlias[uniqueKey] ||= [];
         }
 
         // What the merge can touch: the applied scripts, and — when the kept
@@ -203,6 +223,7 @@ export async function _mergeDataKeys({
             ...mergedUniqueKeys,
             ...plan.nextSurvivorOptions,
             ...merged.flatMap((dataKey) => dataKey.options || []),
+            ...plan.parentOptionRewrites.map((rewrite) => rewrite.parentUniqueKey),
         ]);
         const snapshotScope: MergeSnapshotScope = {
             scriptIds: scopeScriptIds,
@@ -244,6 +265,7 @@ export async function _mergeDataKeys({
             },
             describeKey: reportKeyDescriber(byUniqueKey),
             run: async (tx, { before }) => {
+                throwIfAborted(signal);
                 // 0. Confirmed links for legacy option items without a data key.
                 if (legacyLinks.length) {
                     const parentOptions = new Map(merged.map((dataKey) => [dataKey.uniqueKey, new Set(dataKey.options || [])]));
@@ -275,6 +297,38 @@ export async function _mergeDataKeys({
                         client: tx,
                     });
                     if (saveRes.errors?.length) throw new Error(saveRes.errors[0]);
+                }
+
+                // 1b. Parents that offer a merged key offer the kept key instead:
+                // swap it inside their screens (an item the kept key already has
+                // there is removed rather than duplicated), then update their pools.
+                if (plan.parentOptionRewrites.length) {
+                    const rewrittenKeys = uniqueValues(plan.parentOptionRewrites.flatMap((rewrite) => rewrite.replaced));
+                    const swapRes = await _deleteReferencedDataKeyOptions({
+                        userId: userId || undefined,
+                        uniqueKeys: rewrittenKeys,
+                        scope: {
+                            parentUniqueKeys: plan.parentOptionRewrites.map((rewrite) => rewrite.parentUniqueKey),
+                            replacements: Object.fromEntries(rewrittenKeys.map((uniqueKey) => [uniqueKey, {
+                                uniqueKey: survivor.uniqueKey,
+                                name: survivor.name || '',
+                                label: plan.survivorLabel || survivor.label || '',
+                                confidential: byUniqueKey.get(survivor.uniqueKey)?.confidential,
+                                replacedName: byUniqueKey.get(uniqueKey)?.name || '',
+                            }])),
+                        },
+                        client: tx,
+                    });
+                    if (swapRes.errors?.length) throw new Error(swapRes.errors[0]);
+
+                    const poolsRes = await _saveDataKeys({
+                        data: plan.parentOptionRewrites.map((rewrite) => ({ uuid: rewrite.parentId, options: rewrite.nextOptions })),
+                        userId: userId || undefined,
+                        // The swap above already updated their screens.
+                        updateRefs: false,
+                        client: tx,
+                    });
+                    if (poolsRes.errors?.length) throw new Error(poolsRes.errors[0]);
                 }
 
                 // 2. Inside the merged parents' screens, swap matched children for
@@ -323,6 +377,7 @@ export async function _mergeDataKeys({
                     matchUniqueKeysByDataKey: { [survivorNow.uniqueKey]: mergedUniqueKeys },
                     includePrimaryUniqueKeys: false,
                     excludeScriptIdsByAlias,
+                    onlyScriptIdsByAlias,
                     client: tx,
                 });
                 if (refsRes.errors?.length) throw new Error(refsRes.errors[0]);
@@ -458,6 +513,7 @@ export async function _mergeDataKeys({
                     legacyLinks,
                     optionPlacements: placements,
                     mergedKeys: merged.map((dataKey) => ({ uniqueKey: dataKey.uniqueKey, name: dataKey.name, label: dataKey.label })),
+                    parentOptionRewrites: plan.parentOptionRewrites.map(({ parentUniqueKey, parentTitle, replaced }) => ({ parentUniqueKey, parentTitle, replaced })),
                 },
                 reportExtras: { addedOptions: plan.addedOptions, deletedDataKeyIds },
             }),
@@ -482,7 +538,7 @@ export async function _mergeDataKeys({
             socket.emit('data_changed', 'save_scripts');
         }
     } catch (e: any) {
-        logger.error('_mergeDataKeys ERROR', e.message);
+        if (!signal?.aborted) logger.error('_mergeDataKeys ERROR', e.message);
         response.success = false;
         response.errors = [e.message];
     }
@@ -507,20 +563,29 @@ export async function _mergeDataKeysBatch({
     dryRun,
     userId,
     broadcastAction,
+    signal,
 }: {
     groups: MergeBatchItem[];
     dryRun?: boolean;
     userId?: string | null;
     broadcastAction?: boolean;
+    /** Dry runs only: stop checking once nobody is waiting for the answer. */
+    signal?: AbortSignal;
 }): Promise<{ success: boolean; results: MergeBatchResult[] }> {
     const results: MergeBatchResult[] = [];
+    // A dry run rolls every group back, so one load serves them all. A real
+    // merge changes the data the next group plans against, so it reloads.
+    const sources = dryRun && groups.length ? await loadMergeSources() : undefined;
     for (const group of groups) {
+        if (dryRun && signal?.aborted) break;
         const res = await _mergeDataKeys({
             survivorId: group.survivorId,
             mergedIds: group.mergedIds,
             dryRun,
             userId,
             broadcastAction: false,
+            sources,
+            signal: dryRun ? signal : undefined,
         });
         results.push({ ...group, ...res });
     }

@@ -24,3 +24,22 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: false, data: [], errors: [e.message] });
     }
 }
+
+/** Same as GET, with the ids in the body — usage for hundreds of keys does not fit in a URL. */
+export async function POST(req: NextRequest) {
+    try {
+        const isAuthorised = await isAuthenticated();
+        if (!isAuthorised.yes) return NextResponse.json({ success: false, data: [], errors: ['Unauthorised'] }, { status: 200 });
+
+        const body = await req.json() as { dataKeysIds?: string[]; uniqueKeys?: string[]; scopeParentUniqueKey?: string; };
+        const res = await getDataKeysDeleteImpact({
+            dataKeysIds: body.dataKeysIds || [],
+            uniqueKeys: body.uniqueKeys || [],
+            scopeParentUniqueKey: body.scopeParentUniqueKey || undefined,
+        });
+        return NextResponse.json(res);
+    } catch (e: any) {
+        logger.log('[POST] /api/data-keys/delete-impact', e);
+        return NextResponse.json({ success: false, data: [], errors: [e.message] });
+    }
+}

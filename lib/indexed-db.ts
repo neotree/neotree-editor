@@ -131,6 +131,17 @@ export const pendingChangesAPI = {
     return await changeLogDB.pendingChanges.where("entityId").equals(entityId).delete()
   },
 
+  /** Drops queued deletions for entities that are live again (e.g. a reverted merge, possibly from another browser). */
+  async clearStaleDeletions(entityType: PendingChange["entityType"], liveEntityIds: Iterable<string>) {
+    const live = new Set(liveEntityIds)
+    if (!live.size) return 0
+    return await changeLogDB.pendingChanges
+      .where("entityId")
+      .anyOf(Array.from(live))
+      .and((change) => change.entityType === entityType && change.action === "delete")
+      .delete()
+  },
+
   async clearAllChanges() {
     return await changeLogDB.pendingChanges.clear()
   },

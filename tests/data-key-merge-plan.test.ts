@@ -2,7 +2,7 @@ import assert from "assert"
 
 import {
   buildDataKeysMergePlan,
-  findDuplicateParentGroups,
+  findDuplicateKeyGroups,
   suggestChildMergeActions,
 } from "../lib/data-key-merge-plan"
 
@@ -27,11 +27,11 @@ const dataKeys = [
   key("c5", "num_child", "Count", "Count", "number"),
 ]
 
-// --- duplicate groups: same name + label + type, case-insensitive, parents only ---
+// --- duplicate groups: same name + type + label, any kind of key ---
 {
-  const groups = findDuplicateParentGroups(dataKeys)
-  assert.strictEqual(groups.length, 1)
-  assert.deepStrictEqual(groups[0].map((dataKey) => dataKey.uuid).sort(), ["p1", "p2"])
+  const groups = findDuplicateKeyGroups(dataKeys)
+  // the parents Feeding/feeding, and the options Yes/YES
+  assert.deepStrictEqual(groups.map((group) => group.map((dataKey) => dataKey.uuid).sort()), [["p1", "p2"], ["c1", "c3"]])
 }
 
 // --- suggestions: keep shared, match by name, add the rest ---
@@ -99,7 +99,7 @@ const dataKeys = [
     .errors.some((error) => error.includes("different data type")))
 
   assert.ok(buildDataKeysMergePlan({ dataKeys, survivorId: "p1", mergedIds: ["s1"] })
-    .errors.some((error) => error.includes("has no options")))
+    .errors.some((error) => error.includes("different data type")))
 
   assert.ok(buildDataKeysMergePlan({ dataKeys, survivorId: "p1", mergedIds: ["p1"] })
     .errors.some((error) => error.includes("at least one other")))
@@ -116,6 +116,29 @@ const dataKeys = [
   ]
   const plan = buildDataKeysMergePlan({ dataKeys: mixed, survivorId: "p1", mergedIds: ["p5"] })
   assert.ok(plan.errors.some((error) => error.includes("data type does not match")), plan.errors.join("; "))
+}
+
+// --- keys without options merge too; parents offering a merged option offer the kept key instead ---
+{
+  const plan = buildDataKeysMergePlan({ dataKeys, survivorId: "c1", mergedIds: ["c3"] })
+  assert.deepStrictEqual(plan.errors, [])
+  assert.deepStrictEqual(plan.children, [])
+  assert.deepStrictEqual(plan.parentOptionRewrites, [
+    { parentId: "p2", parentUniqueKey: "feed_2", parentTitle: "feeding", replaced: ["yes_2"], nextOptions: ["yes_1", "no_1", "unk_2"] },
+  ])
+
+  // a parent that already offers the kept key just loses the merged one
+  const both = [...dataKeys, key("p9", "both", "Both", "Both", "dropdown", ["yes_1", "yes_2", "no_1"])]
+  const rewrite = buildDataKeysMergePlan({ dataKeys: both, survivorId: "c1", mergedIds: ["c3"] }).parentOptionRewrites.find((r) => r.parentId === "p9")!
+  assert.deepStrictEqual(rewrite.nextOptions, ["yes_1", "no_1"])
+
+  // standalone keys: nothing to rewrite
+  const weights = [...dataKeys, key("s2", "weight_2", "Weight", "Weight", "number")]
+  const standalone = buildDataKeysMergePlan({ dataKeys: weights, survivorId: "s1", mergedIds: ["s2"] })
+  assert.deepStrictEqual([standalone.errors, standalone.parentOptionRewrites], [[], []])
+
+  // a key cannot be merged into its own parent or option
+  assert.ok(buildDataKeysMergePlan({ dataKeys, survivorId: "p1", mergedIds: ["c1"] }).errors.length)
 }
 
 console.log("data-key-merge-plan tests passed")

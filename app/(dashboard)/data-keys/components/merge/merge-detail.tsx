@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -47,6 +47,13 @@ export function MergeDetail({
     const [confirming, setConfirming] = useState(false);
     const [reverting, setReverting] = useState(false);
 
+    // Arriving straight from a merge: the header's publish bar and drafts count
+    // come from the root layout, which a client navigation does not re-render.
+    useEffect(() => {
+        if (justMerged) router.refresh();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const byUniqueKey = new Map(allDataKeys.map((dataKey) => [dataKey.uniqueKey, dataKey]));
     const request = merge.request || {};
     const report = merge.report || { scripts: [], totals: {} };
@@ -66,7 +73,7 @@ export function MergeDetail({
             setReverting(true);
             await revertDataKeysMerge(merge.mergeId);
             // The keys this merge queued for deletion are back in the library.
-            await Promise.all((report.deletedDataKeyIds || []).map((id: string) => pendingChangesAPI.clearEntityChanges(id, 'data_key')));
+            await Promise.all((report.deletedDataKeyIds || []).map((id: string) => pendingChangesAPI.clearEntityChanges(id, 'dataKey')));
             await loadDataKeys();
             router.refresh();
             alert({ title: `${Noun} reverted`, message: `The drafts are back to how they were before the ${noun}.`, variant: 'success' });
@@ -94,7 +101,7 @@ export function MergeDetail({
             <div className="min-w-0 space-y-6 px-4 pb-6">
                 <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <OperationKindBadge kind={kind} />
-                    <MergeStatusBadge status={merge.status} kind={kind} />
+                    <MergeStatusBadge status={merge.status} />
                     <span>
                         {isMerge ? 'Merged' : 'Made'} {format(new Date(merge.createdAt), 'PP p')}
                         {merge.createdByName && ` by ${merge.createdByName}`}
@@ -106,6 +113,13 @@ export function MergeDetail({
                             {merge.revertedByName && ` by ${merge.revertedByName}`}
                         </span>
                     )}
+                    {merge.status === 'published' && merge.publishedAt && (
+                        <span>
+                            · published {format(new Date(merge.publishedAt), 'PP p')}
+                            {merge.publishedByName && ` by ${merge.publishedByName}`}
+                            {merge.publishedDataVersion != null && ` in v${merge.publishedDataVersion}`}
+                        </span>
+                    )}
                 </div>
 
                 {!!notice && merge.status === 'applied' && merge.revertible && <Callout variant="warning">{notice}</Callout>}
@@ -113,12 +127,19 @@ export function MergeDetail({
                 {justMerged && merge.status === 'applied' && (
                     <Callout variant="info">
                         The {noun} is saved as drafts. Review the changes below, check data key integrity for the changed
-                        scripts, then publish. You can revert it until it is published.
+                        scripts, then publish. You can revert it until it is published; it shows in the history once it is.
                     </Callout>
                 )}
                 {merge.status === 'applied' && !merge.revertible && (
                     <Callout variant="info">
-                        This {noun} can no longer be reverted: its changes have been published, discarded or edited since.
+                        This {noun} can no longer be reverted: its drafts have been edited since.
+                    </Callout>
+                )}
+                {merge.status === 'discarded' && (
+                    <Callout variant="info">
+                        The drafts of this {noun} were discarded
+                        {merge.discardedAt && ` on ${format(new Date(merge.discardedAt), 'PP p')}`} before it was published,
+                        so nothing changed.
                     </Callout>
                 )}
 
@@ -141,6 +162,14 @@ export function MergeDetail({
                                 </div>
                             ))}
                         </div>
+                        {!!request.parentOptionRewrites?.length && (
+                            <div className="rounded-md border border-border p-3 md:col-span-2">
+                                <div className="text-xs uppercase tracking-wide text-muted-foreground">Parents now offering the kept key</div>
+                                <div className="mt-1 text-sm">
+                                    {request.parentOptionRewrites.map((rewrite: { parentTitle: string }) => rewrite.parentTitle).join(', ')}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </section>
                 ) : (
@@ -246,11 +275,17 @@ export function MergeDetail({
                         defaultOpen={report.scripts.length <= 3}
                         emptyMessage="No script was changed."
                     />
-                    {!!report.deletedDataKeyIds?.length && (
+                    {!!report.deletedDataKeyIds?.length && merge.status === 'applied' && (
                         <div className="text-sm text-muted-foreground">
                             {pluralize(report.deletedDataKeyIds.length, 'data key')} {report.deletedDataKeyIds.length === 1 ? 'is' : 'are'} deleted
                             from the library on the next publish.{' '}
                             <Link href="/changelogs/pending" className="text-primary hover:underline">Pending changes</Link>
+                        </div>
+                    )}
+                    {!!report.deletedDataKeyIds?.length && merge.status === 'published' && (
+                        <div className="text-sm text-muted-foreground">
+                            {pluralize(report.deletedDataKeyIds.length, 'data key')} {report.deletedDataKeyIds.length === 1 ? 'was' : 'were'} deleted
+                            from the library when this was published.
                         </div>
                     )}
                 </section>

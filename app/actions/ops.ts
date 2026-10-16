@@ -1537,6 +1537,15 @@ export async function publishData({ scope, allowConfidentialDowngrade }: { scope
 
       await tx.update(editorInfo).set({ dataVersion: nextDataVersion, lastPublishDate: new Date() }).where(eq(editorInfo.id, editor.id))
 
+      // Data key merges, deletes and unlinks whose drafts just went out become history.
+      await dataKeysMutations._settleDataKeyOperations({
+        outcome: "published",
+        userId,
+        actorUserId: publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
+
       const releaseLog = await _saveChangeLog({
         data: buildReleasePublishChangeLog({
           dataVersion: nextDataVersion,
@@ -1609,6 +1618,9 @@ export async function discardDrafts({ scope }: { scope: number }) {
       if (!clearPendingDeletion.success) {
         throw new Error(clearPendingDeletion.errors?.join(", ") || "Failed to clear queued deletions")
       }
+
+      // Their drafts are gone, so data key operations that made them never happened.
+      await dataKeysMutations._settleDataKeyOperations({ outcome: "discarded", userId, client: tx })
     })
 
     if (affectedScriptIds.size) void recomputeScriptsConditionErrors(Array.from(affectedScriptIds))

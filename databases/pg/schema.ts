@@ -1570,7 +1570,9 @@ export const integrityImportSnapshotsRelations = relations(integrityImportSnapsh
   }),
 }))
 
-export const dataKeyMergeStatusEnum = pgEnum("data_key_merge_status", ["applied", "reverted"])
+// applied: saved as drafts, revertible until published. Publishing or discarding
+// those drafts settles it as published or discarded; reverting it, as reverted.
+export const dataKeyMergeStatusEnum = pgEnum("data_key_merge_status", ["applied", "reverted", "published", "discarded"])
 
 // One row per recorded data key operation (merge, delete/replace, replace or
 // remove in selected scripts, unlink from a parent): what was asked, what
@@ -1596,8 +1598,13 @@ export const dataKeyMerges = pgTable(
     snapshot: jsonb("snapshot").$type<any>().default({}).notNull(),
     createdByUserId: uuid("created_by_user_id").references(() => users.userId, { onDelete: "set null" }),
     revertedByUserId: uuid("reverted_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    publishedByUserId: uuid("published_by_user_id").references(() => users.userId, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     revertedAt: timestamp("reverted_at"),
+    publishedAt: timestamp("published_at"),
+    // The release (editor data version) that published it.
+    publishedDataVersion: integer("published_data_version"),
+    discardedAt: timestamp("discarded_at"),
   },
   (table) => ({
     statusIndex: index("data_key_merges_status_index").on(table.status),

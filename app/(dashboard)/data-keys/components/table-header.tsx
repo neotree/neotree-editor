@@ -9,7 +9,7 @@ import { useDataKeysCtx } from '@/contexts/data-keys';
 import { useAppContext } from '@/contexts/app';
 import { dataKeysSortOpts, dataKeysStatuses, dataKeyTypes, } from "@/constants";
 import { ExportMetadataButton } from './export-metadata-button';
-import { DuplicateParentsButton } from './duplicate-parents-button';
+import { DuplicatesButton } from './duplicates-button';
 import { 
     Select, 
     SelectGroup,
@@ -155,7 +155,7 @@ export function DataKeysTableHeader() {
                             {unusedDataKeys.show ? 'Show all keys' : 'Show unused keys'}
                         </Button>
 
-                        {isSuperUser && <DuplicateParentsButton />}
+                        {isSuperUser && <DuplicatesButton />}
 
                         {isSuperUser && (
                             <Button asChild variant="outline" className="w-auto h-auto">

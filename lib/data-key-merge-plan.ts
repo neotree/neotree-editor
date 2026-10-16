@@ -54,8 +54,23 @@ export type DataKeyMergePlan = {
     /** merged child uniqueKey -> kept parent's child uniqueKey */
     childReplacements: Record<string, string>;
     droppedChildren: string[];
-    /** New label for the kept parent, when it is being changed. */
+    /** New label for the kept key, when it is being changed. */
     survivorLabel: string | null;
+    /**
+     * Parents (other than the merged keys) that offer a merged key as an option:
+     * they offer the kept key instead after the merge.
+     */
+    parentOptionRewrites: ParentOptionRewrite[];
+};
+
+export type ParentOptionRewrite = {
+    parentId: string;
+    parentUniqueKey: string;
+    parentTitle: string;
+    /** Merged keys this parent offers. */
+    replaced: string[];
+    /** The parent's options after the merge (merged keys -> kept key, no repeats). */
+    nextOptions: string[];
 };
 
 const norm = (value?: string | null) => `${value || ''}`.trim();
@@ -73,18 +88,50 @@ export function getMergeKeyTitle(dataKey?: Pick<MergeDataKey, 'name' | 'label' |
     return norm(dataKey?.name) || norm(dataKey?.label) || norm(dataKey?.uniqueKey) || 'Data key';
 }
 
+/** Lowercase words of a label ("Hypertonia = 1" -> ["hypertonia", "1"]). */
+const labelWords = (label?: string | null) => lower(label).split(/[^a-z0-9]+/).filter(Boolean);
+const isNumberWord = (word: string) => /^\d+(\.\d+)?$/.test(word);
+
 /**
- * Parent keys that look like the same key: identical name, label and data type
- * (case-insensitive). Each group has at least two parents and is a candidate
- * for a merge.
+ * A label's identity for duplicate matching: its words in any order, ignoring
+ * case, spacing and punctuation — "1 = Poor" and "Poor = 1" are the same label.
  */
-export function findDuplicateParentGroups<T extends MergeDataKey>(dataKeys: T[]): T[][] {
+export function labelSignature(label?: string | null) {
+    return Array.from(new Set(labelWords(label))).sort().join(' ');
+}
+
+/**
+ * How alike two labels are (0..1): the share of the shorter label's words the
+ * other label also has. Numbers are ignored — score options such as "0 = Alert"
+ * and "0 = None" share a number, not a meaning.
+ */
+export function labelSimilarity(a?: string | null, b?: string | null) {
+    if (labelSignature(a) === labelSignature(b)) return 1;
+    const left = new Set(labelWords(a).filter((word) => !isNumberWord(word)));
+    const right = new Set(labelWords(b).filter((word) => !isNumberWord(word)));
+    if (!left.size || !right.size) return 0;
+    let shared = 0;
+    left.forEach((word) => { if (right.has(word)) shared++; });
+    return shared / Math.min(left.size, right.size);
+}
+
+/** The name + type a key is matched on (its "key identity"). */
+const nameTypeKey = (dataKey: MergeDataKey) => `${lower(dataKey.name)}::${normalizeDataKeyType(dataKey.dataType)}`;
+
+const isCandidate = (dataKey: MergeDataKey) => !dataKey.isDeleted && !!norm(dataKey.uuid) && !!lower(dataKey.name);
+
+/**
+ * Keys that are the same key: identical name and data type — the deciding
+ * variables — and the same label (same words, any case or order). Covers every
+ * kind of key: parents, their options, and standalone keys. Each group has at
+ * least two keys and is a candidate for a merge.
+ */
+export function findDuplicateKeyGroups<T extends MergeDataKey>(dataKeys: T[]): T[][] {
     const groups = new Map<string, T[]>();
 
     for (const dataKey of dataKeys) {
-        if (dataKey.isDeleted || !isParent(dataKey) || !norm(dataKey.uuid)) continue;
-        const key = [lower(dataKey.name), lower(dataKey.label), normalizeDataKeyType(dataKey.dataType)].join('::');
-        if (key === '::::' || !lower(dataKey.name)) continue;
+        if (!isCandidate(dataKey)) continue;
+        const key = `${nameTypeKey(dataKey)}::${labelSignature(dataKey.label)}`;
         groups.set(key, [...(groups.get(key) || []), dataKey]);
     }
 
@@ -196,6 +243,7 @@ export function buildDataKeysMergePlan({
         childReplacements: {},
         droppedChildren: [],
         survivorLabel: null,
+        parentOptionRewrites: [],
     };
 
     const byId = new Map(dataKeys.map((dataKey) => [norm(dataKey.uuid), dataKey]));
@@ -217,9 +265,15 @@ export function buildDataKeysMergePlan({
         return plan;
     }
 
-    for (const dataKey of [survivor, ...plan.merged]) {
-        if (!isParent(dataKey)) {
-            plan.errors.push(`"${getMergeKeyTitle(dataKey)}" has no options. Merging is for parent data keys; use Delete with a replacement for other keys.`);
+    // Any kind of key can be merged — parents, options and standalone keys —
+    // as long as the keys are the same type and not options of one another.
+    const mergedKeySet = new Set(plan.merged.map((dataKey) => norm(dataKey.uniqueKey)));
+    if ((survivor.options || []).some((option) => mergedKeySet.has(norm(option)))) {
+        plan.errors.push(`A data key being merged is an option of "${getMergeKeyTitle(survivor)}" — a key cannot be merged into its own parent.`);
+    }
+    for (const dataKey of plan.merged) {
+        if ((dataKey.options || []).map(norm).includes(norm(survivor.uniqueKey))) {
+            plan.errors.push(`"${getMergeKeyTitle(survivor)}" is an option of "${getMergeKeyTitle(dataKey)}" — a key cannot be merged into one of its own options.`);
         }
     }
     const survivorType = normalizeDataKeyType(survivor.dataType);
@@ -299,6 +353,34 @@ export function buildDataKeysMergePlan({
     plan.addedOptions = added;
     plan.nextSurvivorOptions = [...survivorOptions, ...added];
 
+    // Parents that offer a merged key offer the kept key instead.
+    const survivorKey = norm(survivor.uniqueKey);
+    for (const parent of dataKeys) {
+        if (parent.isDeleted || !isParent(parent)) continue;
+        const parentKey = norm(parent.uniqueKey);
+        if (parentKey === survivorKey || mergedKeySet.has(parentKey)) continue;
+        const options = (parent.options || []).map(norm).filter(Boolean);
+        const replaced = options.filter((option) => mergedKeySet.has(option));
+        if (!replaced.length) continue;
+        const nextOptions = Array.from(new Set(options.map((option) => mergedKeySet.has(option) ? survivorKey : option)));
+        if (!options.includes(survivorKey)) {
+            const optionsError = validateDataKeyOptionsAddition({
+                dataKeys: dataKeys as Parameters<typeof validateDataKeyOptionsAddition>[0]['dataKeys'],
+                parentUniqueKey: parentKey,
+                previousOptions: options,
+                nextOptions,
+            });
+            if (optionsError) plan.errors.push(`"${getMergeKeyTitle(parent)}": ${optionsError}`);
+        }
+        plan.parentOptionRewrites.push({
+            parentId: norm(parent.uuid),
+            parentUniqueKey: parentKey,
+            parentTitle: getMergeKeyTitle(parent),
+            replaced,
+            nextOptions,
+        });
+    }
+
     if (survivorOptionOrder?.length) {
         const order = survivorOptionOrder.map(norm).filter(Boolean);
         const expected = new Set(plan.nextSurvivorOptions);
@@ -332,86 +414,60 @@ export function buildDataKeysMergePlan({
     return plan;
 }
 
-export type PossibleDuplicateReason = 'same_name' | 'shared_options';
+export type PossibleDuplicateReason = 'similar_label';
 
 export type PossibleDuplicateGroup<T extends MergeDataKey> = {
     keys: T[];
     reason: PossibleDuplicateReason;
-    /** Share of options the keys have in common (0..1), by option name. */
+    /** The lowest label similarity between two keys of the group (0..1). */
     overlap: number;
 };
 
 /**
- * Parents that are probably the same key but not exact duplicates:
- * - same name and type, different label;
- * - same type and at least `minOverlap` of their options in common (by option
- *   name), whatever their names.
- * Exact duplicate groups are not repeated here.
+ * Keys that are probably the same key but need a review before merging: same
+ * name and type — the deciding variables — with labels that say the same thing
+ * in different words ("Traditional Birth Attendant (TBA)" ~ "Traditional birth
+ * attendant", "Absent = 2" ~ "2 = Absent or with bites").
+ *
+ * Every pair in a group must be similar, so groups never chain unrelated keys
+ * together. Same name and type with unrelated labels ("0 = Alert" vs "0 = None")
+ * are different keys and are not suggested, and neither are different questions
+ * that merely offer the same answers. Exact duplicate groups are not repeated.
  */
 export function findPossibleDuplicateGroups<T extends MergeDataKey>(
     dataKeys: T[],
-    { minOverlap = 0.7 }: { minOverlap?: number } = {},
+    { minLabelSimilarity = 0.75 }: { minLabelSimilarity?: number } = {},
 ): PossibleDuplicateGroup<T>[] {
-    const byUniqueKey = new Map(dataKeys.map((dataKey) => [norm(dataKey.uniqueKey), dataKey]));
-    const parents = dataKeys.filter((dataKey) => !dataKey.isDeleted && isParent(dataKey) && norm(dataKey.uuid));
-    const exactKeys = new Set(findDuplicateParentGroups(parents).map(getDuplicateGroupKey));
+    const candidates = dataKeys.filter(isCandidate);
+    const exactKeys = new Set(findDuplicateKeyGroups(candidates).map(getDuplicateGroupKey));
 
-    const optionNames = new Map(parents.map((parent) => [parent.uuid, new Set((parent.options || [])
-        .map((option) => lower(byUniqueKey.get(norm(option))?.name) || norm(option))
-        .filter(Boolean))]));
-    const overlapOf = (a: T, b: T) => {
-        const left = optionNames.get(a.uuid)!;
-        const right = optionNames.get(b.uuid)!;
-        if (!left.size || !right.size) return 0;
-        let shared = 0;
-        left.forEach((name) => { if (right.has(name)) shared++; });
-        return shared / Math.max(left.size, right.size);
-    };
+    const buckets = new Map<string, T[]>();
+    candidates.forEach((dataKey) => buckets.set(nameTypeKey(dataKey), [...(buckets.get(nameTypeKey(dataKey)) || []), dataKey]));
 
-    // Union-find over "probably the same" pairs.
-    const parentOf = new Map(parents.map((parent) => [parent.uuid, parent.uuid]));
-    const find = (id: string): string => {
-        const next = parentOf.get(id)!;
-        if (next === id) return id;
-        const root = find(next);
-        parentOf.set(id, root);
-        return root;
-    };
-    const union = (a: string, b: string) => parentOf.set(find(a), find(b));
+    const groups: PossibleDuplicateGroup<T>[] = [];
+    buckets.forEach((keys) => {
+        if (keys.length < 2) return;
+        // Complete-link clustering: a key joins a cluster only when it is
+        // similar to every key already in it.
+        const clusters: T[][] = [];
+        [...keys]
+            .sort((a, b) => labelSignature(a.label).localeCompare(labelSignature(b.label)))
+            .forEach((key) => {
+                const home = clusters.find((cluster) => cluster.every((member) => labelSimilarity(member.label, key.label) >= minLabelSimilarity));
+                if (home) home.push(key);
+                else clusters.push([key]);
+            });
 
-    const sameNamePairs = new Set<string>();
-    for (let i = 0; i < parents.length; i++) {
-        for (let j = i + 1; j < parents.length; j++) {
-            const a = parents[i];
-            const b = parents[j];
-            if (normalizeDataKeyType(a.dataType) !== normalizeDataKeyType(b.dataType)) continue;
-            const sameName = !!lower(a.name) && lower(a.name) === lower(b.name);
-            if (sameName || overlapOf(a, b) >= minOverlap) {
-                union(a.uuid, b.uuid);
-                if (sameName) sameNamePairs.add([a.uuid, b.uuid].sort().join('|'));
-            }
-        }
-    }
-
-    const groups = new Map<string, T[]>();
-    parents.forEach((parent) => {
-        const root = find(parent.uuid);
-        groups.set(root, [...(groups.get(root) || []), parent]);
+        clusters
+            .filter((cluster) => cluster.length > 1 && !exactKeys.has(getDuplicateGroupKey(cluster)))
+            .forEach((cluster) => {
+                let minimum = 1;
+                for (let i = 0; i < cluster.length; i++) {
+                    for (let j = i + 1; j < cluster.length; j++) minimum = Math.min(minimum, labelSimilarity(cluster[i].label, cluster[j].label));
+                }
+                groups.push({ keys: cluster, reason: 'similar_label', overlap: Math.round(minimum * 100) / 100 });
+            });
     });
 
-    return Array.from(groups.values())
-        .filter((keys) => keys.length > 1 && !exactKeys.has(getDuplicateGroupKey(keys)))
-        .map((keys) => {
-            let minimum = 1;
-            for (let i = 0; i < keys.length; i++) {
-                for (let j = i + 1; j < keys.length; j++) minimum = Math.min(minimum, overlapOf(keys[i], keys[j]));
-            }
-            const allSameName = keys.every((key) => lower(key.name) === lower(keys[0].name));
-            return {
-                keys,
-                reason: (allSameName ? 'same_name' : 'shared_options') as PossibleDuplicateReason,
-                overlap: Math.round(minimum * 100) / 100,
-            };
-        })
-        .sort((a, b) => getMergeKeyTitle(a.keys[0]).localeCompare(getMergeKeyTitle(b.keys[0])));
+    return groups.sort((a, b) => getMergeKeyTitle(a.keys[0]).localeCompare(getMergeKeyTitle(b.keys[0])));
 }

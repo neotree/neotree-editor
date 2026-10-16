@@ -9,18 +9,19 @@ import type {
     MergeDataKeysResponse,
 } from '@/databases/mutations/data-keys';
 
-type MergeRequest = Omit<MergeDataKeysParams, 'userId' | 'broadcastAction' | 'dryRun'>;
+type MergeRequest = Omit<MergeDataKeysParams, 'userId' | 'broadcastAction' | 'dryRun' | 'signal' | 'sources'>;
 
 /** Runs the merge in a rolled-back transaction and returns what would change. */
-export async function previewDataKeysMerge(params: MergeRequest) {
-    const res = await axios.post<MergeDataKeysResponse>('/api/data-keys/merge/preview', params);
+export async function previewDataKeysMerge(params: MergeRequest, signal?: AbortSignal) {
+    const res = await axios.post<MergeDataKeysResponse>('/api/data-keys/merge/preview', params, { signal });
     return res.data;
 }
 
-export async function mergeDataKeyGroups(groups: MergeBatchItem[], dryRun: boolean) {
+export async function mergeDataKeyGroups(groups: MergeBatchItem[], dryRun: boolean, signal?: AbortSignal) {
     const res = await axios.post<{ success: boolean; results: MergeBatchResult[]; errors?: string[] }>(
         '/api/data-keys/merge/batch',
         { groups, dryRun },
+        { signal },
     );
     if (res.data.errors?.length) throw new Error(res.data.errors[0]);
     return res.data.results;

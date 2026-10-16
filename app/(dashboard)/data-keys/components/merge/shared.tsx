@@ -4,6 +4,7 @@ import { useAppContext } from '@/contexts/app';
 import { Badge } from '@/components/ui/badge';
 import { CHANGELOG_ACTION_BADGE_CLASSES, CHANGELOG_DEFAULT_ACTION_BADGE_CLASS } from '@/lib/changelog-utils';
 import type { ChildMatchReason, ChildMergeAction } from '@/lib/data-key-merge-plan';
+import type { DataKeyMergeListItem } from '@/databases/queries/data-keys';
 import { cn } from '@/lib/utils';
 
 export type KeyLike = {
@@ -76,13 +77,18 @@ export const MATCH_REASON_LABELS: Record<ChildMatchReason, string> = {
     similar: 'similar name',
 };
 
-export function MergeStatusBadge({ status, kind = 'merge' }: { status: 'applied' | 'reverted'; kind?: string; }) {
+const STATUS_BADGES: Record<DataKeyMergeListItem['status'], { label: string; className: string; }> = {
+    applied: { label: 'Not published', className: CHANGELOG_ACTION_BADGE_CLASSES.restore },
+    published: { label: 'Published', className: CHANGELOG_ACTION_BADGE_CLASSES.publish },
+    reverted: { label: 'Reverted', className: CHANGELOG_ACTION_BADGE_CLASSES.rollback },
+    discarded: { label: 'Discarded', className: CHANGELOG_DEFAULT_ACTION_BADGE_CLASS },
+};
+
+export function MergeStatusBadge({ status }: { status: DataKeyMergeListItem['status']; }) {
+    const badge = STATUS_BADGES[status] || STATUS_BADGES.applied;
     return (
-        <Badge
-            variant="outline"
-            className={cn('font-normal', status === 'reverted' ? CHANGELOG_ACTION_BADGE_CLASSES.rollback : CHANGELOG_ACTION_BADGE_CLASSES.merge)}
-        >
-            {status === 'reverted' ? 'Reverted' : (kind === 'merge' ? 'Merged' : 'Applied')}
+        <Badge variant="outline" className={cn('font-normal', badge.className)}>
+            {badge.label}
         </Badge>
     );
 }

@@ -21,6 +21,7 @@ import { DeleteDataKeysParams, DeleteDataKeysResponse, MergeDataKeysParams, Merg
 import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
+import { pendingChangesAPI } from "@/lib/indexed-db";
 import { useAppContext } from "@/contexts/app";
 import { buildDataKeyParentIndex } from "@/lib/data-key-children";
 import { matchesDataKeySearch } from "@/lib/data-keys-search";
@@ -270,6 +271,12 @@ export function DataKeysCtxProvider({
             });
             setCurrentPage(1);
             setAllDataKeysLastFetchedDate(new Date().toISOString());
+
+            // The full library excludes keys queued for deletion, so any local "delete" entry for a key that is
+            // listed again is stale (its deletion was reverted, maybe by someone else).
+            if (!queryParams.toString()) {
+                pendingChangesAPI.clearStaleDeletions("dataKey", sortedData.map(d => d.uuid)).catch(() => {});
+            }
         } catch (e: any) {
             if (!opts?.silent) {
                 setErrors([e.message]);

@@ -7,6 +7,10 @@ import { defineConfig } from '@playwright/test';
  * throwaway database: set E2E_DATABASE_URL to a copy whose name contains
  * "e2e" or "scratch", e.g.
  *   E2E_DATABASE_URL=postgres://user:pass@localhost:5433/neotree_e2e yarn test:e2e
+ *
+ * The test server is a `next dev` in this folder, so it shares `.next` with any
+ * other dev server running here; stop that one first, or the two corrupt each
+ * other's builds (pages and API routes start answering 404).
  */
 const databaseUrl = process.env.E2E_DATABASE_URL || '';
 if (!databaseUrl) throw new Error('Set E2E_DATABASE_URL to a throwaway database to run the browser tests.');
