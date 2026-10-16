@@ -27,6 +27,7 @@ import {
     collectNewOutcomeKeyCollisions,
     collectScriptConditionFindings,
     collectScriptOutcomeReferences,
+    hrefForConditionEntity,
     buildConditionReportSignature,
     isSupersededConditionReportSignature,
     getConfigurationConditionKeySignature,
@@ -35,7 +36,6 @@ import {
     isOutcomeCollectionName,
     type OutcomeCollectionName,
     type OutcomeReferenceFinding,
-    type ScriptConditionEntityRef,
 } from "@/lib/conditional-expression";
 import { buildScriptConditionKeys } from "@/lib/conditional-expression/script-keys";
 import {
@@ -450,14 +450,18 @@ type GetScriptsWithItemsResponse = {
     })[];
 };
 
-export async function getScriptsWithItems(params: Parameters<typeof queries._getScripts>[0]): Promise<GetScriptsWithItemsResponse> {
+export async function getScriptsWithItems(
+    params: Parameters<typeof queries._getScripts>[0],
+    options?: { withDataKeys?: boolean },
+): Promise<GetScriptsWithItemsResponse> {
     const data: GetScriptsWithItemsResponse['data'] = [];
     const errors: string[] = [];
 
     try {
         const returnDraftsIfExist = params?.returnDraftsIfExist !== false;
+        const withDataKeys = options?.withDataKeys !== false;
         const scripts = await queries._getScripts({ ...params, returnDraftsIfExist });
-        const { data: dataKeys, } = await _getDataKeys();
+        const { data: dataKeys, } = withDataKeys ? await _getDataKeys() : { data: [] };
 
         scripts.errors?.forEach(e => errors.push(e));
 
@@ -481,13 +485,13 @@ export async function getScriptsWithItems(params: Parameters<typeof queries._get
                     );
                 });
 
-            const scrappedDataKeys = await scrapDataKeys({
+            const scrappedDataKeys = withDataKeys ? await scrapDataKeys({
                 dataKeys,
                 screens: screens.data,
                 diagnoses: diagnoses.data,
                 problems: problems.data,
                 drugsLibrary: drugsLibraryItems,
-            });
+            }) : [];
 
             data.push({
                 ...s,
@@ -642,20 +646,6 @@ async function resolveConditionReportSignatures(
     const ids = Array.from(new Set((scriptIds || []).map((id) => `${id || ''}`).filter(Boolean)));
     if (!ids.length) return new Map<string, string>();
     return buildConditionReportSignatures(ids, configurationSignature, await fetchConditionReportStamps(ids));
-}
-
-function hrefForConditionEntity(scriptId: string, entity?: ScriptConditionEntityRef): string {
-    if (!entity) return `/script/${scriptId}`;
-    switch (entity.kind) {
-        case 'screen':
-            return entity.screenId ? `/script/${scriptId}/screen/${entity.screenId}` : `/script/${scriptId}?section=screens`;
-        case 'diagnosis':
-            return entity.diagnosisId ? `/script/${scriptId}/diagnosis/${entity.diagnosisId}` : `/script/${scriptId}?section=diagnoses`;
-        case 'problem':
-            return entity.problemId ? `/script/${scriptId}/problem/${entity.problemId}` : `/script/${scriptId}?section=diagnoses`;
-        default:
-            return `/script/${scriptId}`;
-    }
 }
 
 function buildConditionReport(scriptId: string, script: any, inputsSignature?: string): ScriptConditionReport {

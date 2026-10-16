@@ -8,6 +8,7 @@ import { collectOutcomeKeyCollisions, getOutcomeProducers, getPreScriptUnavailab
 
 export interface ScriptWithItems {
   scriptId?: string;
+  hospitalId?: string | null;
   title?: string;
   name?: string;
   dataKeys?: any[];
@@ -36,6 +37,130 @@ export interface ScriptConditionFinding {
   entity?: ScriptConditionEntityRef;
 }
 
+export interface ScriptConditionVisit {
+  expression: unknown;
+  field: string;
+  location: string;
+  entity: ScriptConditionEntityRef;
+  /** Which key set the expression resolves against. */
+  scope: "script" | "nuid" | "syntax";
+  mode?: "boolean" | "reference";
+  consumerPosition?: number | null;
+}
+
+export function hrefForConditionEntity(scriptId: string, entity?: ScriptConditionEntityRef): string {
+  if (!entity) return `/script/${scriptId}`;
+  switch (entity.kind) {
+    case "screen":
+      return entity.screenId ? `/script/${scriptId}/screen/${entity.screenId}` : `/script/${scriptId}?section=screens`;
+    case "diagnosis":
+      return entity.diagnosisId ? `/script/${scriptId}/diagnosis/${entity.diagnosisId}` : `/script/${scriptId}?section=diagnoses`;
+    case "problem":
+      return entity.problemId ? `/script/${scriptId}/problem/${entity.problemId}` : `/script/${scriptId}?section=diagnoses`;
+    default:
+      return `/script/${scriptId}`;
+  }
+}
+
+/**
+ * Visits every conditional expression in a script, raw (unvalidated and untrimmed).
+ * Shared by the static evaluator below and the runtime-failure locator (locate.ts),
+ * so both agree on where expressions live.
+ */
+export function walkScriptConditions(script: ScriptWithItems, visit: (v: ScriptConditionVisit) => void): void {
+  for (const screen of (script?.screens || []) as any[]) {
+    const loc = `Screen "${screen?.title || screen?.key || screen?.screenId || ""}"`;
+    const entity: ScriptConditionEntityRef = { kind: "screen", screenId: screen?.screenId };
+    const consumerPosition = screen?.position;
+    visit({ expression: screen?.condition, field: "condition", location: loc, entity, scope: "script", consumerPosition });
+    visit({ expression: screen?.skipToCondition, field: "skipToCondition", location: loc, entity, scope: "script", consumerPosition });
+    for (const field of (screen?.fields || []) as any[]) {
+      const fieldLoc = `${loc} > field "${field?.key || field?.label || ""}"`;
+      visit({ expression: field?.condition, field: "field.condition", location: fieldLoc, entity, scope: "script", consumerPosition });
+      visit({ expression: field?.calculation, field: "field.calculation", location: fieldLoc, entity, scope: "script", mode: "reference", consumerPosition });
+      for (const item of (field?.items || []) as any[]) {
+        if (!`${item?.condition ?? ""}`.trim()) continue;
+        visit({
+          expression: item.condition,
+          field: "item.condition",
+          location: `${fieldLoc} > option "${item?.value || item?.label || ""}"`,
+          entity,
+          scope: "script",
+          consumerPosition,
+        });
+      }
+    }
+    for (const item of (screen?.items || []) as any[]) {
+      const itemLoc = `${loc} > item "${item?.key || item?.label || ""}"`;
+      visit({ expression: item?.condition, field: "item.condition", location: itemLoc, entity, scope: "script", consumerPosition });
+    }
+  }
+
+  const outcomeProducers = getOutcomeProducers(script?.screens || []);
+  const producerPosition = (collection: "Diagnoses" | "Problems") => {
+    const position = outcomeProducers[collection]?.position;
+    return position === null || position === undefined || !Number.isFinite(Number(position)) ? null : Number(position);
+  };
+
+  const diagnosisPosition = producerPosition("Diagnoses");
+  for (const diagnosis of (script?.diagnoses || []) as any[]) {
+    const location = `Diagnosis "${diagnosis?.name || diagnosis?.key || ""}"`;
+    const entity: ScriptConditionEntityRef = { kind: "diagnosis", diagnosisId: diagnosis?.diagnosisId };
+    visit({ expression: diagnosis?.expression, field: "expression", location, entity, scope: "script", consumerPosition: diagnosisPosition });
+    for (const symptom of (diagnosis?.symptoms || []) as any[]) {
+      visit({
+        expression: symptom?.expression,
+        field: "symptom.expression",
+        location: `${location} > symptom "${symptom?.name || symptom?.key || ""}"`,
+        entity,
+        scope: "script",
+        consumerPosition: diagnosisPosition,
+      });
+    }
+  }
+
+  const problemPosition = producerPosition("Problems");
+  for (const problem of (script?.problems || []) as any[]) {
+    const location = `Problem "${problem?.name || problem?.key || ""}"`;
+    const entity: ScriptConditionEntityRef = { kind: "problem", problemId: problem?.problemId };
+    visit({ expression: problem?.expression, field: "expression", location, entity, scope: "script", consumerPosition: problemPosition });
+    for (const symptom of (problem?.symptoms || []) as any[]) {
+      visit({
+        expression: symptom?.expression,
+        field: "symptom.expression",
+        location: `${location} > symptom "${symptom?.name || symptom?.key || ""}"`,
+        entity,
+        scope: "script",
+        consumerPosition: problemPosition,
+      });
+    }
+  }
+
+  for (const item of (script?.drugsLibrary || []) as any[]) {
+    const location = `Drug/Fluid "${item?.drug || item?.fluid || item?.key || ""}"`;
+    const entity: ScriptConditionEntityRef = { kind: "drug" };
+    visit({ expression: item?.condition, field: "condition", location, entity, scope: "syntax" });
+    visit({ expression: item?.calculator_condition, field: "calculator_condition", location, entity, scope: "syntax" });
+  }
+
+  for (const field of (script?.nuidSearchFields || []) as any[]) {
+    visit({
+      expression: field?.condition,
+      field: "condition",
+      location: `NUID search field "${field?.key || field?.label || ""}"`,
+      entity: { kind: "nuid" },
+      scope: "nuid",
+    });
+  }
+
+  const eligibility = script?.eligibilityCriteria;
+  if (eligibility) {
+    const entity: ScriptConditionEntityRef = { kind: "eligibility" };
+    visit({ expression: eligibility?.criteria_condition, field: "criteria_condition", location: "Eligibility criteria", entity, scope: "nuid" });
+    visit({ expression: eligibility?.alternative_criteria_condition, field: "alternative_criteria_condition", location: "Eligibility criteria (alternative)", entity, scope: "nuid" });
+  }
+}
+
 /**
  * Collects every conditional expression across a script's entities, validates
  * each against that script's keys (the same rules and key resolution the editor
@@ -60,7 +185,6 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
   const scriptCtx: ValidationContext = { keys, allowSelf: true, skipKeyResolution: false };
   const syntaxOnlyCtx: ValidationContext = { keys: [], allowSelf: true, skipKeyResolution: true };
 
-  const nuidFields = (script?.nuidSearchFields || []) as any[];
   const nuidKeys = toConditionKeys(script?.nuidDataKeys || []);
   const nuidMergedKeys = nuidKeys.length ? mergeConditionKeys(keys, nuidKeys) : keys;
   const nuidCtx: ValidationContext = {
@@ -113,83 +237,13 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
     if (errors.length) findings.push({ location, field, expression: value, errors, entity: opts?.entity });
   };
 
-  for (const screen of (script?.screens || []) as any[]) {
-    const loc = `Screen "${screen?.title || screen?.key || screen?.screenId || ""}"`;
-    const entity: ScriptConditionEntityRef = { kind: "screen", screenId: screen?.screenId };
-    check(screen?.condition, "condition", loc, { entity, consumerPosition: screen?.position });
-    check(screen?.skipToCondition, "skipToCondition", loc, { entity, consumerPosition: screen?.position });
-    for (const field of (screen?.fields || []) as any[]) {
-      const fieldLoc = `${loc} > field "${field?.key || field?.label || ""}"`;
-      check(field?.condition, "field.condition", fieldLoc, { entity, consumerPosition: screen?.position });
-      check(field?.calculation, "field.calculation", fieldLoc, { mode: "reference", entity, consumerPosition: screen?.position });
-      for (const item of (field?.items || []) as any[]) {
-        if (!`${item?.condition ?? ""}`.trim()) continue;
-        check(item.condition, "item.condition", `${fieldLoc} > option "${item?.value || item?.label || ""}"`, {
-          entity,
-          consumerPosition: screen?.position,
-        });
-      }
-    }
-    for (const item of (screen?.items || []) as any[]) {
-      const itemLoc = `${loc} > item "${item?.key || item?.label || ""}"`;
-      check(item?.condition, "item.condition", itemLoc, { entity, consumerPosition: screen?.position });
-    }
-  }
-
-  const diagnosisProducerPosition = outcomeProducers.Diagnoses?.position === null || outcomeProducers.Diagnoses?.position === undefined
-    ? Number.NaN
-    : Number(outcomeProducers.Diagnoses.position);
-  for (const diagnosis of (script?.diagnoses || []) as any[]) {
-    const location = `Diagnosis "${diagnosis?.name || diagnosis?.key || ""}"`;
-    const entity: ScriptConditionEntityRef = { kind: "diagnosis", diagnosisId: diagnosis?.diagnosisId };
-    check(diagnosis?.expression, "expression", `Diagnosis "${diagnosis?.name || diagnosis?.key || ""}"`, {
-      entity,
-      consumerPosition: Number.isFinite(diagnosisProducerPosition) ? diagnosisProducerPosition : null,
-    });
-    for (const symptom of (diagnosis?.symptoms || []) as any[]) {
-      check(symptom?.expression, "symptom.expression", `${location} > symptom "${symptom?.name || symptom?.key || ""}"`, {
-        entity,
-        consumerPosition: Number.isFinite(diagnosisProducerPosition) ? diagnosisProducerPosition : null,
-      });
-    }
-  }
-
-  const problemProducerPosition = outcomeProducers.Problems?.position === null || outcomeProducers.Problems?.position === undefined
-    ? Number.NaN
-    : Number(outcomeProducers.Problems.position);
-  for (const problem of (script?.problems || []) as any[]) {
-    const location = `Problem "${problem?.name || problem?.key || ""}"`;
-    const entity: ScriptConditionEntityRef = { kind: "problem", problemId: problem?.problemId };
-    check(problem?.expression, "expression", location, {
-      entity,
-      consumerPosition: Number.isFinite(problemProducerPosition) ? problemProducerPosition : null,
-    });
-    for (const symptom of (problem?.symptoms || []) as any[]) {
-      check(symptom?.expression, "symptom.expression", `${location} > symptom "${symptom?.name || symptom?.key || ""}"`, {
-        entity,
-        consumerPosition: Number.isFinite(problemProducerPosition) ? problemProducerPosition : null,
-      });
-    }
-  }
-
-  for (const item of (script?.drugsLibrary || []) as any[]) {
-    const loc = `Drug/Fluid "${item?.drug || item?.fluid || item?.key || ""}"`;
-    check(item?.condition, "condition", loc, { ctx: syntaxOnlyCtx, entity: { kind: "drug" } });
-    check(item?.calculator_condition, "calculator_condition", loc, { ctx: syntaxOnlyCtx, entity: { kind: "drug" } });
-  }
-
-  for (const field of nuidFields) {
-    check(field?.condition, "condition", `NUID search field "${field?.key || field?.label || ""}"`, {
-      ctx: { ...nuidCtx, unavailableKeys: getPreScriptUnavailableOutcomeKeys() },
-      entity: { kind: "nuid" },
-    });
-  }
-
-  const eligibility = script?.eligibilityCriteria;
-  if (eligibility) {
-    check(eligibility?.criteria_condition, "criteria_condition", "Eligibility criteria", { ctx: { ...nuidCtx, unavailableKeys: getPreScriptUnavailableOutcomeKeys() }, entity: { kind: "eligibility" } });
-    check(eligibility?.alternative_criteria_condition, "alternative_criteria_condition", "Eligibility criteria (alternative)", { ctx: { ...nuidCtx, unavailableKeys: getPreScriptUnavailableOutcomeKeys() }, entity: { kind: "eligibility" } });
-  }
+  const nuidScopeCtx = (): ValidationContext => ({ ...nuidCtx, unavailableKeys: getPreScriptUnavailableOutcomeKeys() });
+  walkScriptConditions(script, (v) => check(v.expression, v.field, v.location, {
+    mode: v.mode,
+    ctx: v.scope === "syntax" ? syntaxOnlyCtx : v.scope === "nuid" ? nuidScopeCtx() : undefined,
+    entity: v.entity,
+    consumerPosition: v.consumerPosition,
+  }));
 
   for (const collision of collectOutcomeKeyCollisions(script)) {
     findings.push({
