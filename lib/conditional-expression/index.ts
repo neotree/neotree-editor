@@ -63,6 +63,7 @@ export {
 export {
   collectScriptConditionFindings,
   getScriptConditionErrorCount,
+  hrefForConditionEntity,
   type ScriptWithItems,
   type ScriptConditionFinding,
   type ScriptConditionEntityRef,
