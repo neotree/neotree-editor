@@ -6,6 +6,7 @@ import {
   collectNewOutcomeKeyCollisions,
   collectOutcomeKeyCollisions,
   collectScriptOutcomeReferences,
+  collectScriptConditionFindings,
   getConfigurationConditionKeySignature,
   getUnavailableOutcomeKeys,
   getScriptConditionErrorCount,
@@ -1068,10 +1069,26 @@ assert.equal(
   getScriptConditionErrorCount({
     dataKeys: scriptKeys,
     screens: [{ title: "Items", items: [{ label: "Bad item", condition: "$MissingItemKey = 'x'" }] }],
-    diagnoses: [{ name: "Diagnosis", symptoms: [{ name: "Bad symptom", expression: "$MissingSymptomKey = 'x'" }] }],
+    diagnoses: [{ name: "Diagnosis", expression: "$Gestation > 20", symptoms: [{ name: "Bad symptom", expression: "$MissingSymptomKey = 'x'" }] }],
   }),
   2,
   "publish validation includes nested screen-item and CDS symptom expressions",
+);
+// Tablets evaluate a diagnosis or problem that has symptoms even with no expression, and it fails.
+assert.deepEqual(
+  collectScriptConditionFindings({
+    dataKeys: scriptKeys,
+    diagnoses: [
+      { diagnosisId: "d1", name: "Symptoms only", symptoms: [{ name: "Any", expression: "$Gestation > 20" }] },
+      { diagnosisId: "d2", name: "Nothing at all" },
+    ],
+    problems: [{ problemId: "p1", name: "Problem, symptoms only", expression: null, symptoms: [{ name: "Any", expression: "$Gestation > 20" }] }],
+  }).map((f) => [f.location, f.errors[0].code]),
+  [
+    ['Diagnosis "Symptoms only"', "EMPTY_OUTCOME_EXPRESSION"],
+    ['Problem "Problem, symptoms only"', "EMPTY_OUTCOME_EXPRESSION"],
+  ],
+  "a diagnosis or problem with symptoms and no expression is a finding; one with neither is not",
 );
 
 // NUID conditions resolve against the NUID fields' LINKED registry keys
