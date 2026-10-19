@@ -85,7 +85,7 @@ export const loadRemoteScripts = async ({
 
         const url = '/api/scripts?' + queryString.stringify({
             data: JSON.stringify({
-                returnDraftsIfExist: false,
+                returnDraftsIfExist: true,
                 ...params
             }),
         });
@@ -126,7 +126,7 @@ export const loadRemoteScreens = async ({
 
         const url = '/api/screens?' + queryString.stringify({
             data: JSON.stringify({
-                returnDraftsIfExist: false,
+                returnDraftsIfExist: true,
                 ...params
             }),
         });
@@ -175,7 +175,7 @@ export const loadRemoteDiagnoses = async ({
 
         const url = '/api/diagnoses?' + queryString.stringify({
             data: JSON.stringify({
-                returnDraftsIfExist: false,
+                returnDraftsIfExist: true,
                 ...params
             }),
         });
@@ -224,7 +224,7 @@ export const loadRemoteProblems = async ({
 
         const url = '/api/problems?' + queryString.stringify({
             data: JSON.stringify({
-                returnDraftsIfExist: false,
+                returnDraftsIfExist: true,
                 ...params
             }),
         });
@@ -273,7 +273,7 @@ export const loadRemoteDrugsLibraryItems = async ({
 
         const url = '/api/problems?' + queryString.stringify({
             data: JSON.stringify({
-                returnDraftsIfExist: false,
+                returnDraftsIfExist: true,
                 ...params
             }),
         });
@@ -315,7 +315,7 @@ export const loadRemoteDataKeys = async ({
 
         const url = '/api/data-keys?' + queryString.stringify({
             data: JSON.stringify({
-                returnDraftsIfExist: false,
+                returnDraftsIfExist: true,
                 ...params
             }),
         });
