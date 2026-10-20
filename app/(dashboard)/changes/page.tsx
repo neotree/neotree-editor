@@ -8,6 +8,7 @@ import { ScriptField } from "@/types";
 import { _getScreens, _getScripts } from "@/databases/queries/scripts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Card } from "./card";
+import { getScriptsWithItems } from "@/app/actions/scripts";
 
 export default async function Changes() {
     const history = await db.query.screensHistory.findMany({
@@ -52,6 +53,8 @@ export default async function Changes() {
         };
     }).filter(s => s.screens.length);
 
+    // const { data } = await getScriptsWithItems({});
+
     return (
         <>
             <div className="font-bold text-xl mx-4">{data.length} scripts</div>
@@ -87,6 +90,8 @@ export default async function Changes() {
 
                                                 <div className="mx-4">
                                                     {fields.map(f => {
+                                                        const items = f.items || [];
+
                                                         return (
                                                             <div key={f.fieldId}>
                                                                 <Link 
@@ -94,7 +99,7 @@ export default async function Changes() {
                                                                     target="_blank" 
                                                                     href={`${screenLink}?field=${f.fieldId}`}
                                                                 >
-                                                                    {s.label} ({f.key}) <ExternalLinkIcon className="size-4" />
+                                                                    {s.label} ({f.key}) - {items.length} option(s) <ExternalLinkIcon className="size-4" />
                                                                 </Link>
                                                             </div>
                                                         );
