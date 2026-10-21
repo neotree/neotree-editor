@@ -470,6 +470,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../app/(dashboard)/settings/sync/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/settings/sync">> = Specific
+  const handler = {} as typeof import("../../app/(dashboard)/settings/sync/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../app/(dashboard)/settings/sys/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/settings/sys">> = Specific
@@ -861,6 +870,42 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/config-keys/save">> = Specific
   const handler = {} as typeof import("../../app/api/config-keys/save/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/content-sync/hotfix/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/content-sync/hotfix">> = Specific
+  const handler = {} as typeof import("../../app/api/content-sync/hotfix/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/content-sync/import-base/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/content-sync/import-base">> = Specific
+  const handler = {} as typeof import("../../app/api/content-sync/import-base/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/content-sync/state/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/content-sync/state">> = Specific
+  const handler = {} as typeof import("../../app/api/content-sync/state/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/content-sync/status/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/content-sync/status">> = Specific
+  const handler = {} as typeof import("../../app/api/content-sync/status/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check
