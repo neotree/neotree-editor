@@ -9,11 +9,12 @@ import { useAppContext } from "@/contexts/app";
 const TTL_MS = 30 * 1000;
 const cache = new Map<string, { at: number; promise: Promise<ContentSyncEntityDiffResult> }>();
 
-function load(scriptId: string) {
-    const hit = cache.get(scriptId);
+function load(scriptId: string, settingsKey: string) {
+    const key = `${settingsKey}|${scriptId}`;
+    const hit = cache.get(key);
     if (hit && Date.now() - hit.at < TTL_MS) return hit.promise;
     const promise = getContentSyncEntityDiff({ scriptId }).catch(() => ({ enabled: false, status: null, diff: null } as ContentSyncEntityDiffResult));
-    cache.set(scriptId, { at: Date.now(), promise });
+    cache.set(key, { at: Date.now(), promise });
     return promise;
 }
 
@@ -26,17 +27,19 @@ export function useContentSyncEntityDiff(scriptId?: string | null) {
     const { contentSync } = useAppContext();
     const settings = contentSync?.settings;
     const active = !!scriptId && !!settings && settings.role !== "off" && !!settings.linkedSiteId;
+    const settingsKey = active ? `${settings?.role}|${settings?.linkedSiteId}` : "";
     const [result, setResult] = useState<ContentSyncEntityDiffResult | null>(null);
 
     useEffect(() => {
-        if (!active || !scriptId) { setResult(null); return; }
+        setResult(null);
+        if (!settingsKey || !scriptId) return;
         let cancelled = false;
-        load(scriptId).then(r => { if (!cancelled) setResult(r); });
+        load(scriptId, settingsKey).then(r => { if (!cancelled) setResult(r); });
         return () => { cancelled = true; };
-    }, [active, scriptId]);
+    }, [settingsKey, scriptId]);
 
     return useMemo(() => {
-        const diff = result?.diff || null;
+        const diff = active ? (result?.diff || null) : null;
         const ids = (d?: { changed: string[]; onlyHere: string[] }) => new Set([...(d?.changed || []), ...(d?.onlyHere || [])]);
         return {
             active,

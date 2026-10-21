@@ -62,6 +62,17 @@ export function AppContextProvider({
                         name: 'mode_changed',
                         onEvent: { callback: ctx.onModeChange, },
                     },
+                    // content sync settings and hotfixes come from the root layout: reload it everywhere
+                    {
+                        name: 'data_changed',
+                        action: 'content_sync_settings',
+                        onEvent: { refreshRouter: true, },
+                    },
+                    {
+                        name: 'data_changed',
+                        action: 'content_sync_hotfix',
+                        onEvent: { refreshRouter: true, },
+                    },
                     // {
                     //     name: 'update_system',
                     //     onEvent: { refreshRouter: true, },

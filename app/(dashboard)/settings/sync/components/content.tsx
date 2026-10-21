@@ -56,8 +56,9 @@ export function Content({ initialSettings, sites, canManage, appUrl }: Props) {
             if (!res.success || !res.settings) throw new Error(res.errors?.join(", ") || "Failed to save");
             setSettings(res.settings);
             setSaved(res.settings);
-            alert({ variant: "success", title: "Saved", message: "Content sync settings were saved.", onClose: () => router.refresh() });
-            sync.refresh();
+            // the settings reach every page through the root layout: reload it now
+            router.refresh();
+            alert({ variant: "success", title: "Saved", message: "Content sync settings were saved." });
         } catch (e: any) {
             alert({ variant: "error", title: "Error", message: e.message });
         } finally {
