@@ -175,7 +175,7 @@ export async function scrapDataKeys({
         const name = s.key || s.name;
         return {
             id: s.problemId,
-            type: 'option', // 'problem',
+            type: 'problem',
             key: {
                 label: s.name,
                 name,
