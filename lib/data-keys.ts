@@ -157,13 +157,13 @@ export async function scrapDataKeys({
             key: {
                 label: s.name,
                 name,
-                dataType: 'diagnosis',
+                dataType: 'option', // 'diagnosis',
                 children: (s.symptoms || []).map(f => {
                     const name = f.key || f.name;
                     return {
                         label: f.name,
                         name,
-                        dataType: `diagnosis_symptom_${f.type}`,
+                        dataType: 'option', // `diagnosis_symptom_${f.type}`,
                         children: [],
                     };
                 }),
@@ -175,11 +175,11 @@ export async function scrapDataKeys({
         const name = s.key || s.name;
         return {
             id: s.problemId,
-            type: 'problem',
+            type: 'option', // 'problem',
             key: {
                 label: s.name,
                 name,
-                dataType: 'problem',
+                dataType: 'option', // 'problem',
                 children: [],
             },
         };
@@ -224,7 +224,7 @@ export async function scrapDataKeys({
 
                         let _dataType = 'option';
 
-                        if (s.type === 'diagnosis') _dataType = 'diagnosis';
+                        // if (s.type === 'diagnosis') _dataType = 'diagnosis';
 
                         return {
                             label: f.label,
@@ -392,7 +392,7 @@ export async function parseImportedDataKeys({
             const k = {
                 label: s.name,
                 name,
-                dataType: 'diagnosis',
+                dataType: 'option', // 'diagnosis',
             }; 
             const keyId = pickDataKey(parsed, k)?.uniqueKey;
             return {
@@ -403,7 +403,7 @@ export async function parseImportedDataKeys({
                     const k = {
                         label: f.name,
                         name,
-                        dataType: `diagnosis_symptom_${f.type}`,
+                        dataType: 'option', // `diagnosis_symptom_${f.type}`',
                     };
                     const keyId = pickDataKey(parsed, k)?.uniqueKey;
                     return {
@@ -419,7 +419,7 @@ export async function parseImportedDataKeys({
             const k = {
                 label: s.name,
                 name,
-                dataType: 'problem',
+                dataType: 'option' // 'problem',
             }; 
             const keyId = pickDataKey(parsed, k)?.uniqueKey;
             return {
@@ -466,7 +466,7 @@ export async function parseImportedDataKeys({
                 items: (s.items || []).map(f => {
                     const name = f.key || f.id;
                     let dataType = 'option';
-                    if (s.type === 'diagnosis') dataType = 'diagnosis';
+                    // if (s.type === 'diagnosis') dataType = 'diagnosis';
                     const k = {
                         label: f.label,
                         name,
