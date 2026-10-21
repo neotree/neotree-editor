@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorCard } from "@/components/error-card";
+import { Title } from "./title";
 import { CHANGELOG_ACTION_BADGE_CLASSES, CHANGELOG_DEFAULT_ACTION_BADGE_CLASS } from "@/lib/changelog-utils";
 import { cn } from "@/lib/utils";
 import type { ScriptImportChange, ScriptImportEntityCounts, ScriptImportPreview } from "@/lib/script-import-preview";
@@ -56,7 +57,7 @@ function CountsRow({ label, counts }: { label: string; counts: ScriptImportEntit
     if (!chips.length && !counts.unchanged) return null;
     return (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="w-24 shrink-0 font-medium">{label}</span>
+            <span className="w-24 shrink-0 text-muted-foreground">{label}</span>
             {chips}
             {!!counts.unchanged && <span className="text-xs text-muted-foreground">{counts.unchanged} unchanged</span>}
         </div>
@@ -96,25 +97,26 @@ export function ScriptImportPreviewSummary({ preview }: { preview: ScriptImportP
 
     return (
         <div className="flex flex-col gap-y-3">
+            <Title>Summary</Title>
             <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-medium">{preview.sourceScript.title || preview.sourceScript.scriptId}</span>
+                <span>{preview.sourceScript.title || preview.sourceScript.scriptId}</span>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">{preview.targetScript ? (preview.targetScript.title || 'this script') : 'new script on this editor'}</span>
+                <span>{preview.targetScript ? (preview.targetScript.title || 'this script') : 'new script on this editor'}</span>
                 <Chip className={preview.mode === 'merge' ? CHANGELOG_ACTION_BADGE_CLASSES.merge : CHANGELOG_ACTION_BADGE_CLASSES.create}>
                     {preview.mode === 'merge' ? (preview.firstImport ? 'First import (merge)' : 'Merge') : 'New copy'}
                 </Chip>
             </div>
 
             {preview.upToDate ? (
-                <div className="flex items-center gap-x-2 rounded-md border px-3 py-3 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <div className="flex items-center gap-x-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
                     Already up to date with the source. Importing would not change anything.
                 </div>
             ) : (
-                <div className="flex flex-col gap-y-2 rounded-md border px-3 py-3">
+                <div className="flex flex-col gap-y-2">
                     {!!preview.scriptChanges?.length && (
                         <div className="flex flex-wrap items-center gap-2 text-sm">
-                            <span className="w-24 shrink-0 font-medium">Settings</span>
+                            <span className="w-24 shrink-0 text-muted-foreground">Settings</span>
                             <span className="text-muted-foreground">{preview.scriptChanges.join(', ')}</span>
                         </div>
                     )}
@@ -123,13 +125,13 @@ export function ScriptImportPreviewSummary({ preview }: { preview: ScriptImportP
                     <CountsRow label="Problems" counts={preview.problems} />
                     {!!optionChips.length && (
                         <div className="flex flex-wrap items-center gap-2 text-sm">
-                            <span className="w-24 shrink-0 font-medium">Options</span>
+                            <span className="w-24 shrink-0 text-muted-foreground">Options</span>
                             {optionChips}
                         </div>
                     )}
                     {(!!dataKeys.created || !!dataKeys.updated) && (
                         <div className="flex flex-wrap items-center gap-2 text-sm">
-                            <span className="w-24 shrink-0 font-medium">Data keys</span>
+                            <span className="w-24 shrink-0 text-muted-foreground">Data keys</span>
                             {!!dataKeys.created && <Chip className={CHANGELOG_ACTION_BADGE_CLASSES.create}>{dataKeys.created} new</Chip>}
                             {!!dataKeys.updated && <Chip className={CHANGELOG_ACTION_BADGE_CLASSES.update}>{dataKeys.updated} updated</Chip>}
                             <span className="text-xs text-muted-foreground">
@@ -158,7 +160,7 @@ export function ScriptImportPreviewSummary({ preview }: { preview: ScriptImportP
             )}
 
             {preview.mode === 'merge' && preview.firstImport && !preview.upToDate && (
-                <div className="flex gap-x-2 rounded-md border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-800 dark:text-blue-300">
+                <div className="flex gap-x-2 text-xs text-muted-foreground">
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>
                         First import into this script: nothing that only exists here is removed. Later imports also apply what the source removes.
@@ -179,8 +181,8 @@ export function ScriptImportPreviewSummary({ preview }: { preview: ScriptImportP
             )}
 
             {!!dataKeys.details.length && (
-                <details className="rounded-md border px-3 py-2 text-sm">
-                    <summary className="cursor-pointer font-medium">Data key changes ({dataKeys.details.length})</summary>
+                <details className="text-sm">
+                    <summary className="cursor-pointer text-primary">Data key changes ({dataKeys.details.length})</summary>
                     <div className="mt-2 flex flex-col gap-y-1">
                         {dataKeys.details.slice(0, 100).map((k, i) => (
                             <div key={`${k.label}-${i}`} className="flex flex-wrap items-center gap-x-2 text-xs">
@@ -202,7 +204,8 @@ export function ScriptImportPreviewSummary({ preview }: { preview: ScriptImportP
             )}
 
             {!!preview.changes.length && (
-                <div className="flex flex-col gap-y-2 rounded-md border p-3">
+                <div className="flex flex-col gap-y-2">
+                    <Title>Changes</Title>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
                             <TabsList className="h-8">

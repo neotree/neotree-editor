@@ -23,78 +23,45 @@ import socket  from '@/lib/socket';
 import type { ScriptImportPreview } from "@/lib/script-import-preview";
 import { ScriptImportPreviewSummary } from "./script-import-preview";
 import { ImportSourcePicker } from "./import-source-picker";
+import { Title } from "./title";
 
 type Step = 'source' | 'review' | 'running' | 'done' | 'error';
 type CopyResult = Awaited<ReturnType<ReturnType<typeof useScriptsContext>['copyScripts']>>;
 
 const newRequestKey = () => Math.random().toString(12).substring(2);
 
-const STEPS: { key: 'source' | 'review' | 'import'; label: string; }[] = [
-    { key: 'source', label: 'Source' },
-    { key: 'review', label: 'Review' },
-    { key: 'import', label: 'Import' },
-];
-
-function Stepper({ current, complete }: { current: 'source' | 'review' | 'import'; complete?: boolean; }) {
-    const index = complete ? STEPS.length : STEPS.findIndex(s => s.key === current);
-    return (
-        <ol className="flex items-center gap-x-2 text-xs">
-            {STEPS.map((s, i) => (
-                <li key={s.key} className="flex items-center gap-x-2">
-                    <span className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded-full border text-[10px]",
-                        i < index && "border-primary bg-primary text-primary-foreground",
-                        i === index && "border-primary text-primary",
-                        i > index && "text-muted-foreground",
-                    )}>
-                        {i < index ? <CheckIcon className="h-3 w-3" /> : i + 1}
-                    </span>
-                    <span className={cn(i === index ? "font-medium" : "text-muted-foreground")}>{s.label}</span>
-                    {i < STEPS.length - 1 && <span className="mx-1 h-px w-6 bg-border" />}
-                </li>
-            ))}
-        </ol>
-    );
-}
+const STEP_TEXT: Record<'source' | 'review' | 'import' | 'done', string> = {
+    source: 'Step 1 of 3 \u00b7 Choose what to import',
+    review: 'Step 2 of 3 \u00b7 Review the changes',
+    import: 'Step 3 of 3 \u00b7 Import',
+    done: 'Finished',
+};
 
 function ChoiceGroup<T extends string>({
     id,
-    label,
     value,
     onChange,
     disabled,
     options,
 }: {
     id: string;
-    label: string;
     value: T;
     onChange: (value: T) => void;
     disabled?: boolean;
     options: { value: T; title: string; description: string; }[];
 }) {
     return (
-        <div className="flex flex-col gap-y-2">
-            <Label>{label}</Label>
-            <RadioGroup value={value} onValueChange={(v) => onChange(v as T)} disabled={disabled} className="gap-2">
-                {options.map(o => (
-                    <label
-                        key={o.value}
-                        htmlFor={`${id}-${o.value}`}
-                        className={cn(
-                            "flex cursor-pointer items-start gap-x-3 rounded-md border px-3 py-2",
-                            value === o.value ? "border-primary bg-primary/5" : "hover:bg-muted/50",
-                            disabled && "cursor-not-allowed opacity-60",
-                        )}
-                    >
-                        <RadioGroupItem id={`${id}-${o.value}`} value={o.value} className="mt-0.5" />
-                        <div>
-                            <div className="text-sm font-medium">{o.title}</div>
-                            <div className="text-xs text-muted-foreground">{o.description}</div>
-                        </div>
-                    </label>
-                ))}
-            </RadioGroup>
-        </div>
+        <RadioGroup value={value} onValueChange={(v) => onChange(v as T)} disabled={disabled} className="flex flex-col gap-y-3">
+            {options.map(o => (
+                <div key={o.value} className="flex items-start space-x-2">
+                    <RadioGroupItem id={`${id}-${o.value}`} value={o.value} className="mt-0.5" />
+                    <div>
+                        <Label secondary htmlFor={`${id}-${o.value}`}>{o.title}</Label>
+                        <p className="text-xs text-muted-foreground">{o.description}</p>
+                    </div>
+                </div>
+            ))}
+        </RadioGroup>
     );
 }
 
@@ -382,12 +349,8 @@ export function ScriptsImportModal({
             <Modal
                 open={open}
                 onOpenChange={(next) => { if (!next) close(); }}
-                title={(
-                    <div className="flex flex-col gap-y-3">
-                        <span>{isOverwriteImport ? `Import into ${targetTitle ? `“${targetTitle}”` : 'this script'}` : 'Import scripts'}</span>
-                        <Stepper current={progressStep} complete={step === 'done'} />
-                    </div>
-                )}
+                title={isOverwriteImport ? `Import into ${targetTitle ? `“${targetTitle}”` : 'this script'}` : 'Import scripts'}
+                description={STEP_TEXT[step === 'done' ? 'done' : progressStep]}
                 contentProps={{
                     className: 'sm:max-w-3xl',
                     // a running import can't be dismissed by clicking outside or Esc
@@ -461,6 +424,7 @@ export function ScriptsImportModal({
                     {step === 'source' && (
                         <>
                             {!!error && <ErrorCard><div className="p-2 text-sm">{error}</div></ErrorCard>}
+                            <Title>Source</Title>
                             <ImportSourcePicker
                                 sites={sites}
                                 siteId={siteId}
@@ -475,15 +439,15 @@ export function ScriptsImportModal({
                             />
 
                             {isOverwriteImport && (
-                                <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                                <p className="text-xs text-muted-foreground">
                                     The source is <b>merged</b> into this script: its changes are applied, screens and options that only exist here are kept.
                                     Nothing is saved until you have reviewed the changes, and then only as drafts.
-                                </div>
+                                </p>
                             )}
 
+                            <Title>Data keys</Title>
                             <ChoiceGroup
                                 id="import-data-keys"
-                                label="Data keys"
                                 value={dataKeysMode}
                                 onChange={setDataKeysMode}
                                 disabled={disabled}
@@ -493,9 +457,9 @@ export function ScriptsImportModal({
                                 ]}
                             />
 
+                            <Title>Drugs, feeds &amp; fluids</Title>
                             <ChoiceGroup
                                 id="import-drugs"
-                                label="Drugs, feeds & fluids"
                                 value={drugsMode}
                                 onChange={setDrugsMode}
                                 disabled={disabled}
@@ -526,7 +490,7 @@ export function ScriptsImportModal({
                             ))}
 
                             {needsKeepChoice && (
-                                <div className="flex gap-x-2 rounded-md border px-3 py-2">
+                                <div className="flex gap-x-2">
                                     <Checkbox id="keepTargetOnly" checked={keepTargetOnly} onCheckedChange={() => setKeepTargetOnly(!keepTargetOnly)} />
                                     <Label secondary htmlFor="keepTargetOnly">Keep screens, diagnoses and problems that are not in the source script</Label>
                                 </div>
@@ -534,7 +498,7 @@ export function ScriptsImportModal({
 
 
                             {isOverwriteImport && !allUpToDate && (
-                                <div className="flex gap-x-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+                                <div className="flex gap-x-2">
                                     <Checkbox id="confirmed" checked={confirmed} onCheckedChange={() => setConfirmed(!confirmed)} />
                                     <Label secondary htmlFor="confirmed">I have reviewed these changes and want to import them into this script as drafts</Label>
                                 </div>
@@ -568,10 +532,10 @@ export function ScriptsImportModal({
 
                     {step === 'done' && !!result && (
                         <div className="flex flex-col gap-y-4">
-                            <div className="flex items-start gap-x-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-3">
-                                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                            <div className="flex items-start gap-x-3">
+                                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                                 <div className="text-sm">
-                                    <div className="font-medium">{doneUpToDate ? 'Already up to date: nothing was changed' : 'Imported as drafts'}</div>
+                                    <div>{doneUpToDate ? 'Already up to date: nothing was changed' : 'Imported as drafts'}</div>
                                     {!doneUpToDate && (
                                         <div className="mt-1 text-muted-foreground">
                                             {[
@@ -799,7 +763,7 @@ function ImportProgress({
                         const done = events[s.key] === false;
                         const Icon = active ? EllipsisIcon : done ? CheckIcon : XIcon;
                         return (
-                            <div key={s.key} className={cn("flex items-center gap-x-2 text-xs", active ? "font-medium" : done ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground opacity-60")}>
+                            <div key={s.key} className={cn("flex items-center gap-x-2 text-xs", active ? "opacity-100" : done ? "text-green-400" : "opacity-50")}>
                                 <Icon className={cn("size-3", !active && !done && "opacity-0")} />
                                 <span>{s.label}</span>
                             </div>

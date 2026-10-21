@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { format } from "date-fns";
-import { RefreshCw, Search } from "lucide-react";
 
 import {
     Select,
@@ -16,13 +15,12 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorCard } from "@/components/error-card";
+import { DataTable } from "@/components/data-table";
+import { CHANGELOG_ACTION_BADGE_CLASSES } from "@/lib/changelog-utils";
 import { cn } from "@/lib/utils";
 import type { ImportSourcesResult, ImportSourceScript } from "@/app/actions/scripts";
 
@@ -114,61 +112,79 @@ export function ImportSourcePicker({
         onChange(value.includes(scriptId) ? value.filter(id => id !== scriptId) : [...value, scriptId]);
     };
 
-    const row = (s: ImportSourceScript) => {
-        const selected = value.includes(s.scriptId);
-        const isLastSource = lastImport?.sourceScriptId === s.scriptId;
-        return (
-            <label
-                key={s.scriptId}
-                htmlFor={`import-source-${s.scriptId}`}
-                className={cn(
-                    "flex items-start gap-x-3 rounded-md border px-3 py-2 cursor-pointer transition-colors",
-                    selected ? "border-primary bg-primary/5" : "hover:bg-muted/50",
-                    disabled && "cursor-not-allowed opacity-60",
-                )}
-            >
-                {multiple ? (
-                    <Checkbox id={`import-source-${s.scriptId}`} checked={selected} disabled={disabled} onCheckedChange={() => toggle(s.scriptId)} className="mt-0.5" />
-                ) : (
-                    <RadioGroupItem id={`import-source-${s.scriptId}`} value={s.scriptId} disabled={disabled} className="mt-0.5" />
-                )}
-                <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium">{s.title || '(untitled)'}</span>
-                        {!!s.type && <Badge variant="outline" className="text-[10px] capitalize">{s.type.replace(/_/g, ' ')}</Badge>}
-                        {isLastSource && <Badge variant="outline" className="text-[10px] border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">Imported from last time</Badge>}
-                        {!isLastSource && !!targetScriptId && s.scriptId === targetScriptId && <Badge variant="outline" className="text-[10px]">Same script</Badge>}
-                    </div>
-                    {(!!s.hospitalName || !!s.description) && (
-                        <div className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
-                            {[s.hospitalName, s.description].filter(Boolean).join(' · ')}
-                        </div>
-                    )}
-                    {multiple && !!s.importedInto.length && (
-                        <div className="mt-1 text-xs text-amber-700">
-                            Already imported here as {s.importedInto.map(t => `“${t.title || t.scriptId}”`).join(', ')}. To update it, open that script and import into it instead of making another copy.
-                        </div>
-                    )}
-                </div>
-            </label>
-        );
+    const noteFor = (s: ImportSourceScript) => {
+        if (lastImport?.sourceScriptId === s.scriptId) return <Badge variant="outline" className={CHANGELOG_ACTION_BADGE_CLASSES.create}>Last source</Badge>;
+        if (!!targetScriptId && s.scriptId === targetScriptId) return <Badge variant="outline">Same script</Badge>;
+        if (multiple && s.importedInto.length) return <span className="text-xs text-amber-700">Already imported as {s.importedInto.map(t => `“${t.title || t.scriptId}”`).join(', ')}</span>;
+        return null;
     };
 
-    const list = (
-        <div className="flex flex-col gap-y-2">
-            {filtered.map(row)}
-            {!filtered.length && (
-                <div className="py-6 text-center text-sm text-muted-foreground">
-                    {search ? 'No script matches your search.' : 'This editor has no published scripts.'}
-                </div>
-            )}
-        </div>
+    const table = (
+        <DataTable
+            loading={loading}
+            noDataMessage={search ? 'No script matches your search.' : 'This editor has no published scripts.'}
+            search={{
+                inputPlaceholder: 'Search scripts by title, type or hospital',
+                value: search,
+                setValue: setSearch,
+                filterRows: false,
+            }}
+            selectable={multiple && !disabled}
+            selectedIndexes={multiple ? filtered.map((s, i) => (value.includes(s.scriptId) ? i : -1)).filter(i => i >= 0) : undefined}
+            onSelect={multiple ? (indexes) => {
+                const visible = new Set(filtered.map(s => s.scriptId));
+                // keep selections hidden by the search, replace the visible ones
+                onChange([...value.filter(id => !visible.has(id)), ...indexes.map(i => filtered[i]?.scriptId).filter(Boolean)]);
+            } : undefined}
+            getRowOptions={({ rowIndex }) => ({
+                className: cn('cursor-pointer', !multiple && value[0] === filtered[rowIndex]?.scriptId && 'bg-muted/50'),
+                onClick: (e) => {
+                    if ((e.target as HTMLElement).closest('button, [role="checkbox"]')) return;
+                    if (!disabled && filtered[rowIndex]) toggle(filtered[rowIndex].scriptId);
+                },
+            })}
+            columns={[
+                ...(!multiple ? [{
+                    name: '',
+                    thClassName: 'w-10',
+                    cellRenderer: ({ rowIndex }: { rowIndex: number; }) => (
+                        <RadioGroupItem
+                            id={`import-source-${filtered[rowIndex]?.scriptId}`}
+                            value={filtered[rowIndex]?.scriptId || ''}
+                            disabled={disabled}
+                        />
+                    ),
+                }] : []),
+                {
+                    name: 'Title',
+                    cellRenderer: ({ rowIndex }) => {
+                        const s = filtered[rowIndex];
+                        return (
+                            <div>
+                                <div>{s?.title || '(untitled)'}</div>
+                                {!!s?.description && <div className="text-xs text-muted-foreground line-clamp-1">{s.description}</div>}
+                            </div>
+                        );
+                    },
+                },
+                { name: 'Type', cellRenderer: ({ rowIndex }) => <span className="capitalize">{`${filtered[rowIndex]?.type || ''}`.replace(/_/g, ' ')}</span> },
+                { name: 'Hospital' },
+                { name: '', align: 'right', cellRenderer: ({ rowIndex }) => filtered[rowIndex] ? noteFor(filtered[rowIndex]) : null },
+            ]}
+            data={filtered.map(s => [
+                ...(!multiple ? [''] : []),
+                s.title || '',
+                s.type || '',
+                s.hospitalName || '',
+                '',
+            ])}
+        />
     );
 
     return (
-        <div className="flex flex-col gap-y-3">
+        <div className="flex flex-col gap-y-4">
             <div>
-                <Label htmlFor="import-site">Import from *</Label>
+                <Label secondary htmlFor="import-site">Import from *</Label>
                 <Select
                     name="siteId"
                     disabled={disabled}
@@ -176,11 +192,11 @@ export function ImportSourcePicker({
                     onValueChange={(v) => { onSiteChange(v); onChange([]); setSearch(''); }}
                 >
                     <SelectTrigger id="import-site">
-                        <SelectValue placeholder="Choose an editor" />
+                        <SelectValue placeholder="Select site" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectGroup>
-                            <SelectLabel>Editors</SelectLabel>
+                            <SelectLabel>Sites</SelectLabel>
                             {sites.map(s => <SelectItem key={s.siteId} value={s.siteId}>{s.name}</SelectItem>)}
                         </SelectGroup>
                     </SelectContent>
@@ -190,78 +206,61 @@ export function ImportSourcePicker({
             {!!siteId && (
                 <div className="flex flex-col gap-y-2">
                     <div className="flex items-center justify-between gap-x-2">
-                        <Label>{multiple ? 'Scripts to import *' : 'Script to import *'}</Label>
+                        <Label secondary>{multiple ? 'Scripts to import *' : 'Script to import *'}</Label>
                         {multiple && !!value.length && <span className="text-xs text-muted-foreground">{value.length} selected</span>}
                     </div>
 
-                    {!!targetScriptId && !loading && (
-                        <div className="text-xs text-muted-foreground">
+                    {!!targetScriptId && !loading && !result?.errors?.length && (
+                        <p className="text-xs text-muted-foreground">
                             {lastImport ? (
                                 <>
-                                    &ldquo;{targetTitle || 'This script'}&rdquo; was last imported from{' '}
-                                    <span className="font-medium text-foreground">{lastSource?.title || lastImport.sourceScriptId}</span>
+                                    Last imported from <span className="text-foreground">{lastSource?.title || lastImport.sourceScriptId}</span>
                                     {lastImport.importedAt && <> on {format(new Date(lastImport.importedAt), 'PP p')}</>}
                                     {lastImport.pending && ' (not published yet)'}.
                                     {!lastSource && ' That script is not published on this editor any more.'}
                                 </>
                             ) : (
-                                <>This script has not been imported before: the first import keeps everything that only exists here.</>
+                                <>Not imported before: the first import keeps everything that only exists here.</>
                             )}
-                        </div>
+                        </p>
                     )}
 
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search scripts by title, type or hospital"
-                            className="pl-9"
-                            disabled={disabled || loading}
-                        />
-                    </div>
-
-                    {loading ? (
-                        <div className="flex flex-col gap-y-2">
-                            {[0, 1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}
-                        </div>
-                    ) : result?.errors?.length ? (
+                    {result?.errors?.length ? (
                         <ErrorCard>
                             <div className="flex items-center justify-between gap-x-3 p-2 text-sm">
                                 <span>Could not load the scripts: {result.errors.join(', ')}</span>
-                                <Button size="sm" variant="outline" onClick={() => setReloadKey(k => k + 1)}>
-                                    <RefreshCw className="mr-1 h-3 w-3" /> Try again
-                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => setReloadKey(k => k + 1)}>Try again</Button>
                             </div>
                         </ErrorCard>
                     ) : (
-                        <ScrollArea className="h-[260px] rounded-md border p-2">
-                            {multiple ? list : (
+                        <div className="max-h-[320px] overflow-y-auto rounded-md border">
+                            {multiple ? table : (
                                 <RadioGroup value={value[0] || ''} onValueChange={(v) => onChange([v])} disabled={disabled}>
-                                    {list}
+                                    {table}
                                 </RadioGroup>
                             )}
-                        </ScrollArea>
-                    )}
-
-                    {!!unknownSelected.length && !loading && !!scripts.length && (
-                        <div className="text-xs text-amber-700">
-                            Selected by id, not in this editor&apos;s published scripts: {unknownSelected.join(', ')}
                         </div>
                     )}
 
+                    {!!unknownSelected.length && !loading && !!scripts.length && (
+                        <p className="text-xs text-amber-700">
+                            Selected by id, not in this editor&apos;s published scripts: {unknownSelected.join(', ')}
+                        </p>
+                    )}
+
                     <div>
-                        <button
+                        <Button
                             type="button"
-                            className="text-xs text-muted-foreground underline"
+                            variant="link"
+                            className="h-auto p-0 text-xs text-muted-foreground"
                             onClick={() => setShowManual(v => !v)}
                             disabled={disabled}
                         >
-                            {showManual ? 'Hide' : 'Can’t find it? Enter a script id'}
-                        </button>
+                            {showManual ? 'Hide' : 'Can\u2019t find it? Enter a script id'}
+                        </Button>
                         {showManual && (
                             <div className="mt-2 flex gap-x-2">
-                                <Input value={manualId} onChange={(e) => setManualId(e.target.value)} placeholder="Script id" disabled={disabled} />
+                                <Input value={manualId} onChange={(e) => setManualId(e.target.value)} placeholder="Script ID" disabled={disabled} />
                                 <Button
                                     variant="outline"
                                     disabled={disabled || !manualId.trim()}
