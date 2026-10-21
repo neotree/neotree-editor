@@ -4,6 +4,8 @@ import { _saveScreens, _saveDiagnoses, _saveProblems, _saveScripts, } from '../s
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 
+type RefRow = Awaited<ReturnType<typeof _getDataKeysRefs>>['data'][number];
+
 export type UnlinkReplacementDataKey = {
     uniqueKey: string;
     name: string;
@@ -48,11 +50,25 @@ export async function _deleteReferencedDataKeyOptions({
 }): Promise<{
     errors?: string[];
     success: boolean;
+    skipped?: { refType: string; refId: string; title: string; draftOwnerId: string | null }[];
 }> {
+    const skipped: NonNullable<Awaited<ReturnType<typeof _deleteReferencedDataKeyOptions>>['skipped']> = [];
+
     try {
         if (uniqueKeys.length) {
             const refs = await _getDataKeysRefs({ uniqueKeys, client, });
             if (refs.errors?.length) throw new Error(refs.errors[0]);
+
+            const writable = (ref: RefRow, title: string) => {
+                if (!ref.isDraft || ref.draftOwnerId === (userId || null)) return true;
+                skipped.push({
+                    refType: ref.refType,
+                    refId: ref.refId,
+                    title,
+                    draftOwnerId: ref.draftOwnerId ?? null,
+                });
+                return false;
+            };
 
             // Matching is strictly exact on keyId/uniqueKey — names and labels are
             // NOT unique across the library and must never identify a data key.
@@ -95,6 +111,7 @@ export async function _deleteReferencedDataKeyOptions({
                 scriptId: string,
                 items: T[],
                 rebuildItem: (item: T, replacement: UnlinkReplacementDataKey) => T,
+                appliedReplacements: Set<UnlinkReplacementDataKey>,
                 onChange: () => void,
             ): T[] => {
                 const presentKeyIds = new Set(items.map((item) => `${item.keyId || ''}`.trim()).filter(Boolean));
@@ -108,11 +125,7 @@ export async function _deleteReferencedDataKeyOptions({
                         if (!replacement || presentKeyIds.has(replacement.uniqueKey)) return null;
 
                         presentKeyIds.add(replacement.uniqueKey);
-                        if (scriptId) {
-                            const applied = appliedReplacementsByScript.get(scriptId) || new Set();
-                            applied.add(replacement);
-                            appliedReplacementsByScript.set(scriptId, applied);
-                        }
+                        appliedReplacements.add(replacement);
                         return rebuildItem(item, replacement);
                     })
                     .filter((item): item is T => !!item);
@@ -152,6 +165,7 @@ export async function _deleteReferencedDataKeyOptions({
                     const referencesDeletedKey = referencesDeletedKeyIn(screenScriptId);
                     let changed = false;
                     const markChanged = () => { changed = true; };
+                    const appliedReplacements = new Set<UnlinkReplacementDataKey>();
 
                     const items = !isOwnedByScope(screen?.keyId)
                         ? (screen?.items || [])
@@ -167,6 +181,7 @@ export async function _deleteReferencedDataKeyOptions({
                                 keyId: replacement.uniqueKey,
                                 confidential: !!replacement.confidential,
                             }),
+                            appliedReplacements,
                             markChanged,
                         );
 
@@ -203,6 +218,7 @@ export async function _deleteReferencedDataKeyOptions({
                                             label: replacement.label,
                                             keyId: replacement.uniqueKey,
                                         }),
+                                        appliedReplacements,
                                         markChanged,
                                     ),
                             };
@@ -213,7 +229,13 @@ export async function _deleteReferencedDataKeyOptions({
                         { id: 'refIdDataKey' },
                     ], markChanged);
 
-                    return changed ? { ...clearedScreen, items, fields } : null;
+                    if (!changed || !writable(d, screen?.title || screen?.label || d.refId)) return null;
+                    if (screenScriptId && appliedReplacements.size) {
+                        const applied = appliedReplacementsByScript.get(screenScriptId) || new Set();
+                        appliedReplacements.forEach(replacement => applied.add(replacement));
+                        appliedReplacementsByScript.set(screenScriptId, applied);
+                    }
+                    return { ...clearedScreen, items, fields };
                 })
                 .filter((screen): screen is NonNullable<typeof screen> => !!screen);
 
@@ -265,7 +287,8 @@ export async function _deleteReferencedDataKeyOptions({
 
                         const clearedDiagnosis = clearScalarRefs(referencesDeletedKey, diagnosis, [{ id: 'keyId' }], markChanged);
 
-                        return changed ? { ...clearedDiagnosis, symptoms } : null;
+                        if (!changed || !writable(d, diagnosis?.name || d.refId)) return null;
+                        return { ...clearedDiagnosis, symptoms };
                     })
                     .filter((diagnosis): diagnosis is NonNullable<typeof diagnosis> => !!diagnosis);
 
@@ -295,7 +318,8 @@ export async function _deleteReferencedDataKeyOptions({
 
                         const clearedProblem = clearScalarRefs(referencesDeletedKey, problem, [{ id: 'keyId' }], markChanged);
 
-                        return changed ? { ...clearedProblem, symptoms } : null;
+                        if (!changed || !writable(d, problem?.name || d.refId)) return null;
+                        return { ...clearedProblem, symptoms };
                     })
                     .filter((problem): problem is NonNullable<typeof problem> => !!problem);
 
@@ -318,7 +342,10 @@ export async function _deleteReferencedDataKeyOptions({
 
                     const nuidSearchFields = script?.nuidSearchFields || [];
                     const keptFields = nuidSearchFields.filter(f => !referencesDeletedKey(f.keyId));
-                    if (keptFields.length === nuidSearchFields.length) return null;
+                    if (
+                        keptFields.length === nuidSearchFields.length ||
+                        !writable(d, script?.title || d.refId)
+                    ) return null;
 
                     return {
                         scriptId: script.scriptId,
@@ -328,23 +355,26 @@ export async function _deleteReferencedDataKeyOptions({
                 .filter((script): script is NonNullable<typeof script> => !!script);
 
             if (saveScriptsData.length) {
-                await _saveScripts({
+                const res = await _saveScripts({
                     userId: userId || undefined,
                     data: saveScriptsData,
                     draftOrigin: 'data_key_sync',
                     client,
                 });
+                if (res.errors?.length) throw new Error(res.errors[0]);
             }
         }
 
         return {
             success: true,
+            skipped,
         };
     } catch(e: any) {
         logger.error('_deleteReferencedDataKeyOptions ERROR', e.message);
         return {
             success: false,
             errors: [e.message],
+            skipped,
         };
     }
 }

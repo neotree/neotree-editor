@@ -53,12 +53,16 @@ export async function _processPendingDeletion(params?: {
         const { items, } = { ...params };
         const executor = params?.client || db;
 
-        const _configKeys = await executor.query.pendingDeletion.findMany({
-            where: and(
-                items === 'configKeys' ? isNotNull(pendingDeletion.configKeyId) : undefined,
-                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
-            ),
-        });
+        // Each kind only looks at its own rows, and only at the publisher's rows unless everything is
+        // being published. The script query used to have no filter at all unless items === 'scripts',
+        // so "publish my changes" also applied every other user's queued script deletions.
+        const wants = (kind: NonNullable<typeof items>) => !items || items === kind;
+        const byUser = !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId);
+        const rowsFor = (kind: NonNullable<typeof items>, where: ReturnType<typeof and>) => !wants(kind)
+            ? Promise.resolve([] as (typeof pendingDeletion.$inferSelect)[])
+            : executor.query.pendingDeletion.findMany({ where: and(where, byUser) });
+
+        const _configKeys = await rowsFor('configKeys', isNotNull(pendingDeletion.configKeyId));
 
         if (_configKeys.length) {
             await executor.update(configKeys)
@@ -66,19 +70,9 @@ export async function _processPendingDeletion(params?: {
                 .where(inArray(configKeys.configKeyId, _configKeys.map(c => c.configKeyId!)));
         }
 
-        const _drugsLibraryItems = await executor.query.pendingDeletion.findMany({
-            where: and(
-                items === 'drugsLibrary' ? isNotNull(pendingDeletion.drugsLibraryItemId) : undefined,
-                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
-            ),
-        });
+        const _drugsLibraryItems = await rowsFor('drugsLibrary', isNotNull(pendingDeletion.drugsLibraryItemId));
 
-        const _dataKeys = await executor.query.pendingDeletion.findMany({
-            where: and(
-                items === 'dataKeys' ? isNotNull(pendingDeletion.dataKeyId) : undefined,
-                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
-            ),
-        });
+        const _dataKeys = await rowsFor('dataKeys', isNotNull(pendingDeletion.dataKeyId));
 
         if (_dataKeys.length) {
             await executor.update(dataKeys)
@@ -98,14 +92,11 @@ export async function _processPendingDeletion(params?: {
                 .where(inArray(drugsLibrary.itemId, _drugsLibraryItems.map(c => c.drugsLibraryItemId!)));
         }
 
-        const _scripts = await executor.query.pendingDeletion.findMany({
-            where: items === 'scripts' ? and(
-                isNotNull(pendingDeletion.scriptId),
-                isNull(pendingDeletion.screenId),
-                isNull(pendingDeletion.diagnosisId),
-                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
-            ) : undefined,
-        });
+        const _scripts = await rowsFor('scripts', and(
+            isNotNull(pendingDeletion.scriptId),
+            isNull(pendingDeletion.screenId),
+            isNull(pendingDeletion.diagnosisId),
+        ));
 
         if (_scripts.length) {
             await executor.update(scripts)
@@ -125,12 +116,7 @@ export async function _processPendingDeletion(params?: {
                 .where(inArray(problems.scriptId, _scripts.map(c => c.scriptId!)));
         }
 
-        const _screens = await executor.query.pendingDeletion.findMany({
-            where: and(
-                items === 'screens' ? isNotNull(pendingDeletion.screenId) : undefined,
-                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
-            ),
-        });
+        const _screens = await rowsFor('screens', isNotNull(pendingDeletion.screenId));
 
         if (_screens.length) {
             await executor.update(screens)
@@ -138,12 +124,7 @@ export async function _processPendingDeletion(params?: {
                 .where(inArray(screens.screenId, _screens.map(c => c.screenId!)));
         }
 
-        const _diagnoses = await executor.query.pendingDeletion.findMany({
-            where: and(
-                items === 'diagnoses' ? isNotNull(pendingDeletion.diagnosisId) : undefined,
-                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
-            ),
-        });
+        const _diagnoses = await rowsFor('diagnoses', isNotNull(pendingDeletion.diagnosisId));
 
         if (_diagnoses.length) {
             await executor.update(diagnoses)
@@ -151,12 +132,7 @@ export async function _processPendingDeletion(params?: {
                 .where(inArray(diagnoses.diagnosisId, _diagnoses.map(c => c.diagnosisId!)));
         }
 
-        const _problems = await executor.query.pendingDeletion.findMany({
-            where: and(
-                items === 'problems' ? isNotNull(pendingDeletion.problemId) : undefined,
-                !params?.userId ? undefined : eq(pendingDeletion.createdByUserId, params.userId),
-            ),
-        });
+        const _problems = await rowsFor('problems', isNotNull(pendingDeletion.problemId));
 
         if (_problems.length) {
             await executor.update(problems)

@@ -74,7 +74,7 @@ export async function getDevice(deviceId: string, opts?: { req?: NextRequest }) 
             revealSecret = deviceIdMatches && signature.ok;
         }
 
-        const lastUpdates = await _getDatesWhenUpdatesWereMade();
+        const lastUpdates = await _getDatesWhenUpdatesWereMade({ publishedOnly: true, });
 
         const dates = Object.values(lastUpdates.data).filter(d => d).map(d => new Date(d!).getTime());
 

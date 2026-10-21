@@ -43,7 +43,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { useIsLocked } from '@/hooks/use-is-locked';
 import { isNuidManagedDataKey } from '@/lib/nuid-search';
-import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { cn } from "@/lib/utils";
 import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
 import type { UpdateDataKeysRefsResponse } from "@/databases/mutations/data-keys/_update_data_keys_refs";
@@ -89,7 +89,7 @@ function Form({
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, getLatestDataKeys } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
     const { alert } = useAlertModal();
-    const { viewOnly } = useAppContext();
+    const viewOnly = useContentViewOnly("dataKeys", null);
 
     const dataKey = useMemo(() => dataKeys.find(k => (
         (k.uuid === dataKeyId) ||
@@ -279,10 +279,17 @@ function Form({
 
         const uuid = (data as any)?.uuid || dataKey?.uuid || uuidv4();
         const uniqueKey = (data as any)?.uniqueKey ?? dataKey?.uniqueKey ?? null;
+        // Reconcile removals from the snapshot this form opened with. This also
+        // prevents a remove-then-readd sequence from being sent as an unlink.
+        const finalOptions = data.options || [];
+        const baseOptions = currentDataKey?.options || [];
+        const removedOptions = baseOptions.filter(option => !finalOptions.includes(option));
         const payload = {
             ...data,
             uuid,
             uniqueKey,
+            deletedUniqueKeys: removedOptions,
+            ...(currentDataKey ? { baseOptions } : {}),
             version: typeof data.version === "string" ? Number(data.version) : data.version,
         } as DataKeyFormData & {
             uuid: string;
@@ -294,7 +301,7 @@ function Form({
             setValue("uniqueKey" as any, uniqueKey);
         }
 
-        if ((getValues('deletedUniqueKeys') || []).length) {
+        if (removedOptions.length) {
             await reviewUnlinks(payload as unknown as DataKeyFormData);
             return;
         }
@@ -333,8 +340,16 @@ function Form({
 
     const isFormDisabled = isReadOnly || saving;
 
+    // Keep one row per stored option, even if its data key is missing, so row
+    // actions always operate on the option the user can see.
     const children = useMemo(() => {
-        return options.map(o => dataKeys.find(k => k.uniqueKey === o)!).filter(k => k);
+        return (options || []).map(option => dataKeys.find(key => key.uniqueKey === option) || {
+            uniqueKey: option,
+            name: '(missing data key)',
+            label: option,
+            dataType: '',
+            missing: true,
+        } as unknown as (typeof dataKeys)[0] & { missing?: boolean });
     }, [dataKeys, options]);
 
     // Parents that link this key as a child option — shown so users understand
@@ -972,23 +987,25 @@ function Form({
                                                                     </DropdownMenuTrigger>
 
                                                                     <DropdownMenuContent>
-                                                                        <DropdownMenuItem asChild>
-                                                                            <Link
-                                                                                href={`/data-keys/edit/${child.uuid}`}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
-                                                                            >
-                                                                                {isReadOnly ? (
-                                                                                    <>
-                                                                                        <EyeIcon className="h-4 w-4 mr-2" /> View
-                                                                                    </>
-                                                                                ) : (
-                                                                                    <>
-                                                                                        <EditIcon className="h-4 w-4 mr-2" /> Edit
-                                                                                    </>
-                                                                                )}
-                                                                            </Link>
-                                                                        </DropdownMenuItem>
+                                                                        {!!child.uuid && (
+                                                                            <DropdownMenuItem asChild>
+                                                                                <Link
+                                                                                    href={`/data-keys/edit/${child.uuid}`}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                >
+                                                                                    {isReadOnly ? (
+                                                                                        <>
+                                                                                            <EyeIcon className="h-4 w-4 mr-2" /> View
+                                                                                        </>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <EditIcon className="h-4 w-4 mr-2" /> Edit
+                                                                                        </>
+                                                                                    )}
+                                                                                </Link>
+                                                                            </DropdownMenuItem>
+                                                                        )}
 
                                                                         {!optionsLocked && (
                                                                             <DropdownMenuItem

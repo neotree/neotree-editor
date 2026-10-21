@@ -373,6 +373,11 @@ export async function _deleteDataKeys(
                             client: tx,
                         });
                         if (res.errors?.length) throw new Error(res.errors[0]);
+                        if (res.skipped?.length) {
+                            throw new Error(
+                                `Not saved: ${res.skipped.length === 1 ? 'a referenced draft is' : `${res.skipped.length} referenced drafts are`} still being edited by another user.`,
+                            );
+                        }
                     },
                     record: () => ({
                         kind: 'scripts',
@@ -420,16 +425,49 @@ export async function _deleteDataKeys(
                         client: tx,
                     });
 
-                    const deletedUniqueKeys = uniqueValues(targets.map((dataKey) => dataKey.uniqueKey || ''));
-                    if (deletedUniqueKeys.length) {
-                        const deleteReferencedOptionsRes = await _deleteReferencedDataKeyOptions({
-                            userId: userId || undefined,
-                            uniqueKeys: deletedUniqueKeys,
-                            client: tx,
-                        });
+                    // Replacements have already rewritten their reachable references. Only strip
+                    // a replaced key in scripts where the user explicitly chose removal; otherwise
+                    // a missed rewrite must fail visibly instead of silently becoming a deletion.
+                    const replacedTargetIds = new Set(
+                        Object.entries(replacements)
+                            .filter(([, replacementId]) => !!`${replacementId || ''}`.trim())
+                            .map(([targetId]) => targetId),
+                    );
+                    const unreplacedUniqueKeys = uniqueValues(
+                        targets
+                            .filter(target => !replacedTargetIds.has(target.uuid))
+                            .map(target => target.uniqueKey || ''),
+                    );
+                    const replacementRemovalScripts = resolveScriptRemovalExclusions({
+                        impact,
+                        replacements,
+                        scriptRemovals,
+                    });
 
-                        if (deleteReferencedOptionsRes.errors?.length) {
-                            throw new Error(deleteReferencedOptionsRes.errors[0]);
+                    const cleanupResults = [];
+                    if (unreplacedUniqueKeys.length) {
+                        cleanupResults.push(await _deleteReferencedDataKeyOptions({
+                            userId: userId || undefined,
+                            uniqueKeys: unreplacedUniqueKeys,
+                            client: tx,
+                        }));
+                    }
+                    const replacementKeysToStrip = Object.keys(replacementRemovalScripts);
+                    if (replacementKeysToStrip.length) {
+                        cleanupResults.push(await _deleteReferencedDataKeyOptions({
+                            userId: userId || undefined,
+                            uniqueKeys: replacementKeysToStrip,
+                            scriptIdsByUniqueKey: replacementRemovalScripts,
+                            client: tx,
+                        }));
+                    }
+
+                    for (const cleanup of cleanupResults) {
+                        if (cleanup.errors?.length) throw new Error(cleanup.errors[0]);
+                        if (cleanup.skipped?.length) {
+                            throw new Error(
+                                `Not saved: ${cleanup.skipped.length === 1 ? 'a referenced draft is' : `${cleanup.skipped.length} referenced drafts are`} still being edited by another user.`,
+                            );
                         }
                     }
 

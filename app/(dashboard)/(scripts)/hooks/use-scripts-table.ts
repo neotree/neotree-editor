@@ -9,6 +9,7 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useScriptsContext, type IScriptsContext } from "@/contexts/scripts"
 import { useAppContext } from "@/contexts/app"
+import { useContentViewOnly } from "@/hooks/use-content-lock"
 import type { ScriptsSearchResultsItem, ScriptsSearchResultsFilter } from "@/lib/scripts-search"
 
 export type UseScriptsTableParams = {
@@ -37,7 +38,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
   }, [scriptsParam])
 
   const router = useRouter()
-  const { viewOnly } = useAppContext()
+  const viewOnly = useContentViewOnly("scripts", null)
   const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 

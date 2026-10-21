@@ -402,10 +402,15 @@ export function DataKeysCtxProvider({
                 await loadDataKeys();
                 router.refresh();
                 const conditionsRewritten = ("info" in res ? res.info?.conditionsRewritten : 0) || 0;
+                const warnings = (res as { warnings?: string[] }).warnings || [];
+                const notices = [
+                    conditionsRewritten
+                        ? `${conditionsRewritten} condition${conditionsRewritten === 1 ? ' was' : 's were'} updated to the new name in the scripts using it.`
+                        : '',
+                    ...warnings,
+                ].filter(Boolean);
                 alert({
-                    message: conditionsRewritten
-                        ? `Data key saved! ${conditionsRewritten} condition${conditionsRewritten === 1 ? ' was' : 's were'} updated to the new name in the scripts using it.`
-                        : "Data key saved!",
+                    message: notices.length ? `Data key saved. ${notices.join(' ')}` : "Data key saved!",
                     variant: 'success',
                     onClose: () => cb?.(),
                 });

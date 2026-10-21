@@ -7,7 +7,7 @@ import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getDataKeys, _getDataKeysRefs } from '@/databases/queries/data-keys';
-import { normalizeIncomingDataKeyPatch } from '@/lib/data-key-save';
+import { normalizeIncomingDataKeyPatch, rebaseDataKeyOptions } from '@/lib/data-key-save';
 import { validateDataKeyOptionsAddition } from '@/lib/data-key-children';
 import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
 import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
@@ -22,6 +22,11 @@ import {
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
     deletedUniqueKeys?: string[];
+    /**
+     * The option list the editor started from. If the current draft changed
+     * meanwhile, apply only this edit's additions/removals to that newer list.
+     */
+    baseOptions?: string[];
     /**
      * Unlinked child uniqueKey -> fellow child uniqueKey that replaces it in
      * screens owned by this data key. Replacements must be present in the saved
@@ -50,6 +55,7 @@ export type SaveDataKeysParams = {
 export type SaveDataKeysResponse = {
     success: boolean;
     errors?: string[];
+    warnings?: string[];
     info?: {
         refs?: Pick<Awaited<ReturnType<typeof _updateDataKeysRefs>>, 'info' | 'affected'>;
         /** Conditions rewritten because a key or option was renamed. */
@@ -62,6 +68,10 @@ export type SaveDataKeysResponse = {
 };
 
 const uniqueValues = (values: string[]) => Array.from(new Set(values.map((value) => `${value || ''}`.trim()).filter(Boolean)));
+
+const describeOthersDrafts = (items: { title: string; scriptTitle?: string }[]) =>
+    items.slice(0, 10).map(item => `${item.scriptTitle ? `${item.scriptTitle} > ` : ''}${item.title}`).join('; ') +
+    (items.length > 10 ? '; ...' : '');
 
 async function createNewUniqueKey(executor: DbOrTransaction, uniqueKey?: string): Promise<string> {
     uniqueKey = `${uniqueKey || ''}`.trim();
@@ -136,7 +146,12 @@ async function buildOptionUnlinkPlan({
     deletedUniqueKeys: string[];
     replacements: Record<string, UnlinkReplacementDataKey>;
 }> {
-    const normalizedDeleted = Array.from(new Set(deletedUniqueKeys.map(k => `${k || ''}`.trim()).filter(Boolean)));
+    const savedOptionSet = new Set(savedOptions.map(option => `${option || ''}`.trim()).filter(Boolean));
+    const normalizedDeleted = Array.from(new Set(
+        deletedUniqueKeys
+            .map(key => `${key || ''}`.trim())
+            .filter(key => key && !savedOptionSet.has(key)),
+    ));
     if (!normalizedDeleted.length) return null;
 
     // A brand-new data key has no screens bound to it yet, so there is nothing to unlink.
@@ -212,14 +227,16 @@ export async function _saveDataKeys({
     propagatedDraftOrigin,
     client,
     dryRun,
-}: SaveDataKeysParams) {
+}: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     const response: SaveDataKeysResponse = { success: false, };
+    const refuseOthersDrafts = draftOrigin === 'editor' && !!userId;
 
     try {
         let refsSaved = 0;
 
         const executeSave = async (executor: DbOrTransaction) => {
             const errors: string[] = [];
+            const warnings: string[] = [];
             const propagationMatchUniqueKeysByDataKey: Record<string, string[]> = {};
             // Name changes (old -> new): scripts follow them, so conditions must too.
             const nameRenames: { from: string; to: string }[] = [];
@@ -321,12 +338,21 @@ export async function _saveDataKeys({
                     deletedAt,
                     updatedAt,
                     deletedUniqueKeys = [],
+                    baseOptions,
                     optionReplacements = {},
                     ...item
                 } of data
             ) {
                 try {
                     const normalizedItem = normalizeIncomingDataKeyPatch(item);
+                    const rebaseOptions = (current?: string[] | null) => {
+                        if (!Array.isArray(baseOptions) || !Array.isArray(normalizedItem.options)) return;
+                        normalizedItem.options = rebaseDataKeyOptions({
+                            incoming: normalizedItem.options,
+                            base: baseOptions,
+                            current: current || [],
+                        });
+                    };
 
                     index++;
 
@@ -347,9 +373,13 @@ export async function _saveDataKeys({
 
                         const existingUniqueKey = draft?.data?.uniqueKey || published?.uniqueKey || normalizedItem.uniqueKey || '';
                         const previousOptions = (draft?.data?.options || published?.options || []) as string[];
+                        rebaseOptions(previousOptions);
                         const nextOptions = normalizedItem.options !== undefined
                             ? (normalizedItem.options || [])
                             : previousOptions;
+                        const reconciledDeletedUniqueKeys = deletedUniqueKeys.filter(key =>
+                            previousOptions.includes(key) && !nextOptions.includes(key),
+                        );
 
                         // Newly added options must exist, keep the pool single-typed,
                         // and never create circular references.
@@ -366,7 +396,7 @@ export async function _saveDataKeys({
                         // Validate the unlink plan BEFORE writing the draft so a bad
                         // replacement can never leave a half-applied save behind.
                         const unlinkPlan = await buildOptionUnlinkPlan({
-                            deletedUniqueKeys,
+                            deletedUniqueKeys: reconciledDeletedUniqueKeys,
                             optionReplacements,
                             parentUniqueKey: existingUniqueKey,
                             savedOptions: nextOptions,
@@ -422,7 +452,11 @@ export async function _saveDataKeys({
                                     name: data.name,
                                     uniqueKey: data.uniqueKey,
                                     draftOrigin,
-                                }).where(eq(dataKeysDrafts.uuid, dataKeyUuid));
+                                    // An ownerless draft is claimed by the next authenticated editor.
+                                    ...(!draft.createdByUserId && userId ? { createdByUserId: userId } : {}),
+                                })
+                                // The draft may have matched by uniqueKey under a different uuid.
+                                .where(eq(dataKeysDrafts.uuid, draft.uuid));
                             trackRename(draft.data?.name, data.name);
 
                             if (data.uniqueKey) {
@@ -494,6 +528,19 @@ export async function _saveDataKeys({
                                 client: executor,
                             });
                             if (unlinkRes.errors?.length) throw new Error(unlinkRes.errors.join(', '));
+                            if (unlinkRes.skipped?.length && refuseOthersDrafts) {
+                                throw new Error(
+                                    `Not saved: removing ${reconciledDeletedUniqueKeys.length === 1 ? 'this option' : 'these options'} would change ${unlinkRes.skipped.length === 1 ? 'a question' : `${unlinkRes.skipped.length} questions`} that another user is still editing (unpublished): ` +
+                                    describeOthersDrafts(unlinkRes.skipped) +
+                                    '. Ask them to publish or discard their changes first (an admin can take over drafts that have no owner).',
+                                );
+                            }
+                            if (unlinkRes.skipped?.length) {
+                                warnings.push(
+                                    `${unlinkRes.skipped.length} question${unlinkRes.skipped.length === 1 ? '' : 's'} still list the removed option${reconciledDeletedUniqueKeys.length === 1 ? '' : 's'} because another user has unpublished changes there: ` +
+                                    describeOthersDrafts(unlinkRes.skipped),
+                                );
+                            }
                         }
                     }
                 } catch(e: any) {
@@ -542,6 +589,21 @@ export async function _saveDataKeys({
                     },
                 };
 
+                const othersDrafts = updateRefsRes.othersDrafts || [];
+                if (othersDrafts.length && refuseOthersDrafts) {
+                    throw new Error(
+                        `Not saved: this change would also update ${othersDrafts.length === 1 ? 'a question' : `${othersDrafts.length} questions`} that another user is still editing (unpublished): ` +
+                        describeOthersDrafts(othersDrafts) +
+                        '. Ask them to publish or discard their changes first (an admin can take over drafts that have no owner).',
+                    );
+                }
+                if (othersDrafts.length) {
+                    warnings.push(
+                        `${othersDrafts.length} question${othersDrafts.length === 1 ? ' is' : 's are'} in another user's unpublished draft and ${othersDrafts.length === 1 ? 'was' : 'were'} updated there; ${othersDrafts.length === 1 ? 'it goes' : 'they go'} live when that user publishes: ` +
+                        describeOthersDrafts(othersDrafts),
+                    );
+                }
+
                 // The refs sync renamed field keys and option values in these
                 // scripts; bring their conditions along ($Old, $Parent = 'Old').
                 // Each rename is only applied where the script itself shows it.
@@ -555,6 +617,10 @@ export async function _saveDataKeys({
                     if (conditionsRes.errors?.length) throw new Error(conditionsRes.errors.join(', '));
                     response.info = { ...response.info, conditionsRewritten: conditionsRes.rewritten };
                 }
+            }
+
+            if (warnings.length) {
+                response.warnings = [...(response.warnings || []), ...warnings];
             }
         };
 
@@ -659,7 +725,7 @@ export async function _saveDataKeysIfNotExist({
     try {
         const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
 
-        const saved = await _getDataKeys({ uniqueKeys, });
+        const saved = await _getDataKeys({ uniqueKeys, client: params.client, });
 
         data = data.filter(item => {
             const existing = saved.data.find(dk => dk.uniqueKey === item.uniqueKey);
@@ -700,7 +766,7 @@ export async function _saveDataKeysUpdateIfExist({
     try {
         const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
 
-        const saved = await _getDataKeys({ uniqueKeys, });
+        const saved = await _getDataKeys({ uniqueKeys, client: params.client, });
 
         const res = await _saveDataKeys({
             ...params,

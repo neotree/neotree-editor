@@ -102,6 +102,12 @@ export type UpdateDataKeysRefsResponse = {
         problems: AffectedEntity[];
         usages: AffectedUsage[];
     };
+    /**
+     * Updated entities whose current version is another user's draft. The sync is written into their
+     * draft (so it goes live with their work); the saver is told, because it reaches devices only when
+     * that user publishes.
+     */
+    othersDrafts?: { type: 'screen' | 'diagnosis' | 'problem'; title: string; scriptTitle?: string; ownerId: string | null; }[];
 };
 
 // NUID search fields hang off the script record, so they are synced from the scripts
@@ -523,7 +529,9 @@ export async function _updateDataKeysRefs({
                 });
             }
 
-            let updated = !!screenDataKey || !!refIdDataKey;
+            // Only entities that actually change are saved. Saving every entity that merely references a
+            // changed key created a draft (owned by whoever saved the key) in every script that uses it.
+            let updated = false;
             const screenOptionUniqueKeys = new Set((screenDataKey?.options || []).filter(Boolean));
             const shouldSyncScreenOptions = shouldSyncScreenOwnedOptions({
                 screenType: s.type,
@@ -541,7 +549,6 @@ export async function _updateDataKeysRefs({
                     trackMatchSource(itemMatchSource);
 
                     if (itemDataKey) {
-                        updated = true;
                         addUsage({
                             id: item.itemId || `${s.screenId}:item:${itemIndex}`,
                             kind: 'screen_item',
@@ -643,7 +650,6 @@ export async function _updateDataKeysRefs({
                     trackMatchSource(fieldItemMatchSource);
 
                     if (fieldItemDataKey) {
-                        updated = true;
                         addUsage({
                             id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
                             kind: 'screen_field_item',
@@ -773,7 +779,7 @@ export async function _updateDataKeysRefs({
                 });
             }
 
-            let updated = !!diagnosisDataKey;
+            let updated = false;
 
             const symptoms = (d.symptoms || []).map((item, symptomIndex) => {
                 const { dataKey: symptomDataKey, source: symptomMatchSource } = getUpdatedDataKey({
@@ -783,7 +789,6 @@ export async function _updateDataKeysRefs({
                 trackMatchSource(symptomMatchSource);
 
                 if (symptomDataKey) {
-                    updated = true;
                     addUsage({
                         id: item?.symptomId || `${d.diagnosisId}:symptom:${symptomIndex}`,
                         kind: 'diagnosis_symptom',
@@ -839,17 +844,24 @@ export async function _updateDataKeysRefs({
                 });
             }
 
-            let updated = !!problemDataKey;
-
-            return {
+            const synced = {
                 ...d,
                 key: name,
-                updated,
                 ...(!problemDataKey ? {} : {
                     keyId: problemDataKey.uniqueKey,
                     key: problemDataKey.name,
                     name: problemDataKey.label,
                 }),
+            };
+            const updated = !!problemDataKey && (
+                `${synced.keyId || ''}` !== `${d.keyId || ''}` ||
+                `${synced.key || ''}` !== `${d.key || ''}` ||
+                `${synced.name || ''}` !== `${d.name || ''}`
+            );
+
+            return {
+                ...synced,
+                updated,
             };
         }).filter(d => !!d.updated).map(({ updated, ...d }) => d);
 
@@ -946,9 +958,18 @@ export async function _updateDataKeysRefs({
             usages: Array.from(usagesMap.values()),
         };
 
+        const isOthersDraft = (e: { isDraft?: boolean; draftCreatedByUserId?: string | null; }) =>
+            !!e.isDraft && (e.draftCreatedByUserId || null) !== (userId || null);
+        const othersDrafts: NonNullable<UpdateDataKeysRefsResponse['othersDrafts']> = [
+            ...screensUpdatedData.filter(isOthersDraft).map(s => ({ type: 'screen' as const, title: s.title || s.label || s.screenId, scriptTitle: s.scriptTitle || undefined, ownerId: s.draftCreatedByUserId || null })),
+            ...diagnosesUpdatedData.filter(isOthersDraft).map(d => ({ type: 'diagnosis' as const, title: d.name || d.diagnosisId, scriptTitle: d.scriptTitle || undefined, ownerId: d.draftCreatedByUserId || null })),
+            ...problemsUpdatedData.filter(isOthersDraft).map(p => ({ type: 'problem' as const, title: p.name || p.problemId, scriptTitle: p.scriptTitle || undefined, ownerId: p.draftCreatedByUserId || null })),
+        ];
+
         if (dryRun) {
             return {
                 success: true,
+                othersDrafts,
                 info: stats,
                 preview: {
                     screens: screensUpdatedData,
@@ -1056,7 +1077,7 @@ export async function _updateDataKeysRefs({
         const saved = stats.savedDiagnoses + stats.savedProblems + stats.savedScreens + stats.savedScriptRecords;
         if (broadcastAction && saved) socket.emit('data_changed', 'save_scripts');
 
-        return { success: true, info: stats, affected };
+        return { success: true, info: stats, affected, othersDrafts };
     } catch(e: any) {
         logger.error('_updateDataKeysRefs ERROR', e.message);
         return {

@@ -8,6 +8,7 @@ import { DataTable } from "@/components/data-table";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { ScreensTableBottomActions } from "./table-bottom-actions";
 import { ScreensTableRowActions } from "./table-row-actions";
 import { useScreensTable, UseScreensTableParams } from '../../hooks/use-screens-table';
@@ -39,7 +40,8 @@ export function ScreensTable(props: Props) {
         setSelected,
     } = useScreensTable(props);
 
-    const { sys, viewOnly } = useAppContext();
+    const { sys } = useAppContext();
+    const viewOnly = useContentViewOnly("scripts");
     const { conditionKeys, keysReady } = useConditionKeys();
     const outcomeProducers = useMemo(() => getOutcomeProducers(screens.data), [screens.data]);
     const unavailableByPosition = useMemo(() => {

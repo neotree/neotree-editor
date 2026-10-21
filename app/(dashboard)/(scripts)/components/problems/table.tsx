@@ -7,6 +7,7 @@ import { DataTable } from "@/components/data-table";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { ProblemsTableBottomActions } from "./table-bottom-actions";
 import { ProblemsTableRowActions } from "./table-row-actions";
 import { useProblemsTable, UseProblemsTableParams } from '../../hooks/use-problems-table';
@@ -37,7 +38,8 @@ export function ProblemsTable(props: Props) {
         setSelected,
     } = useProblemsTable(props);
 
-    const { sys, viewOnly } = useAppContext();
+    const { sys } = useAppContext();
+    const viewOnly = useContentViewOnly("scripts");
     const { conditionKeys, keysReady } = useConditionKeys();
     const { conditionScreens, conditionCatalogueReady } = useScriptFormCtx();
     const producer = getOutcomeProducer(conditionScreens, "Problems");

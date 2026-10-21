@@ -32,27 +32,37 @@ import { OverlayInfoCard } from "@/components/overlay-info-card";
 import { BROADCAST_ACTIONS_IN_PROGRESS, IMPORT_JOB_COMPLETE_EVENT } from "@/lib/in-progress";
 import { SocketEventsListener } from "@/components/socket-events-listener";
 import socket  from '@/lib/socket';
+import type { ScriptImportPreview } from "@/lib/script-import-preview";
+import { ScriptImportPreviewSummary } from "./script-import-preview";
 
-const getDefaultFormFields = (overWriteScriptWithId?: string) => ({
-    siteId: '',
-    scriptId: '',
+const getDefaultFormFields = (overWriteScriptWithId?: string, defaults?: { siteId?: string; scriptId?: string }) => ({
+    siteId: defaults?.siteId || '',
+    scriptId: defaults?.scriptId || '',
     confirmed: overWriteScriptWithId ? false : true,
-    overwriteDataKeys: true,
+    // Off by default: the import then only adds what this editor's data keys are missing.
+    overwriteDataKeys: false,
     overwriteDrugsLibraryItems: true,
+    confirmSourceMismatch: false,
+    keepTargetOnly: true,
 });
+
+const newRequestKey = () => Math.random().toString(12).substring(2);
 
 export function ScriptsImportModal({ 
     open, 
     overWriteScriptWithId,
     onOpenChange, 
     onImportSuccess,
+    defaultSourceScriptId,
 }: {
     open: boolean;
     overWriteScriptWithId?: string;
     onOpenChange: (open: boolean) => void;
     onImportSuccess?: () => void;
+    /** Pre-fill the source script (e.g. from the content sync status page). */
+    defaultSourceScriptId?: string;
 }) {
-    const [requestKey, setRequestKey] = useState(Math.random().toString(12).substring(2));
+    const [requestKey, setRequestKey] = useState(newRequestKey());
 
     const router = useRouter();
     const routeParams = useParams();
@@ -64,9 +74,16 @@ export function ScriptsImportModal({
 
     const [loading, setLoading] = useState(false);
     const [importReview, setImportReview] = useState<NonNullable<Awaited<ReturnType<typeof copyScripts>>['integrityImportReview']> | null>(null);
+    // What the import would do, computed by the server without saving (dry run).
+    const [preview, setPreview] = useState<ScriptImportPreview[] | null>(null);
     
-    const { sites: _sites } = useAppContext();
+    const { sites: _sites, contentSync } = useAppContext();
     const sites = _sites.filter(s => s.type === 'webeditor');
+    // Content sync: imports normally come from the linked editor.
+    const formDefaults = useMemo(() => ({
+        siteId: contentSync?.settings?.role !== 'off' ? (contentSync?.settings?.linkedSiteId || '') : '',
+        scriptId: defaultSourceScriptId || '',
+    }), [contentSync, defaultSourceScriptId]);
 
     const isLoading = loading;
     const disabled = isLoading;
@@ -80,34 +97,65 @@ export function ScriptsImportModal({
         register,
         handleSubmit,
     } = useForm({
-        defaultValues: getDefaultFormFields(overWriteScriptWithId),
+        defaultValues: getDefaultFormFields(overWriteScriptWithId, formDefaults),
     });
 
     const confirmed = watch('confirmed');
     const overwriteDataKeys = watch('overwriteDataKeys');
     const overwriteDrugsLibraryItems = watch('overwriteDrugsLibraryItems');
+    const confirmSourceMismatch = watch('confirmSourceMismatch');
+    const keepTargetOnly = watch('keepTargetOnly');
+    const watchedSiteId = watch('siteId');
+    const watchedScriptId = watch('scriptId');
+
+    // Any change to what would be imported invalidates the preview.
+    useEffect(() => {
+        setPreview(null);
+        setValue('confirmed', overWriteScriptWithId ? false : true);
+    }, [watchedSiteId, watchedScriptId, overwriteDataKeys, overwriteDrugsLibraryItems, keepTargetOnly, overWriteScriptWithId, setValue]);
+
+    const sourceMismatch = preview?.find(p => p.requiresConfirmation?.sourceMismatch)?.requiresConfirmation?.sourceMismatch;
+
+    // Defaults can arrive after mount (opened from a link); apply them when the dialog opens.
+    useEffect(() => {
+        if (!open) return;
+        if (formDefaults.scriptId && !watchedScriptId) setValue('scriptId', formDefaults.scriptId);
+        if (formDefaults.siteId && !watchedSiteId) setValue('siteId', formDefaults.siteId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, formDefaults]);
 
     // Handles the final result of an import, whichever way it arrived: an
     // immediate failure from the POST itself (auth/validation), or the
     // background job's result delivered later over the socket channel.
-    const handleImportResult = (res: Awaited<ReturnType<typeof copyScripts>>) => {
+    const handleImportResult = (res: Awaited<ReturnType<typeof copyScripts>>, dryRun?: boolean) => {
+        // Every run gets its own request key, so a later run is never answered with this one's result.
+        setRequestKey(newRequestKey());
         try {
             if (!res.success) throw new Error(res.errors?.join(', ') || 'Failed to import script');
             if (res.errors?.length) throw new Error(res.errors.join(', '));
+
+            if (dryRun) {
+                setPreview(res.preview || []);
+                return;
+            }
 
             router.refresh();
 
             const review = res.integrityImportReview;
             if (review?.totalBlockingIssues) {
-                resetForm(getDefaultFormFields(overWriteScriptWithId));
+                resetForm(getDefaultFormFields(overWriteScriptWithId, formDefaults));
                 onOpenChange(false);
                 setImportReview(review);
                 return;
             }
 
+            const upToDate = !!res.preview?.length && res.preview.every(p => p.upToDate);
+            const baseMessage = upToDate
+                ? 'The script was already up to date. Nothing was changed.'
+                : 'Script imported as drafts. Review and publish when ready.';
             const successMessage = res.warnings?.length
-                ? `Script imported successfully. ${res.warnings.join(' ')}`
-                : 'Script imported successfully!';
+                ? `${baseMessage} ${res.warnings.join(' ')}`
+                : baseMessage;
 
             alert({
                 variant: 'success',
@@ -115,7 +163,8 @@ export function ScriptsImportModal({
                 message: successMessage,
                 onClose: () => {
                     onImportSuccess?.();
-                    resetForm(getDefaultFormFields(overWriteScriptWithId));
+                    resetForm(getDefaultFormFields(overWriteScriptWithId, formDefaults));
+                    setPreview(null);
                     onOpenChange(false);
                 },
             });
@@ -123,7 +172,7 @@ export function ScriptsImportModal({
             alert({
                 variant: 'error',
                 title: 'Error',
-                message: 'Failed to import script: ' + e.message,
+                message: (dryRun ? 'Failed to prepare the import preview: ' : 'Failed to import script: ') + e.message,
             });
         } finally {
             setLoading(false);
@@ -164,7 +213,7 @@ export function ScriptsImportModal({
                 const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof copyScripts>>;
                 if (!res.started && !settled) {
                     stopWaiting();
-                    handleImportResult(res);
+                    handleImportResult(res, requestBody.dryRun);
                 }
             } catch {
                 // Ignore — the next signal or poll will still resolve it.
@@ -181,11 +230,13 @@ export function ScriptsImportModal({
         const pollTimer = setInterval(checkStatus, 45 * 1000);
     };
 
-    const importScripts = handleSubmit(async (data) => {
+    const runImport = (dryRun: boolean) => handleSubmit(async (data) => {
         try {
             if (!data.siteId) throw new Error('Please select a site!');
             if (!data.scriptId) throw new Error('Please provide a script ID!');
-            if (overWriteScriptWithId && !data.confirmed) throw new Error('Please confirm that you want to overwrite this script!');
+            if (!dryRun && !preview) throw new Error('Preview the import first.');
+            if (!dryRun && overWriteScriptWithId && !data.confirmed) throw new Error('Please confirm that you have reviewed the changes!');
+            if (!dryRun && sourceMismatch && !data.confirmSourceMismatch) throw new Error('Please confirm the source script before importing.');
 
             setLoading(true);
 
@@ -197,13 +248,17 @@ export function ScriptsImportModal({
                 scriptsIds: [data.scriptId],
                 overWriteScriptWithId: overWriteScriptWithId,
                 broadcastAction: true,
+                dryRun,
+                confirmSourceMismatch: !!data.confirmSourceMismatch,
+                keepTargetOnly: data.keepTargetOnly,
             };
 
             const response = await axios.post('/api/scripts/copy', requestBody);
             const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof copyScripts>>;
 
             if (!res.started) {
-                handleImportResult(res);
+                setLoading(false);
+                handleImportResult(res, dryRun);
                 return;
             }
 
@@ -326,10 +381,11 @@ export function ScriptsImportModal({
                 open={open}
                 onOpenChange={() => {
                     onOpenChange(false);
-                    resetForm(getDefaultFormFields(overWriteScriptWithId));
-                    setRequestKey(Math.random().toString(12).substring(2));
+                    resetForm(getDefaultFormFields(overWriteScriptWithId, formDefaults));
+                    setPreview(null);
+                    setRequestKey(newRequestKey());
                 }}
-                title={isOverwriteImport ? "Import and overwrite script" : "Import script"}
+                title={isOverwriteImport ? "Import into this script" : "Import script"}
                 actions={(
                     <>
                         <span className="text-xs text-danger">* Required</span>
@@ -347,8 +403,21 @@ export function ScriptsImportModal({
                         </DialogClose>
 
                         <Button
-                            onClick={() => importScripts()}
+                            variant={preview ? "outline" : "default"}
+                            onClick={() => runImport(true)()}
                             disabled={disabled}
+                        >
+                            {preview ? 'Refresh preview' : 'Preview import'}
+                        </Button>
+
+                        <Button
+                            onClick={() => runImport(false)()}
+                            disabled={
+                                disabled ||
+                                !preview ||
+                                (isOverwriteImport && !confirmed) ||
+                                (!!sourceMismatch && !confirmSourceMismatch)
+                            }
                         >
                             Import
                         </Button>
@@ -356,16 +425,30 @@ export function ScriptsImportModal({
                 )}
             >
                 <div className="flex flex-col gap-y-5">
-                    <ErrorCard>
-                        <div className="p-2 text-sm">
-                            New data keys, drugs, feeds & fluids <b>will be appended</b> to the library
+                    <ErrorCard color="warning">
+                        <div className="p-2 text-sm flex flex-col gap-y-1">
+                            {overwriteDataKeys ? (
+                                <span>
+                                    Data keys: the source&apos;s changes to labels and options <b>are applied</b> to this editor&apos;s keys.
+                                    Options that only exist here are kept. Options the source removed since the last import are removed,
+                                    unless other scripts still use them.
+                                </span>
+                            ) : (
+                                <span>
+                                    Data keys: new keys and new options <b>are added</b>. Existing labels and options here are not changed or removed.
+                                </span>
+                            )}
+                            <span>
+                                Drugs, feeds &amp; fluids: {overwriteDrugsLibraryItems ? <>existing items <b>are replaced</b> by the source&apos;s</> : <>only missing items <b>are added</b></>}.
+                            </span>
                         </div>
                     </ErrorCard>
 
                     {isOverwriteImport && (
                         <ErrorCard>
                             <div className="p-2 text-sm">
-                                This import will <b>update this script with the imported version</b>. The import will still follow the <b>Imports</b> integrity policy.
+                                This import <b>merges the source script into this script</b>: the source&apos;s changes are applied, screens and options that only exist here are kept.
+                                Everything is saved as drafts. The import still follows the <b>Imports</b> integrity policy.
                             </div>
                         </ErrorCard>
                     )}
@@ -375,6 +458,7 @@ export function ScriptsImportModal({
                         <Select
                             name="siteId"
                             disabled={disabled}
+                            value={watchedSiteId || undefined}
                             onValueChange={value => setValue('siteId', value, { shouldDirty: true, })}
                         >
                             <SelectTrigger >
@@ -427,7 +511,46 @@ export function ScriptsImportModal({
                         <Label secondary htmlFor="overwriteDrugsLibraryItems">Overwrite drugs, fluids & feeds</Label>
                     </div>
 
-                    <div className={cn("flex gap-x-2", !overWriteScriptWithId && 'hidden')}>
+                    {!!preview?.length && (
+                        <div className="flex flex-col gap-y-4 border-t pt-4">
+                            {preview.map((p) => (
+                                <ScriptImportPreviewSummary key={p.sourceScript.scriptId} preview={p} />
+                            ))}
+                        </div>
+                    )}
+
+                    {isOverwriteImport && !!preview?.some(p => p.firstImport && p.mode === 'merge') && (
+                        <div className={cn("flex gap-x-2")}>
+                            <Checkbox
+                                name="keepTargetOnly"
+                                id="keepTargetOnly"
+                                disabled={disabled}
+                                checked={keepTargetOnly}
+                                onCheckedChange={() => setValue('keepTargetOnly', !keepTargetOnly, { shouldDirty: true, })}
+                            />
+                            <Label secondary htmlFor="keepTargetOnly">Keep screens, diagnoses and problems that are not in the source script</Label>
+                        </div>
+                    )}
+
+                    {!!sourceMismatch && (
+                        <>
+                            <ErrorCard>
+                                <div className="p-2 text-sm">{sourceMismatch}</div>
+                            </ErrorCard>
+                            <div className={cn("flex gap-x-2")}>
+                                <Checkbox
+                                    name="confirmSourceMismatch"
+                                    id="confirmSourceMismatch"
+                                    disabled={disabled}
+                                    checked={confirmSourceMismatch}
+                                    onCheckedChange={() => setValue('confirmSourceMismatch', !confirmSourceMismatch, { shouldDirty: true, })}
+                                />
+                                <Label secondary htmlFor="confirmSourceMismatch">This is the right source script, import it anyway</Label>
+                            </div>
+                        </>
+                    )}
+
+                    <div className={cn("flex gap-x-2", (!overWriteScriptWithId || !preview) && 'hidden')}>
                         <Checkbox 
                             name="confirmed"
                             id="confirmed"
@@ -435,7 +558,7 @@ export function ScriptsImportModal({
                             checked={confirmed}
                             onCheckedChange={() => setValue('confirmed', !confirmed, { shouldDirty: true, })}
                         />
-                        <Label secondary htmlFor="confirmed">Confirm that you want to overwrite the current script with the imported script</Label>
+                        <Label secondary htmlFor="confirmed">I have reviewed the changes above and want to import them into this script</Label>
                     </div>
                 </div>
             </Modal>
