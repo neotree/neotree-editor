@@ -330,15 +330,15 @@ export async function parseImportedDataKeys({
     let parsed = importedDataKeys.map(k => {
         const key = importedUniqueIdNewIdsMap[k.uniqueKey];
         const localDataKey = localDataKeys.find(lk => lk.uniqueKey === k.uniqueKey);
-        const isNew = !localDataKey;
+
         return {
             ...k,
             id: key.id,
             uniqueKey: key.uniqueKey,
             uuid: key.uuid,
             isDifferentFromLocal: false,
-            canSave: isNew,
-            isNew,
+            canSave: false,
+            isNew: !localDataKey,
             options: k.options.filter(o => importedUniqueIdDataKeyMap[o]).map(o => {
                 const key = importedUniqueIdDataKeyMap[o];
                 return importedUniqueIdNewIdsMap[key.uniqueKey].uniqueKey;
