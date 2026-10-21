@@ -10,6 +10,7 @@ import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useScriptsContext, type IScriptsContext } from "@/contexts/scripts"
 import { useAppContext } from "@/contexts/app"
 import type { ScriptsSearchResultsItem, ScriptsSearchResultsFilter } from "@/lib/scripts-search"
+import * as actions from '@/app/actions/scripts';
 
 export type UseScriptsTableParams = {
   scripts: Awaited<ReturnType<IScriptsContext["getScripts"]>>
@@ -128,6 +129,8 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
     [saveScripts, scripts, router],
   )
 
+  const [duplicateRequestKey, setDuplicateRequestKey] = useState(Math.random().toString(12).substring(2));
+
   const onDuplicate = useCallback(
     async (scriptsIds: string[]) => {
       scriptsIds = scriptsIds.filter((s) => s)
@@ -138,23 +141,42 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
           try {
             if (!scriptsIds.length) throw new Error("No scripts selected")
 
-            setLoading(true)
+            setLoading(true);
 
-            // const res = await copyScripts({
-            //     scriptsIds,
-            //     broadcastAction: true,
-            // });
+            let res = null as (Awaited<ReturnType<typeof actions['copyScripts']>> & {
+                started?: boolean;
+            }) | null;
 
-            // TODO: Replace this with server action
-            const response = await axios.post("/api/scripts/copy", {
-              scriptsIds,
-              broadcastAction: true,
-            })
-            const res = response.data as Awaited<ReturnType<typeof copyScripts>>
+            await new Promise<any>(resolve => {
+                (async () => {
+                    const exportFn = async () => {
+                        const response = await axios.post("/api/scripts/copy", {
+                          scriptsIds,
+                          requestKey: duplicateRequestKey,
+                          broadcastAction: true,
+                        });
+                        return response.data;
+                    };
 
-            if (res.errors?.length) throw new Error(res.errors.join(", "))
+                    res = await exportFn();
 
-            router.refresh()
+                    let exportInterval = setInterval(() => {
+                        (async () => {
+                            res = await exportFn();
+                            if (!res?.started) {
+                                resolve(null);
+                                clearInterval(exportInterval);
+                            }
+                        })();
+                    }, 10000);
+                })();
+            });
+
+            if (res?.errors?.length) throw new Error(res.errors.join(", "))
+
+            router.refresh();
+
+            setDuplicateRequestKey(Math.random().toString(12).substring(2));
 
             alert({
               variant: "success",
@@ -178,7 +200,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
         },
       )
     },
-    [confirm, copyScripts, alert, router, scripts],
+    [confirm, copyScripts, alert, duplicateRequestKey, router, scripts],
   )
 
   const disabled = useMemo(() => viewOnly, [viewOnly])
