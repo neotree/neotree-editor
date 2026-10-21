@@ -206,4 +206,21 @@ const values = (items: any[]) => items.map((i) => i.value ?? i.id);
   assert.deepEqual(inverted.idMap.diagnoses, { "live-d1": "dev-d1" });
 }
 
+// ── First import: values that differ here take the source's, and are listed ─────────────────────────
+{
+  const report = createMergeReport();
+  const merged = mergeList([opt("a", "Alpha (DEV)")], [opt("a", "Alpha (LIVE)"), opt("live-only")], null, FIELD_SPEC.children!.items, "field", report);
+  assert.deepEqual(values(merged), ["a", "live-only"], "nothing is removed");
+  assert.equal(merged[0].label, "Alpha (DEV)", "with no history the source's value is used");
+  const replaced = report.events.filter((e) => e.kind === "replaced_without_history");
+  assert.equal(replaced.length, 1, "and it is reported");
+  assert.deepEqual(replaced[0].props, ["label"]);
+
+  // with a base, the same difference is a normal three-way decision (here: only the target changed it)
+  const withBase = createMergeReport();
+  const merged2 = mergeList([opt("a", "Alpha")], [opt("a", "Alpha (LIVE)")], [opt("a", "Alpha")], FIELD_SPEC.children!.items, "field", withBase);
+  assert.equal(merged2[0].label, "Alpha (LIVE)");
+  assert.ok(!withBase.events.some((e) => e.kind === "replaced_without_history"));
+}
+
 console.log("import-merge tests passed");

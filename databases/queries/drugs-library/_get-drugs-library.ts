@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { drugsLibrary, drugsLibraryDrafts, pendingDeletion, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { Preferences } from "@/types";
@@ -16,6 +17,8 @@ export type GetDrugsLibraryItemsParams = {
      * editor imports this editor's published state: an unpublished deletion is not published yet.
      */
     includePendingDeletion?: boolean;
+    /** Read inside this transaction (sees its uncommitted writes). */
+    client?: DbOrTransaction;
 };
 
 export type GetDrugsLibraryItemsResults = {
@@ -32,7 +35,8 @@ export async function _getDrugsLibraryItems(
     params?: GetDrugsLibraryItemsParams
 ): Promise<GetDrugsLibraryItemsResults> {
     try {
-        const { itemsIds: _itemsIds, keys: _keys, returnDraftsIfExist = true, includePendingDeletion, } = { ...params };
+        const { itemsIds: _itemsIds, keys: _keys, returnDraftsIfExist = true, includePendingDeletion, client, } = { ...params };
+        const executor = client || db;
 
         let itemsIds = (_itemsIds || []).map(id => uuid.validate(id) ? id : uuid.v4());
         let keys = _keys || [];
@@ -51,7 +55,7 @@ export async function _getDrugsLibraryItems(
             ...(!whereDrugsLibraryItemsDraftsIds ? [] : [whereDrugsLibraryItemsDraftsIds]),
         ];
 
-        const drafts = !returnDraftsIfExist ? [] : await db.query.drugsLibraryDrafts.findMany({
+        const drafts = !returnDraftsIfExist ? [] : await executor.query.drugsLibraryDrafts.findMany({
             where: and(...whereDrugsLibraryItemsDrafts),
         });
 
@@ -78,7 +82,7 @@ export async function _getDrugsLibraryItems(
             !itemDraftsIds.length ? undefined : notInArray(drugsLibrary.itemId, itemDraftsIds),
         ];
 
-        const publishedRes = await db
+        const publishedRes = await executor
             .select({
                 drugsLibraryItem: drugsLibrary,
                 pendingDeletion: pendingDeletion,
@@ -89,7 +93,7 @@ export async function _getDrugsLibraryItems(
 
         const published = publishedRes.map(s => s.drugsLibraryItem);
 
-        const inPendingDeletion = !published.length ? [] : await db.query.pendingDeletion.findMany({
+        const inPendingDeletion = !published.length ? [] : await executor.query.pendingDeletion.findMany({
             where: inArray(pendingDeletion.drugsLibraryItemId, published.map(s => s.itemId)),
             columns: { drugsLibraryItemId: true, },
         });

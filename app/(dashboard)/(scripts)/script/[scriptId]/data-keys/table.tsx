@@ -524,7 +524,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                     return;
                 }
 
-                if (!res.changed) {
+                if (!res.changed && res.warnings?.length) {
+                    alert({
+                        title: "Not changed",
+                        message: res.warnings.join("<br />"),
+                        variant: "info",
+                        buttonLabel: "Close",
+                    });
+                } else if (!res.changed) {
                     toast.message("No safe change was applied for this reference");
                 } else {
                     await trackIntegrityDraftChange({
@@ -644,7 +651,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                     return;
                 }
 
-                if (!res.changed) {
+                if (!res.changed && res.warnings?.length) {
+                    alert({
+                        title: "Not changed",
+                        message: res.warnings.join("<br />"),
+                        variant: "info",
+                        buttonLabel: "Close",
+                    });
+                } else if (!res.changed) {
                     toast.message(`No ${bulkResolveStatus.replace(/_/g, " ")} references needed changes`);
                 } else {
                     await trackIntegrityDraftChange({

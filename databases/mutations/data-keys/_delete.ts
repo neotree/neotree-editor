@@ -220,36 +220,36 @@ export async function _deleteDataKeys(
                 }));
 
                 if (pendingDeletionInsertData.length) await tx.insert(pendingDeletion).values(pendingDeletionInsertData);
-            });
 
-            // Keys that listed a deleted key as an option keep pointing at it otherwise (a dead option row
-            // in the data-key form, and an option the pickers can no longer resolve). Point them at the
-            // replacement, or drop the option.
-            const replacementUniqueKeyByDeleted = new Map<string, string>();
-            targets.forEach((target) => {
-                const replacement = dataKeysRes.data.find(k => k.uuid === replacements?.[target.uuid]);
-                if (target.uniqueKey && replacement?.uniqueKey) replacementUniqueKeyByDeleted.set(target.uniqueKey, replacement.uniqueKey);
-            });
-            const deletedUniqueKeySet = new Set(targets.map(t => t.uniqueKey).filter(Boolean));
-            const parentUpdates = dataKeysRes.data
-                .filter(k => !dataKeysIds.includes(k.uuid) && (k.options || []).some(o => deletedUniqueKeySet.has(o)))
-                .map(k => ({
-                    uuid: k.uuid,
-                    uniqueKey: k.uniqueKey,
-                    options: uniqueValues((k.options || [])
-                        .map(o => (deletedUniqueKeySet.has(o) ? (replacementUniqueKeyByDeleted.get(o) || '') : o))),
-                }));
-            if (parentUpdates.length) {
-                const parentsRes = await _saveDataKeys({
-                    data: parentUpdates,
-                    userId: userId || undefined,
-                    updateRefs: false,
-                    draftOrigin: 'data_key_sync',
+                // Keys that listed a deleted key as an option keep pointing at it otherwise (a dead option row
+                // in the data-key form, and an option the pickers can no longer resolve). Point them at the
+                // replacement, or drop the option.
+                const replacementUniqueKeyByDeleted = new Map<string, string>();
+                targets.forEach((target) => {
+                    const replacement = dataKeysRes.data.find(k => k.uuid === replacements?.[target.uuid]);
+                    if (target.uniqueKey && replacement?.uniqueKey) replacementUniqueKeyByDeleted.set(target.uniqueKey, replacement.uniqueKey);
                 });
-                if (parentsRes.errors?.length) {
-                    logger.error('_deleteDataKeys parent options ERROR', parentsRes.errors.join(', '));
+                const deletedUniqueKeySet = new Set(targets.map(t => t.uniqueKey).filter(Boolean));
+                const parentUpdates = dataKeysRes.data
+                    .filter(k => !dataKeysIds.includes(k.uuid) && (k.options || []).some(o => deletedUniqueKeySet.has(o)))
+                    .map(k => ({
+                        uuid: k.uuid,
+                        uniqueKey: k.uniqueKey,
+                        options: uniqueValues((k.options || [])
+                            .map(o => (deletedUniqueKeySet.has(o) ? (replacementUniqueKeyByDeleted.get(o) || '') : o))),
+                    }));
+                if (parentUpdates.length) {
+                    const parentsRes = await _saveDataKeys({
+                        data: parentUpdates,
+                        userId: userId || undefined,
+                        updateRefs: false,
+                        draftOrigin: 'data_key_sync',
+                        client: tx,
+                    });
+                    // part of the delete: if the parents can't be repaired, nothing is deleted
+                    if (parentsRes.errors?.length) throw new Error(parentsRes.errors.join(', '));
                 }
-            }
+            });
         }
 
         response.success = true;

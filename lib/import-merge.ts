@@ -81,13 +81,17 @@ export type MergeEventKind =
     | 'kept_target_only'
     | 'kept_target_removal'
     | 'conflict_source_wins'
-    | 'conflict_kept_target';
+    | 'conflict_kept_target'
+    /** First import (no shared history): a value here differs from the source and takes the source's. */
+    | 'replaced_without_history';
 
 export type MergeEvent = {
     kind: MergeEventKind;
     path: string;
     identity: string;
     label?: string;
+    /** Properties concerned (replaced_without_history). */
+    props?: string[];
 };
 
 export type MergeReport = {
@@ -216,6 +220,8 @@ export function mergeEntity(
     const keys = new Set([...Object.keys(source || {}), ...Object.keys(target || {})]);
     const children = spec.children || {};
     let conflict = false;
+    // Without a base it can't be told which side changed a value; the source's is used, and listed.
+    const replacedWithoutHistory: string[] = [];
 
     keys.forEach((key) => {
         if (children[key]) {
@@ -248,11 +254,17 @@ export function mergeEntity(
         if (base && !samePropValue(key, t, base?.[key]) && !samePropValue(key, s, base?.[key]) && !VOLATILE_KEYS.has(key)) {
             conflict = true;
         }
+        if (!base && target && s !== undefined && t !== undefined && !VOLATILE_KEYS.has(key) && !ID_KEYS.has(key)) {
+            replacedWithoutHistory.push(key);
+        }
         result[key] = s === undefined ? t : s;
     });
 
     if (conflict) {
         report.events.push({ kind: 'conflict_source_wins', path, identity: itemIdentity(spec, source), label: itemLabel(spec, source) });
+    }
+    if (replacedWithoutHistory.length) {
+        report.events.push({ kind: 'replaced_without_history', path, identity: itemIdentity(spec, source), label: itemLabel(spec, source), props: replacedWithoutHistory });
     }
 
     if (idMap && spec.idField && source?.[spec.idField] && result[spec.idField]) {
@@ -731,6 +743,7 @@ export function summariseMergeReport(report: MergeReport) {
         keptTargetOnly: by('kept_target_only'),
         keptTargetRemovals: by('kept_target_removal'),
         conflicts: [...by('conflict_source_wins'), ...by('conflict_kept_target')],
+        replacedWithoutHistory: by('replaced_without_history'),
     };
 }
 

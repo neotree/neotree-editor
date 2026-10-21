@@ -20,9 +20,12 @@ export type ScriptImportChange = {
         | 'kept_target_only'
         | 'kept_target_removal'
         | 'conflict_source_wins'
-        | 'conflict_kept_target';
+        | 'conflict_kept_target'
+        | 'replaced_without_history';
     path: string;
     label?: string;
+    /** Properties concerned (replaced_without_history). */
+    props?: string[];
 };
 
 export type ScriptImportPreview = {
@@ -44,6 +47,11 @@ export type ScriptImportPreview = {
         keptTargetOnly: number;
         conflicts: number;
     };
+    /**
+     * First import only: screens, fields and options here whose values differ from the source and take
+     * the source's values (with no shared history it can't be told which side changed them).
+     */
+    replacedWithoutHistory?: number;
     removedEntities: { kind: 'screen' | 'diagnosis' | 'problem'; title: string; reason: string }[];
     keptEntities: { kind: 'screen' | 'diagnosis' | 'problem'; title: string }[];
     /** Option-level changes, capped (see changesTruncated). */

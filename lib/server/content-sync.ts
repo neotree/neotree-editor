@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
+import { isInternalCall } from "@/lib/server/internal-call";
 import { contentSyncHotfixes, scriptImportSources, users } from "@/databases/pg/schema";
 import * as queries from "@/databases/queries/scripts";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
@@ -71,7 +72,8 @@ export async function assertContentEditable({
     draftOrigin?: string | null;
 }) {
     if (viaApiKey) return;
-    if (draftOrigin && draftOrigin !== "editor") return;
+    // only an import or key sync run by this server counts (see lib/server/internal-call.ts)
+    if (draftOrigin && draftOrigin !== "editor" && isInternalCall()) return;
     const settings = await getContentSyncSettings();
     if (settings.role !== "target" || !settings.lock[area]) return;
     const ids = Array.from(new Set(scriptIds.filter((id): id is string => !!id)));
@@ -238,4 +240,17 @@ export async function fetchRemoteImportBase(siteId: string, remoteScriptId: stri
         logger.error("fetchRemoteImportBase ERROR", e.message);
         return null;
     }
+}
+
+declare global {
+    // eslint-disable-next-line no-var
+    var contentSyncStatusCache: { at: number; value: unknown } | undefined;
+}
+
+/**
+ * Forget the cached script-by-script sync status (Settings > Content Sync, badges, top bar). Called after
+ * anything that changes it here: settings, hotfixes, publishing, discarding and imports.
+ */
+export function clearContentSyncStatusCache() {
+    globalThis.contentSyncStatusCache = undefined;
 }

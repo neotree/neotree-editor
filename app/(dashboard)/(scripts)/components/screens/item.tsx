@@ -28,7 +28,9 @@ import { SelectModal } from "@/components/select-modal"
 import { SelectDataKey } from "@/components/select-data-key"
 import { useDataKeysCtx } from "@/contexts/data-keys"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { useAlertModal } from "@/hooks/use-alert-modal"
+import { ParentKeyOptionsHint } from "./parent-key-options-hint"
 
 type Props = {
   open: boolean
@@ -54,6 +56,7 @@ export function Item<P = {}>({
   subTypes = [],
   onClose,
 }: Props & P) {
+  const { confirm: confirmDiscard } = useConfirmModal()
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
 
@@ -214,15 +217,17 @@ export function Item<P = {}>({
     return !!dataKey?.confidentialLabelOnly
   }, [dataKey?.confidentialLabelOnly])
 
+  // Follows the data key. Done on load too, so it does not count as an edit (opening an option must not
+  // leave "unsaved changes"); choosing another key marks the form changed on its own.
   useEffect(() => {
-    if (confidential !== inheritedConfidential) {
-      setValue("confidential", inheritedConfidential, { shouldDirty: true })
+    if (!!confidential !== inheritedConfidential) {
+      setValue("confidential", inheritedConfidential, { shouldDirty: false })
     }
   }, [confidential, inheritedConfidential, setValue])
 
   useEffect(() => {
-    if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
-      setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: true })
+    if (!!confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+      setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: false })
     }
   }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue])
 
@@ -267,10 +272,7 @@ export function Item<P = {}>({
         }}
       />
       {!!screenDataKey && !isKeyDisabled && (isChecklistScreen || isMultiSelectScreen || isSingleSelectScreen) && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          Only options of the screen&apos;s data key &quot;{screenDataKey.label || screenDataKey.name}&quot; are listed. To use
-          another option, add it to that key in the Data keys library first.
-        </p>
+        <ParentKeyOptionsHint dataKey={screenDataKey} owner="screen" className="mt-1" />
       )}
       </>
     )
@@ -282,9 +284,22 @@ export function Item<P = {}>({
         open={open}
         title={!item ? "New item" : "Edit item"}
         onOpenChange={(open) => {
-          if (!open && itemFormIsDirty && !window.confirm("Discard your changes to this item?")) return
-          if (!open) onClose()
-          resetForm(getDefaultValues())
+          const applyOpenChange = () => {
+            if (!open) onClose()
+            resetForm(getDefaultValues())
+          }
+          // Closing with unsaved changes (Esc, clicking outside, Cancel) asks first, in the app's dialog
+          if (!open && itemFormIsDirty) {
+            confirmDiscard(applyOpenChange, {
+              title: "Discard changes?",
+              message: "Discard your changes to this item?",
+              positiveLabel: "Discard",
+              negativeLabel: "Keep editing",
+              danger: true,
+            })
+            return
+          }
+          applyOpenChange()
         }}
         actions={
           <>

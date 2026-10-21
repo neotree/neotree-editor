@@ -3,6 +3,7 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getDataKeys } from '@/databases/queries/data-keys';
@@ -32,6 +33,8 @@ export type SaveDataKeysParams = {
     allowConfidentialDowngrade?: boolean;
     draftOrigin?: DataKeyDraftOrigin;
     propagatedDraftOrigin?: Extract<DataKeyDraftOrigin, "data_key_sync" | "import">;
+    /** Run inside this transaction (e.g. an import saving its screens and data keys together). */
+    client?: DbOrTransaction;
 };
 
 export type SaveDataKeysResponse = { 
@@ -43,29 +46,42 @@ export type SaveDataKeysResponse = {
     };
 };
 
-async function createNewUniqueKey(uniqueKey?: string) {
+async function createNewUniqueKey(executor: DbOrTransaction, uniqueKey?: string): Promise<string> {
     uniqueKey = `${uniqueKey || ''}`.trim();
     uniqueKey = uniqueKey || uuid.v4()
-    const [{ count: existing, }] = await db
+    const [{ count: existing, }] = await executor
         .select({ count: count(dataKeys.uniqueKey), })
         .from(dataKeys)
         .where(eq(dataKeys.uniqueKey, uniqueKey));
-    if (existing) return await createNewUniqueKey();
+    if (existing) return await createNewUniqueKey(executor);
     return uniqueKey;
 }
+
+/** Thrown inside the save transaction to roll it back and return this response instead. */
+class SaveDataKeysRollback extends Error {
+    constructor(public response: SaveDataKeysResponse) {
+        super((response.errors || []).join(', ') || 'Data keys were not saved');
+    }
+}
+
+const describeOthersDrafts = (items: { title: string; scriptTitle?: string; }[]) =>
+    items.slice(0, 10).map(e => `${e.scriptTitle ? `${e.scriptTitle} > ` : ''}${e.title}`).join('; ') +
+    (items.length > 10 ? '; ...' : '');
 
 async function enforceDraftOriginForTouchedDataKeys({
     uniqueKeys,
     userId,
     draftOrigin,
+    executor,
 }: {
     uniqueKeys: string[];
     userId?: string;
     draftOrigin: DataKeyDraftOrigin;
+    executor: DbOrTransaction;
 }) {
     if (!uniqueKeys.length) return;
 
-    const touchedPublishedDataKeys = await _getDataKeys({ uniqueKeys });
+    const touchedPublishedDataKeys = await _getDataKeys({ uniqueKeys, client: executor, });
     if (touchedPublishedDataKeys.errors?.length) {
         throw new Error(touchedPublishedDataKeys.errors.join(', '));
     }
@@ -74,7 +90,7 @@ async function enforceDraftOriginForTouchedDataKeys({
         .map((item) => item.uuid)
         .filter((value): value is string => !!value);
 
-    const drafts = await db.query.dataKeysDrafts.findMany({
+    const drafts = await executor.query.dataKeysDrafts.findMany({
         where: userId ? eq(dataKeysDrafts.createdByUserId, userId) : undefined,
     });
 
@@ -88,24 +104,49 @@ async function enforceDraftOriginForTouchedDataKeys({
         .map((draft) => draft.uuid);
 
     for (const draftId of touchedDraftIds) {
-        await db
+        await executor
             .update(dataKeysDrafts)
             .set({ draftOrigin })
             .where(eq(dataKeysDrafts.uuid, draftId));
     }
 }
 
-export async function _saveDataKeys({ 
+/**
+ * Saves data keys as drafts and brings the scripts that use them in line (labels, removed options).
+ *
+ * Everything happens in one transaction (the caller's, when `client` is given): either the keys and every
+ * change they cause in scripts are saved, or nothing is. A save made in the editor that would have to
+ * change another user's unpublished draft (or an ownerless one) is refused instead: writing into someone
+ * else's work in progress is how key changes used to get lost or published half-way.
+ */
+export async function _saveDataKeys(params: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
+    try {
+        const run = (tx: DbOrTransaction) => saveDataKeysInTransaction(params, tx);
+        const response = params.client
+            ? await params.client.transaction(run)
+            : await db.transaction(run);
+        if (response.success) socket.emit('data_changed', 'save_data_keys');
+        return response;
+    } catch (e: any) {
+        if (e instanceof SaveDataKeysRollback) return e.response;
+        logger.error('_saveDataKeys ERROR', e.message);
+        return { success: false, errors: [e.message], };
+    }
+}
+
+async function saveDataKeysInTransaction({ 
     data: dataParam, 
     broadcastAction, 
     updateRefs = true,
     userId,
     draftOrigin = "editor",
     propagatedDraftOrigin,
-}: SaveDataKeysParams) {
+}: SaveDataKeysParams, executor: DbOrTransaction): Promise<SaveDataKeysResponse> {
     const response: SaveDataKeysResponse = { success: false, };
+    // an editor save never writes into another user's (or an ownerless) unpublished draft
+    const refuseOthersDrafts = draftOrigin === 'editor' && !!userId;
 
-    try {
+    {
         const errors = [];
         const warnings: string[] = [];
         const propagationMatchUniqueKeysByDataKey: Record<string, string[]> = {};
@@ -164,7 +205,7 @@ export async function _saveDataKeys({
                 new Set(data.map((d) => `${d.name || ''}`.trim().toLowerCase()).filter(Boolean)),
             );
             if (incomingNames.length) {
-                const existing = await _getDataKeys({ names: incomingNames });
+                const existing = await _getDataKeys({ names: incomingNames, client: executor, });
                 const managedExisting = (existing.data || []).filter((k) => isNuidManagedDataKey(k as any));
                 for (const item of data) {
                     const name = `${item.name || ''}`.trim();
@@ -187,7 +228,7 @@ export async function _saveDataKeys({
             logger.error('_saveDataKeys managed-duplicate check ERROR', e?.message);
         }
         if (errors.length) {
-            return { success: false, errors };
+            throw new SaveDataKeysRollback({ success: false, errors });
         }
 
         // const { data: { drafts, published, }, } = await checkDataKeyName(
@@ -229,14 +270,14 @@ export async function _saveDataKeys({
                 index++;
 
                 if (!errors.length) {
-                    const draft = isNewUuid ? null : await db.query.dataKeysDrafts.findFirst({
+                    const draft = isNewUuid ? null : await executor.query.dataKeysDrafts.findFirst({
                         where: or(
                             eq(dataKeysDrafts.uuid, dataKeyUuid),
                             !normalizedItem.uniqueKey ? undefined :  eq(dataKeysDrafts.uniqueKey, normalizedItem.uniqueKey)
                         ),
                     });
 
-                    const published = (draft || isNewUuid) ? null : await db.query.dataKeys.findFirst({
+                    const published = (draft || isNewUuid) ? null : await executor.query.dataKeys.findFirst({
                         where: or(
                             eq(dataKeys.uuid, dataKeyUuid),
                             !normalizedItem.uniqueKey ? undefined : eq(dataKeys.uniqueKey, normalizedItem.uniqueKey)
@@ -245,7 +286,7 @@ export async function _saveDataKeys({
 
                     if (draft) {
                         rebase(draft.data?.options);
-                        const publishedForDraft = !draft.dataKeyId ? null : await db.query.dataKeys.findFirst({
+                        const publishedForDraft = !draft.dataKeyId ? null : await executor.query.dataKeys.findFirst({
                             where: eq(dataKeys.uuid, draft.dataKeyId),
                             columns: {
                                 confidential: true,
@@ -285,7 +326,7 @@ export async function _saveDataKeys({
                             (data as any).metadata = { ...((data as any).metadata || {}), managed: NUID_MANAGED };
                         }
 
-                        await db
+                        await executor
                             .update(dataKeysDrafts)
                             .set({
                                 data,
@@ -307,7 +348,7 @@ export async function _saveDataKeys({
 
                         if (data.uniqueKey) uniqueKeys.push(data.uniqueKey);
 
-                        const publishedOptions = !draft.dataKeyId ? [] : ((await db.query.dataKeys.findFirst({
+                        const publishedOptions = !draft.dataKeyId ? [] : ((await executor.query.dataKeys.findFirst({
                             where: eq(dataKeys.uuid, draft.dataKeyId),
                             columns: { options: true, },
                         }))?.options || []);
@@ -319,7 +360,7 @@ export async function _saveDataKeys({
                         );
                     } else {
                         if (published) rebase(published.options);
-                        const uniqueKey = published?.uniqueKey || await createNewUniqueKey(normalizedItem.uniqueKey || '');
+                        const uniqueKey = published?.uniqueKey || await createNewUniqueKey(executor, normalizedItem.uniqueKey || '');
 
                         const data = {
                             ...published,
@@ -345,7 +386,7 @@ export async function _saveDataKeys({
                             data.metadata = { ...((data as any).metadata || {}), managed: NUID_MANAGED } as any;
                         }
 
-                        await db.insert(dataKeysDrafts).values({
+                        await executor.insert(dataKeysDrafts).values({
                             data,
                             uuid: dataKeyUuid,
                             dataKeyId: published?.uuid,
@@ -376,9 +417,15 @@ export async function _saveDataKeys({
         if (!errors.length) {
             // Remove options that left a key's list from that key's own questions only.
             for (const [parentUniqueKey, removed] of Object.entries(removedOptionsByParent)) {
-                const res = await _deleteReferencedDataKeyOptions({ userId, uniqueKeys: removed, parentUniqueKey, });
+                const res = await _deleteReferencedDataKeyOptions({ userId, uniqueKeys: removed, parentUniqueKey, client: executor, });
                 res.errors?.forEach(e => errors.push(e));
-                if (res.skipped?.length) {
+                if (res.skipped?.length && refuseOthersDrafts) {
+                    errors.push(
+                        `Not saved: removing ${removed.length === 1 ? 'this option' : 'these options'} would change ${res.skipped.length === 1 ? 'a question' : `${res.skipped.length} questions`} that another user is still editing (unpublished): ` +
+                        describeOthersDrafts(res.skipped) +
+                        '. Ask them to publish or discard their changes first (an admin can take over drafts that have no owner).',
+                    );
+                } else if (res.skipped?.length) {
                     warnings.push(
                         `${res.skipped.length} question${res.skipped.length === 1 ? '' : 's'} still list the removed option${removed.length === 1 ? '' : 's'} because another user has unpublished changes there: ` +
                         res.skipped.slice(0, 10).map(s => s.title).join(', ') +
@@ -391,29 +438,32 @@ export async function _saveDataKeys({
         if (warnings.length) response.warnings = warnings;
 
         if (errors.length) {
-            response.errors = errors;
+            throw new SaveDataKeysRollback({ success: false, errors, warnings: warnings.length ? warnings : undefined, });
         } else {
             if (draftOrigin === "import") {
                 await enforceDraftOriginForTouchedDataKeys({
                     uniqueKeys,
                     userId,
                     draftOrigin,
+                    executor,
                 });
             }
 
             if (updateRefs && uniqueKeys.length) {
-                const { data: dataKeys, } = await _getDataKeys({ uniqueKeys, });
+                const { data: dataKeys, } = await _getDataKeys({ uniqueKeys, client: executor, });
                 const updateRefsRes = await _updateDataKeysRefs({
                     dataKeys,
                     broadcastAction,
                     userId,
                     draftOrigin: propagatedDraftOrigin || (draftOrigin === "import" ? "import" : "data_key_sync"),
                     matchUniqueKeysByDataKey: propagationMatchUniqueKeysByDataKey,
+                    client: executor,
                 });
                 if (updateRefsRes.errors?.length || !updateRefsRes.success) {
-                    response.success = false;
-                    response.errors = updateRefsRes.errors?.length ? updateRefsRes.errors : ['Failed to update related scripts references'];
-                    return response;
+                    throw new SaveDataKeysRollback({
+                        success: false,
+                        errors: updateRefsRes.errors?.length ? updateRefsRes.errors : ['Failed to update related scripts references'],
+                    });
                 }
                 response.info = {
                     ...response.info,
@@ -423,25 +473,29 @@ export async function _saveDataKeys({
                     },
                 };
                 const othersDrafts = updateRefsRes.othersDrafts || [];
+                if (othersDrafts.length && refuseOthersDrafts) {
+                    throw new SaveDataKeysRollback({
+                        success: false,
+                        errors: [
+                            `Not saved: this change would also update ${othersDrafts.length === 1 ? 'a question' : `${othersDrafts.length} questions`} that another user is still editing (unpublished): ` +
+                            describeOthersDrafts(othersDrafts) +
+                            '. Ask them to publish or discard their changes first (an admin can take over drafts that have no owner).',
+                        ],
+                    });
+                }
                 if (othersDrafts.length) {
-                    const names = othersDrafts.slice(0, 10).map(e => `${e.scriptTitle ? `${e.scriptTitle} > ` : ''}${e.title}`).join('; ');
+                    const names = describeOthersDrafts(othersDrafts);
                     response.warnings = [
                         ...(response.warnings || []),
-                        `${othersDrafts.length} question${othersDrafts.length === 1 ? ' is' : 's are'} in another user's unpublished draft and ${othersDrafts.length === 1 ? 'was' : 'were'} updated there; ${othersDrafts.length === 1 ? 'it goes' : 'they go'} live when that user publishes: ${names}${othersDrafts.length > 10 ? '; ...' : ''}`,
+                        `${othersDrafts.length} question${othersDrafts.length === 1 ? ' is' : 's are'} in another user's unpublished draft and ${othersDrafts.length === 1 ? 'was' : 'were'} updated there; ${othersDrafts.length === 1 ? 'it goes' : 'they go'} live when that user publishes: ${names}`,
                     ];
                 }
             }
 
-            socket.emit('data_changed', 'save_data_keys');
             response.success = true;
         }
 
         return response;
-    } catch(e: any) {
-        response.success = false;
-        response.errors = [e.message];
-        logger.error('_saveDataKeys ERROR', e.message);
-        return { success: false, errors: [e.message], };
     }
 }
 
@@ -452,7 +506,7 @@ export async function _saveDataKeysIfNotExist({
     try {
         const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
 
-        const saved = await _getDataKeys({ uniqueKeys, });
+        const saved = await _getDataKeys({ uniqueKeys, client: params.client, });
 
         data = data.filter(item => {
             const existing = saved.data.find(dk => dk.uniqueKey === item.uniqueKey);
@@ -493,7 +547,7 @@ export async function _saveDataKeysUpdateIfExist({
     try {
         const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
 
-        const saved = await _getDataKeys({ uniqueKeys, });
+        const saved = await _getDataKeys({ uniqueKeys, client: params.client, });
 
         const res = await _saveDataKeys({
             ...params,

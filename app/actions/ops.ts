@@ -8,7 +8,7 @@ import { isAllowed } from "./is-allowed"
 import { getAuthenticatedUser } from "./get-authenticated-user"
 import { _clearPendingDeletion, _processPendingDeletion } from "@/databases/mutations/ops"
 import { _settlePendingScriptImports } from "@/databases/mutations/scripts/_script_import_sources"
-import { getOpenHotfixes, recordTargetFingerprints } from "@/lib/server/content-sync"
+import { clearContentSyncStatusCache, getOpenHotfixes, recordTargetFingerprints } from "@/lib/server/content-sync"
 import { normalizeContentSyncSettings, type ContentSyncSettings, type OpenHotfix } from "@/lib/content-sync"
 import * as opsQueries from "@/databases/queries/ops"
 import * as scriptsQueries from "@/databases/queries/scripts"
@@ -1558,6 +1558,8 @@ export async function publishData({ scope, allowConfidentialDowngrade }: { scope
 
     // Content sync: the published imports are new sync points; record this editor's side of them.
     if (promotedImportScriptIds.length) await recordTargetFingerprints(promotedImportScriptIds)
+    // published content changed: the sync status must be recomputed, not served from cache
+    clearContentSyncStatusCache()
 
     socket.emit("data_changed", "publish_data")
   } catch (e: any) {
@@ -1630,6 +1632,7 @@ export async function discardDrafts({ scope }: { scope: number }) {
     })
 
     if (affectedScriptIds.size) void recomputeScriptsConditionErrors(Array.from(affectedScriptIds))
+    clearContentSyncStatusCache()
 
     socket.emit("data_changed", "discard_drafts")
   } catch (e: any) {

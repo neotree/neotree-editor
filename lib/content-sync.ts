@@ -234,12 +234,16 @@ export function computeContentSyncPairs({ source, target }: { source: ContentSyn
     const pairedSource = new Set<string>();
     const pairedTarget = new Set<string>();
 
-    points.forEach((list, key) => {
+    // A script can be linked to only one script on the other side; the most recent link wins. Links are
+    // visited newest first: an import still in drafts is the newest, then by the latest sync time.
+    const recency = (list: Point[]) => Math.max(...list.map(p => (p.pending ? Number.MAX_SAFE_INTEGER : p.at)));
+    const links = Array.from(points.entries()).sort((a, b) => recency(b[1]) - recency(a[1]));
+
+    links.forEach(([key, list]) => {
         const [sourceId, targetId] = key.split("|");
         const s = sourceScripts.get(sourceId);
         const t = targetScripts.get(targetId);
         if (!s && !t) return;
-        // a script can be linked to only one script on the other side; the most recent link wins
         if (pairedSource.has(sourceId) || pairedTarget.has(targetId)) return;
         pairedSource.add(sourceId);
         pairedTarget.add(targetId);

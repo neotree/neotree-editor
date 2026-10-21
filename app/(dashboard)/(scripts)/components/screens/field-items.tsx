@@ -26,6 +26,7 @@ import { ConditionalExpressionModal } from "@/components/conditional-expression-
 import type { ConditionKey } from "@/lib/conditional-expression"
 import { useFieldKeyCollisions } from "@/components/field-key-collisions"
 import { ScriptIssueBadge, collisionIssues } from "@/components/script-issues"
+import { ParentKeyOptionsHint } from "./parent-key-options-hint"
 
 type Item = NonNullable<ScriptField["items"]>[0]
 
@@ -379,10 +380,7 @@ function Form({
                         }}
                       />
                       {!!fieldDataKey && !isKeyDisabled && (
-                        <p className="text-xs text-muted-foreground">
-                          Only options of the data key &quot;{fieldDataKey.label || fieldDataKey.name}&quot; are listed. To use
-                          another option, add it to that key in the Data keys library first.
-                        </p>
+                        <ParentKeyOptionsHint dataKey={fieldDataKey} owner="field" />
                       )}
                       {allowCustomKey && (
                         <Input

@@ -41,7 +41,9 @@ import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
 import { useFieldKeyCollisions } from "@/components/field-key-collisions"
+import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { collectNewOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
+import { ParentKeyOptionsHint } from "./parent-key-options-hint"
 
 type Props = {
   open: boolean
@@ -59,6 +61,7 @@ type Props = {
 }
 
 export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
+  const { confirm: confirmDiscard } = useConfirmModal()
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
 
@@ -310,12 +313,23 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
       <Modal
         open={open}
         onOpenChange={(open) => {
-          // Closing the dialog (Esc, clicking outside, Cancel) used to drop edited options and settings
-          // without a word.
-          if (!open && fieldFormIsDirty && !window.confirm("Discard your changes to this field?")) return
-          if (!open) onClose()
-          resetForm(getDefaultValues())
-          setShowForm(!!field)
+          const applyOpenChange = () => {
+            if (!open) onClose()
+            resetForm(getDefaultValues())
+            setShowForm(!!field)
+          }
+          // Closing with unsaved changes (Esc, clicking outside, Cancel) asks first, in the app's dialog
+          if (!open && fieldFormIsDirty) {
+            confirmDiscard(applyOpenChange, {
+              title: "Discard changes?",
+              message: "Discard your changes to this field?",
+              positiveLabel: "Discard",
+              negativeLabel: "Keep editing",
+              danger: true,
+            })
+            return
+          }
+          applyOpenChange()
         }}
         title={field ? "Edit field" : "New field"}
         actions={
@@ -452,6 +466,9 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                       setValue("confidentialLabelOnly", !!item?.confidentialLabelOnly, { shouldDirty: true })
                     }}
                   />
+                  {!!screenDataKey && !isKeyDisabled && (
+                    <ParentKeyOptionsHint dataKey={screenDataKey} owner="screen" className="mt-1 max-w-[280px]" />
+                  )}
 
                   {currentKeyCollisions.map((collision, i) => (
                     <p

@@ -4,6 +4,7 @@ import { v4 } from "uuid";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import db from "@/databases/pg/drizzle";
+import { runAsInternalCall, trustedDraftOrigin } from "@/lib/server/internal-call";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
 import {
     screens,
@@ -68,6 +69,7 @@ import {
     fetchRemoteScriptFingerprints,
     getContentSyncSettings,
     recordTargetFingerprints,
+    clearContentSyncStatusCache,
 } from "@/lib/server/content-sync";
 import { loadRemoteDataKeys, loadRemoteScriptsWithItems, uploadRemoteFiles } from "./remote";
 import { uploadReferencedFileIfMissing } from "@/lib/files";
@@ -188,6 +190,8 @@ async function resolveSaveAffectedScriptIds(
 export const deleteScreens: typeof mutations._deleteScreens = async params => {
     try {
         const session = await isAllowed();
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        params = { ...params, draftOrigin: trustedDraftOrigin((params as any)?.draftOrigin, session) } as typeof params;
 
         const affectedScriptIds = await resolveDeleteAffectedScriptIds(params);
         await assertScriptsEditable(session, affectedScriptIds, params?.draftOrigin);
@@ -208,6 +212,13 @@ type OutcomeCollisionBaseline = {
     diagnoses?: any[];
     problems?: any[];
 };
+
+/** Thrown inside an import transaction to roll it back and return this response instead. */
+class ImportRolledBack extends Error {
+    constructor(public response: Awaited<ReturnType<typeof saveScriptsWithItems>>) {
+        super((response.errors || []).join(', ') || 'Import failed');
+    }
+}
 
 /** Content sync: refuse changes to scripts that this editor only receives from its source editor. */
 async function assertScriptsEditable(
@@ -281,6 +292,8 @@ async function saveScreensInternal(
 ): Promise<Awaited<ReturnType<typeof mutations._saveScreens>>> {
     try {
         const session = await isAllowed();
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        params = { ...params, draftOrigin: trustedDraftOrigin((params as any)?.draftOrigin, session) } as typeof params;
         const incoming = (params?.data || []) as any[];
 
         await assertScriptsEditable(session, await resolveSaveAffectedScriptIds(incoming, "screen"), params?.draftOrigin);
@@ -351,6 +364,8 @@ export const getDiagnosis: typeof queries._getDiagnosis = async (...args) => {
 export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async params => {
     try {
         const session = await isAllowed();
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        params = { ...params, draftOrigin: trustedDraftOrigin((params as any)?.draftOrigin, session) } as typeof params;
         const affectedScriptIds = await resolveDeleteAffectedScriptIds(params);
         await assertScriptsEditable(session, affectedScriptIds, params?.draftOrigin);
         const referenced = await getDeleteOutcomeReferences("Diagnoses", params?.diagnosesIds || []);
@@ -401,6 +416,8 @@ export const getProblem: typeof queries._getProblem = async (...args) => {
 export const deleteProblems: typeof mutations._deleteProblems = async params => {
     try {
         const session = await isAllowed();
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        params = { ...params, draftOrigin: trustedDraftOrigin((params as any)?.draftOrigin, session) } as typeof params;
         const affectedScriptIds = await resolveDeleteAffectedScriptIds(params);
         await assertScriptsEditable(session, affectedScriptIds, params?.draftOrigin);
         const referenced = await getDeleteOutcomeReferences("Problems", params?.problemsIds || []);
@@ -428,6 +445,8 @@ async function saveDiagnosesInternal(
 ): Promise<Awaited<ReturnType<typeof mutations._saveDiagnoses>>> {
     try {
         const session = await isAllowed();
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        params = { ...params, draftOrigin: trustedDraftOrigin((params as any)?.draftOrigin, session) } as typeof params;
         const incoming = (params?.data || []) as any[];
         await assertScriptsEditable(session, await resolveSaveAffectedScriptIds(incoming, "diagnosis"), params?.draftOrigin);
         const blocked = await checkEditorSaveConflicts('diagnosis', incoming, session.user?.userId, params?.draftOrigin);
@@ -468,6 +487,8 @@ async function saveProblemsInternal(
 ): Promise<Awaited<ReturnType<typeof mutations._saveProblems>>> {
     try {
         const session = await isAllowed();
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        params = { ...params, draftOrigin: trustedDraftOrigin((params as any)?.draftOrigin, session) } as typeof params;
         const incoming = (params?.data || []) as any[];
         await assertScriptsEditable(session, await resolveSaveAffectedScriptIds(incoming, "problem"), params?.draftOrigin);
         const blocked = await checkEditorSaveConflicts('problem', incoming, session.user?.userId, params?.draftOrigin);
@@ -531,6 +552,8 @@ export const getScript: typeof queries._getScript = async (...args) => {
 export const deleteScripts: typeof mutations._deleteScripts = async params => {
     try {
         const session = await isAllowed();
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        params = { ...params, draftOrigin: trustedDraftOrigin((params as any)?.draftOrigin, session) } as typeof params;
         // Content sync: on a target editor only super users delete scripts (e.g. ones deleted on the source);
         // it is never part of a hotfix.
         if (session.user?.role !== 'super_user') await assertScriptsEditable(session, [], (params as any)?.draftOrigin);
@@ -547,6 +570,8 @@ export const deleteScripts: typeof mutations._deleteScripts = async params => {
 export const saveScripts: typeof mutations._saveScripts = async params => {
     try {
         const session = await isAllowed();
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        params = { ...params, draftOrigin: trustedDraftOrigin((params as any)?.draftOrigin, session) } as typeof params;
         await assertScriptsEditable(session, (((params as any)?.data || []) as any[]).map((d) => d?.scriptId), (params as any)?.draftOrigin);
         const blocked = await checkEditorSaveConflicts('script', ((params as any)?.data || []) as any[], session.user?.userId, (params as any)?.draftOrigin);
         if (blocked) return { success: false, errors: [blocked], data: undefined, };
@@ -2713,8 +2738,10 @@ const saveScriptsWithItemsInfo = {
     dataKeys: 0,
 };
 
-export async function saveScriptsWithItems({ data, uploadedFiles, }: {
+export async function saveScriptsWithItems({ data, uploadedFiles, client, }: {
     uploadedFiles?: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'];
+    /** Save inside this transaction (each script then gets a savepoint in it). */
+    client?: DbOrTransaction;
     data: (Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0] & {
         overWriteScriptWithId?: string;
         draftOrigin?: "editor" | "data_key_sync" | "import" | "other";
@@ -2742,6 +2769,7 @@ export async function saveScriptsWithItems({ data, uploadedFiles, }: {
         const errors: string[] = [];
 
         const session = await isAllowed();
+        data = data.map(item => ({ ...item, draftOrigin: trustedDraftOrigin(item.draftOrigin, session) }));
         for (const item of data) {
             if (item.draftOrigin === 'import') continue;
             await assertScriptsEditable(session, item.overWriteScriptWithId ? [item.overWriteScriptWithId] : [], item.draftOrigin || 'editor');
@@ -2838,7 +2866,7 @@ export async function saveScriptsWithItems({ data, uploadedFiles, }: {
                 // resolves successfully (see below) — mutating them from inside
                 // the callback would overcount if a later step in the same
                 // transaction fails and rolls everything back.
-                const txInfo = await db.transaction(async (tx) => {
+                const txInfo = await (client || db).transaction(async (tx) => {
                     if (overWriteScript?.data) {
                         const delRes = await deleteScriptsItems({
                             scriptsIds: [overWriteScript.data.scriptId],
@@ -3051,7 +3079,11 @@ async function getOtherDraftOwners(scriptId: string, userId?: string | null) {
  * The import base for a target script. When the last import is still marked pending but its drafts are
  * gone, decide whether they were published or discarded by comparing publish dates.
  */
-async function resolveScriptImportBase(targetScriptId: string, sourceScriptId: string) {
+/**
+ * The stored import record for a script, with an import whose drafts are gone settled (published or
+ * discarded). `persist: false` (a preview) settles it in memory only: a preview never writes.
+ */
+async function resolveScriptImportBase(targetScriptId: string, sourceScriptId: string, { persist = true }: { persist?: boolean } = {}) {
     let row = await _getScriptImportSource(targetScriptId);
     if (row?.pendingSnapshot) {
         const withDrafts = await _getScriptsWithDrafts([targetScriptId]);
@@ -3062,22 +3094,27 @@ async function resolveScriptImportBase(targetScriptId: string, sourceScriptId: s
                 .from(screens)
                 .where(eq(screens.scriptId, targetScriptId));
             const published = !!last && new Date(last).getTime() >= importedAt;
-            await db.update(scriptImportSourcesTable)
-                .set(published
-                    ? {
-                        baseSnapshot: row.pendingSnapshot,
-                        pendingSnapshot: null,
-                        pendingByUserId: null,
-                        sourceFingerprint: row.pendingSourceFingerprint,
-                        pendingSourceFingerprint: null,
-                        targetFingerprint: null,
-                        syncedAt: null,
-                    }
-                    : { pendingSnapshot: null, pendingByUserId: null, pendingSourceFingerprint: null })
-                .where(eq(scriptImportSourcesTable.id, row.id));
+            const settled = published
+                ? {
+                    baseSnapshot: row.pendingSnapshot,
+                    pendingSnapshot: null,
+                    pendingByUserId: null,
+                    sourceFingerprint: row.pendingSourceFingerprint,
+                    pendingSourceFingerprint: null,
+                    targetFingerprint: null,
+                    syncedAt: null,
+                }
+                : { pendingSnapshot: null, pendingByUserId: null, pendingSourceFingerprint: null };
             // (the target side of this sync point stays unknown: the publish may have been a while ago, and
             // today's fingerprint could hide changes made since)
-            row = await _getScriptImportSource(targetScriptId);
+            if (persist) {
+                await db.update(scriptImportSourcesTable)
+                    .set(settled)
+                    .where(eq(scriptImportSourcesTable.id, row.id));
+                row = await _getScriptImportSource(targetScriptId);
+            } else {
+                row = { ...row, ...settled };
+            }
         }
     }
     const sameSource = !!row && row.sourceScriptId === sourceScriptId;
@@ -3090,8 +3127,8 @@ async function resolveScriptImportBase(targetScriptId: string, sourceScriptId: s
  * from DEV, and now DEV brings a LIVE hotfix back): that record's base, with ids turned around, is then
  * the more recent common ancestor.
  */
-async function resolveMergeBase(targetScriptId: string, sourceScriptId: string, fromRemoteSiteId: string) {
-    const local = await resolveScriptImportBase(targetScriptId, sourceScriptId);
+async function resolveMergeBase(targetScriptId: string, sourceScriptId: string, fromRemoteSiteId: string, opts?: { persist?: boolean }) {
+    const local = await resolveScriptImportBase(targetScriptId, sourceScriptId, opts);
     // our own pending import wins: the drafts here were built on it
     if (local.sameSource && local.row?.pendingSnapshot) return { ...local, origin: 'local' as const };
     const remote = await fetchRemoteImportBase(fromRemoteSiteId, sourceScriptId, targetScriptId);
@@ -3319,8 +3356,8 @@ async function planMergeImport({
     const summary = summariseMergeReport(report);
     const isOption = (path: string) => path.endsWith('> items');
     const changes: ScriptImportChange[] = report.events
-        .filter(e => e.path.includes('>'))
-        .map(e => ({ kind: e.kind, path: e.path, label: e.label }));
+        .filter(e => e.path.includes('>') || e.kind === 'replaced_without_history')
+        .map(e => ({ kind: e.kind, path: e.path, label: e.label, ...(e.props ? { props: e.props } : {}) }));
     const MAX_CHANGES = 300;
 
     const titleOf = (kind: EntityKind, e: any) => kind === 'screens' ? (e.title || e.label || e.refId || '') : (e.name || e.key || '');
@@ -3351,6 +3388,7 @@ async function planMergeImport({
             keptTargetOnly: summary.keptTargetOnly.filter(e => isOption(e.path)).length,
             conflicts: summary.conflicts.filter(e => isOption(e.path)).length,
         },
+        replacedWithoutHistory: summary.replacedWithoutHistory.length,
         removedEntities,
         keptEntities,
         changes: changes.slice(0, MAX_CHANGES),
@@ -3378,6 +3416,7 @@ async function applyMergeImport({
     sourceSiteLink,
     sourceFingerprint,
     userId,
+    saveLibraries,
 }: {
     plan: MergeImportPlan;
     targetScriptId: string;
@@ -3387,6 +3426,8 @@ async function applyMergeImport({
     sourceSiteLink?: string | null;
     sourceFingerprint?: string | null;
     userId?: string | null;
+    /** Saves the import's drugs and data keys in the same transaction; throws to roll everything back. */
+    saveLibraries?: (tx: DbOrTransaction) => Promise<void>;
 }) {
     const draftOrigin = 'import' as const;
     const oldScriptId = plan.target.script.oldScriptId ?? null;
@@ -3452,6 +3493,8 @@ async function applyMergeImport({
             if (res.errors?.length) throw new Error(res.errors.join(', '));
         }
 
+        if (saveLibraries) await saveLibraries(tx);
+
         const hasDrafts = (await _getScriptsWithDrafts([targetScriptId], tx)).has(targetScriptId);
         await _recordScriptImport({
             targetScriptId,
@@ -3485,24 +3528,51 @@ async function getTakenDataKeyUniqueKeys(uniqueKeys: string[], liveUniqueKeys: S
 }
 
 /** Option uniqueKeys that screens outside `excludeScriptIds` still reference. */
-async function getOptionsUsedOutsideScripts(optionUniqueKeys: string[], excludeScriptIds: string[]) {
+/**
+ * Which (parent key, option) pairs are used by screens outside the given scripts: the option listed under
+ * a question whose own key is that parent (the screen's items, or a field's items). An option the source
+ * removed from a key is kept on that key while such questions exist. The same option under OTHER parent
+ * keys does not count: it is not affected by this key's list.
+ */
+async function getOptionsUsedOutsideScripts(
+    pairs: { parent: string; option: string; }[],
+    excludeScriptIds: string[],
+): Promise<Set<string>> {
     const used = new Set<string>();
-    for (const uk of Array.from(new Set(optionUniqueKeys.filter(Boolean)))) {
-        const pattern = `%${uk.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
-        const notExcluded = (column: any) => excludeScriptIds.length ? sql`(${column} is null or ${column} not in (${sql.join(excludeScriptIds.map(id => sql`${id}`), sql`, `)}))` : sql`true`;
+    const pairKey = (parent: string, option: string) => `${parent}|${option}`;
+    const asArray = (value: any): any[] => {
+        if (typeof value === 'string') { try { value = JSON.parse(value); } catch { return []; } }
+        return Array.isArray(value) ? value : [];
+    };
+    const usesUnder = (screen: { keyId?: string | null; items?: any; fields?: any; }, parent: string, option: string) =>
+        ((screen.keyId || '') === parent && asArray(screen.items).some(i => i?.keyId === option)) ||
+        asArray(screen.fields).some(f => f?.keyId === parent && asArray(f?.items).some(i => i?.keyId === option));
+
+    const byOption = new Map<string, Set<string>>();
+    pairs.filter(p => p.parent && p.option).forEach(({ parent, option }) => {
+        byOption.set(option, new Set([...(byOption.get(option) || []), parent]));
+    });
+
+    const notExcluded = (column: any) => excludeScriptIds.length ? sql`(${column} is null or ${column} not in (${sql.join(excludeScriptIds.map(id => sql`${id}`), sql`, `)}))` : sql`true`;
+    for (const [option, parents] of Array.from(byOption.entries())) {
+        // cheap text pre-filter, then the exact check per question
+        const pattern = `%${option.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
         const [published, drafts] = await Promise.all([
-            db.select({ id: screens.screenId }).from(screens).where(and(
+            db.select({ keyId: screens.keyId, items: screens.items, fields: screens.fields }).from(screens).where(and(
                 isNull(screens.deletedAt),
                 notExcluded(screens.scriptId),
                 or(sql`${screens.fields}::text like ${pattern}`, sql`${screens.items}::text like ${pattern}`),
-            )).limit(1),
-            db.select({ id: screensDrafts.screenDraftId }).from(screensDrafts).where(and(
+            )),
+            db.select({ data: screensDrafts.data }).from(screensDrafts).where(and(
                 notExcluded(screensDrafts.scriptId),
                 notExcluded(screensDrafts.scriptDraftId),
                 sql`${screensDrafts.data}::text like ${pattern}`,
-            )).limit(1),
+            )),
         ]);
-        if (published.length || drafts.length) used.add(uk);
+        const candidates = [...published, ...drafts.map(d => (d.data || {}) as any)];
+        parents.forEach(parent => {
+            if (candidates.some(screen => usesUnder(screen, parent, option))) used.add(pairKey(parent, option));
+        });
     }
     return used;
 }
@@ -3598,7 +3668,18 @@ async function exportScriptsViaRemoteImport({
     }
 }
 
-export async function copyScripts(params?: {
+/**
+ * Import / copy scripts. Runs as an internal operation: the saves it makes with draftOrigin 'import' are
+ * trusted as imports (see lib/server/internal-call.ts); its own checks decide whether it may run.
+ */
+export async function copyScripts(params?: Parameters<typeof copyScriptsInternal>[0]): ReturnType<typeof copyScriptsInternal> {
+    const res = await runAsInternalCall(() => copyScriptsInternal(params));
+    // an import changes what the sync status shows (pending imports, new sync points)
+    if (res?.success && !params?.dryRun) clearContentSyncStatusCache();
+    return res;
+}
+
+async function copyScriptsInternal(params?: {
     requestKey?: string;
     scriptsIds?: string[];
     confirmCopyAll?: boolean;
@@ -3773,7 +3854,7 @@ export async function copyScripts(params?: {
             });
 
             if (isMergeImport) {
-                mergeBase = await resolveMergeBase(overWriteScriptWithId!, scripts.data[0].scriptId, fromRemoteSiteId);
+                mergeBase = await resolveMergeBase(overWriteScriptWithId!, scripts.data[0].scriptId, fromRemoteSiteId, { persist: !dryRun });
             }
 
             const liveUniqueKeys = new Set(localDataKeys.map(k => k.uniqueKey));
@@ -3804,7 +3885,9 @@ export async function copyScripts(params?: {
                 let parsed = await parseImportedDataKeys(parseArgs);
 
                 // Options the source removed are only removed from a key when no other script uses them.
-                const removalCandidates = parsed.dataKeys.filter(k => k.canSave).flatMap(k => k.removedOptions);
+                const removalCandidates = parsed.dataKeys
+                    .filter(k => k.canSave)
+                    .flatMap(k => k.removedOptions.map(option => ({ parent: k.uniqueKey, option })));
                 if (removalCandidates.length) {
                     const usedElsewhere = await getOptionsUsedOutsideScripts(
                         removalCandidates,
@@ -3813,7 +3896,7 @@ export async function copyScripts(params?: {
                     if (usedElsewhere.size) {
                         parsed = await parseImportedDataKeys({
                             ...parseArgs,
-                            isOptionUsedOutsideImport: (_parent, option) => usedElsewhere.has(option),
+                            isOptionUsedOutsideImport: (parent, option) => usedElsewhere.has(`${parent}|${option}`),
                         });
                     }
                 }
@@ -3858,6 +3941,44 @@ export async function copyScripts(params?: {
                 removed: k.removedOptions.length,
                 changed: k.changedProps,
             })),
+        };
+
+        // Drugs and data keys are saved in the same transaction as the scripts: if any part fails,
+        // nothing is saved (screens referencing options their data key doesn't have, or the reverse).
+        const libraryInfo = { dffItems: 0, dataKeys: 0, };
+        const saveLibraries = async (tx: DbOrTransaction) => {
+            if (dffItemsToSave.length) {
+                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, true);
+                const saveDrugsStartedAt = Date.now();
+                const res = overwriteDrugsLibraryItems ?
+                    await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId, client: tx, })
+                    :
+                    await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId, client: tx, });
+                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
+                markTiming('save_drugs_library_items', saveDrugsStartedAt);
+                if (!res.success) throw new Error((res.errors || ['Failed to save drugs library items']).join(', '));
+                libraryInfo.dffItems = dffItemsToSave.length;
+            }
+
+            if (dataKeysToSave.length) {
+                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, true);
+                const saveDataKeysStartedAt = Date.now();
+                const res = await _saveDataKeys({
+                    data: dataKeysToSave.map(toDataKeySavePayload),
+                    userId,
+                    draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
+                    propagatedDraftOrigin: fromRemoteSiteId ? 'import' : 'data_key_sync',
+                    client: tx,
+                });
+                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
+                markTiming('save_data_keys', saveDataKeysStartedAt);
+                if (!res.success) throw new Error((res.errors || ['Failed to save data keys']).join(', '));
+                libraryInfo.dataKeys = dataKeysToSave.length;
+                res.warnings?.forEach(w => warnings.push(w));
+                importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])
+                    .map((script: { scriptId?: string | null }) => script.scriptId)
+                    .filter((value): value is string => !!value);
+            }
         };
 
         let response: Awaited<ReturnType<typeof saveScriptsWithItems>> & {
@@ -3932,6 +4053,7 @@ export async function copyScripts(params?: {
                     sourceSiteLink: siteUrl,
                     sourceFingerprint: sourceFingerprints.get(source.scriptId) || null,
                     userId,
+                    saveLibraries,
                 });
                 // Nothing to publish: the published state here already matches, so this is a sync point now.
                 if (!saved.hasDrafts) await recordTargetFingerprints([targetScriptId]);
@@ -3972,48 +4094,59 @@ export async function copyScripts(params?: {
             await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, true);
 
             const saveScriptsStartedAt = Date.now();
-            response = await saveScriptsWithItems({
-                uploadedFiles: importedFiles,
-                data: scripts.data.map(s => ({
-                    ...(withoutKeys(s, IMPORT_ROW_KEYS) as typeof s),
-                    overWriteScriptWithId,
-                    keepSourceIds: !!fromRemoteSiteId && syncSettings.role !== 'off' && syncSettings.keepSameIds,
-                    draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
-                    hospitalId: undefined!,
-                    hospitalName: undefined!,
-                })),
-            });
-            markTiming('save_scripts_with_items', saveScriptsStartedAt);
+            try {
+                response = await db.transaction(async (tx) => {
+                    const res = await saveScriptsWithItems({
+                        client: tx,
+                        uploadedFiles: importedFiles,
+                        data: scripts.data.map(s => ({
+                            ...(withoutKeys(s, IMPORT_ROW_KEYS) as typeof s),
+                            overWriteScriptWithId,
+                            keepSourceIds: !!fromRemoteSiteId && syncSettings.role !== 'off' && syncSettings.keepSameIds,
+                            draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
+                            hospitalId: undefined!,
+                            hospitalName: undefined!,
+                        })),
+                    });
+                    if (!res.success || res.errors?.length) throw new ImportRolledBack(res);
 
-            // Remember where each new copy came from, so a later import into it can merge.
-            if (fromRemoteSiteId && response.success) {
-                for (const [newScriptId, maps] of Object.entries(response.importIdMaps || {})) {
-                    const source = scripts.data.find(s => s.scriptId === maps.sourceScriptId);
-                    if (!source) continue;
-                    try {
-                        await _recordScriptImport({
-                            targetScriptId: newScriptId,
-                            sourceSiteId: fromRemoteSiteId,
-                            sourceSiteLink: siteUrl,
-                            sourceFingerprint: sourceFingerprints.get(source.scriptId) || null,
-                            userId,
-                            hasDrafts: true,
-                            snapshot: {
-                                sourceScriptId: source.scriptId,
-                                importedAt: new Date().toISOString(),
-                                script: scriptImportProps(source),
-                                screens: source.screens as any[],
-                                diagnoses: source.diagnoses as any[],
-                                problems: source.problems as any[],
-                                dataKeys: dataKeySnapshots[source.scriptId] || {},
-                                idMap: { screens: maps.screens, diagnoses: maps.diagnoses, problems: maps.problems },
-                            },
-                        });
-                    } catch (e: any) {
-                        logger.error('copyScripts record import source ERROR', e.message);
+                    // Remember where each new copy came from, so a later import into it can merge.
+                    if (fromRemoteSiteId) {
+                        for (const [newScriptId, maps] of Object.entries(res.importIdMaps || {})) {
+                            const source = scripts.data.find(s => s.scriptId === maps.sourceScriptId);
+                            if (!source) continue;
+                            await _recordScriptImport({
+                                targetScriptId: newScriptId,
+                                sourceSiteId: fromRemoteSiteId,
+                                sourceSiteLink: siteUrl,
+                                sourceFingerprint: sourceFingerprints.get(source.scriptId) || null,
+                                userId,
+                                hasDrafts: true,
+                                snapshot: {
+                                    sourceScriptId: source.scriptId,
+                                    importedAt: new Date().toISOString(),
+                                    script: scriptImportProps(source),
+                                    screens: source.screens as any[],
+                                    diagnoses: source.diagnoses as any[],
+                                    problems: source.problems as any[],
+                                    dataKeys: dataKeySnapshots[source.scriptId] || {},
+                                    idMap: { screens: maps.screens, diagnoses: maps.diagnoses, problems: maps.problems },
+                                },
+                                client: tx,
+                            });
+                        }
                     }
-                }
+
+                    await saveLibraries(tx);
+                    return res;
+                });
+                void recomputeScriptsConditionErrors(response.savedScriptIds || []);
+            } catch (e: any) {
+                response = e instanceof ImportRolledBack
+                    ? e.response
+                    : { success: false, errors: [e.message], info, };
             }
+            markTiming('save_scripts_with_items', saveScriptsStartedAt);
 
             await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
         }
@@ -4022,48 +4155,7 @@ export async function copyScripts(params?: {
             return response;
         }
 
-        if (dffItemsToSave.length) {
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, true);
-
-            const saveDrugsStartedAt = Date.now();
-            const res = overwriteDrugsLibraryItems ?
-                await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId, })
-                :
-                await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId, });
-            if (res.success) {
-                response.info.dffItems = dffItemsToSave.length;
-            } else {
-                response.success = false;
-                response.errors = [...(response.errors || []), ...(res.errors || ['Failed to save drugs library items'])];
-            }
-            markTiming('save_drugs_library_items', saveDrugsStartedAt);
-        }
-
-        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
-
-        if (dataKeysToSave.length) {
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, true);
-
-            const saveDataKeysStartedAt = Date.now();
-            const res = await _saveDataKeys({
-                data: dataKeysToSave.map(toDataKeySavePayload),
-                userId,
-                draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
-                propagatedDraftOrigin: fromRemoteSiteId ? 'import' : 'data_key_sync',
-            });
-            if (res.success) {
-                response.info.dataKeys = dataKeysToSave.length;
-                importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])
-                    .map((script: { scriptId?: string | null }) => script.scriptId)
-                    .filter((value): value is string => !!value);
-            } else {
-                response.success = false;
-                response.errors = [...(response.errors || []), ...(res.errors || ['Failed to save data keys'])];
-            }
-            markTiming('save_data_keys', saveDataKeysStartedAt);
-        }
-
-        await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
+        response.info = { ...response.info, ...libraryInfo, };
 
         if (warnings.length) response.warnings = Array.from(new Set([...(response.warnings || []), ...warnings]));
 

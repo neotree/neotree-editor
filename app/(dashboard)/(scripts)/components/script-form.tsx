@@ -66,7 +66,7 @@ export function ScriptForm() {
         saveDraft,
         formIsDirty,
     } = form;
-    useUnsavedChangesGuard(!!formIsDirty && !loading);
+    const { confirmLeave } = useUnsavedChangesGuard(!!formIsDirty && !loading);
 
     const { mode } = useAppContext();
 
@@ -303,7 +303,7 @@ export function ScriptForm() {
 
                     <Button
                         variant="ghost"
-                        onClick={() => onCancelScriptForm()}
+                        onClick={() => confirmLeave(() => onCancelScriptForm())}
                     >
                         Cancel
                     </Button>

@@ -20,6 +20,7 @@ import {
     getContentSyncSettings,
     getLocalContentSyncState,
     getOpenHotfixes,
+    clearContentSyncStatusCache,
 } from "@/lib/server/content-sync";
 import { isAllowed } from "./is-allowed";
 
@@ -171,13 +172,8 @@ export type ContentSyncStatusResult = {
 
 const STATUS_TTL_MS = 60 * 1000;
 
-declare global {
-    // eslint-disable-next-line no-var
-    var contentSyncStatusCache: { at: number; value: ContentSyncStatusResult } | undefined;
-}
-
 function clearStatusCache() {
-    globalThis.contentSyncStatusCache = undefined;
+    clearContentSyncStatusCache();
 }
 
 /**
@@ -215,7 +211,7 @@ export async function getContentSyncStatus(opts?: { refresh?: boolean; scriptId?
             };
         }
 
-        const cached = globalThis.contentSyncStatusCache;
+        const cached = globalThis.contentSyncStatusCache as { at: number; value: ContentSyncStatusResult } | undefined;
         if (!opts?.refresh && cached && Date.now() - cached.at < STATUS_TTL_MS && cached.value.role === settings.role) return cached.value;
 
         const site = await db.query.sites.findFirst({

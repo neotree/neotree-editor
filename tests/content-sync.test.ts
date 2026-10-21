@@ -153,4 +153,29 @@ const pairOf = (pairs: ReturnType<typeof computeContentSyncPairs>, title: string
     assert.equal(pairOf(pairs, "Identical").status, "in_sync", "equal content needs no import");
 }
 
+// ── A script linked to two counterparts: the newest link wins ──────────────────────────────────────
+// (the records come back from the database in no particular order)
+{
+    const source = state("source", [["d1", "Old source", "a"], ["d7", "New source", "b"]]);
+    const target = state("target", [["l1", "Imported", "b"]], [
+        rec("l1", "d1", "a", "a", 1),
+        rec("l1", "d7", "b", "b", 5),
+    ]);
+    const pairs = computeContentSyncPairs({ source, target });
+    const l1 = pairs.find(p => p.targetScriptId === "l1")!;
+    assert.equal(l1.sourceScriptId, "d7", "the most recent import decides the counterpart");
+    assert.equal(l1.status, "in_sync");
+
+    // an import still in drafts is newer than any published one
+    const pendingFirst = computeContentSyncPairs({
+        source,
+        target: state("target", [["l1", "Imported", "b"]], [
+            rec("l1", "d7", "b", "b", 5),
+            { ...rec("l1", "d1", "a", "a", 0, true), syncedAt: null },
+        ]),
+    });
+    assert.equal(pendingFirst.find(p => p.targetScriptId === "l1")!.sourceScriptId, "d1");
+    assert.equal(pendingFirst.find(p => p.targetScriptId === "l1")!.status, "pending");
+}
+
 console.log("content sync tests passed");

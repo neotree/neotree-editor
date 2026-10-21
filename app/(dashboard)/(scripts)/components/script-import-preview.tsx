@@ -11,6 +11,7 @@ const CHANGE_LABELS: Record<ScriptImportChange['kind'], string> = {
     kept_target_removal: 'Stays removed (removed here)',
     conflict_source_wins: 'Changed on both: source version used',
     conflict_kept_target: 'Changed here, removed on source: kept',
+    replaced_without_history: 'Differs here, source version used (first import)',
 };
 
 const CHANGE_CLASSES: Record<ScriptImportChange['kind'], string> = {
@@ -20,6 +21,7 @@ const CHANGE_CLASSES: Record<ScriptImportChange['kind'], string> = {
     kept_target_removal: 'text-muted-foreground',
     conflict_source_wins: 'text-amber-700',
     conflict_kept_target: 'text-amber-700',
+    replaced_without_history: 'text-amber-700',
 };
 
 function countsLine(label: string, counts: ScriptImportEntityCounts) {
@@ -91,6 +93,14 @@ export function ScriptImportPreviewSummary({ preview }: { preview: ScriptImportP
                 </div>
             )}
 
+            {preview.mode === 'merge' && preview.firstImport && !!preview.replacedWithoutHistory && (
+                <div className="text-xs text-amber-700">
+                    {preview.replacedWithoutHistory === 1 ? '1 screen, field or option here differs' : `${preview.replacedWithoutHistory} screens, fields or options here differ`} from
+                    the source and will take the source&apos;s wording or settings (listed below as &ldquo;source
+                    version used&rdquo;). Nothing is removed. Check them before importing.
+                </div>
+            )}
+
             {!!dataKeys.details.length && (
                 <details className="rounded-md border px-3 py-2 text-sm">
                     <summary className="cursor-pointer font-medium">Data key changes ({dataKeys.details.length})</summary>
@@ -141,6 +151,7 @@ export function ScriptImportPreviewSummary({ preview }: { preview: ScriptImportP
                                 <span className={CHANGE_CLASSES[c.kind]}>{CHANGE_LABELS[c.kind]}</span>
                                 {': '}
                                 <span className="font-medium">{c.label || '(no label)'}</span>
+                                {!!c.props?.length && <span className="text-muted-foreground"> ({c.props.join(', ')})</span>}
                                 <span className="text-muted-foreground"> &mdash; {c.path}</span>
                             </div>
                         ))}

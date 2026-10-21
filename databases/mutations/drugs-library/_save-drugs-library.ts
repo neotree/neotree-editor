@@ -3,6 +3,7 @@ import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { drugsLibrary, drugsLibraryDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
@@ -101,12 +102,13 @@ export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, ...params }: 
     data: SaveDrugsLibraryItemsData[];
     broadcastAction?: boolean;
     userId?: string;
+    client?: DbOrTransaction;
 }) {
     try {
         const keys = data.map(item => item.key!).filter(key => key);
         
         if (keys.length) {
-            const existing = await _getDrugsLibraryItems({ keys });
+            const existing = await _getDrugsLibraryItems({ keys, client: params.client, });
 
             data = data
                 .filter(item => !existing.data.map(d => d.key).includes(item.key!))
@@ -136,12 +138,13 @@ export async function _saveDrugsLibraryItemsUpdateIfExists({ data, ...params }: 
     data: SaveDrugsLibraryItemsData[];
     broadcastAction?: boolean;
     userId?: string;
+    client?: DbOrTransaction;
 }) {
     try {
         const keys = data.map(item => item.key!).filter(key => key);
         
         if (keys.length) {
-            const existing = await _getDrugsLibraryItems({ keys });
+            const existing = await _getDrugsLibraryItems({ keys, client: params.client, });
 
             data = data.map(item => {
                 const found = existing.data.find(k => `${k.key}`.toLowerCase() === `${item.key}`.toLowerCase());
@@ -171,12 +174,15 @@ export async function _saveDrugsLibraryItemsUpdateIfExists({ data, ...params }: 
     } 
 }
 
-export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }: {
+export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, client, }: {
     data: SaveDrugsLibraryItemsData[],
     broadcastAction?: boolean,
     userId?: string;
+    /** Run inside this transaction (e.g. an import saving its screens and drugs together). */
+    client?: DbOrTransaction;
 }) {
     const response: SaveDrugsLibraryItemsResponse = { success: false, };
+    const executor = client || db;
 
     try {
         const errors = [];
@@ -196,11 +202,11 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }:
                 let newType: null | typeof drugsLibrary.$inferSelect['type'] = item.type || null;
 
                 if (!errors.length) {
-                    const draft = !_itemId ? null : await db.query.drugsLibraryDrafts.findFirst({
+                    const draft = !_itemId ? null : await executor.query.drugsLibraryDrafts.findFirst({
                         where: eq(drugsLibraryDrafts.itemDraftId, itemId),
                     });
 
-                    const published = (draft || !_itemId) ? null : await db.query.drugsLibrary.findFirst({
+                    const published = (draft || !_itemId) ? null : await executor.query.drugsLibrary.findFirst({
                         where: eq(drugsLibrary.itemId, itemId),
                     });
 
@@ -213,7 +219,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }:
                             ...item,
                         };
                         
-                        await db
+                        await executor
                             .update(drugsLibraryDrafts)
                             .set({
                                 data,
@@ -226,12 +232,12 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }:
                         let position = item.position || published?.position;
 
                         if (!position) {
-                            const confKey = await db.query.drugsLibrary.findFirst({
+                            const confKey = await executor.query.drugsLibrary.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(drugsLibrary.position),
                             });
 
-                            const confKeyDraft = await db.query.drugsLibraryDrafts.findFirst({
+                            const confKeyDraft = await executor.query.drugsLibraryDrafts.findFirst({
                                 columns: { position: true, },
                                 orderBy: desc(drugsLibraryDrafts.position),
                             });
@@ -247,7 +253,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }:
                             position,
                         } as typeof drugsLibrary.$inferInsert;
 
-                        await db.insert(drugsLibraryDrafts).values({
+                        await executor.insert(drugsLibraryDrafts).values({
                             data,
                             itemDraftId: itemId,
                             position: data.position,
@@ -269,12 +275,16 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }:
             }
         }
 
-        if (removeReferences.length) await _removeDrugLibraryItemsReferences({ keys: removeReferences, userId, });
+        if (removeReferences.length) {
+            const res = await _removeDrugLibraryItemsReferences({ keys: removeReferences, userId, client, });
+            if (res.errors?.length) errors.push(...res.errors);
+        }
 
         if (keys.length) {
             const screens = await _getScreens({
                 types: ['drugs', 'fluids', 'feeds'],
                 returnDraftsIfExist: true,
+                client,
             });
 
             const updatedScreens: typeof screens.data = [];
@@ -319,7 +329,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, }:
                         // Safe to chunk/parallelize here specifically: every screen came
                         // from _getScreens above, so it already has a real position —
                         // the racy MAX(position)+1 fallback in _saveScreens is never hit.
-                        const res = await _saveScreens({ data: chunk, userId, });
+                        const res = await _saveScreens({ data: chunk, userId, client, });
                         if (res.errors?.length) errors.push(...res.errors);
                     },
                 );

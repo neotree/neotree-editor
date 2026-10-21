@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS "script_import_sources_source_index"
 -- 3. nt_script_import_sources: the last sync point of each imported script (fingerprints of the imported
 --    source content and of this editor's published content right after the import was published).
 --
--- Run after 2026-10-20_add_script_import_sources.sql.
+-- The nt_script_import_sources table above must exist first (it is created at the top of this file).
 
 ALTER TABLE "nt_editor_info" ADD COLUMN IF NOT EXISTS "content_sync" jsonb DEFAULT '{}'::jsonb NOT NULL;
 

@@ -18,6 +18,7 @@ import { Title } from "../title";
 import { useDiagnosisForm } from "../..//hooks/use-diagnosis-form";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
+import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { collectNewOutcomeKeyCollisions } from "@/lib/conditional-expression";
 
 type Props = {
@@ -43,6 +44,7 @@ export function Symptom<P = {}>({
     unavailableOutcomeKeys,
     ...extraProps
 }: Props & P) {
+    const { confirm: confirmDiscard } = useConfirmModal();
     const { data: symptom, index: symptomIndex, } = { ...symptomProp, };
 
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -118,9 +120,22 @@ export function Symptom<P = {}>({
                 title={symptom ? 'Edit symptom' : 'Add symptom'}
                 trigger={children ? (typeof children === 'function' ? children({ extraProps }) : children) : undefined}
                 onOpenChange={open => {
-                    if (!open && symptomFormIsDirty && !window.confirm('Discard your changes to this symptom?')) return;
-                    setOpen(open);
-                    resetForm(getDefaultValues());
+                    const applyOpenChange = () => {
+                        setOpen(open);
+                        resetForm(getDefaultValues());
+                    };
+                    // Closing with unsaved changes (Esc, clicking outside, Cancel) asks first, in the app's dialog
+                    if (!open && symptomFormIsDirty) {
+                        confirmDiscard(applyOpenChange, {
+                            title: 'Discard changes?',
+                            message: 'Discard your changes to this symptom?',
+                            positiveLabel: 'Discard',
+                            negativeLabel: 'Keep editing',
+                            danger: true,
+                        });
+                        return;
+                    }
+                    applyOpenChange();
                 }}
                 actions={(
                     <>

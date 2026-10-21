@@ -22,6 +22,7 @@ import { getUser } from "@/app/actions/users";
 import { _getUser } from '@/databases/queries/users';
 import { actingUserHeaders } from '@/lib/acting-user';
 import { assertContentEditable } from '@/lib/server/content-sync';
+import { trustedDraftOrigin } from '@/lib/server/internal-call';
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
@@ -197,6 +198,12 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, 
     };
 }
 
+/** A repair that matches more than one question changes nothing; say so instead of skipping it silently. */
+function ambiguousRepairWarning(entry: DataKeyIntegrityEntry, matches: number) {
+    const where = [entry.scriptTitle, entry.location].filter(Boolean).join(' > ') || 'This reference';
+    return `${where}: not changed. It matches ${matches} questions (for example fields with the same label), so it can't be told which one to fix. Fix it in the screen editor instead.`;
+}
+
 // Repairs only touch nuidSearchFields - send just that so the draft keeps every other
 // script value, and computed read-model fields never leak into the stored record.
 function toNuidSearchFieldsSavePayload(scripts: Awaited<ReturnType<typeof _getScripts>>["data"]) {
@@ -287,9 +294,12 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
     try {
         const session = await isAllowed();
         await assertCanManageDataKeys(session.user);
-        await assertContentEditable({ area: 'dataKeys', userRole: session.user?.role, viaApiKey: session.viaApiKey, draftOrigin: params?.draftOrigin, });
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        const draftOrigin = trustedDraftOrigin(params?.draftOrigin, session);
+        await assertContentEditable({ area: 'dataKeys', userRole: session.user?.role, viaApiKey: session.viaApiKey, draftOrigin, });
         const res = await _saveDataKeys({
             ...params,
+            draftOrigin,
             userId: session.user?.userId,
         });
        
@@ -318,10 +328,12 @@ export const saveDataKeysIfNotExist = async (
 ): ReturnType<typeof _saveDataKeysIfNotExist> => {
     try {
         const session = await isAllowed();
-        await assertContentEditable({ area: 'dataKeys', userRole: session.user?.role, viaApiKey: session.viaApiKey, draftOrigin: params?.draftOrigin, });
+        const draftOrigin = trustedDraftOrigin(params?.draftOrigin, session);
+        await assertContentEditable({ area: 'dataKeys', userRole: session.user?.role, viaApiKey: session.viaApiKey, draftOrigin, });
         await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysIfNotExist({
             ...params,
+            draftOrigin,
             userId: session.user?.userId,
         });
     } catch (e: any) {
@@ -339,10 +351,12 @@ export const saveDataKeysUpdateIfExist  = async (
 ): ReturnType<typeof _saveDataKeysUpdateIfExist> => {
     try {
         const session = await isAllowed();
-        await assertContentEditable({ area: 'dataKeys', userRole: session.user?.role, viaApiKey: session.viaApiKey, draftOrigin: params?.draftOrigin, });
+        const draftOrigin = trustedDraftOrigin(params?.draftOrigin, session);
+        await assertContentEditable({ area: 'dataKeys', userRole: session.user?.role, viaApiKey: session.viaApiKey, draftOrigin, });
         await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysUpdateIfExist({
             ...params,
+            draftOrigin,
             userId: session.user?.userId,
         });
     } catch (e: any) {
@@ -565,7 +579,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 reportAfter: null,
                 impactSummary: null,
                 errors: [],
-                warnings: [],
+                warnings: repairs.ambiguousMatches ? [ambiguousRepairWarning(params.entry, repairs.ambiguousMatches)] : [],
             };
         }
 
@@ -815,7 +829,10 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 overrideTargetUniqueKey: item.selectedTargetUniqueKey,
             });
 
-            if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length && !repairs.scripts.length) continue;
+            if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length && !repairs.scripts.length) {
+                if (repairs.ambiguousMatches) warnings.push(ambiguousRepairWarning(entry, repairs.ambiguousMatches));
+                continue;
+            }
 
             resolvedCount++;
             if (repairs.screens.length) {
@@ -868,7 +885,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 resolvedCount: 0,
                 impactSummary: null,
                 errors: [],
-                warnings: [],
+                warnings,
             };
         }
 
