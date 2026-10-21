@@ -19,7 +19,7 @@ function load(scriptId: string) {
 
 /**
  * Content sync: which screens, diagnoses and problems of a script differ from its counterpart on the
- * linked editor, so they can be shaded like unpublished drafts. Empty sets when content sync is off,
+ * linked editor, listed by name on the script page. Empty sets when content sync is off,
  * the script is in sync, or the other editor can't tell.
  */
 export function useContentSyncEntityDiff(scriptId?: string | null) {

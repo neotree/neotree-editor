@@ -17,6 +17,8 @@
  * Everything here is pure (no database access) so it can be unit-tested.
  */
 
+import { fileRefIdentity } from './file-ref';
+
 const VOLATILE_KEYS = new Set([
     'id',
     'createdAt',
@@ -50,7 +52,8 @@ const FILE_KEYS = new Set(['image1', 'image2', 'image3', 'contentTextImage']);
 
 function normalizeFileRef(value: any) {
     if (!value || typeof value !== 'object') return value;
-    return { fileId: value.fileId || value.data || null };
+    // the copy on the other editor has its own id and URL: the same file is the same name and size
+    return { file: fileRefIdentity(value) };
 }
 
 /** sameValue for one property, treating file references as equal when they name the same file. */

@@ -167,7 +167,13 @@ export type ContentSyncStatus =
     | "pending"
     | "never_synced"
     | "only_on_source"
-    | "only_on_target";
+    | "only_on_target"
+    /**
+     * The two editors run different builds of the editor software, which fingerprint content differently
+     * (e.g. one was deployed before the other). Not about data versions: those never match between editors
+     * and play no part in content sync.
+     */
+    | "cannot_compare";
 
 export type ContentSyncPair = {
     status: ContentSyncStatus;
@@ -192,6 +198,7 @@ export const CONTENT_SYNC_STATUS_LABELS: Record<ContentSyncStatus, string> = {
     never_synced: "Not synced yet",
     only_on_source: "Only on source",
     only_on_target: "Only on target",
+    cannot_compare: "Can't compare yet: update both editors",
 };
 
 /**
@@ -199,6 +206,8 @@ export const CONTENT_SYNC_STATUS_LABELS: Record<ContentSyncStatus, string> = {
  * Sync points come from both editors: imports into the target (source -> target) and back-ports into the
  * source (target -> source). The most recent one is the reference.
  */
+const fingerprintVersion = (fp?: string | null) => (`${fp || ""}`.includes(":") ? `${fp}`.split(":")[0] : "");
+
 export function computeContentSyncPairs({ source, target }: { source: ContentSyncState; target: ContentSyncState; }): ContentSyncPair[] {
     const sourceScripts = new Map(source.scripts.map(s => [s.scriptId, s]));
     const targetScripts = new Map(target.scripts.map(s => [s.scriptId, s]));
@@ -267,6 +276,7 @@ export function computeContentSyncPairs({ source, target }: { source: ContentSyn
         if (!s) { pairs.push({ ...base, status: "only_on_target" }); return; }
         if (!t) { pairs.push({ ...base, status: "only_on_source" }); return; }
         if (pending) { pairs.push({ ...base, status: "pending", pendingOn: pending.pendingOn }); return; }
+        if (version(s.fingerprint) !== version(t.fingerprint)) { pairs.push({ ...base, status: "cannot_compare" }); return; }
         if (s.fingerprint === t.fingerprint) { pairs.push({ ...base, status: "in_sync" }); return; }
         if (!synced) { pairs.push({ ...base, status: "never_synced" }); return; }
         const sourceChanged = s.fingerprint !== synced.sourceFp;
@@ -302,7 +312,8 @@ export function computeContentSyncPairs({ source, target }: { source: ContentSyn
         pairedSource.add(s.scriptId);
         pairedTarget.add(t.scriptId);
         pairs.push({
-            status: s.fingerprint === t.fingerprint ? "in_sync" : "never_synced",
+            status: fingerprintVersion(s.fingerprint) !== fingerprintVersion(t.fingerprint) ? "cannot_compare"
+                : s.fingerprint === t.fingerprint ? "in_sync" : "never_synced",
             sourceScriptId: s.scriptId,
             targetScriptId: t.scriptId,
             sourceTitle: s.title,
@@ -315,7 +326,7 @@ export function computeContentSyncPairs({ source, target }: { source: ContentSyn
         pairs.push({ status: "only_on_target", sourceScriptId: null, targetScriptId: t.scriptId, sourceTitle: null, targetTitle: t.title, hotfix: hotfixes.get(t.scriptId) || null, linkedBy: "none" });
     });
 
-    const order: ContentSyncStatus[] = ["diverged", "target_ahead", "pending", "source_ahead", "never_synced", "only_on_target", "only_on_source", "in_sync"];
+    const order: ContentSyncStatus[] = ["diverged", "target_ahead", "pending", "source_ahead", "never_synced", "only_on_target", "only_on_source", "cannot_compare", "in_sync"];
     return pairs.sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status)
         || `${a.sourceTitle || a.targetTitle}`.localeCompare(`${b.sourceTitle || b.targetTitle}`));
 }
@@ -345,13 +356,16 @@ export type EntityKindDiff = {
     onlyHere: string[];
     /** Titles of entities the other editor has and this one doesn't. */
     onlyThere: string[];
+    /** Titles of `changed` and `onlyHere`, for listing them. */
+    changedLabels: string[];
+    onlyHereLabels: string[];
 };
 
 export type ScriptEntitiesDiff = {
     screens: EntityKindDiff;
     diagnoses: EntityKindDiff;
     problems: EntityKindDiff;
-    /** Number of entities here that differ or exist only here (what gets shaded). */
+    /** Number of entities here that differ or exist only here. */
     total: number;
 };
 
@@ -392,8 +406,15 @@ export function diffScriptEntities({ local, remote }: { local: ScriptEntitiesLik
             if (!l) onlyThere.push(r.label || r.natural);
             else if (l.fingerprint !== r.fingerprint) changed.push(l.id);
         });
-        const onlyHere = local[kind].filter(e => !paired.has(e.id)).map(e => e.id);
-        return { changed, onlyHere, onlyThere };
+        const onlyHereEntities = local[kind].filter(e => !paired.has(e.id));
+        const labelOf = (id: string) => localById.get(id)?.label || localById.get(id)?.natural || id;
+        return {
+            changed,
+            onlyHere: onlyHereEntities.map(e => e.id),
+            onlyThere,
+            changedLabels: changed.map(labelOf),
+            onlyHereLabels: onlyHereEntities.map(e => e.label || e.natural || e.id),
+        };
     };
     const screens = diffKind("screens");
     const diagnoses = diffKind("diagnoses");

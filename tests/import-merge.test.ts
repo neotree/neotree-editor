@@ -223,4 +223,15 @@ const values = (items: any[]) => items.map((i) => i.value ?? i.id);
   assert.ok(!withBase.events.some((e) => e.kind === "replaced_without_history"));
 }
 
+// ── An image copied by the import is not a change ───────────────────────────────────────────────────
+{
+  const report = createMergeReport();
+  const img = (fileId: string, filename: string, size: any) => ({ image1: { fileId, filename, size, data: `/files/${fileId}` } });
+  const source = [opt("a", "A", img("22222222-2222-4222-8222-222222222222", "photo.jpg", "100"))];
+  const target = [opt("a", "A", img("11111111-1111-4111-8111-111111111111", "11111111-1111-4111-8111-111111111111__photo.jpg?w=1", 100))];
+  const merged = mergeList(source, target, source, FIELD_SPEC.children!.items, "field", report);
+  assert.equal(merged[0].image1.fileId, "11111111-1111-4111-8111-111111111111", "the target keeps its own copy of the file");
+  assert.ok(!contentChanged(merged[0], target[0]), "and nothing counts as changed");
+}
+
 console.log("import-merge tests passed");

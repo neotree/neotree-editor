@@ -1,5 +1,7 @@
 import { createHash } from "crypto";
 
+import { fileRefIdentity } from "./file-ref";
+
 /**
  * Content fingerprints for content sync (see lib/content-sync.ts). Server-side only (node crypto).
  *
@@ -13,7 +15,8 @@ import { createHash } from "crypto";
  * Bumped whenever what counts as content changes. Sync points recorded with another version are not
  * compared (lib/content-sync.ts), so a rule change never shows false drift.
  */
-export const FINGERPRINT_VERSION = "v1";
+// v2: images are compared by file name and size (v1 used the file id, which differs after an import copy)
+export const FINGERPRINT_VERSION = "v2";
 
 // Row bookkeeping and per-editor state: never content.
 const IGNORED = new Set([
@@ -84,8 +87,8 @@ function canonical(value: unknown): string {
             .sort();
         return `{${keys.map(k => {
             const v = obj[k];
-            // the same file is served from a different URL on each editor
-            const normalized = FILE_KEYS.has(k) && v && typeof v === "object" ? { fileId: (v as any).fileId || (v as any).data || null } : v;
+            // the same file has a different id and URL on each editor: compare what it is (name and size)
+            const normalized = FILE_KEYS.has(k) && v && typeof v === "object" ? { file: fileRefIdentity(v) } : v;
             return `${JSON.stringify(k)}:${canonical(normalized)}`;
         }).join(",")}}`;
     }

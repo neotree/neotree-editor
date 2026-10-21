@@ -305,7 +305,7 @@ export type ContentSyncEntityDiffResult = {
 
 /**
  * Which screens, diagnoses and problems of a script differ from its counterpart on the linked editor
- * (published content on both sides). Script pages shade them, like unpublished drafts are shaded.
+ * (published content on both sides). The script page lists them by name.
  */
 export async function getContentSyncEntityDiff({ scriptId }: { scriptId: string; }): Promise<ContentSyncEntityDiffResult> {
     const none = (extra?: Partial<ContentSyncEntityDiffResult>): ContentSyncEntityDiffResult => ({ enabled: false, status: null, diff: null, ...extra });

@@ -218,4 +218,28 @@ const pairOf = (pairs: ReturnType<typeof computeContentSyncPairs>, title: string
     assert.equal(diffScriptEntities({ local: a, remote: a }).total, 0, "identical content: nothing to shade");
 }
 
+// ── Images copied by an import are the same image (new id, id-prefixed name, size as text) ─────────
+{
+    const here = { image1: { fileId: "11111111-1111-4111-8111-111111111111", data: "http://0.0.0.0:8500/files/1111", url: "http://0.0.0.0:8500/files/1111",
+        filename: "11111111-1111-4111-8111-111111111111__HBB action plan.jpg?w=588&h=1076", size: 84101, contentType: "image/jpeg" } };
+    const there = { image1: { fileId: "22222222-2222-4222-8222-222222222222", data: "https://demo/files/2222?height=1076&width=588",
+        filename: "HBB action plan.jpg", size: "84101", type: "application/octet-stream" } };
+    const fp = (img: any) => computeScriptFingerprint({ script: { title: "S" }, screens: [{ screenId: "a", position: 1, title: "T", ...img }] });
+    assert.equal(fp(here), fp(there), "the same file on both editors is not a difference");
+    assert.notEqual(fp(here), fp({ image1: { ...there.image1, size: "90000" } }), "a different image still is");
+    // the other editor may store a generated name: size and dimensions still identify the file
+    assert.equal(fp(here), fp({ image1: { ...there.image1, filename: "448c90df-47b3-4ca6-9c6c-262024419e4d.jpeg" } }));
+    assert.notEqual(fp(here), fp({ image1: { ...there.image1, data: "https://demo/files/2222?height=10&width=20" } }), "same size, other dimensions: a different image");
+    assert.ok(fp(here).startsWith("v2:"));
+}
+
+// ── Editors that fingerprint differently can't be compared: no false "out of sync" ─────────────────
+{
+    const source = state("source", [["s1", "Same", "v1:abc"]]);
+    const target = state("target", [["s1", "Same", "v2:def"]]);
+    const pairs = computeContentSyncPairs({ source, target });
+    assert.equal(pairs[0].status, "cannot_compare");
+    assert.ok(!isOutOfSync(pairs[0].status), "and it is not shaded as out of sync");
+}
+
 console.log("content sync tests passed");
