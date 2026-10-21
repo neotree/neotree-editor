@@ -298,8 +298,8 @@ export async function parseImportedDataKeys({
     importedDrugsLibraryItems = [],
 }: {
     localDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'];
-    importedDataKeys: DataKey[];
-    importedScrappedKeys: Awaited<ReturnType<typeof scrapDataKeys>>;
+    importedDataKeys: DataKey[]; // the whole remote data key library
+    importedScrappedKeys: Awaited<ReturnType<typeof scrapDataKeys>>; // 
     importedScreens?: Awaited<ReturnType<typeof _getScreens>>['data'];
     importedDiagnoses?: Awaited<ReturnType<typeof _getDiagnoses>>['data'];
     importedProblems?: Awaited<ReturnType<typeof _getProblems>>['data'];
@@ -357,7 +357,7 @@ export async function parseImportedDataKeys({
             )
         );
 
-        let isScrapped = !!importedScrappedKeys.find(sk => dataKeyToJSON(sk) === dataKeyToJSON(k));
+        let isScrapped = !!importedScrappedKeys.find(sk => k.name === sk.name);
 
         return {
             ...k,
