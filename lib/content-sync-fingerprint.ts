@@ -16,7 +16,8 @@ import { fileRefIdentity } from "./file-ref";
  * compared (lib/content-sync.ts), so a rule change never shows false drift.
  */
 // v2: images are compared by file name and size (v1 used the file id, which differs after an import copy)
-export const FINGERPRINT_VERSION = "v2";
+// v3: SHA-256 instead of SHA-1 (v2 values cannot be compared with v3 ones)
+export const FINGERPRINT_VERSION = "v3";
 
 // Row bookkeeping and per-editor state: never content.
 const IGNORED = new Set([
@@ -142,7 +143,7 @@ export function computeScriptFingerprint({
         canonical([...diagnoses].sort(byPosition)),
         canonical([...problems].sort(byPosition)),
     ].join("|");
-    return `${FINGERPRINT_VERSION}:${createHash("sha1").update(body).digest("hex")}`;
+    return `${FINGERPRINT_VERSION}:${createHash("sha256").update(body).digest("hex")}`;
 }
 
 /** One screen, diagnosis or problem, fingerprinted on its own (to show which ones differ). */
@@ -181,7 +182,7 @@ export function computeEntityFingerprints({
         if (s.oldScreenId) screenIndex.set(`${s.oldScreenId}`, i);
     });
     const screenRef = (id: any) => (id && screenIndex.has(`${id}`) ? `#${screenIndex.get(`${id}`)}` : id ? "?" : null);
-    const hash = (value: unknown) => createHash("sha1").update(canonical(value)).digest("hex");
+    const hash = (value: unknown) => createHash("sha256").update(canonical(value)).digest("hex");
     const norm = (...parts: unknown[]) => parts.map(p => `${p || ""}`.trim().toLowerCase()).join("|");
 
     return {
