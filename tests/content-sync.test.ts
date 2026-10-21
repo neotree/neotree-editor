@@ -230,7 +230,7 @@ const pairOf = (pairs: ReturnType<typeof computeContentSyncPairs>, title: string
     // the other editor may store a generated name: size and dimensions still identify the file
     assert.equal(fp(here), fp({ image1: { ...there.image1, filename: "448c90df-47b3-4ca6-9c6c-262024419e4d.jpeg" } }));
     assert.notEqual(fp(here), fp({ image1: { ...there.image1, data: "https://demo/files/2222?height=10&width=20" } }), "same size, other dimensions: a different image");
-    assert.ok(fp(here).startsWith("v2:"));
+    assert.ok(fp(here).startsWith("v3:"));
 }
 
 // ── Editors that fingerprint differently can't be compared: no false "out of sync" ─────────────────

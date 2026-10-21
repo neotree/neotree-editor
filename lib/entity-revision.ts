@@ -54,5 +54,5 @@ function canonical(value: unknown, topLevel: boolean): string {
 
 export function computeEntityRevision(entity: Record<string, unknown> | null | undefined) {
     if (!entity) return '';
-    return createHash('sha1').update(canonical(entity, true)).digest('hex');
+    return createHash('sha256').update(canonical(entity, true)).digest('hex');
 }

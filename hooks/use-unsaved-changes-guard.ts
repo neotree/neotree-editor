@@ -46,8 +46,10 @@ export function useUnsavedChangesGuard(dirty: boolean, message = DEFAULT_MESSAGE
             const anchor = (e.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
             if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
             const href = anchor.getAttribute('href') || '';
-            if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+            if (!href || href.startsWith('#')) return;
             const url = new URL(anchor.href, window.location.href);
+            // only page navigations: leave javascript:, data:, mailto: etc. links to the browser
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
             if (url.origin === window.location.origin && url.pathname === window.location.pathname && url.search === window.location.search) return;
 
             // next/link skips a prevented click
