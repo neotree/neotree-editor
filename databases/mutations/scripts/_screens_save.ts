@@ -11,7 +11,10 @@ import { removeHexCharacters } from '../../utils'
 import { normalizeSelectionRuleItems, validateSelectionRules } from '@/lib/selection-rules';
 
 
-export type SaveScreensData = Partial<ScreenType>;
+export type SaveScreensData = Partial<ScreenType> & {
+    /** The revision the editor loaded (see lib/entity-revision.ts); checked by the save action. */
+    baseRevision?: string;
+};
 
 export type SaveScreensResponse = { 
     success: boolean; 
@@ -72,8 +75,9 @@ function normalizeScreenSelectionRuleItemIds(screen: SaveScreensData): {
     return {
         value: {
             ...screen,
-            items: screenItems.items,
-            fields,
+            // Partial saves (e.g. only a title) must not turn missing lists into empty ones.
+            ...(screen.items === undefined ? {} : { items: screenItems.items }),
+            ...(screen.fields === undefined ? {} : { fields }),
         },
         warnings: [
             ...summarizeSelectionRuleWarnings('Screen items', screenItems.warnings),
@@ -238,7 +242,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
     
     try {
         let index = 0;
-        for (const { screenId: itemScreenId, ...item } of data) {
+        for (const { screenId: itemScreenId, baseRevision: _baseRevision, revision: _revision, ...item } of data) {
             try {
                 index++;
                 const normalized = normalizeScreenSelectionRuleItemIds(item);
@@ -279,9 +283,11 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                     if (draft) {                        
                         const persistedDraftOrigin = requestedDraftOrigin;
 
+                        // Persist the normalised items (generated itemIds, remapped selection rules); saving
+                        // the raw payload meant the ids were regenerated on every save.
                         const data = {
                             ...draft.data,
-                            ...item,
+                            ...normalizedItem,
                         } as typeof draft.data;
                         
                         const q = executor
@@ -290,6 +296,9 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                                 data,
                                 position: data.position,
                                 draftOrigin: persistedDraftOrigin,
+                                // A draft nobody owns cannot be published by anyone ("publish my changes");
+                                // whoever edits it next takes it over.
+                                ...(!draft.createdByUserId && userId ? { createdByUserId: userId } : {}),
                             }).where(eq(screensDrafts.screenDraftId, screenId));
 
                         info.query = q.toSQL();
@@ -313,7 +322,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
 
                         const data = {
                             ...published,
-                            ...item,
+                            ...normalizedItem,
                             screenId,
                             version: published?.version ? (published.version + 1) : 1,
                             position,

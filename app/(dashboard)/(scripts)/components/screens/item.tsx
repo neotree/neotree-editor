@@ -130,7 +130,7 @@ export function Item<P = {}>({
     register,
     handleSubmit,
     setValue,
-    formState: { errors },
+    formState: { errors, isDirty: itemFormIsDirty },
   } = useForm({
     defaultValues: getDefaultValues(),
   })
@@ -191,6 +191,7 @@ export function Item<P = {}>({
                 score: data.score ? Number(data.score) : null,
               }),
         })),
+        { shouldDirty: true },
       )
     } else {
       form.setValue("items", [...form.getValues("items"), data], { shouldDirty: true })
@@ -238,6 +239,7 @@ export function Item<P = {}>({
     const _type = screenType + "_option"
 
     return (
+      <>
       <SelectDataKey
         modal
         value={key}
@@ -264,6 +266,13 @@ export function Item<P = {}>({
           setValue("label", label, { shouldDirty: true })
         }}
       />
+      {!!screenDataKey && !isKeyDisabled && (isChecklistScreen || isMultiSelectScreen || isSingleSelectScreen) && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Only options of the screen&apos;s data key &quot;{screenDataKey.label || screenDataKey.name}&quot; are listed. To use
+          another option, add it to that key in the Data keys library first.
+        </p>
+      )}
+      </>
     )
   }
 
@@ -273,6 +282,7 @@ export function Item<P = {}>({
         open={open}
         title={!item ? "New item" : "Edit item"}
         onOpenChange={(open) => {
+          if (!open && itemFormIsDirty && !window.confirm("Discard your changes to this item?")) return
           if (!open) onClose()
           resetForm(getDefaultValues())
         }}
@@ -334,9 +344,12 @@ export function Item<P = {}>({
                     <TooltipProvider delayDuration={0}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
-                            type="button"
+                          {/* not a <button>: the Switch inside is one, and buttons cannot be nested */}
+                          <div
+                            role="button"
+                            tabIndex={0}
                             className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                             onClick={() =>
                               alert({
                                 title: "Confidentiality is managed in Data Keys",
@@ -349,7 +362,7 @@ export function Item<P = {}>({
                             <Label secondary htmlFor="confidential">
                               Confidential
                             </Label>
-                          </button>
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="flex flex-col gap-y-1">
@@ -372,9 +385,12 @@ export function Item<P = {}>({
                     <TooltipProvider delayDuration={0}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
-                            type="button"
+                          {/* not a <button>: the Switch inside is one, and buttons cannot be nested */}
+                          <div
+                            role="button"
+                            tabIndex={0}
                             className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                             onClick={() =>
                               alert({
                                 title: "Confidentiality is managed in Data Keys",
@@ -387,7 +403,7 @@ export function Item<P = {}>({
                             <Label secondary htmlFor="confidentialLabelOnly">
                               Confidential (label only)
                             </Label>
-                          </button>
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="flex flex-col gap-y-1">

@@ -23,6 +23,11 @@ export type GetDataKeysParams = {
     }[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    /**
+     * Return published rows even when a deletion is queued (pending) for them. Used when another
+     * editor imports this editor's published state: an unpublished deletion is not published yet.
+     */
+    includePendingDeletion?: boolean;
     pagination?: {
         limit: number;
         page: number;
@@ -75,6 +80,7 @@ export async function _getDataKeys(
             names: namesParam = [],
             uniqueKeys: uniqueKeysParam = [],
             returnDraftsIfExist = true, 
+            includePendingDeletion,
             pagination: paginationParam,
             dateAfter: _dateAfter = null,
         } = { ...params };
@@ -152,7 +158,7 @@ export async function _getDataKeys(
         const whereDataKeys = [
             wherePublishedDateAfter,
             isNull(dataKeys.deletedAt),
-            isNull(pendingDeletion),
+            includePendingDeletion ? undefined : isNull(pendingDeletion),
 
             !drafts.length ? undefined : notInArray(dataKeys.uuid, drafts.map(d => d.uuid)),
 

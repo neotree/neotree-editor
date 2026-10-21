@@ -146,6 +146,8 @@ export async function _saveDrugsLibraryItemsUpdateIfExists({ data, ...params }: 
             data = data.map(item => {
                 const found = existing.data.find(k => `${k.key}`.toLowerCase() === `${item.key}`.toLowerCase());
 
+                // Items that are new here must not carry the other editor's serial id, position or
+                // version: the serial id collides with an unrelated local row when the draft is published.
                 return {
                     ...item,
                     itemId: found?.itemId || item.itemId,
@@ -153,9 +155,9 @@ export async function _saveDrugsLibraryItemsUpdateIfExists({ data, ...params }: 
                     updatedAt: undefined,
                     deletedAt: undefined,
                     publishDate: undefined,
-                    id: found?.id || item.id,
-                    position: found?.position || item.position,
-                    version: found?.version || item.version,
+                    id: found?.id,
+                    position: found?.position,
+                    version: found?.version,
                 };
             });
 

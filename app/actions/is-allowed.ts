@@ -8,7 +8,7 @@ import { isUnauthenticatedError } from "@/lib/auth-errors";
 type PermissionParam = PagePermission | PagePermission[] | DataAction | DataAction[];
 
 export async function canAccessPage(perm?: PermissionParam) {
-    let response: Awaited<ReturnType<typeof isAllowed>> = { yes: false, user: null, };
+    let response: Awaited<ReturnType<typeof isAllowed>> = { yes: false, user: null, viaApiKey: false, };
     try {
         response = await isAllowed(perm);
     } catch(e: any) {

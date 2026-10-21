@@ -38,6 +38,7 @@ import { getDataKeyIntegrityEntryFingerprint, getDataKeyIntegrityStatusLabel, is
 import { getDataKeyIntegrityRulesHref } from "@/lib/data-key-integrity-rules";
 import type { IntegrityPolicy } from "@/lib/integrity-policy";
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { pendingChangesAPI } from "@/lib/indexed-db";
 
 const statusStyles = {
@@ -233,7 +234,8 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
 }) {
     type BulkPreviewItem = Awaited<ReturnType<typeof previewDataKeyIntegrityEntriesBulk>>["previews"][number];
     const router = useRouter();
-    const { viewOnly, authenticatedUser } = useAppContext();
+    const { authenticatedUser } = useAppContext();
+    const viewOnly = useContentViewOnly("scripts");
     const { alert } = useAlertModal();
     const [isRepairing, startRepairTransition] = useTransition();
     const [resolvingKey, setResolvingKey] = useState<string | null>(null);

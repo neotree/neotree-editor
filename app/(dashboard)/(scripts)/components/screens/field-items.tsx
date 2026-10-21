@@ -378,6 +378,12 @@ function Form({
                           return opts.includes(k.uniqueKey)
                         }}
                       />
+                      {!!fieldDataKey && !isKeyDisabled && (
+                        <p className="text-xs text-muted-foreground">
+                          Only options of the data key &quot;{fieldDataKey.label || fieldDataKey.name}&quot; are listed. To use
+                          another option, add it to that key in the Data keys library first.
+                        </p>
+                      )}
                       {allowCustomKey && (
                         <Input
                           id="value"

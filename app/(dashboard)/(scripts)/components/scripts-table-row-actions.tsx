@@ -28,8 +28,10 @@ import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
 import { cn } from "@/lib/utils";
 
-export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onDelete, onDuplicate, onRecheckIssues }: {
+export function ScriptsTableActions({ item, disabled, deleteDisabled, setScriptsIdsToExport, onDelete, onDuplicate, onRecheckIssues }: {
     disabled: boolean;
+    /** Content sync: on a target editor super users may still delete a script (e.g. one deleted on the source). */
+    deleteDisabled?: boolean;
     item: Awaited<ReturnType<IScriptsContext['getScripts']>>['data'][0];
     onDelete: () => void;
     onDuplicate: () => void;
@@ -48,6 +50,7 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
     const isLocked = useIsLocked(lockStatusParams);
 
     disabled = disabled || isLocked;
+    const canDelete = !(deleteDisabled ?? disabled) && !isLocked;
 
     if (!item) return null;
 
@@ -88,12 +91,14 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
                             </Link>
                         </DropdownMenuItem>
 
-                        <DropdownMenuItem
-                            onClick={() => setTimeout(() => onDuplicate(), 0)}
-                        >
-                            <CopyPlus className="mr-2 h-4 w-4" />
-                            Duplicate
-                        </DropdownMenuItem>
+                        {!disabled && (
+                            <DropdownMenuItem
+                                onClick={() => setTimeout(() => onDuplicate(), 0)}
+                            >
+                                <CopyPlus className="mr-2 h-4 w-4" />
+                                Duplicate
+                            </DropdownMenuItem>
+                        )}
 
                         {!!onRecheckIssues && (
                             <DropdownMenuItem
@@ -144,7 +149,7 @@ export function ScriptsTableActions({ item, disabled, setScriptsIdsToExport, onD
                             </Link>
                         </DropdownMenuItem>
 
-                        {!disabled && (
+                        {canDelete && (
                             <DropdownMenuItem
                                 onClick={() => setTimeout(() => onDelete(), 0)}
                                 className="text-danger focus:bg-danger focus:text-danger-foreground"

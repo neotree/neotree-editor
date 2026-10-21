@@ -37,6 +37,8 @@ import { ScreenReviewConfig } from "./screen-review-config";
 import { LockStatus } from '@/components/lock-status';
 import { EligibilityCriteriaForm } from "./eligibility-criteria-form";
 import { useScriptFormCtx } from '@/contexts/script-form';
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { ContentSyncBanner } from "./content-sync-banner";
 
 export function ScriptForm() {
     const searchParams = useSearchParams();
@@ -62,7 +64,9 @@ export function ScriptForm() {
         getDefaultScreenReviewConfigurations,
         onSubmit,
         saveDraft,
+        formIsDirty,
     } = form;
+    useUnsavedChangesGuard(!!formIsDirty && !loading);
 
     const { mode } = useAppContext();
 
@@ -91,6 +95,8 @@ export function ScriptForm() {
                 className="flex flex-col gap-y-4 [&>*]:px-4"
             >
                 <>
+                    <ContentSyncBanner scriptId={scriptFormCtx.formData?.scriptId} />
+
                     {isLocked && (
                         <div>
                             <LockStatus 

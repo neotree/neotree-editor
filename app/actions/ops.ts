@@ -7,6 +7,9 @@ import logger from "@/lib/logger"
 import { isAllowed } from "./is-allowed"
 import { getAuthenticatedUser } from "./get-authenticated-user"
 import { _clearPendingDeletion, _processPendingDeletion } from "@/databases/mutations/ops"
+import { _settlePendingScriptImports } from "@/databases/mutations/scripts/_script_import_sources"
+import { getOpenHotfixes, recordTargetFingerprints } from "@/lib/server/content-sync"
+import { normalizeContentSyncSettings, type ContentSyncSettings, type OpenHotfix } from "@/lib/content-sync"
 import * as opsQueries from "@/databases/queries/ops"
 import * as scriptsQueries from "@/databases/queries/scripts"
 import * as scriptsMutations from "@/databases/mutations/scripts"
@@ -37,7 +40,7 @@ import {
   screensDrafts,
   scriptsDrafts,
 } from "@/databases/pg/schema"
-import { eq, sql } from "drizzle-orm"
+import { count, eq, isNull, sql } from "drizzle-orm"
 
 export type PendingDraftQueueScope = "all" | "mine"
 export type PendingDraftQueueTab = "all" | "creates" | "updates" | "deletes" | "mine"
@@ -1263,6 +1266,8 @@ export async function getEditorDetails(): Promise<{
   myDrafts: typeof opsQueries.defaultCountDraftsData
   myDraftQueueCount: number
   info: GetEditorInfoResults["data"]
+  /** Content sync settings and open hotfixes, for the editing lock in the UI (lib/content-sync.ts). */
+  contentSync: { settings: ContentSyncSettings; hotfixes: OpenHotfix[] }
 }> {
   const errors: string[] = []
   let shouldPublishData = false
@@ -1297,6 +1302,10 @@ export async function getEditorDetails(): Promise<{
       errors: errors.length ? errors : undefined,
       shouldPublishData,
       info: editorInfo.data,
+      contentSync: {
+        settings: normalizeContentSyncSettings((editorInfo.data as any)?.contentSync),
+        hotfixes: await getOpenHotfixes().catch(() => []),
+      },
     }
   } catch (e: any) {
     logger.error("getEditorDetails ERROR", e.message)
@@ -1309,6 +1318,7 @@ export async function getEditorDetails(): Promise<{
       myDraftQueueCount: 0,
       shouldPublishData,
       info: null,
+      contentSync: { settings: normalizeContentSyncSettings(null), hotfixes: [] },
     }
   }
 }
@@ -1375,9 +1385,16 @@ export async function publishData({ scope, allowConfidentialDowngrade }: { scope
 
     let userId: string | null = publisherUserId
 
-    if (scope === 1) userId = null
+    if (scope === 1) {
+      // Publishing every user's drafts releases other people's unfinished work to devices.
+      if (!["admin", "super_user"].includes(session?.user?.role || "")) {
+        throw new Error("Only admins can publish drafts belonging to other users")
+      }
+      userId = null
+    }
 
     const draftScopeFilter = <TColumn>(column: TColumn) => (!userId ? undefined : eq(column as any, userId))
+    let promotedImportScriptIds: string[] = []
     const publishScriptIds = new Set<string>()
     try {
       const draftRows = await Promise.all([
@@ -1520,6 +1537,10 @@ export async function publishData({ scope, allowConfidentialDowngrade }: { scope
       })
       if (!processPendingDeletion.success) throw new Error(processPendingDeletion.errors?.join(", ") || "Failed to publish pending deletions")
 
+      // Imports whose drafts are now all published become the base for the next import's merge.
+      const settled = await _settlePendingScriptImports({ outcome: "published", client: tx })
+      promotedImportScriptIds = settled.promotedScriptIds || []
+
       await tx.update(editorInfo).set({ dataVersion: nextDataVersion, lastPublishDate: new Date() }).where(eq(editorInfo.id, editor.id))
 
       const releaseLog = await _saveChangeLog({
@@ -1534,6 +1555,9 @@ export async function publishData({ scope, allowConfidentialDowngrade }: { scope
         throw new Error(releaseLog.errors?.join(", ") || "Failed to save release changelog")
       }
     })
+
+    // Content sync: the published imports are new sync points; record this editor's side of them.
+    if (promotedImportScriptIds.length) await recordTargetFingerprints(promotedImportScriptIds)
 
     socket.emit("data_changed", "publish_data")
   } catch (e: any) {
@@ -1556,6 +1580,12 @@ export async function discardDrafts({ scope }: { scope: number }) {
     const session = await isAllowed(["delete_config_keys", "delete_scripts", "delete_diagnoses", "delete_problems", "delete_screens"])
 
     let userId: string | null | undefined = session?.user?.userId
+
+    // Without a user the filters below match every row, i.e. "discard my drafts" would discard
+    // everybody's (API-key requests have no user). Fail closed instead.
+    if (!userId && scope !== 1) {
+      throw new Error("Discarding drafts requires an authenticated user")
+    }
 
     if (scope === 1) {
       // Discarding every user's drafts is destructive to other people's work
@@ -1594,6 +1624,9 @@ export async function discardDrafts({ scope }: { scope: number }) {
       if (!clearPendingDeletion.success) {
         throw new Error(clearPendingDeletion.errors?.join(", ") || "Failed to clear queued deletions")
       }
+
+      // An import whose drafts were all discarded is forgotten; the previous import stays the base.
+      await _settlePendingScriptImports({ outcome: "discarded", client: tx })
     })
 
     if (affectedScriptIds.size) void recomputeScriptsConditionErrors(Array.from(affectedScriptIds))
@@ -1605,5 +1638,68 @@ export async function discardDrafts({ scope }: { scope: number }) {
     logger.error("discardDrafts ERROR", e.message)
   } finally {
     return results
+  }
+}
+
+const OWNED_DRAFT_TABLES = [
+  { name: "scripts", table: scriptsDrafts, owner: scriptsDrafts.createdByUserId },
+  { name: "screens", table: screensDrafts, owner: screensDrafts.createdByUserId },
+  { name: "diagnoses", table: diagnosesDrafts, owner: diagnosesDrafts.createdByUserId },
+  { name: "problems", table: problemsDrafts, owner: problemsDrafts.createdByUserId },
+  { name: "configKeys", table: configKeysDrafts, owner: configKeysDrafts.createdByUserId },
+  { name: "hospitals", table: hospitalsDrafts, owner: hospitalsDrafts.createdByUserId },
+  { name: "drugsLibraryItems", table: drugsLibraryDrafts, owner: drugsLibraryDrafts.createdByUserId },
+  { name: "dataKeys", table: dataKeysDrafts, owner: dataKeysDrafts.createdByUserId },
+  { name: "pendingDeletions", table: pendingDeletion, owner: pendingDeletion.createdByUserId },
+] as const
+
+async function assertAdmin() {
+  const session = await isAllowed()
+  if (!["admin", "super_user"].includes(session?.user?.role || "") || !session.user?.userId) {
+    throw new Error("Only admins can manage drafts that have no owner")
+  }
+  return session.user
+}
+
+/**
+ * Drafts (and queued deletions) without an owner: created through an API key, a maintenance script, or
+ * before ownership was recorded. "Publish / discard my changes" never includes them, so they can neither
+ * be published nor discarded from the UI.
+ */
+export async function countOwnerlessDrafts(): Promise<{ total: number; byType: Record<string, number>; errors?: string[] }> {
+  try {
+    await assertAdmin()
+    const byType: Record<string, number> = {}
+    for (const { name, table, owner } of OWNED_DRAFT_TABLES) {
+      const [row] = await db.select({ count: count() }).from(table as any).where(isNull(owner as any))
+      byType[name] = Number(row?.count || 0)
+    }
+    return { total: Object.values(byType).reduce((a, b) => a + b, 0), byType }
+  } catch (e: any) {
+    return { total: 0, byType: {}, errors: [e.message] }
+  }
+}
+
+/** An admin takes over every ownerless draft, so it can be reviewed and then published or discarded. */
+export async function adoptOwnerlessDrafts(): Promise<{ success: boolean; adopted?: number; errors?: string[] }> {
+  try {
+    const user = await assertAdmin()
+    let adopted = 0
+    await db.transaction(async (tx) => {
+      for (const { table, owner } of OWNED_DRAFT_TABLES) {
+        const rows = await tx
+          .update(table as any)
+          .set({ createdByUserId: user.userId } as any)
+          .where(isNull(owner as any))
+          .returning({ id: (table as any).id })
+        adopted += rows.length
+      }
+    })
+    logger.log("adoptOwnerlessDrafts", JSON.stringify({ userId: user.userId, adopted }))
+    socket.emit("data_changed", "adopt_ownerless_drafts")
+    return { success: true, adopted }
+  } catch (e: any) {
+    logger.error("adoptOwnerlessDrafts ERROR", e.message)
+    return { success: false, errors: [e.message] }
   }
 }

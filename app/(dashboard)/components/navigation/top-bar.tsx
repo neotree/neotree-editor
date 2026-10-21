@@ -11,6 +11,8 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { PublishDrafts } from "./publish-drafts";
+import { OwnerlessDrafts } from "./ownerless-drafts";
+import { ContentSyncIndicator } from "./content-sync-indicator";
 
 type Props = {
 
@@ -132,6 +134,10 @@ export function TopBar({}: Props) {
                             <PublishDrafts variant="discard" />
                         </>
                     )}
+
+                    {(mode === 'development') && (isSuperUser || isAdmin) && <OwnerlessDrafts />}
+
+                    {(isSuperUser || isAdmin) && <ContentSyncIndicator />}
                 </div>
             </Content>
         </>

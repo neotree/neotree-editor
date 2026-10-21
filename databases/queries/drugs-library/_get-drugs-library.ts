@@ -11,6 +11,11 @@ export type GetDrugsLibraryItemsParams = {
     keys?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    /**
+     * Return published rows even when a deletion is queued (pending) for them. Used when another
+     * editor imports this editor's published state: an unpublished deletion is not published yet.
+     */
+    includePendingDeletion?: boolean;
 };
 
 export type GetDrugsLibraryItemsResults = {
@@ -27,7 +32,7 @@ export async function _getDrugsLibraryItems(
     params?: GetDrugsLibraryItemsParams
 ): Promise<GetDrugsLibraryItemsResults> {
     try {
-        const { itemsIds: _itemsIds, keys: _keys, returnDraftsIfExist = true, } = { ...params };
+        const { itemsIds: _itemsIds, keys: _keys, returnDraftsIfExist = true, includePendingDeletion, } = { ...params };
 
         let itemsIds = (_itemsIds || []).map(id => uuid.validate(id) ? id : uuid.v4());
         let keys = _keys || [];
@@ -67,7 +72,7 @@ export async function _getDrugsLibraryItems(
 
         const whereDrugsLibraryItems = [
             isNull(drugsLibrary.deletedAt),
-            isNull(pendingDeletion),
+            includePendingDeletion ? undefined : isNull(pendingDeletion),
             whereDrugsLibraryItemsIds,
             whereDrugsLibraryItemsKeys,
             !itemDraftsIds.length ? undefined : notInArray(drugsLibrary.itemId, itemDraftsIds),
@@ -104,7 +109,7 @@ export async function _getDrugsLibraryItems(
             } as GetDrugsLibraryItemsResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.drugsLibraryItemId).includes(s.itemId));
+            .filter(s => includePendingDeletion || !inPendingDeletion.map(s => s.drugsLibraryItemId).includes(s.itemId));
 
         return  { 
             data: responseData,

@@ -77,6 +77,7 @@ export function Symptom<P = {}>({
         register,
         handleSubmit,
         setValue,
+        formState: { isDirty: symptomFormIsDirty },
     } = useForm({
         defaultValues: getDefaultValues(),
     });
@@ -101,7 +102,7 @@ export function Symptom<P = {}>({
             form.setValue('symptoms', form.getValues('symptoms').map((f, i) => ({
                 ...f,
                 ...(i === symptomIndex ? data : null),
-            })));
+            })), { shouldDirty: true, });
         } else {
             form.setValue('symptoms', [...form.getValues('symptoms'), data], { shouldDirty: true, })
         }
@@ -117,6 +118,7 @@ export function Symptom<P = {}>({
                 title={symptom ? 'Edit symptom' : 'Add symptom'}
                 trigger={children ? (typeof children === 'function' ? children({ extraProps }) : children) : undefined}
                 onOpenChange={open => {
+                    if (!open && symptomFormIsDirty && !window.confirm('Discard your changes to this symptom?')) return;
                     setOpen(open);
                     resetForm(getDefaultValues());
                 }}

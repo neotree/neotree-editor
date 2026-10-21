@@ -28,6 +28,7 @@ import { useAlertModal } from '@/hooks/use-alert-modal';
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { Loader } from '@/components/loader';
 import { useAppContext } from '@/contexts/app';
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { ErrorCard } from './error-card';
 
 type Props = {
@@ -103,7 +104,8 @@ export function SearchAndReplaceModal(props: Props) {
 
     const { confirm } = useConfirmModal();
     const { alert } = useAlertModal();
-    const { isAdmin, isSuperUser, viewOnly, } = useAppContext();
+    const { isAdmin, isSuperUser, } = useAppContext();
+    const viewOnly = useContentViewOnly("scripts", null);
 
     useEffect(() => {
         if (

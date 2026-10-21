@@ -4,6 +4,7 @@ import * as uuid from "uuid";
 import db from "@/databases/pg/drizzle";
 import { scripts, scriptsDrafts, pendingDeletion, hospitals, screensDrafts, diagnosesDrafts, problemsDrafts, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { computeEntityRevision } from "@/lib/entity-revision";
 import { ScriptField, Preferences, PrintSection, ScreenReviewField, Alias, EligibilityCriteria } from "@/types";
 import { _getScreens } from "./_screens_get";
 
@@ -13,6 +14,11 @@ export type GetScriptsParams = {
     hospitalIds?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    /**
+     * Return published rows even when a deletion is queued (pending) for them. Used when another
+     * editor imports this editor's published state: an unpublished deletion is not published yet.
+     */
+    includePendingDeletion?: boolean;
 };
 
 export type ScriptType = typeof scripts.$inferSelect & {
@@ -27,6 +33,8 @@ export type ScriptType = typeof scripts.$inferSelect & {
     printSections: PrintSection[];
     hospitalName: string;
     draftCreatedByUserId?: string | null;
+    /** Content fingerprint for save conflict checks (set by _getScript). */
+    revision?: string;
     hasChangedItems?: boolean;
     itemsChangedByUserId?: string | null;
 };
@@ -68,6 +76,7 @@ export async function _getScripts(
             scriptsIds = [], 
             hospitalIds = [],
             returnDraftsIfExist = true, 
+            includePendingDeletion,
         } = { ...params };
 
         const oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
@@ -136,7 +145,7 @@ export async function _getScripts(
             ))
             .where(and(
                 isNull(scripts.deletedAt),
-                isNull(pendingDeletion),
+                includePendingDeletion ? undefined : isNull(pendingDeletion),
                 !returnDraftsIfExist ? undefined : isNull(scriptsDrafts.scriptId),
                 !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds),
                 !hospitalIds.length ? undefined : inArray(scripts.hospitalId, hospitalIds),
@@ -168,7 +177,7 @@ export async function _getScripts(
             } as GetScriptsResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.scriptId).includes(s.scriptId))
+            .filter(s => includePendingDeletion || !inPendingDeletion.map(s => s.scriptId).includes(s.scriptId))
             .map(s => ({
                 ...s,
                 hospitalId: s.hospitalName ? s.hospitalId : null,
@@ -238,7 +247,7 @@ export async function _getScript(
             responseData.hasChangedItems = !!item?.hasChangedItems;
             responseData.itemsChangedByUserId = item.itemsChangedByUserId || null;
 
-            return { data: responseData, };
+            return { data: { ...responseData, revision: computeEntityRevision(responseData), }, };
         }
 
         const publishedRes = await db
@@ -289,7 +298,7 @@ export async function _getScript(
         responseData.itemsChangedByUserId = item.itemsChangedByUserId || null;
 
         return  { 
-            data: responseData, 
+            data: { ...responseData, revision: computeEntityRevision(responseData), }, 
         };
     } catch(e: any) {
         logger.error('_getScript ERROR', e.message);

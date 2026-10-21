@@ -6,7 +6,7 @@ import db from '@/databases/pg/drizzle';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getDataKeys } from '@/databases/queries/data-keys';
-import { normalizeIncomingDataKeyPatch } from '@/lib/data-key-save';
+import { normalizeIncomingDataKeyPatch, rebaseDataKeyOptions } from '@/lib/data-key-save';
 import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
 import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
@@ -15,7 +15,14 @@ import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
     deletedUniqueKeys?: string[];
+    /**
+     * The option list the editor started from. When the key changed since (another user, an import),
+     * only this edit's own additions and removals are applied to the current list instead of replacing it.
+     */
+    baseOptions?: string[];
 };
+
+
 
 export type SaveDataKeysParams = {
     data: SaveDataKeysData[],
@@ -30,6 +37,7 @@ export type SaveDataKeysParams = {
 export type SaveDataKeysResponse = { 
     success: boolean; 
     errors?: string[];
+    warnings?: string[];
     info?: {
         refs?: Pick<Awaited<ReturnType<typeof _updateDataKeysRefs>>, 'info' | 'affected'>;
     };
@@ -99,7 +107,17 @@ export async function _saveDataKeys({
 
     try {
         const errors = [];
+        const warnings: string[] = [];
         const propagationMatchUniqueKeysByDataKey: Record<string, string[]> = {};
+        // parent uniqueKey -> options that left its list in this save (and were asked to be removed)
+        const removedOptionsByParent: Record<string, string[]> = {};
+        const reconcileRemovedOptions = (parentUniqueKey: string | undefined | null, previous: string[], next: string[], requested: string[]) => {
+            if (!parentUniqueKey || !requested.length) return;
+            // Only options that really left this key's list. The form's list of deleted options was never
+            // reconciled: an option deleted and added back, or deleted from the wrong row, was still sent.
+            const removed = requested.filter(uk => previous.includes(uk) && !next.includes(uk));
+            if (removed.length) removedOptionsByParent[parentUniqueKey] = Array.from(new Set([...(removedOptionsByParent[parentUniqueKey] || []), ...removed]));
+        };
 
         const resolveConfidential = ({
             incoming,
@@ -193,11 +211,20 @@ export async function _saveDataKeys({
                 deletedAt, 
                 updatedAt, 
                 deletedUniqueKeys = [],
+                baseOptions,
                 ...item 
             } of data
         ) {
             try {
                 const normalizedItem = normalizeIncomingDataKeyPatch(item);
+                const rebase = (current?: string[] | null) => {
+                    if (!Array.isArray(baseOptions) || !Array.isArray(normalizedItem.options)) return;
+                    normalizedItem.options = rebaseDataKeyOptions({
+                        incoming: normalizedItem.options,
+                        base: baseOptions,
+                        current: current || [],
+                    });
+                };
 
                 index++;
 
@@ -217,6 +244,7 @@ export async function _saveDataKeys({
                     });
 
                     if (draft) {
+                        rebase(draft.data?.options);
                         const publishedForDraft = !draft.dataKeyId ? null : await db.query.dataKeys.findFirst({
                             where: eq(dataKeys.uuid, draft.dataKeyId),
                             columns: {
@@ -264,7 +292,10 @@ export async function _saveDataKeys({
                                 name: data.name,
                                 uniqueKey: data.uniqueKey,
                                 draftOrigin,
-                            }).where(eq(dataKeysDrafts.uuid, dataKeyUuid));
+                                // an ownerless draft is taken over by whoever edits it next
+                                ...(!draft.createdByUserId && userId ? { createdByUserId: userId } : {}),
+                            // the draft may have been found by uniqueKey under a different uuid
+                            }).where(eq(dataKeysDrafts.uuid, draft.uuid));
 
                         if (data.uniqueKey) {
                             propagationMatchUniqueKeysByDataKey[data.uniqueKey] = Array.from(new Set([
@@ -275,7 +306,19 @@ export async function _saveDataKeys({
                         }
 
                         if (data.uniqueKey) uniqueKeys.push(data.uniqueKey);
+
+                        const publishedOptions = !draft.dataKeyId ? [] : ((await db.query.dataKeys.findFirst({
+                            where: eq(dataKeys.uuid, draft.dataKeyId),
+                            columns: { options: true, },
+                        }))?.options || []);
+                        reconcileRemovedOptions(
+                            data.uniqueKey,
+                            Array.from(new Set([...(draft.data?.options || []), ...publishedOptions])),
+                            data.options || [],
+                            deletedUniqueKeys,
+                        );
                     } else {
+                        if (published) rebase(published.options);
                         const uniqueKey = published?.uniqueKey || await createNewUniqueKey(normalizedItem.uniqueKey || '');
 
                         const data = {
@@ -321,14 +364,31 @@ export async function _saveDataKeys({
                         }
 
                         uniqueKeys.push(data.uniqueKey);
-                    }
 
-                    if (deletedUniqueKeys.length) await _deleteReferencedDataKeyOptions({ userId, uniqueKeys: deletedUniqueKeys, });
+                        reconcileRemovedOptions(data.uniqueKey, published?.options || [], data.options || [], deletedUniqueKeys);
+                    }
                 }
             } catch(e: any) {
                 errors.push(e.message);
             }
         }
+
+        if (!errors.length) {
+            // Remove options that left a key's list from that key's own questions only.
+            for (const [parentUniqueKey, removed] of Object.entries(removedOptionsByParent)) {
+                const res = await _deleteReferencedDataKeyOptions({ userId, uniqueKeys: removed, parentUniqueKey, });
+                res.errors?.forEach(e => errors.push(e));
+                if (res.skipped?.length) {
+                    warnings.push(
+                        `${res.skipped.length} question${res.skipped.length === 1 ? '' : 's'} still list the removed option${removed.length === 1 ? '' : 's'} because another user has unpublished changes there: ` +
+                        res.skipped.slice(0, 10).map(s => s.title).join(', ') +
+                        (res.skipped.length > 10 ? ', ...' : ''),
+                    );
+                }
+            }
+        }
+
+        if (warnings.length) response.warnings = warnings;
 
         if (errors.length) {
             response.errors = errors;
@@ -362,6 +422,14 @@ export async function _saveDataKeys({
                         affected: updateRefsRes.affected,
                     },
                 };
+                const othersDrafts = updateRefsRes.othersDrafts || [];
+                if (othersDrafts.length) {
+                    const names = othersDrafts.slice(0, 10).map(e => `${e.scriptTitle ? `${e.scriptTitle} > ` : ''}${e.title}`).join('; ');
+                    response.warnings = [
+                        ...(response.warnings || []),
+                        `${othersDrafts.length} question${othersDrafts.length === 1 ? ' is' : 's are'} in another user's unpublished draft and ${othersDrafts.length === 1 ? 'was' : 'were'} updated there; ${othersDrafts.length === 1 ? 'it goes' : 'they go'} live when that user publishes: ${names}${othersDrafts.length > 10 ? '; ...' : ''}`,
+                    ];
+                }
             }
 
             socket.emit('data_changed', 'save_data_keys');
