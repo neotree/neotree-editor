@@ -2,12 +2,13 @@ import assert from "assert";
 
 import {
     computeContentSyncPairs,
+    diffScriptEntities,
     getContentLockReason,
     isOutOfSync,
     normalizeContentSyncSettings,
     type ContentSyncState,
 } from "../lib/content-sync";
-import { computeScriptFingerprint } from "../lib/content-sync-fingerprint";
+import { computeEntityFingerprints, computeScriptFingerprint } from "../lib/content-sync-fingerprint";
 
 // ── Settings ─────────────────────────────────────────────────────────────────────────────────────
 {
@@ -176,6 +177,45 @@ const pairOf = (pairs: ReturnType<typeof computeContentSyncPairs>, title: string
     });
     assert.equal(pendingFirst.find(p => p.targetScriptId === "l1")!.sourceScriptId, "d1");
     assert.equal(pendingFirst.find(p => p.targetScriptId === "l1")!.status, "pending");
+}
+
+// ── Which screens differ: pairing and comparison ────────────────────────────────────────────────────
+{
+    const screen = (screenId: string, title: string, position: number, items: string[], extra: Record<string, any> = {}) => ({
+        screenId, title, position, type: "single_select", refId: title,
+        items: items.map((v, i) => ({ itemId: `${screenId}-i${i}`, value: v, label: v })), ...extra,
+    });
+    // DEV (source) and LIVE (target) copies of a script with different ids; LIVE recorded the import id map
+    const dev = { scriptId: "dev-s", ...computeEntityFingerprints({ screens: [
+        screen("d1", "Birth", 1, ["A", "B"]),
+        screen("d2", "Vitals", 2, ["X", "Y", "Z"]),   // DEV added Z
+        screen("d3", "New on DEV", 3, ["Q"]),
+    ] }), importIdMap: null };
+    const live = { scriptId: "live-s", ...computeEntityFingerprints({ screens: [
+        screen("l2", "Vitals", 1, ["X", "Y"]),         // reordered: position alone is not a difference
+        screen("l1", "Birth", 2, ["A", "B"]),
+        screen("l9", "LIVE only", 3, ["W"]),
+    ] }), importIdMap: { sourceScriptId: "dev-s", screens: { d1: "l1", d2: "l2" }, diagnoses: {}, problems: {} } };
+
+    const onLive = diffScriptEntities({ local: live, remote: dev });
+    assert.deepEqual(onLive.screens.changed, ["l2"], "only the screen whose content differs is flagged; a reorder is not");
+    assert.deepEqual(onLive.screens.onlyHere, ["l9"]);
+    assert.deepEqual(onLive.screens.onlyThere, ["New on DEV"]);
+    assert.equal(onLive.total, 2);
+
+    // from DEV's side the same pairing comes from LIVE's record (inverted)
+    const onDev = diffScriptEntities({ local: dev, remote: live });
+    assert.deepEqual(onDev.screens.changed, ["d2"]);
+    assert.deepEqual(onDev.screens.onlyHere, ["d3"]);
+    assert.deepEqual(onDev.screens.onlyThere, ["LIVE only"]);
+
+    // no import record: same ids pair, then an unambiguous type/ref/title
+    const a = { scriptId: "a", ...computeEntityFingerprints({ screens: [screen("s1", "Same id", 1, ["A"]), screen("x1", "By title", 2, ["B"])] }), importIdMap: null };
+    const b = { scriptId: "b", ...computeEntityFingerprints({ screens: [screen("s1", "Same id", 1, ["A"]), screen("y7", "By title", 2, ["B", "C"])] }), importIdMap: null };
+    const ab = diffScriptEntities({ local: a, remote: b });
+    assert.deepEqual(ab.screens.changed, ["x1"], "paired by title, and its options differ");
+    assert.deepEqual(ab.screens.onlyHere, []);
+    assert.equal(diffScriptEntities({ local: a, remote: a }).total, 0, "identical content: nothing to shade");
 }
 
 console.log("content sync tests passed");

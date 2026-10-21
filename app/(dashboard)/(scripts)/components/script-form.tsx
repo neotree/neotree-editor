@@ -95,7 +95,7 @@ export function ScriptForm() {
                 className="flex flex-col gap-y-4 [&>*]:px-4"
             >
                 <>
-                    <ContentSyncBanner scriptId={scriptFormCtx.formData?.scriptId} />
+                    <ContentSyncBanner scriptId={scriptFormCtx.formData?.scriptId} showEntityDiff />
 
                     {isLocked && (
                         <div>

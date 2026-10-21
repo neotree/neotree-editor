@@ -14,12 +14,54 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useContentLock } from "@/hooks/use-content-lock";
 import { useContentSyncStatus } from "@/hooks/use-content-sync-status";
+import { useContentSyncEntityDiff } from "@/hooks/use-content-sync-entity-diff";
 
 /**
  * Content sync on a script page: why the script is read-only here and what to do instead (target), the
  * hotfix controls for admins, and on the source a warning when the target has changes to bring back.
  */
-export function ContentSyncBanner({ scriptId }: { scriptId?: string | null }) {
+export function ContentSyncBanner({ scriptId, showEntityDiff }: {
+    scriptId?: string | null;
+    /** On the script page: say which screens, diagnoses and problems differ (they are shaded below). */
+    showEntityDiff?: boolean;
+}) {
+    return (
+        <>
+            <ContentSyncBannerBody scriptId={scriptId} />
+            {showEntityDiff && <ContentSyncDiffSummary scriptId={scriptId} />}
+        </>
+    );
+}
+
+/** What the red shading on the screens, diagnoses and problems below means. */
+function ContentSyncDiffSummary({ scriptId }: { scriptId?: string | null }) {
+    const sync = useContentSyncStatus({ enabled: false });
+    const { diff, active } = useContentSyncEntityDiff(scriptId);
+    const { contentSync } = useAppContext();
+    if (!active || !diff) return null;
+    const other = contentSync?.settings?.role === "target" ? sync.sourceName : sync.targetName;
+    const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+    const differs = [
+        diff.screens.changed.length && plural(diff.screens.changed.length, 'screen', 'screens'),
+        diff.diagnoses.changed.length && plural(diff.diagnoses.changed.length, 'diagnosis', 'diagnoses'),
+        diff.problems.changed.length && plural(diff.problems.changed.length, 'problem', 'problems'),
+    ].filter(Boolean);
+    const onlyHere = diff.screens.onlyHere.length + diff.diagnoses.onlyHere.length + diff.problems.onlyHere.length;
+    const onlyThere = [...diff.screens.onlyThere, ...diff.diagnoses.onlyThere, ...diff.problems.onlyThere];
+    if (!differs.length && !onlyHere && !onlyThere.length) return null;
+    return (
+        <div className="text-xs text-muted-foreground">
+            {!!differs.length && <>{differs.join(', ')} differ from {other}. </>}
+            {!!onlyHere && <>{plural(onlyHere, 'item exists', 'items exist')} only on this editor. </>}
+            {(!!differs.length || !!onlyHere) && <>They are <span className="rounded px-1 bg-danger/20 text-foreground">shaded</span> below. </>}
+            {!!onlyThere.length && (
+                <>Only on {other}: {onlyThere.slice(0, 5).join(', ')}{onlyThere.length > 5 ? `, and ${onlyThere.length - 5} more` : ''}.</>
+            )}
+        </div>
+    );
+}
+
+function ContentSyncBannerBody({ scriptId }: { scriptId?: string | null }) {
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
     const { contentSync, isAdmin, isSuperUser, viewOnly } = useAppContext();

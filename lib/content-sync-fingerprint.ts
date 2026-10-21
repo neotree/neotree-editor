@@ -141,3 +141,69 @@ export function computeScriptFingerprint({
     ].join("|");
     return `${FINGERPRINT_VERSION}:${createHash("sha1").update(body).digest("hex")}`;
 }
+
+/** One screen, diagnosis or problem, fingerprinted on its own (to show which ones differ). */
+export type EntityFingerprint = {
+    id: string;
+    /** Matches the same entity on the other editor when ids differ and no import recorded the pairing. */
+    natural: string;
+    label: string;
+    fingerprint: string;
+};
+
+export type ScriptEntityFingerprints = {
+    screens: EntityFingerprint[];
+    diagnoses: EntityFingerprint[];
+    problems: EntityFingerprint[];
+};
+
+/**
+ * Per-entity fingerprints of one script's published content, with the same portable rules as the script
+ * fingerprint (ids dropped, references as positions, empty = unset). Position alone is not a difference.
+ */
+export function computeEntityFingerprints({
+    screens = [],
+    diagnoses = [],
+    problems = [],
+}: {
+    screens?: Record<string, any>[];
+    diagnoses?: Record<string, any>[];
+    problems?: Record<string, any>[];
+}): ScriptEntityFingerprints {
+    const byPosition = (a: Record<string, any>, b: Record<string, any>) => (Number(a.position) || 0) - (Number(b.position) || 0);
+    const orderedScreens = [...screens].sort(byPosition);
+    const screenIndex = new Map<string, number>();
+    orderedScreens.forEach((s, i) => {
+        if (s.screenId) screenIndex.set(`${s.screenId}`, i);
+        if (s.oldScreenId) screenIndex.set(`${s.oldScreenId}`, i);
+    });
+    const screenRef = (id: any) => (id && screenIndex.has(`${id}`) ? `#${screenIndex.get(`${id}`)}` : id ? "?" : null);
+    const hash = (value: unknown) => createHash("sha1").update(canonical(value)).digest("hex");
+    const norm = (...parts: unknown[]) => parts.map(p => `${p || ""}`.trim().toLowerCase()).join("|");
+
+    return {
+        screens: orderedScreens.map(s => ({
+            id: `${s.screenId}`,
+            natural: norm(s.type, s.refId, s.title),
+            label: s.title || s.label || s.refId || "",
+            fingerprint: hash({
+                ...s,
+                skipToScreenId: screenRef(s.skipToScreenId),
+                items: itemsWithPortableRefs(s.items || []),
+                fields: (s.fields || []).map((f: any) => ({ ...f, items: itemsWithPortableRefs(f.items || []) })),
+            }),
+        })),
+        diagnoses: [...diagnoses].sort(byPosition).map(d => ({
+            id: `${d.diagnosisId}`,
+            natural: norm(d.key, d.name),
+            label: d.name || d.key || "",
+            fingerprint: hash(d),
+        })),
+        problems: [...problems].sort(byPosition).map(p => ({
+            id: `${p.problemId}`,
+            natural: norm(p.key, p.name),
+            label: p.name || p.key || "",
+            fingerprint: hash(p),
+        })),
+    };
+}

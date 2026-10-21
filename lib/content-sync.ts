@@ -324,3 +324,80 @@ export function computeContentSyncPairs({ source, target }: { source: ContentSyn
 export function isOutOfSync(status: ContentSyncStatus) {
     return status === "source_ahead" || status === "target_ahead" || status === "diverged" || status === "pending" || status === "never_synced";
 }
+
+/* ------------------------------------------------------------------------------------------------ */
+/* Which screens, diagnoses and problems of a script differ from its counterpart                    */
+/* ------------------------------------------------------------------------------------------------ */
+
+type EntityLike = { id: string; natural: string; label: string; fingerprint: string; };
+type ScriptEntitiesLike = {
+    scriptId: string;
+    screens: EntityLike[];
+    diagnoses: EntityLike[];
+    problems: EntityLike[];
+    importIdMap: { sourceScriptId: string; screens: Record<string, string>; diagnoses: Record<string, string>; problems: Record<string, string>; } | null;
+};
+
+export type EntityKindDiff = {
+    /** Ids here whose content differs from their counterpart. */
+    changed: string[];
+    /** Ids here with no counterpart on the other editor. */
+    onlyHere: string[];
+    /** Titles of entities the other editor has and this one doesn't. */
+    onlyThere: string[];
+};
+
+export type ScriptEntitiesDiff = {
+    screens: EntityKindDiff;
+    diagnoses: EntityKindDiff;
+    problems: EntityKindDiff;
+    /** Number of entities here that differ or exist only here (what gets shaded). */
+    total: number;
+};
+
+/**
+ * Pairs a script's entities with its counterpart's and lists those that differ. Pairing uses, in order,
+ * the id map of the import between the two scripts (whichever editor recorded it), identical ids, then
+ * type/ref/title (screens) or key/name (diagnoses, problems) when that is unambiguous.
+ */
+export function diffScriptEntities({ local, remote }: { local: ScriptEntitiesLike; remote: ScriptEntitiesLike; }): ScriptEntitiesDiff {
+    // remote id -> local id
+    const mapFor = (kind: "screens" | "diagnoses" | "problems"): Map<string, string> => {
+        if (local.importIdMap?.sourceScriptId === remote.scriptId) return new Map(Object.entries(local.importIdMap[kind] || {}));
+        if (remote.importIdMap?.sourceScriptId === local.scriptId) {
+            return new Map(Object.entries(remote.importIdMap[kind] || {}).map(([localId, remoteId]) => [remoteId, localId] as [string, string]));
+        }
+        return new Map();
+    };
+    const diffKind = (kind: "screens" | "diagnoses" | "problems"): EntityKindDiff => {
+        const idMap = mapFor(kind);
+        const localById = new Map(local[kind].map(e => [e.id, e]));
+        const localByNatural = new Map<string, EntityLike[]>();
+        local[kind].forEach(e => localByNatural.set(e.natural, [...(localByNatural.get(e.natural) || []), e]));
+        const paired = new Set<string>();
+        const changed: string[] = [];
+        const onlyThere: string[] = [];
+        const take = (e?: EntityLike) => (e && !paired.has(e.id) ? e : undefined);
+        // the most reliable pairings first, so heuristics never claim an entity a recorded pairing needs
+        const pairs = new Map<EntityLike, EntityLike>();
+        remote[kind].forEach(r => { const l = take(localById.get(idMap.get(r.id) || "")); if (l) { paired.add(l.id); pairs.set(r, l); } });
+        remote[kind].forEach(r => { if (pairs.has(r)) return; const l = take(localById.get(r.id)); if (l) { paired.add(l.id); pairs.set(r, l); } });
+        remote[kind].forEach(r => {
+            if (pairs.has(r)) return;
+            const candidates = (localByNatural.get(r.natural) || []).filter(e => !paired.has(e.id));
+            if (r.natural.replace(/\|/g, "") && candidates.length === 1) { paired.add(candidates[0].id); pairs.set(r, candidates[0]); }
+        });
+        remote[kind].forEach(r => {
+            const l = pairs.get(r);
+            if (!l) onlyThere.push(r.label || r.natural);
+            else if (l.fingerprint !== r.fingerprint) changed.push(l.id);
+        });
+        const onlyHere = local[kind].filter(e => !paired.has(e.id)).map(e => e.id);
+        return { changed, onlyHere, onlyThere };
+    };
+    const screens = diffKind("screens");
+    const diagnoses = diffKind("diagnoses");
+    const problems = diffKind("problems");
+    const count = (d: EntityKindDiff) => d.changed.length + d.onlyHere.length;
+    return { screens, diagnoses, problems, total: count(screens) + count(diagnoses) + count(problems) };
+}

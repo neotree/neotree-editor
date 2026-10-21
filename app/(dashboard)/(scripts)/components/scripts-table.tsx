@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
 import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { useContentSyncStatus } from "@/hooks/use-content-sync-status";
+import { isOutOfSync } from "@/lib/content-sync";
 import { ContentSyncStatusBadge } from "@/components/content-sync-status-badge";
 import { ScriptsTableBottomActions } from "./scripts-table-bottom-actions";
 import { ScriptsTableActions } from "./scripts-table-row-actions";
@@ -144,8 +145,13 @@ export function ScriptsTable(props: Props) {
                     onSort={onSort}
                     getRowOptions={({ rowIndex }) => {
                         const s = scriptsArr[rowIndex];
+                        const syncStatus = s ? contentSyncStatus.pairsByLocalScriptId.get(s.scriptId)?.status : undefined;
                         return !s ? {} : {
-                            className: cn(!viewOnly && (s.isDraft || s.hasChangedItems) && 'bg-danger/20 hover:bg-danger/30')
+                            className: cn(
+                                !viewOnly && (s.isDraft || s.hasChangedItems) && 'bg-danger/20 hover:bg-danger/30',
+                                // content sync: not the same as its counterpart on the linked editor
+                                !!syncStatus && isOutOfSync(syncStatus) && 'bg-danger/20 hover:bg-danger/30',
+                            ),
                         };
                     }}
                     rowRenderer={!search.value ? undefined : ({ props, cells, rowIndex, }) => {

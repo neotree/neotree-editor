@@ -8,6 +8,8 @@ import { DataTable } from "@/components/data-table";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
+import { useParams } from "next/navigation";
+import { useContentSyncEntityDiff } from "@/hooks/use-content-sync-entity-diff";
 import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { ScreensTableBottomActions } from "./table-bottom-actions";
 import { ScreensTableRowActions } from "./table-row-actions";
@@ -42,6 +44,8 @@ export function ScreensTable(props: Props) {
 
     const { sys } = useAppContext();
     const viewOnly = useContentViewOnly("scripts");
+    const routeParams = useParams();
+    const syncDiff = useContentSyncEntityDiff(routeParams.scriptId as string);
     const { conditionKeys, keysReady } = useConditionKeys();
     const outcomeProducers = useMemo(() => getOutcomeProducers(screens.data), [screens.data]);
     const unavailableByPosition = useMemo(() => {
@@ -121,7 +125,11 @@ export function ScreensTable(props: Props) {
                     getRowOptions={({ rowIndex }) => {
                         const s = screensArr[rowIndex];
                         return !s ? {} : {
-                            className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
+                            className: cn(
+                                !viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30',
+                                // content sync: differs from (or is missing on) the linked editor
+                                syncDiff.screens.has(s.screenId) && 'bg-danger/20 hover:bg-danger/30',
+                            ),
                         };
                     }}
                     noDataMessage={(

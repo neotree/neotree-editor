@@ -9,7 +9,9 @@ import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 import {
     computeContentSyncPairs,
+    diffScriptEntities,
     normalizeContentSyncSettings,
+    type ScriptEntitiesDiff,
     type ContentSyncPair,
     type ContentSyncSettings,
     type ContentSyncState,
@@ -21,6 +23,8 @@ import {
     getLocalContentSyncState,
     getOpenHotfixes,
     clearContentSyncStatusCache,
+    fetchRemoteScriptEntities,
+    getLocalScriptEntities,
 } from "@/lib/server/content-sync";
 import { isAllowed } from "./is-allowed";
 
@@ -288,4 +292,41 @@ async function getScriptPairStatus(settings: ContentSyncSettings, scriptId: stri
         pairs: [pair],
         checkedAt: new Date().toISOString(),
     };
+}
+
+export type ContentSyncEntityDiffResult = {
+    /** Content sync is on and this script has a counterpart to compare with. */
+    enabled: boolean;
+    status: ContentSyncPair["status"] | null;
+    /** Which screens, diagnoses and problems differ; null when the script is in sync or can't be compared. */
+    diff: ScriptEntitiesDiff | null;
+    errors?: string[];
+};
+
+/**
+ * Which screens, diagnoses and problems of a script differ from its counterpart on the linked editor
+ * (published content on both sides). Script pages shade them, like unpublished drafts are shaded.
+ */
+export async function getContentSyncEntityDiff({ scriptId }: { scriptId: string; }): Promise<ContentSyncEntityDiffResult> {
+    const none = (extra?: Partial<ContentSyncEntityDiffResult>): ContentSyncEntityDiffResult => ({ enabled: false, status: null, diff: null, ...extra });
+    try {
+        const settings = await getContentSyncSettings();
+        if (settings.role === "off" || !settings.linkedSiteId || !scriptId) return none();
+        const status = await getContentSyncStatus({ scriptId });
+        const pair = status.pairs[0];
+        if (!pair) return none({ errors: status.errors });
+        const counterpartId = settings.role === "target" ? pair.sourceScriptId : pair.targetScriptId;
+        if (!counterpartId) return none({ enabled: true, status: pair.status });
+        if (pair.status === "in_sync") return { enabled: true, status: pair.status, diff: null };
+
+        const [local, remote] = await Promise.all([
+            getLocalScriptEntities(scriptId),
+            fetchRemoteScriptEntities(settings.linkedSiteId, counterpartId),
+        ]);
+        if (!local || !remote) return { enabled: true, status: pair.status, diff: null };
+        return { enabled: true, status: pair.status, diff: diffScriptEntities({ local, remote }) };
+    } catch (e: any) {
+        logger.error("getContentSyncEntityDiff ERROR", e.message);
+        return none({ errors: [e.message] });
+    }
 }
