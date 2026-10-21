@@ -2,19 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
 import axios from "axios";
-import { CheckIcon, XIcon, EllipsisIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, CheckIcon, EllipsisIcon, Loader2, XIcon } from "lucide-react";
 
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { DialogClose, } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAlertModal } from "@/hooks/use-alert-modal";
@@ -23,30 +13,57 @@ import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/loader";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/modal";
-import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
 import { ErrorCard } from "@/components/error-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { OverlayInfoCard } from "@/components/overlay-info-card";
 import { BROADCAST_ACTIONS_IN_PROGRESS, IMPORT_JOB_COMPLETE_EVENT } from "@/lib/in-progress";
-import { SocketEventsListener } from "@/components/socket-events-listener";
 import socket  from '@/lib/socket';
 import type { ScriptImportPreview } from "@/lib/script-import-preview";
 import { ScriptImportPreviewSummary } from "./script-import-preview";
+import { ImportSourcePicker } from "./import-source-picker";
+import { Title } from "./title";
 
-const getDefaultFormFields = (overWriteScriptWithId?: string, defaults?: { siteId?: string; scriptId?: string }) => ({
-    siteId: defaults?.siteId || '',
-    scriptId: defaults?.scriptId || '',
-    confirmed: overWriteScriptWithId ? false : true,
-    // Off by default: the import then only adds what this editor's data keys are missing.
-    overwriteDataKeys: false,
-    overwriteDrugsLibraryItems: true,
-    confirmSourceMismatch: false,
-    keepTargetOnly: true,
-});
+type Step = 'source' | 'review' | 'running' | 'done' | 'error';
+type CopyResult = Awaited<ReturnType<ReturnType<typeof useScriptsContext>['copyScripts']>>;
 
 const newRequestKey = () => Math.random().toString(12).substring(2);
+
+const STEP_TEXT: Record<'source' | 'review' | 'import' | 'done', string> = {
+    source: 'Step 1 of 3 \u00b7 Choose what to import',
+    review: 'Step 2 of 3 \u00b7 Review the changes',
+    import: 'Step 3 of 3 \u00b7 Import',
+    done: 'Finished',
+};
+
+function ChoiceGroup<T extends string>({
+    id,
+    value,
+    onChange,
+    disabled,
+    options,
+}: {
+    id: string;
+    value: T;
+    onChange: (value: T) => void;
+    disabled?: boolean;
+    options: { value: T; title: string; description: string; }[];
+}) {
+    return (
+        <RadioGroup value={value} onValueChange={(v) => onChange(v as T)} disabled={disabled} className="flex flex-col gap-y-3">
+            {options.map(o => (
+                <div key={o.value} className="flex items-start space-x-2">
+                    <RadioGroupItem id={`${id}-${o.value}`} value={o.value} className="mt-0.5" />
+                    <div>
+                        <Label secondary htmlFor={`${id}-${o.value}`}>{o.title}</Label>
+                        <p className="text-xs text-muted-foreground">{o.description}</p>
+                    </div>
+                </div>
+            ))}
+        </RadioGroup>
+    );
+}
 
 export function ScriptsImportModal({ 
     open, 
@@ -68,216 +85,173 @@ export function ScriptsImportModal({
     const routeParams = useParams();
 
     overWriteScriptWithId = overWriteScriptWithId || (routeParams.scriptId as string);
+    const isOverwriteImport = !!overWriteScriptWithId;
 
     const { copyScripts } = useScriptsContext();
     const { alert } = useAlertModal();
 
-    const [loading, setLoading] = useState(false);
-    const [importReview, setImportReview] = useState<NonNullable<Awaited<ReturnType<typeof copyScripts>>['integrityImportReview']> | null>(null);
+    const [step, setStep] = useState<Step>('source');
+    const [runningKind, setRunningKind] = useState<'preview' | 'import'>('preview');
+    const [error, setError] = useState<string | null>(null);
+    const [result, setResult] = useState<CopyResult | null>(null);
+    const [importReview, setImportReview] = useState<NonNullable<CopyResult['integrityImportReview']> | null>(null);
     // What the import would do, computed by the server without saving (dry run).
     const [preview, setPreview] = useState<ScriptImportPreview[] | null>(null);
-    
+
     const { sites: _sites, contentSync } = useAppContext();
     const sites = _sites.filter(s => s.type === 'webeditor');
     // Content sync: imports normally come from the linked editor.
-    const formDefaults = useMemo(() => ({
-        siteId: contentSync?.settings?.role !== 'off' ? (contentSync?.settings?.linkedSiteId || '') : '',
-        scriptId: defaultSourceScriptId || '',
-    }), [contentSync, defaultSourceScriptId]);
+    const defaultSiteId = contentSync?.settings?.role !== 'off' ? (contentSync?.settings?.linkedSiteId || '') : '';
 
-    const isLoading = loading;
-    const disabled = isLoading;
-    const isOverwriteImport = !!overWriteScriptWithId;
+    const [siteId, setSiteId] = useState(defaultSiteId);
+    const [scriptIds, setScriptIds] = useState<string[]>(defaultSourceScriptId ? [defaultSourceScriptId] : []);
+    const [dataKeysMode, setDataKeysMode] = useState<'add' | 'apply'>('add');
+    const [drugsMode, setDrugsMode] = useState<'replace' | 'add'>('replace');
+    const [keepTargetOnly, setKeepTargetOnly] = useState(true);
+    const [confirmSourceMismatch, setConfirmSourceMismatch] = useState(false);
+    const [confirmed, setConfirmed] = useState(false);
 
-    const {
-        formState: { errors },
-        reset: resetForm,
-        watch,
-        setValue,
-        register,
-        handleSubmit,
-    } = useForm({
-        defaultValues: getDefaultFormFields(overWriteScriptWithId, formDefaults),
-    });
-
-    const confirmed = watch('confirmed');
-    const overwriteDataKeys = watch('overwriteDataKeys');
-    const overwriteDrugsLibraryItems = watch('overwriteDrugsLibraryItems');
-    const confirmSourceMismatch = watch('confirmSourceMismatch');
-    const keepTargetOnly = watch('keepTargetOnly');
-    const watchedSiteId = watch('siteId');
-    const watchedScriptId = watch('scriptId');
-
-    // Any change to what would be imported invalidates the preview.
-    useEffect(() => {
-        setPreview(null);
-        setValue('confirmed', overWriteScriptWithId ? false : true);
-    }, [watchedSiteId, watchedScriptId, overwriteDataKeys, overwriteDrugsLibraryItems, keepTargetOnly, overWriteScriptWithId, setValue]);
-
-    const sourceMismatch = preview?.find(p => p.requiresConfirmation?.sourceMismatch)?.requiresConfirmation?.sourceMismatch;
+    const running = step === 'running';
+    const [targetTitle, setTargetTitle] = useState('');
 
     // Defaults can arrive after mount (opened from a link); apply them when the dialog opens.
     useEffect(() => {
         if (!open) return;
-        if (formDefaults.scriptId && !watchedScriptId) setValue('scriptId', formDefaults.scriptId);
-        if (formDefaults.siteId && !watchedSiteId) setValue('siteId', formDefaults.siteId);
+        if (defaultSourceScriptId && !scriptIds.length) setScriptIds([defaultSourceScriptId]);
+        if (defaultSiteId && !siteId) setSiteId(defaultSiteId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, formDefaults]);
+    }, [open, defaultSourceScriptId, defaultSiteId]);
 
-    // Handles the final result of an import, whichever way it arrived: an
-    // immediate failure from the POST itself (auth/validation), or the
-    // background job's result delivered later over the socket channel.
-    const handleImportResult = (res: Awaited<ReturnType<typeof copyScripts>>, dryRun?: boolean) => {
+    // A preview belongs to the choices it was made with.
+    useEffect(() => {
+        setPreview(null);
+        setConfirmed(false);
+        setConfirmSourceMismatch(false);
+        if (step === 'review') setStep('source');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [siteId, scriptIds.join(','), dataKeysMode, drugsMode]);
+
+    const sourceMismatch = preview?.find(p => p.requiresConfirmation?.sourceMismatch)?.requiresConfirmation?.sourceMismatch;
+    const allUpToDate = !!preview?.length && preview.every(p => p.upToDate);
+    const needsKeepChoice = isOverwriteImport && !!preview?.some(p => p.firstImport && p.mode === 'merge');
+    const site = useMemo(() => sites.find(s => s.siteId === siteId), [sites, siteId]);
+
+    const resetAll = () => {
+        setStep('source');
+        setPreview(null);
+        setResult(null);
+        setError(null);
+        setConfirmed(false);
+        setConfirmSourceMismatch(false);
+        setKeepTargetOnly(true);
+        setScriptIds(defaultSourceScriptId ? [defaultSourceScriptId] : []);
+        setRequestKey(newRequestKey());
+    };
+
+    const close = () => {
+        if (running) return;
+        onOpenChange(false);
+        resetAll();
+    };
+
+    // Handles the final result of a run, whichever way it arrived: an immediate answer from the POST
+    // (auth/validation errors), or the background job's result fetched after its completion signal.
+    const handleRunResult = (res: CopyResult, dryRun: boolean) => {
         // Every run gets its own request key, so a later run is never answered with this one's result.
         setRequestKey(newRequestKey());
-        try {
-            if (!res.success) throw new Error(res.errors?.join(', ') || 'Failed to import script');
-            if (res.errors?.length) throw new Error(res.errors.join(', '));
-
-            if (dryRun) {
-                setPreview(res.preview || []);
-                return;
-            }
-
-            router.refresh();
-
-            const review = res.integrityImportReview;
-            if (review?.totalBlockingIssues) {
-                resetForm(getDefaultFormFields(overWriteScriptWithId, formDefaults));
-                onOpenChange(false);
-                setImportReview(review);
-                return;
-            }
-
-            const upToDate = !!res.preview?.length && res.preview.every(p => p.upToDate);
-            const baseMessage = upToDate
-                ? 'The script was already up to date. Nothing was changed.'
-                : 'Script imported as drafts. Review and publish when ready.';
-            const successMessage = res.warnings?.length
-                ? `${baseMessage} ${res.warnings.join(' ')}`
-                : baseMessage;
-
-            alert({
-                variant: 'success',
-                title: 'Success',
-                message: successMessage,
-                onClose: () => {
-                    onImportSuccess?.();
-                    resetForm(getDefaultFormFields(overWriteScriptWithId, formDefaults));
-                    setPreview(null);
-                    onOpenChange(false);
-                },
-            });
-        } catch (e: any) {
-            alert({
-                variant: 'error',
-                title: 'Error',
-                message: (dryRun ? 'Failed to prepare the import preview: ' : 'Failed to import script: ') + e.message,
-            });
-        } finally {
-            setLoading(false);
+        if (!res.success || res.errors?.length) {
+            setError(res.errors?.join(', ') || (dryRun ? 'The preview could not be prepared.' : 'The import failed.'));
+            // a preview that can't be confirmed (source mismatch) still comes back with what it would do
+            if (dryRun && res.preview?.length) setPreview(res.preview);
+            setStep('error');
+            return;
         }
+        if (dryRun) {
+            setPreview(res.preview || []);
+            setStep('review');
+            return;
+        }
+        router.refresh();
+        setResult(res);
+        const review = res.integrityImportReview;
+        if (review?.totalBlockingIssues) {
+            onOpenChange(false);
+            resetAll();
+            setImportReview(review);
+            return;
+        }
+        setStep('done');
     };
 
-    // The import runs in the background on the server (it can take minutes
-    // for large scripts) — the POST only acks that it started. The actual
-    // result arrives over the same per-requestKey socket channel already
-    // used for progress. As a safety net against a dropped socket event, we
-    // also poll by re-POSTing the identical request every 45s; the endpoint
-    // is idempotent on requestKey, so a poll either returns the
-    // already-finished result (if the socket event was missed) or another
-    // "still running" ack (a cheap no-op — it does NOT re-run the import,
-    // see lib/import-jobs.ts's coalescing). This is a repeating poll rather
-    // than a one-shot check specifically so it keeps recovering regardless
-    // of how long the import actually takes, not just within one fixed
-    // window.
-    const waitForImportCompletion = (requestBody: Record<string, any>) => {
+    // The import runs in the background on the server (it can take minutes for large scripts): the POST
+    // only acks that it started, and the same request is asked again (idempotent on requestKey) when the
+    // job signals completion over the socket, or every 45 s in case that signal is missed. The socket
+    // event is only a "check now" signal: the result itself only travels over this authenticated request.
+    const waitForCompletion = (requestBody: Record<string, any>) => {
         let settled = false;
-
-        const stopWaiting = () => {
-            settled = true;
-            socket.off(requestBody.requestKey, onSignal);
-            clearInterval(pollTimer);
-        };
-
-        // The socket event is only a "check now" signal — it never carries
-        // the import result itself (the socket.io relay is an unauthenticated,
-        // global broadcast, so the result must only ever travel over this
-        // authenticated HTTP endpoint instead). This same check also serves
-        // as the periodic fallback poll below, for a socket event that never
-        // arrives.
-        const checkStatus = async () => {
+        const stop = () => { settled = true; socket.off(requestBody.requestKey, onSignal); clearInterval(pollTimer); };
+        const check = async () => {
             if (settled) return;
             try {
-                const response = await axios.post('/api/scripts/copy', requestBody);
-                const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof copyScripts>>;
-                if (!res.started && !settled) {
-                    stopWaiting();
-                    handleImportResult(res, requestBody.dryRun);
-                }
+                const res = (await axios.post('/api/scripts/copy', requestBody)).data as { started?: boolean; } & CopyResult;
+                if (!res.started && !settled) { stop(); handleRunResult(res, !!requestBody.dryRun); }
             } catch {
-                // Ignore — the next signal or poll will still resolve it.
+                // the next signal or poll resolves it
             }
         };
-
-        const onSignal = (key: string) => {
-            if (key !== IMPORT_JOB_COMPLETE_EVENT || settled) return;
-            checkStatus();
-        };
-
+        const onSignal = (key: string) => { if (key === IMPORT_JOB_COMPLETE_EVENT && !settled) check(); };
         socket.on(requestBody.requestKey, onSignal);
-
-        const pollTimer = setInterval(checkStatus, 45 * 1000);
+        const pollTimer = setInterval(check, 45 * 1000);
     };
 
-    const runImport = (dryRun: boolean) => handleSubmit(async (data) => {
+    const run = async (dryRun: boolean) => {
+        setError(null);
+        if (!siteId) return setError('Choose the editor to import from.');
+        if (!scriptIds.length) return setError(isOverwriteImport ? 'Choose the script to import.' : 'Choose at least one script to import.');
+        setRunningKind(dryRun ? 'preview' : 'import');
+        setStep('running');
+        const requestBody = {
+            requestKey,
+            fromRemoteSiteId: siteId,
+            overwriteDrugsLibraryItems: drugsMode === 'replace',
+            overwriteDataKeys: dataKeysMode === 'apply',
+            scriptsIds: isOverwriteImport ? scriptIds.slice(0, 1) : scriptIds,
+            overWriteScriptWithId: overWriteScriptWithId,
+            broadcastAction: true,
+            dryRun,
+            confirmSourceMismatch,
+            keepTargetOnly,
+        };
         try {
-            if (!data.siteId) throw new Error('Please select a site!');
-            if (!data.scriptId) throw new Error('Please provide a script ID!');
-            if (!dryRun && !preview) throw new Error('Preview the import first.');
-            if (!dryRun && overWriteScriptWithId && !data.confirmed) throw new Error('Please confirm that you have reviewed the changes!');
-            if (!dryRun && sourceMismatch && !data.confirmSourceMismatch) throw new Error('Please confirm the source script before importing.');
-
-            setLoading(true);
-
-            const requestBody = {
-                requestKey,
-                fromRemoteSiteId: data.siteId,
-                overwriteDrugsLibraryItems: data.overwriteDrugsLibraryItems,
-                overwriteDataKeys: data.overwriteDataKeys,
-                scriptsIds: [data.scriptId],
-                overWriteScriptWithId: overWriteScriptWithId,
-                broadcastAction: true,
-                dryRun,
-                confirmSourceMismatch: !!data.confirmSourceMismatch,
-                keepTargetOnly: data.keepTargetOnly,
-            };
-
-            const response = await axios.post('/api/scripts/copy', requestBody);
-            const res = response.data as { started?: boolean; } & Awaited<ReturnType<typeof copyScripts>>;
-
-            if (!res.started) {
-                setLoading(false);
-                handleImportResult(res, dryRun);
-                return;
-            }
-
-            waitForImportCompletion(requestBody);
-        } catch(e: any) {
-            setLoading(false);
-            alert({
-                variant: 'error',
-                title: 'Error',
-                message: 'Failed to import script: ' + e.message,
-            });
+            const res = (await axios.post('/api/scripts/copy', requestBody)).data as { started?: boolean; } & CopyResult;
+            if (!res.started) return handleRunResult(res, dryRun);
+            waitForCompletion(requestBody);
+        } catch (e: any) {
+            setError(e.message);
+            setStep('error');
         }
-    });
+    };
+
+    // keepTargetOnly changes what a first import removes: the preview must be redone
+    useEffect(() => {
+        if (step === 'review' && needsKeepChoice) run(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [keepTargetOnly]);
+
+    const importBlockedReason = !preview ? 'Preview the changes first.'
+        : allUpToDate ? null
+        : (sourceMismatch && !confirmSourceMismatch) ? 'Confirm the source script above.'
+        : (isOverwriteImport && !confirmed) ? 'Tick the confirmation to import.'
+        : null;
+
+    const [accepting, setAccepting] = useState(false);
+    const disabled = running || accepting;
 
     const acceptImportedIssues = async () => {
         try {
             if (!importReview?.snapshotId) throw new Error('Missing import review snapshot');
 
-            setLoading(true);
+            setAccepting(true);
 
             const response = await axios.post('/api/integrity-imports/accept', {
                 snapshotId: importReview.snapshotId,
@@ -304,7 +278,7 @@ export function ScriptsImportModal({
                 message: 'Failed to accept imported issues: ' + e.message,
             });
         } finally {
-            setLoading(false);
+            setAccepting(false);
         }
     };
 
@@ -312,7 +286,7 @@ export function ScriptsImportModal({
         try {
             if (!importReview?.snapshotId) throw new Error('Missing import review snapshot');
 
-            setLoading(true);
+            setAccepting(true);
 
             const response = await axios.post('/api/integrity-imports/accept', {
                 snapshotId: importReview.snapshotId,
@@ -355,211 +329,239 @@ export function ScriptsImportModal({
                 message: 'Failed to accept imported script issues: ' + e.message,
             });
         } finally {
-            setLoading(false);
+            setAccepting(false);
         }
     };
 
-    const siteId = watch('siteId');
 
-    const selectedSite = useMemo(() => sites.find(s => s.siteId === siteId), [siteId]);
+    const savedScriptIds = result?.savedScriptIds || [];
+    const doneUpToDate = !!result?.preview?.length && result.preview.every(p => p.upToDate);
+    const progressStep: 'source' | 'review' | 'import' = step === 'source' ? 'source'
+        : step === 'review' ? 'review'
+        : step === 'running' ? (runningKind === 'preview' ? 'review' : 'import')
+        : step === 'error' ? (preview ? 'review' : 'source')
+        : 'import';
 
     return (
         <>
-            {isLoading && <Loader overlay />}
-
-            {open && (
-                <ImportInfo 
-                    loading={loading} 
-                    site={selectedSite}
-                    overwriteDataKeys={overwriteDataKeys}
-                    overwriteDrugsLibraryItems={overwriteDrugsLibraryItems}
-                    requestKey={requestKey}
-                />
-            )}
+            {accepting && <Loader overlay />}
 
             <Modal
                 open={open}
-                onOpenChange={() => {
-                    onOpenChange(false);
-                    resetForm(getDefaultFormFields(overWriteScriptWithId, formDefaults));
-                    setPreview(null);
-                    setRequestKey(newRequestKey());
+                onOpenChange={(next) => { if (!next) close(); }}
+                title={isOverwriteImport ? `Import into ${targetTitle ? `“${targetTitle}”` : 'this script'}` : 'Import scripts'}
+                description={STEP_TEXT[step === 'done' ? 'done' : progressStep]}
+                contentProps={{
+                    className: 'sm:max-w-3xl',
+                    // a running import can't be dismissed by clicking outside or Esc
+                    onInteractOutside: (e) => { if (running) e.preventDefault(); },
+                    onEscapeKeyDown: (e) => { if (running) e.preventDefault(); },
                 }}
-                title={isOverwriteImport ? "Import into this script" : "Import script"}
                 actions={(
                     <>
-                        <span className="text-xs text-danger">* Required</span>
+                        {step === 'source' && (
+                            <>
+                                <div className="flex-1" />
+                                <DialogClose asChild>
+                                    <Button variant="ghost" onClick={close}>Cancel</Button>
+                                </DialogClose>
+                                <Button onClick={() => run(true)} disabled={!siteId || !scriptIds.length}>
+                                    Preview changes
+                                </Button>
+                            </>
+                        )}
 
-                        <div className="flex-1" />
+                        {step === 'review' && (
+                            <>
+                                <Button variant="ghost" onClick={() => setStep('source')}>Back</Button>
+                                <div className="flex-1" />
+                                {allUpToDate ? (
+                                    <Button onClick={close}>Close</Button>
+                                ) : (
+                                    <>
+                                        {!!importBlockedReason && <span className="text-xs text-muted-foreground">{importBlockedReason}</span>}
+                                        <Button variant="outline" onClick={() => run(true)}>Refresh preview</Button>
+                                        <Button onClick={() => run(false)} disabled={!!importBlockedReason}>
+                                            Import as drafts
+                                        </Button>
+                                    </>
+                                )}
+                            </>
+                        )}
 
-                        <DialogClose asChild>
-                            <Button
-                                variant="ghost"
-                                disabled={disabled}
-                                onClick={() => onOpenChange(false)}
-                            >
-                                Cancel
-                            </Button>
-                        </DialogClose>
+                        {step === 'running' && (
+                            <>
+                                <span className="text-xs text-muted-foreground">You can keep this open; it finishes on the server.</span>
+                                <div className="flex-1" />
+                                <Button disabled><Loader2 className="mr-2 h-4 w-4 animate-spin" />{runningKind === 'preview' ? 'Preparing preview' : 'Importing'}</Button>
+                            </>
+                        )}
 
-                        <Button
-                            variant={preview ? "outline" : "default"}
-                            onClick={() => runImport(true)()}
-                            disabled={disabled}
-                        >
-                            {preview ? 'Refresh preview' : 'Preview import'}
-                        </Button>
+                        {step === 'error' && (
+                            <>
+                                <Button variant="ghost" onClick={() => setStep(preview && !sourceMismatch ? 'review' : 'source')}>Back</Button>
+                                <div className="flex-1" />
+                                <Button variant="outline" onClick={close}>Close</Button>
+                                <Button onClick={() => run(runningKind === 'preview')}>Try again</Button>
+                            </>
+                        )}
 
-                        <Button
-                            onClick={() => runImport(false)()}
-                            disabled={
-                                disabled ||
-                                !preview ||
-                                (isOverwriteImport && !confirmed) ||
-                                (!!sourceMismatch && !confirmSourceMismatch)
-                            }
-                        >
-                            Import
-                        </Button>
+                        {step === 'done' && (
+                            <>
+                                <div className="flex-1" />
+                                {!isOverwriteImport && savedScriptIds.length === 1 && (
+                                    <Button variant="outline" onClick={() => { close(); router.push(`/script/${savedScriptIds[0]}`); }}>
+                                        Open the new script
+                                    </Button>
+                                )}
+                                <Button onClick={() => { onImportSuccess?.(); close(); }}>Done</Button>
+                            </>
+                        )}
                     </>
                 )}
             >
                 <div className="flex flex-col gap-y-5">
-                    <ErrorCard color="warning">
-                        <div className="p-2 text-sm flex flex-col gap-y-1">
-                            {overwriteDataKeys ? (
-                                <span>
-                                    Data keys: the source&apos;s changes to labels and options <b>are applied</b> to this editor&apos;s keys.
-                                    Options that only exist here are kept. Options the source removed since the last import are removed,
-                                    unless other scripts still use them.
-                                </span>
-                            ) : (
-                                <span>
-                                    Data keys: new keys and new options <b>are added</b>. Existing labels and options here are not changed or removed.
-                                </span>
-                            )}
-                            <span>
-                                Drugs, feeds &amp; fluids: {overwriteDrugsLibraryItems ? <>existing items <b>are replaced</b> by the source&apos;s</> : <>only missing items <b>are added</b></>}.
-                            </span>
-                        </div>
-                    </ErrorCard>
+                    {step === 'source' && (
+                        <>
+                            {!!error && <ErrorCard><div className="p-2 text-sm">{error}</div></ErrorCard>}
+                            <Title>Source</Title>
+                            <ImportSourcePicker
+                                sites={sites}
+                                siteId={siteId}
+                                onSiteChange={setSiteId}
+                                targetScriptId={overWriteScriptWithId}
+                                targetTitle={targetTitle}
+                                multiple={!isOverwriteImport}
+                                value={scriptIds}
+                                onChange={setScriptIds}
+                                disabled={disabled}
+                                onLoaded={(r) => setTargetTitle(r.targetTitle || '')}
+                            />
 
-                    {isOverwriteImport && (
+                            {isOverwriteImport && (
+                                <p className="text-xs text-muted-foreground">
+                                    The source is <b>merged</b> into this script: its changes are applied, screens and options that only exist here are kept.
+                                    Nothing is saved until you have reviewed the changes, and then only as drafts.
+                                </p>
+                            )}
+
+                            <Title>Data keys</Title>
+                            <ChoiceGroup
+                                id="import-data-keys"
+                                value={dataKeysMode}
+                                onChange={setDataKeysMode}
+                                disabled={disabled}
+                                options={[
+                                    { value: 'add', title: 'Add what this editor is missing (recommended)', description: 'New keys and new options are added. Labels and options already here are not changed or removed.' },
+                                    { value: 'apply', title: 'Also apply the source\u2019s changes', description: 'The source\u2019s changes to labels and options are applied. Options only here are kept; options the source removed since the last import are removed unless other scripts use them.' },
+                                ]}
+                            />
+
+                            <Title>Drugs, feeds &amp; fluids</Title>
+                            <ChoiceGroup
+                                id="import-drugs"
+                                value={drugsMode}
+                                onChange={setDrugsMode}
+                                disabled={disabled}
+                                options={[
+                                    { value: 'replace', title: 'Use the source\u2019s version', description: 'Items the scripts use are updated to match the source.' },
+                                    { value: 'add', title: 'Only add missing items', description: 'Items that already exist here are left as they are.' },
+                                ]}
+                            />
+                        </>
+                    )}
+
+                    {step === 'review' && !!preview && (
+                        <>
+                            {/* the most important thing on this screen when it applies: is this the right source? */}
+                            {!!sourceMismatch && (
+                                <ErrorCard>
+                                    <div className="flex flex-col gap-y-2 p-2 text-sm">
+                                        <div>{sourceMismatch}</div>
+                                        <div className="flex gap-x-2">
+                                            <Checkbox id="confirmSourceMismatch" checked={confirmSourceMismatch} onCheckedChange={() => setConfirmSourceMismatch(!confirmSourceMismatch)} />
+                                            <Label secondary htmlFor="confirmSourceMismatch">This is the right source script, import it anyway</Label>
+                                        </div>
+                                    </div>
+                                </ErrorCard>
+                            )}
+                            {preview.map((p) => (
+                                <ScriptImportPreviewSummary key={p.sourceScript.scriptId} preview={p} />
+                            ))}
+
+                            {needsKeepChoice && (
+                                <div className="flex gap-x-2">
+                                    <Checkbox id="keepTargetOnly" checked={keepTargetOnly} onCheckedChange={() => setKeepTargetOnly(!keepTargetOnly)} />
+                                    <Label secondary htmlFor="keepTargetOnly">Keep screens, diagnoses and problems that are not in the source script</Label>
+                                </div>
+                            )}
+
+
+                            {isOverwriteImport && !allUpToDate && (
+                                <div className="flex gap-x-2">
+                                    <Checkbox id="confirmed" checked={confirmed} onCheckedChange={() => setConfirmed(!confirmed)} />
+                                    <Label secondary htmlFor="confirmed">I have reviewed these changes and want to import them into this script as drafts</Label>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {step === 'running' && (
+                        <ImportProgress
+                            requestKey={requestKey}
+                            site={site}
+                            title={runningKind === 'preview' ? 'Working out what would change\u2026' : 'Importing\u2026'}
+                            description={runningKind === 'preview'
+                                ? 'Nothing is saved yet: this only compares the source with this editor.'
+                                : 'Saving the changes as drafts. Large scripts can take a few minutes.'}
+                        />
+                    )}
+
+                    {step === 'error' && (
                         <ErrorCard>
-                            <div className="p-2 text-sm">
-                                This import <b>merges the source script into this script</b>: the source&apos;s changes are applied, screens and options that only exist here are kept.
-                                Everything is saved as drafts. The import still follows the <b>Imports</b> integrity policy.
+                            <div className="flex gap-x-2 p-2 text-sm">
+                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                                <div>
+                                    <div className="font-medium">{runningKind === 'preview' ? 'The preview could not be prepared' : 'The import did not go through'}</div>
+                                    <div className="mt-1">{error}</div>
+                                    {runningKind === 'import' && <div className="mt-1 opacity-80">Nothing was saved: an import is saved completely or not at all.</div>}
+                                </div>
                             </div>
                         </ErrorCard>
                     )}
 
-                    <div>
-                        <Label htmlFor="siteId">Site *</Label>
-                        <Select
-                            name="siteId"
-                            disabled={disabled}
-                            value={watchedSiteId || undefined}
-                            onValueChange={value => setValue('siteId', value, { shouldDirty: true, })}
-                        >
-                            <SelectTrigger >
-                                <SelectValue placeholder="Select site" />
-                            </SelectTrigger>
-
-                            <SelectContent>
-                                <SelectGroup>
-                                    <SelectLabel>Sites</SelectLabel>
-                                    {sites.map(({ siteId, name }) => (
-                                        <SelectItem key={siteId} value={siteId}>
-                                            {name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
-
-                        {!!errors.siteId?.message && <div className="text-xs text-danger mt-1">{errors.siteId.message}</div>}
-                    </div>
-
-                    <div>
-                        <Label htmlFor="scriptId">Script ID *</Label>
-                        <Input
-                            {...register('scriptId', { disabled, required: true, })}
-                            name="scriptId"
-                        />
-                        {!!errors.scriptId?.message && <div className="text-xs text-danger mt-1">{errors.scriptId.message}</div>}
-                    </div>
-
-                    <div className={cn("flex gap-x-2")}>
-                        <Checkbox 
-                            name="overwriteDataKeys"
-                            id="overwriteDataKeys"
-                            disabled={disabled}
-                            checked={overwriteDataKeys}
-                            onCheckedChange={() => setValue('overwriteDataKeys', !overwriteDataKeys, { shouldDirty: true, })}
-                        />
-                        <Label secondary htmlFor="overwriteDataKeys">Overwrite datakeys</Label>
-                    </div>
-
-                    <div className={cn("flex gap-x-2")}>
-                        <Checkbox 
-                            name="overwriteDrugsLibraryItems"
-                            id="overwriteDrugsLibraryItems"
-                            disabled={disabled}
-                            checked={overwriteDrugsLibraryItems}
-                            onCheckedChange={() => setValue('overwriteDrugsLibraryItems', !overwriteDrugsLibraryItems, { shouldDirty: true, })}
-                        />
-                        <Label secondary htmlFor="overwriteDrugsLibraryItems">Overwrite drugs, fluids & feeds</Label>
-                    </div>
-
-                    {!!preview?.length && (
-                        <div className="flex flex-col gap-y-4 border-t pt-4">
-                            {preview.map((p) => (
-                                <ScriptImportPreviewSummary key={p.sourceScript.scriptId} preview={p} />
-                            ))}
-                        </div>
-                    )}
-
-                    {isOverwriteImport && !!preview?.some(p => p.firstImport && p.mode === 'merge') && (
-                        <div className={cn("flex gap-x-2")}>
-                            <Checkbox
-                                name="keepTargetOnly"
-                                id="keepTargetOnly"
-                                disabled={disabled}
-                                checked={keepTargetOnly}
-                                onCheckedChange={() => setValue('keepTargetOnly', !keepTargetOnly, { shouldDirty: true, })}
-                            />
-                            <Label secondary htmlFor="keepTargetOnly">Keep screens, diagnoses and problems that are not in the source script</Label>
-                        </div>
-                    )}
-
-                    {!!sourceMismatch && (
-                        <>
-                            <ErrorCard>
-                                <div className="p-2 text-sm">{sourceMismatch}</div>
-                            </ErrorCard>
-                            <div className={cn("flex gap-x-2")}>
-                                <Checkbox
-                                    name="confirmSourceMismatch"
-                                    id="confirmSourceMismatch"
-                                    disabled={disabled}
-                                    checked={confirmSourceMismatch}
-                                    onCheckedChange={() => setValue('confirmSourceMismatch', !confirmSourceMismatch, { shouldDirty: true, })}
-                                />
-                                <Label secondary htmlFor="confirmSourceMismatch">This is the right source script, import it anyway</Label>
+                    {step === 'done' && !!result && (
+                        <div className="flex flex-col gap-y-4">
+                            <div className="flex items-start gap-x-3">
+                                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                                <div className="text-sm">
+                                    <div>{doneUpToDate ? 'Already up to date: nothing was changed' : 'Imported as drafts'}</div>
+                                    {!doneUpToDate && (
+                                        <div className="mt-1 text-muted-foreground">
+                                            {[
+                                                result.info?.scripts && `${result.info.scripts} script${result.info.scripts === 1 ? '' : 's'}`,
+                                                result.info?.screens && `${result.info.screens} screen${result.info.screens === 1 ? '' : 's'}`,
+                                                result.info?.diagnoses && `${result.info.diagnoses} diagnos${result.info.diagnoses === 1 ? 'is' : 'es'}`,
+                                                result.info?.problems && `${result.info.problems} problem${result.info.problems === 1 ? '' : 's'}`,
+                                                result.info?.dataKeys && `${result.info.dataKeys} data key${result.info.dataKeys === 1 ? '' : 's'}`,
+                                                result.info?.dffItems && `${result.info.dffItems} drug/fluid/feed item${result.info.dffItems === 1 ? '' : 's'}`,
+                                            ].filter(Boolean).join(', ') || 'Changes'} saved as drafts. Review them, then publish when ready.
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </>
+                            {!!result.warnings?.length && (
+                                <ErrorCard color="warning">
+                                    <div className="py-2 text-sm">
+                                        <div className="mb-1 font-medium">Worth checking</div>
+                                        <ul className="list-disc space-y-1 pl-5">
+                                            {result.warnings.map((w, i) => <li key={`${w}-${i}`}>{w}</li>)}
+                                        </ul>
+                                    </div>
+                                </ErrorCard>
+                            )}
+                        </div>
                     )}
-
-                    <div className={cn("flex gap-x-2", (!overWriteScriptWithId || !preview) && 'hidden')}>
-                        <Checkbox 
-                            name="confirmed"
-                            id="confirmed"
-                            disabled={disabled}
-                            checked={confirmed}
-                            onCheckedChange={() => setValue('confirmed', !confirmed, { shouldDirty: true, })}
-                        />
-                        <Label secondary htmlFor="confirmed">I have reviewed the changes above and want to import them into this script</Label>
-                    </div>
                 </div>
             </Modal>
 
@@ -676,185 +678,99 @@ export function ScriptsImportModal({
     );
 }
 
-function ImportInfo({ 
+function ImportProgress({
     requestKey,
-    loading, 
-    site, 
-    overwriteDataKeys,
-    overwriteDrugsLibraryItems,
+    site,
+    title,
+    description,
 }: {
-    loading: boolean;
-    site?: ReturnType<typeof useAppContext>['sites'][0];
-    overwriteDataKeys?: boolean;
-    overwriteDrugsLibraryItems?: boolean;
     requestKey: string;
+    site?: ReturnType<typeof useAppContext>['sites'][0];
+    title: string;
+    description: string;
 }) {
     const { getSocketEvent, removeSocketEvent } = useAppContext();
-    const [show, setShow] = useState(false);
 
-    useEffect(() => { if (loading) setShow(true); }, [loading]);
-
-    // Elapsed-time clock: gives users something concrete to watch while a
-    // slow step (e.g. propagating an overwritten data key/drug item to every
-    // script that references it) runs in the background.
-    const startedAtRef = useRef<number | null>(null);
+    // Elapsed-time clock: something concrete to watch while a slow step runs on the server.
+    const startedAt = useRef(Date.now());
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
     useEffect(() => {
-        if (!show) {
-            startedAtRef.current = null;
-            setElapsedSeconds(0);
-            return;
-        }
-
-        startedAtRef.current = Date.now();
-        setElapsedSeconds(0);
-
-        const interval = setInterval(() => {
-            if (startedAtRef.current) setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
-        }, 1000);
-
+        startedAt.current = Date.now();
+        const interval = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - startedAt.current) / 1000)), 1000);
         return () => clearInterval(interval);
-    }, [show]);
+    }, [requestKey]);
+    const elapsed = elapsedSeconds >= 60 ? `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s` : `${elapsedSeconds}s`;
 
-    const formatElapsed = (totalSeconds: number) => {
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-    };
-
-    const actionsInProgress = useMemo(() => {
-        return [
-            ...(!site ? [{ 
-                key: BROADCAST_ACTIONS_IN_PROGRESS.loading_local_data, 
-                label: 'Loading data', 
-            }] : [
-                { 
-                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_datakeys, 
-                    label: 'Loading data keys from ' + site.name, 
-                },
-                { 
-                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_scripts, 
-                    label: 'Loading scripts from ' + site.name, 
-                },
-                { 
-                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_screens, 
-                    label: 'Loading screens from ' + site.name, 
-                },
-                { 
-                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_diagnoses, 
-                    label: 'Loading diagnoses from ' + site.name, 
-                },
-                { 
-                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_problems, 
-                    label: 'Loading problems from ' + site.name, 
-                },
-                { 
-                    key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_dff, 
-                    label: 'Loading drugs library from ' + site.name, 
-                },
-                { 
-                    key: BROADCAST_ACTIONS_IN_PROGRESS.uploading_remote_files, 
-                    label: 'Uploading files from ' + site.name, 
-                },
-            ]),
-
-            { 
-                key: BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, 
-                label: 'Saving scripts', 
-            },
-
-            { 
-                key: BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, 
-                label: 'Saving drugs & fluids', 
-            },
-
-            { 
-                key: BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, 
-                label: 'Saving data keys', 
-            },
-        ];
-    }, [
-        site,
-        overwriteDataKeys,
-        overwriteDrugsLibraryItems,
-    ]);
+    const steps = useMemo(() => [
+        ...(!site ? [{ key: BROADCAST_ACTIONS_IN_PROGRESS.loading_local_data, label: 'Loading data' }] : [
+            { key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_datakeys, label: `Loading data keys from ${site.name}` },
+            { key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_scripts, label: `Loading scripts from ${site.name}` },
+            { key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_screens, label: `Loading screens from ${site.name}` },
+            { key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_diagnoses, label: `Loading diagnoses from ${site.name}` },
+            { key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_problems, label: `Loading problems from ${site.name}` },
+            { key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_dff, label: `Loading drugs library from ${site.name}` },
+            { key: BROADCAST_ACTIONS_IN_PROGRESS.uploading_remote_files, label: `Copying files from ${site.name}` },
+        ]),
+        { key: BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, label: 'Saving scripts' },
+        { key: BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, label: 'Saving drugs & fluids' },
+        { key: BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, label: 'Saving data keys' },
+    ], [site]);
 
     const [events, setEvents] = useState<Record<string, boolean>>({});
-    const [latestEvent, setLatestEvent] = useState('');
+    const [latestEvent, setLatestEvent] = useState<string>(steps[0]?.key || '');
 
     useEffect(() => {
-        socket.on(requestKey, (key: string, value: boolean) => {
+        const onEvent = (key: string, value: boolean) => {
             setLatestEvent(key);
-            setEvents(prev => ({
-                ...prev,
-                [key]: value,
-            }));
-        });
-    }, [requestKey]);
-
-    const getSocketEventTimeout = useRef<null | ReturnType<typeof setTimeout>>(null);
-
-    useEffect(() => {  
-        if (!loading && getSocketEventTimeout.current) {
-            clearTimeout(getSocketEventTimeout.current);
+            setEvents(prev => ({ ...prev, [key]: value }));
+        };
+        socket.on(requestKey, onEvent);
+        // also ask the server for what happened so far (events can be missed, e.g. on a reconnect)
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let stopped = false;
+        const poll = async () => {
+            const res: string[] = await getSocketEvent(requestKey);
+            if (stopped) return;
+            const evts = (res || []).map(e => e.split('__'));
+            const last = evts[evts.length - 1];
+            if (last?.[0]) setLatestEvent(last[0]);
+            setEvents(prev => evts.reduce((acc, e) => ({ ...acc, [e[0]]: e[1] === 'true' }), { ...prev }));
+            timer = setTimeout(poll, 5 * 1000);
+        };
+        poll();
+        return () => {
+            stopped = true;
+            socket.off(requestKey, onEvent);
+            if (timer) clearTimeout(timer);
             removeSocketEvent(requestKey);
-        }
-
-        if (loading && !getSocketEventTimeout.current) {
-            const fn = async () => {
-                const res: string[] = await getSocketEvent(requestKey);
-                const evts = (res || []).map(e => e.split('__'));
-                const lastEvent = evts[evts.length - 1] || [];
-                setLatestEvent(lastEvent[0] || actionsInProgress[0]?.key || '');
-                setEvents(prev => evts.reduce((acc, e) => ({
-                    ...prev,
-                    ...acc,
-                    [e[0]]: e[1] === 'true',
-                }), {} as Record<string, boolean>));
-                getSocketEventTimeout.current = setTimeout(fn, 5 * 1000);
-            };
-            setLatestEvent(actionsInProgress[0]?.key || '');
-            fn();
-        }
-    }, [requestKey, loading, actionsInProgress, getSocketEvent, removeSocketEvent]);
+        };
+    }, [requestKey, getSocketEvent, removeSocketEvent]);
 
     return (
-        <>
-            <OverlayInfoCard
-                show={show}
-                // onClose={() => setShow(false)}
-            >
-                <div className="text-xs text-muted-foreground mb-2">
-                    Running for {formatElapsed(elapsedSeconds)}
+        <div className="flex flex-col gap-y-4">
+            <div>
+                <div className="flex items-center gap-x-2 text-sm font-medium">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    {title}
+                    <span className="text-xs font-normal text-muted-foreground">{elapsed}</span>
                 </div>
-
-                <div className="flex flex-col gap-y-1">
-                    {actionsInProgress.map(a => {
-                        const inProgress = latestEvent === a.key;
-                        let isCompleted = events[a.key] === false;
-
-                        if (loading && latestEvent && !events[latestEvent] && inProgress) isCompleted = false;
-
-                        let className = 'opacity-50';
-
-                        if (inProgress) className = 'opacity-100';
-
-                        if (isCompleted) className = 'opacity-100 text-green-400';
-
-                        let Icon = isCompleted ? CheckIcon : XIcon;
-
-                        if (inProgress) Icon = EllipsisIcon;
-
+                <div className="mt-1 text-xs text-muted-foreground">{description}</div>
+            </div>
+            <ScrollArea className="max-h-[320px]">
+                <div className="flex flex-col gap-y-1.5">
+                    {steps.map(s => {
+                        const active = latestEvent === s.key && events[s.key] !== false;
+                        const done = events[s.key] === false;
+                        const Icon = active ? EllipsisIcon : done ? CheckIcon : XIcon;
                         return (
-                            <div key={a.key} className="text-xs flex items-center gap-x-2">
-                                <Icon className={cn(className, 'size-3')} />
-                                <span className={cn(className)}>{a.label}</span>
+                            <div key={s.key} className={cn("flex items-center gap-x-2 text-xs", active ? "opacity-100" : done ? "text-green-400" : "opacity-50")}>
+                                <Icon className={cn("size-3", !active && !done && "opacity-0")} />
+                                <span>{s.label}</span>
                             </div>
-                        )
+                        );
                     })}
                 </div>
-            </OverlayInfoCard>
-        </>
+            </ScrollArea>
+        </div>
     );
 }
