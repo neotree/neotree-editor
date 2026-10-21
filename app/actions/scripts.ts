@@ -2997,6 +2997,7 @@ export async function copyScripts(params?: {
             });
             if (res.success) {
                 response.info.dataKeys = dataKeysToSave.length;
+                if (res.warnings?.length) response.warnings = Array.from(new Set([...(response.warnings || []), ...res.warnings]));
                 importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])
                     .map((script: { scriptId?: string | null }) => script.scriptId)
                     .filter((value): value is string => !!value);

@@ -345,4 +345,51 @@ assert.deepEqual(
   "no exceptions means replace everywhere — the default action",
 )
 
+// ── A parent and its new option saved together (an import) ────────────────────────────────────────
+// The save validates against the stored library with the batch laid over it, so an option created in
+// the same save counts as existing; without it in the library, it is missing.
+{
+  const newChild = { uuid: "child-new", uniqueKey: "child_new", name: "ChildNew", label: "Child new", dataType: "id", options: [] }
+  const stored = [parentA, child1, child2]
+  assert.match(
+    validateDataKeyOptionsAddition({ dataKeys: stored, parentUniqueKey: "parent_a", previousOptions: parentA.options, nextOptions: [...parentA.options, "child_new"] }) || "",
+    /does not exist/,
+    "an option nobody creates is still refused",
+  )
+  assert.equal(
+    validateDataKeyOptionsAddition({ dataKeys: [...stored, newChild], parentUniqueKey: "parent_a", previousOptions: parentA.options, nextOptions: [...parentA.options, "child_new"] }),
+    null,
+    "an option created in the same save is accepted",
+  )
+  // the batch's own options take part in cycle detection
+  const batchParent = { ...parentA, options: [...parentA.options, "child_new"] }
+  const batchChild = { ...newChild, dataType: "dropdown", options: ["parent_a"] }
+  assert.match(
+    validateDataKeyOptionsAddition({ dataKeys: [batchParent, child1, child2, batchChild], parentUniqueKey: "parent_a", previousOptions: parentA.options, nextOptions: batchParent.options }) || "",
+    /circular/,
+    "a cycle created within one batch is refused",
+  )
+}
+
+// ── Imports: a mixed-type pool from the source is reported, not refused ────────────────────────────
+{
+  const odd = { uuid: "odd", uniqueKey: "odd", name: "Odd", label: "Odd", dataType: "number", options: [] }
+  const library = [parentA, child1, child2, odd]
+  const args = { dataKeys: library, parentUniqueKey: "parent_a", previousOptions: parentA.options, nextOptions: [...parentA.options, "odd"] }
+  assert.match(validateDataKeyOptionsAddition(args) || "", /data type does not match/, "the editor still refuses mixing types")
+  const reported: string[] = []
+  assert.equal(validateDataKeyOptionsAddition({ ...args, onTypeMismatch: (m) => reported.push(m) }), null, "an import goes ahead")
+  assert.equal(reported.length, 1, "and the mismatch is reported")
+  assert.match(
+    validateDataKeyOptionsAddition({ ...args, nextOptions: [...parentA.options, "missing"], onTypeMismatch: () => {} }) || "",
+    /does not exist/,
+    "a missing option still fails on imports",
+  )
+  assert.match(
+    validateDataKeyOptionsAddition({ ...args, nextOptions: [...parentA.options, "parent_a"], onTypeMismatch: () => {} }) || "",
+    /option of itself/,
+    "a self-link still fails on imports",
+  )
+}
+
 console.log("data key children tests passed")
