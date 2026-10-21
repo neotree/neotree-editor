@@ -14,6 +14,7 @@ const STATUS_CLASSES: Record<ContentSyncStatus, string> = {
     never_synced: "bg-muted text-muted-foreground",
     only_on_source: "border-slate-500/20 bg-slate-500/10 text-slate-700 dark:text-slate-300",
     only_on_target: "border-slate-500/20 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    cannot_compare: "bg-muted text-muted-foreground",
 };
 
 /**

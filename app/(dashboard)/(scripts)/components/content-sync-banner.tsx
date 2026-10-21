@@ -14,12 +14,55 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { useContentLock } from "@/hooks/use-content-lock";
 import { useContentSyncStatus } from "@/hooks/use-content-sync-status";
+import { useContentSyncEntityDiff } from "@/hooks/use-content-sync-entity-diff";
 
 /**
  * Content sync on a script page: why the script is read-only here and what to do instead (target), the
  * hotfix controls for admins, and on the source a warning when the target has changes to bring back.
  */
-export function ContentSyncBanner({ scriptId }: { scriptId?: string | null }) {
+export function ContentSyncBanner({ scriptId, showEntityDiff }: {
+    scriptId?: string | null;
+    /** On the script page: list which screens, diagnoses and problems differ from the linked editor. */
+    showEntityDiff?: boolean;
+}) {
+    return (
+        <>
+            <ContentSyncBannerBody scriptId={scriptId} />
+            {showEntityDiff && <ContentSyncDiffSummary scriptId={scriptId} />}
+        </>
+    );
+}
+
+/** Which screens, diagnoses and problems of this script differ from its counterpart on the linked editor. */
+function ContentSyncDiffSummary({ scriptId }: { scriptId?: string | null }) {
+    const sync = useContentSyncStatus({ enabled: false });
+    const { diff, active } = useContentSyncEntityDiff(scriptId);
+    const { contentSync } = useAppContext();
+    if (!active || !diff) return null;
+    const other = contentSync?.settings?.role === "target" ? sync.sourceName : sync.targetName;
+    const list = (labels: string[]) => {
+        const named = labels.map(l => `${l || ''}`.trim() || '(untitled)');
+        return named.slice(0, 6).map(l => `“${l}”`).join(', ') + (named.length > 6 ? ` and ${named.length - 6} more` : '');
+    };
+    const parts = ([
+        ['Screens', diff.screens],
+        ['Diagnoses', diff.diagnoses],
+        ['Problems', diff.problems],
+    ] as const).flatMap(([name, d]) => [
+        d.changedLabels.length ? `${name} that differ: ${list(d.changedLabels)}` : null,
+        d.onlyHereLabels.length ? `${name} only on this editor: ${list(d.onlyHereLabels)}` : null,
+        d.onlyThere.length ? `${name} only on ${other}: ${list(d.onlyThere)}` : null,
+    ]).filter(Boolean) as string[];
+    if (!parts.length) return null;
+    return (
+        <div className="flex flex-col gap-y-0.5 text-xs text-muted-foreground">
+            <span>Compared with {other}:</span>
+            {parts.map(p => <span key={p}>{p}</span>)}
+        </div>
+    );
+}
+
+function ContentSyncBannerBody({ scriptId }: { scriptId?: string | null }) {
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
     const { contentSync, isAdmin, isSuperUser, viewOnly } = useAppContext();

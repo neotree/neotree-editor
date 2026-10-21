@@ -167,7 +167,13 @@ export type ContentSyncStatus =
     | "pending"
     | "never_synced"
     | "only_on_source"
-    | "only_on_target";
+    | "only_on_target"
+    /**
+     * The two editors run different builds of the editor software, which fingerprint content differently
+     * (e.g. one was deployed before the other). Not about data versions: those never match between editors
+     * and play no part in content sync.
+     */
+    | "cannot_compare";
 
 export type ContentSyncPair = {
     status: ContentSyncStatus;
@@ -192,6 +198,7 @@ export const CONTENT_SYNC_STATUS_LABELS: Record<ContentSyncStatus, string> = {
     never_synced: "Not synced yet",
     only_on_source: "Only on source",
     only_on_target: "Only on target",
+    cannot_compare: "Can't compare yet: update both editors",
 };
 
 /**
@@ -199,6 +206,8 @@ export const CONTENT_SYNC_STATUS_LABELS: Record<ContentSyncStatus, string> = {
  * Sync points come from both editors: imports into the target (source -> target) and back-ports into the
  * source (target -> source). The most recent one is the reference.
  */
+const fingerprintVersion = (fp?: string | null) => (`${fp || ""}`.includes(":") ? `${fp}`.split(":")[0] : "");
+
 export function computeContentSyncPairs({ source, target }: { source: ContentSyncState; target: ContentSyncState; }): ContentSyncPair[] {
     const sourceScripts = new Map(source.scripts.map(s => [s.scriptId, s]));
     const targetScripts = new Map(target.scripts.map(s => [s.scriptId, s]));
@@ -267,6 +276,7 @@ export function computeContentSyncPairs({ source, target }: { source: ContentSyn
         if (!s) { pairs.push({ ...base, status: "only_on_target" }); return; }
         if (!t) { pairs.push({ ...base, status: "only_on_source" }); return; }
         if (pending) { pairs.push({ ...base, status: "pending", pendingOn: pending.pendingOn }); return; }
+        if (version(s.fingerprint) !== version(t.fingerprint)) { pairs.push({ ...base, status: "cannot_compare" }); return; }
         if (s.fingerprint === t.fingerprint) { pairs.push({ ...base, status: "in_sync" }); return; }
         if (!synced) { pairs.push({ ...base, status: "never_synced" }); return; }
         const sourceChanged = s.fingerprint !== synced.sourceFp;
@@ -302,7 +312,8 @@ export function computeContentSyncPairs({ source, target }: { source: ContentSyn
         pairedSource.add(s.scriptId);
         pairedTarget.add(t.scriptId);
         pairs.push({
-            status: s.fingerprint === t.fingerprint ? "in_sync" : "never_synced",
+            status: fingerprintVersion(s.fingerprint) !== fingerprintVersion(t.fingerprint) ? "cannot_compare"
+                : s.fingerprint === t.fingerprint ? "in_sync" : "never_synced",
             sourceScriptId: s.scriptId,
             targetScriptId: t.scriptId,
             sourceTitle: s.title,
@@ -315,7 +326,7 @@ export function computeContentSyncPairs({ source, target }: { source: ContentSyn
         pairs.push({ status: "only_on_target", sourceScriptId: null, targetScriptId: t.scriptId, sourceTitle: null, targetTitle: t.title, hotfix: hotfixes.get(t.scriptId) || null, linkedBy: "none" });
     });
 
-    const order: ContentSyncStatus[] = ["diverged", "target_ahead", "pending", "source_ahead", "never_synced", "only_on_target", "only_on_source", "in_sync"];
+    const order: ContentSyncStatus[] = ["diverged", "target_ahead", "pending", "source_ahead", "never_synced", "only_on_target", "only_on_source", "cannot_compare", "in_sync"];
     return pairs.sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status)
         || `${a.sourceTitle || a.targetTitle}`.localeCompare(`${b.sourceTitle || b.targetTitle}`));
 }
@@ -323,4 +334,91 @@ export function computeContentSyncPairs({ source, target }: { source: ContentSyn
 /** Statuses that need someone to act. */
 export function isOutOfSync(status: ContentSyncStatus) {
     return status === "source_ahead" || status === "target_ahead" || status === "diverged" || status === "pending" || status === "never_synced";
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* Which screens, diagnoses and problems of a script differ from its counterpart                    */
+/* ------------------------------------------------------------------------------------------------ */
+
+type EntityLike = { id: string; natural: string; label: string; fingerprint: string; };
+type ScriptEntitiesLike = {
+    scriptId: string;
+    screens: EntityLike[];
+    diagnoses: EntityLike[];
+    problems: EntityLike[];
+    importIdMap: { sourceScriptId: string; screens: Record<string, string>; diagnoses: Record<string, string>; problems: Record<string, string>; } | null;
+};
+
+export type EntityKindDiff = {
+    /** Ids here whose content differs from their counterpart. */
+    changed: string[];
+    /** Ids here with no counterpart on the other editor. */
+    onlyHere: string[];
+    /** Titles of entities the other editor has and this one doesn't. */
+    onlyThere: string[];
+    /** Titles of `changed` and `onlyHere`, for listing them. */
+    changedLabels: string[];
+    onlyHereLabels: string[];
+};
+
+export type ScriptEntitiesDiff = {
+    screens: EntityKindDiff;
+    diagnoses: EntityKindDiff;
+    problems: EntityKindDiff;
+    /** Number of entities here that differ or exist only here. */
+    total: number;
+};
+
+/**
+ * Pairs a script's entities with its counterpart's and lists those that differ. Pairing uses, in order,
+ * the id map of the import between the two scripts (whichever editor recorded it), identical ids, then
+ * type/ref/title (screens) or key/name (diagnoses, problems) when that is unambiguous.
+ */
+export function diffScriptEntities({ local, remote }: { local: ScriptEntitiesLike; remote: ScriptEntitiesLike; }): ScriptEntitiesDiff {
+    // remote id -> local id
+    const mapFor = (kind: "screens" | "diagnoses" | "problems"): Map<string, string> => {
+        if (local.importIdMap?.sourceScriptId === remote.scriptId) return new Map(Object.entries(local.importIdMap[kind] || {}));
+        if (remote.importIdMap?.sourceScriptId === local.scriptId) {
+            return new Map(Object.entries(remote.importIdMap[kind] || {}).map(([localId, remoteId]) => [remoteId, localId] as [string, string]));
+        }
+        return new Map();
+    };
+    const diffKind = (kind: "screens" | "diagnoses" | "problems"): EntityKindDiff => {
+        const idMap = mapFor(kind);
+        const localById = new Map(local[kind].map(e => [e.id, e]));
+        const localByNatural = new Map<string, EntityLike[]>();
+        local[kind].forEach(e => localByNatural.set(e.natural, [...(localByNatural.get(e.natural) || []), e]));
+        const paired = new Set<string>();
+        const changed: string[] = [];
+        const onlyThere: string[] = [];
+        const take = (e?: EntityLike) => (e && !paired.has(e.id) ? e : undefined);
+        // the most reliable pairings first, so heuristics never claim an entity a recorded pairing needs
+        const pairs = new Map<EntityLike, EntityLike>();
+        remote[kind].forEach(r => { const l = take(localById.get(idMap.get(r.id) || "")); if (l) { paired.add(l.id); pairs.set(r, l); } });
+        remote[kind].forEach(r => { if (pairs.has(r)) return; const l = take(localById.get(r.id)); if (l) { paired.add(l.id); pairs.set(r, l); } });
+        remote[kind].forEach(r => {
+            if (pairs.has(r)) return;
+            const candidates = (localByNatural.get(r.natural) || []).filter(e => !paired.has(e.id));
+            if (r.natural.replace(/\|/g, "") && candidates.length === 1) { paired.add(candidates[0].id); pairs.set(r, candidates[0]); }
+        });
+        remote[kind].forEach(r => {
+            const l = pairs.get(r);
+            if (!l) onlyThere.push(r.label || r.natural);
+            else if (l.fingerprint !== r.fingerprint) changed.push(l.id);
+        });
+        const onlyHereEntities = local[kind].filter(e => !paired.has(e.id));
+        const labelOf = (id: string) => localById.get(id)?.label || localById.get(id)?.natural || id;
+        return {
+            changed,
+            onlyHere: onlyHereEntities.map(e => e.id),
+            onlyThere,
+            changedLabels: changed.map(labelOf),
+            onlyHereLabels: onlyHereEntities.map(e => e.label || e.natural || e.id),
+        };
+    };
+    const screens = diffKind("screens");
+    const diagnoses = diffKind("diagnoses");
+    const problems = diffKind("problems");
+    const count = (d: EntityKindDiff) => d.changed.length + d.onlyHere.length;
+    return { screens, diagnoses, problems, total: count(screens) + count(diagnoses) + count(problems) };
 }

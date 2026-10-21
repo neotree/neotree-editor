@@ -85,7 +85,9 @@ export function ProblemsTable(props: Props) {
                     getRowOptions={({ rowIndex }) => {
                         const s = problemsArr[rowIndex];
                         return !s ? {} : {
-                            className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
+                            className: cn(
+                                !viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30',
+                            ),
                         };
                     }}
                     noDataMessage={(

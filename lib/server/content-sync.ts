@@ -16,7 +16,7 @@ import {
     type ContentSyncState,
     type OpenHotfix,
 } from "@/lib/content-sync";
-import { computeScriptFingerprint } from "@/lib/content-sync-fingerprint";
+import { computeEntityFingerprints, computeScriptFingerprint, type ScriptEntityFingerprints } from "@/lib/content-sync-fingerprint";
 import type { ScriptImportSnapshot } from "@/databases/pg/schema";
 
 /**
@@ -195,6 +195,42 @@ export async function recordTargetFingerprints(targetScriptIds: string[]) {
     }
 }
 
+/** A script's entities on this editor, fingerprinted one by one, with the id map of its last import here. */
+export type LocalScriptEntities = ScriptEntityFingerprints & {
+    scriptId: string;
+    /** The last import into this script: source script and source id -> id here. */
+    importIdMap: {
+        sourceScriptId: string;
+        screens: Record<string, string>;
+        diagnoses: Record<string, string>;
+        problems: Record<string, string>;
+    } | null;
+};
+
+/** Published screens, diagnoses and problems of one script, each fingerprinted (null if it has none). */
+export async function getLocalScriptEntities(scriptId: string): Promise<LocalScriptEntities | null> {
+    if (!scriptId) return null;
+    const [loaded] = await loadPublishedScripts([scriptId]);
+    if (!loaded) return null;
+    const [record] = await db
+        .select({ sourceScriptId: scriptImportSources.sourceScriptId, baseSnapshot: scriptImportSources.baseSnapshot })
+        .from(scriptImportSources)
+        .where(eq(scriptImportSources.targetScriptId, scriptId))
+        .limit(1);
+    // the published state corresponds to the base (a pending import is not published yet)
+    const idMap = (record?.baseSnapshot as any)?.idMap;
+    return {
+        scriptId,
+        ...computeEntityFingerprints({ screens: loaded.screens, diagnoses: loaded.diagnoses, problems: loaded.problems }),
+        importIdMap: record && idMap ? {
+            sourceScriptId: record.sourceScriptId,
+            screens: idMap.screens || {},
+            diagnoses: idMap.diagnoses || {},
+            problems: idMap.problems || {},
+        } : null,
+    };
+}
+
 /* ------------------------------------------------------------------------------------------------ */
 /* The linked editor                                                                                */
 /* ------------------------------------------------------------------------------------------------ */
@@ -217,6 +253,18 @@ export async function fetchRemoteScriptFingerprints(siteId: string, scriptIds: s
     } catch (e: any) {
         logger.error("fetchRemoteScriptFingerprints ERROR", e.message);
         return new Map();
+    }
+}
+
+/** The other editor's entities of one of its scripts. Null when it cannot tell (an older editor). */
+export async function fetchRemoteScriptEntities(siteId: string, remoteScriptId: string): Promise<LocalScriptEntities | null> {
+    try {
+        const client = await getSiteAxiosClient(siteId);
+        const res = await client.get('/api/content-sync/entities?data=' + encodeURIComponent(JSON.stringify({ scriptId: remoteScriptId })), { timeout: 120000 });
+        return (res.data?.data as LocalScriptEntities) || null;
+    } catch (e: any) {
+        logger.error("fetchRemoteScriptEntities ERROR", e.message);
+        return null;
     }
 }
 

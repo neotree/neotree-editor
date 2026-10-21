@@ -2,12 +2,13 @@ import assert from "assert";
 
 import {
     computeContentSyncPairs,
+    diffScriptEntities,
     getContentLockReason,
     isOutOfSync,
     normalizeContentSyncSettings,
     type ContentSyncState,
 } from "../lib/content-sync";
-import { computeScriptFingerprint } from "../lib/content-sync-fingerprint";
+import { computeEntityFingerprints, computeScriptFingerprint } from "../lib/content-sync-fingerprint";
 
 // ── Settings ─────────────────────────────────────────────────────────────────────────────────────
 {
@@ -176,6 +177,69 @@ const pairOf = (pairs: ReturnType<typeof computeContentSyncPairs>, title: string
     });
     assert.equal(pendingFirst.find(p => p.targetScriptId === "l1")!.sourceScriptId, "d1");
     assert.equal(pendingFirst.find(p => p.targetScriptId === "l1")!.status, "pending");
+}
+
+// ── Which screens differ: pairing and comparison ────────────────────────────────────────────────────
+{
+    const screen = (screenId: string, title: string, position: number, items: string[], extra: Record<string, any> = {}) => ({
+        screenId, title, position, type: "single_select", refId: title,
+        items: items.map((v, i) => ({ itemId: `${screenId}-i${i}`, value: v, label: v })), ...extra,
+    });
+    // DEV (source) and LIVE (target) copies of a script with different ids; LIVE recorded the import id map
+    const dev = { scriptId: "dev-s", ...computeEntityFingerprints({ screens: [
+        screen("d1", "Birth", 1, ["A", "B"]),
+        screen("d2", "Vitals", 2, ["X", "Y", "Z"]),   // DEV added Z
+        screen("d3", "New on DEV", 3, ["Q"]),
+    ] }), importIdMap: null };
+    const live = { scriptId: "live-s", ...computeEntityFingerprints({ screens: [
+        screen("l2", "Vitals", 1, ["X", "Y"]),         // reordered: position alone is not a difference
+        screen("l1", "Birth", 2, ["A", "B"]),
+        screen("l9", "LIVE only", 3, ["W"]),
+    ] }), importIdMap: { sourceScriptId: "dev-s", screens: { d1: "l1", d2: "l2" }, diagnoses: {}, problems: {} } };
+
+    const onLive = diffScriptEntities({ local: live, remote: dev });
+    assert.deepEqual(onLive.screens.changed, ["l2"], "only the screen whose content differs is flagged; a reorder is not");
+    assert.deepEqual(onLive.screens.onlyHere, ["l9"]);
+    assert.deepEqual(onLive.screens.onlyThere, ["New on DEV"]);
+    assert.equal(onLive.total, 2);
+
+    // from DEV's side the same pairing comes from LIVE's record (inverted)
+    const onDev = diffScriptEntities({ local: dev, remote: live });
+    assert.deepEqual(onDev.screens.changed, ["d2"]);
+    assert.deepEqual(onDev.screens.onlyHere, ["d3"]);
+    assert.deepEqual(onDev.screens.onlyThere, ["LIVE only"]);
+
+    // no import record: same ids pair, then an unambiguous type/ref/title
+    const a = { scriptId: "a", ...computeEntityFingerprints({ screens: [screen("s1", "Same id", 1, ["A"]), screen("x1", "By title", 2, ["B"])] }), importIdMap: null };
+    const b = { scriptId: "b", ...computeEntityFingerprints({ screens: [screen("s1", "Same id", 1, ["A"]), screen("y7", "By title", 2, ["B", "C"])] }), importIdMap: null };
+    const ab = diffScriptEntities({ local: a, remote: b });
+    assert.deepEqual(ab.screens.changed, ["x1"], "paired by title, and its options differ");
+    assert.deepEqual(ab.screens.onlyHere, []);
+    assert.equal(diffScriptEntities({ local: a, remote: a }).total, 0, "identical content: nothing to shade");
+}
+
+// ── Images copied by an import are the same image (new id, id-prefixed name, size as text) ─────────
+{
+    const here = { image1: { fileId: "11111111-1111-4111-8111-111111111111", data: "http://0.0.0.0:8500/files/1111", url: "http://0.0.0.0:8500/files/1111",
+        filename: "11111111-1111-4111-8111-111111111111__HBB action plan.jpg?w=588&h=1076", size: 84101, contentType: "image/jpeg" } };
+    const there = { image1: { fileId: "22222222-2222-4222-8222-222222222222", data: "https://demo/files/2222?height=1076&width=588",
+        filename: "HBB action plan.jpg", size: "84101", type: "application/octet-stream" } };
+    const fp = (img: any) => computeScriptFingerprint({ script: { title: "S" }, screens: [{ screenId: "a", position: 1, title: "T", ...img }] });
+    assert.equal(fp(here), fp(there), "the same file on both editors is not a difference");
+    assert.notEqual(fp(here), fp({ image1: { ...there.image1, size: "90000" } }), "a different image still is");
+    // the other editor may store a generated name: size and dimensions still identify the file
+    assert.equal(fp(here), fp({ image1: { ...there.image1, filename: "448c90df-47b3-4ca6-9c6c-262024419e4d.jpeg" } }));
+    assert.notEqual(fp(here), fp({ image1: { ...there.image1, data: "https://demo/files/2222?height=10&width=20" } }), "same size, other dimensions: a different image");
+    assert.ok(fp(here).startsWith("v2:"));
+}
+
+// ── Editors that fingerprint differently can't be compared: no false "out of sync" ─────────────────
+{
+    const source = state("source", [["s1", "Same", "v1:abc"]]);
+    const target = state("target", [["s1", "Same", "v2:def"]]);
+    const pairs = computeContentSyncPairs({ source, target });
+    assert.equal(pairs[0].status, "cannot_compare");
+    assert.ok(!isOutOfSync(pairs[0].status), "and it is not shaded as out of sync");
 }
 
 console.log("content sync tests passed");

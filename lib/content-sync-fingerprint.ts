@@ -1,5 +1,7 @@
 import { createHash } from "crypto";
 
+import { fileRefIdentity } from "./file-ref";
+
 /**
  * Content fingerprints for content sync (see lib/content-sync.ts). Server-side only (node crypto).
  *
@@ -13,7 +15,8 @@ import { createHash } from "crypto";
  * Bumped whenever what counts as content changes. Sync points recorded with another version are not
  * compared (lib/content-sync.ts), so a rule change never shows false drift.
  */
-export const FINGERPRINT_VERSION = "v1";
+// v2: images are compared by file name and size (v1 used the file id, which differs after an import copy)
+export const FINGERPRINT_VERSION = "v2";
 
 // Row bookkeeping and per-editor state: never content.
 const IGNORED = new Set([
@@ -84,8 +87,8 @@ function canonical(value: unknown): string {
             .sort();
         return `{${keys.map(k => {
             const v = obj[k];
-            // the same file is served from a different URL on each editor
-            const normalized = FILE_KEYS.has(k) && v && typeof v === "object" ? { fileId: (v as any).fileId || (v as any).data || null } : v;
+            // the same file has a different id and URL on each editor: compare what it is (name and size)
+            const normalized = FILE_KEYS.has(k) && v && typeof v === "object" ? { file: fileRefIdentity(v) } : v;
             return `${JSON.stringify(k)}:${canonical(normalized)}`;
         }).join(",")}}`;
     }
@@ -140,4 +143,70 @@ export function computeScriptFingerprint({
         canonical([...problems].sort(byPosition)),
     ].join("|");
     return `${FINGERPRINT_VERSION}:${createHash("sha1").update(body).digest("hex")}`;
+}
+
+/** One screen, diagnosis or problem, fingerprinted on its own (to show which ones differ). */
+export type EntityFingerprint = {
+    id: string;
+    /** Matches the same entity on the other editor when ids differ and no import recorded the pairing. */
+    natural: string;
+    label: string;
+    fingerprint: string;
+};
+
+export type ScriptEntityFingerprints = {
+    screens: EntityFingerprint[];
+    diagnoses: EntityFingerprint[];
+    problems: EntityFingerprint[];
+};
+
+/**
+ * Per-entity fingerprints of one script's published content, with the same portable rules as the script
+ * fingerprint (ids dropped, references as positions, empty = unset). Position alone is not a difference.
+ */
+export function computeEntityFingerprints({
+    screens = [],
+    diagnoses = [],
+    problems = [],
+}: {
+    screens?: Record<string, any>[];
+    diagnoses?: Record<string, any>[];
+    problems?: Record<string, any>[];
+}): ScriptEntityFingerprints {
+    const byPosition = (a: Record<string, any>, b: Record<string, any>) => (Number(a.position) || 0) - (Number(b.position) || 0);
+    const orderedScreens = [...screens].sort(byPosition);
+    const screenIndex = new Map<string, number>();
+    orderedScreens.forEach((s, i) => {
+        if (s.screenId) screenIndex.set(`${s.screenId}`, i);
+        if (s.oldScreenId) screenIndex.set(`${s.oldScreenId}`, i);
+    });
+    const screenRef = (id: any) => (id && screenIndex.has(`${id}`) ? `#${screenIndex.get(`${id}`)}` : id ? "?" : null);
+    const hash = (value: unknown) => createHash("sha1").update(canonical(value)).digest("hex");
+    const norm = (...parts: unknown[]) => parts.map(p => `${p || ""}`.trim().toLowerCase()).join("|");
+
+    return {
+        screens: orderedScreens.map(s => ({
+            id: `${s.screenId}`,
+            natural: norm(s.type, s.refId, s.title),
+            label: s.title || s.label || s.refId || "",
+            fingerprint: hash({
+                ...s,
+                skipToScreenId: screenRef(s.skipToScreenId),
+                items: itemsWithPortableRefs(s.items || []),
+                fields: (s.fields || []).map((f: any) => ({ ...f, items: itemsWithPortableRefs(f.items || []) })),
+            }),
+        })),
+        diagnoses: [...diagnoses].sort(byPosition).map(d => ({
+            id: `${d.diagnosisId}`,
+            natural: norm(d.key, d.name),
+            label: d.name || d.key || "",
+            fingerprint: hash(d),
+        })),
+        problems: [...problems].sort(byPosition).map(p => ({
+            id: `${p.problemId}`,
+            natural: norm(p.key, p.name),
+            label: p.name || p.key || "",
+            fingerprint: hash(p),
+        })),
+    };
 }

@@ -85,7 +85,9 @@ export function DiagnosesTable(props: Props) {
                     getRowOptions={({ rowIndex }) => {
                         const s = diagnosesArr[rowIndex];
                         return !s ? {} : {
-                            className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
+                            className: cn(
+                                !viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30',
+                            ),
                         };
                     }}
                     noDataMessage={(
