@@ -71,7 +71,7 @@ import {
     recordTargetFingerprints,
     clearContentSyncStatusCache,
 } from "@/lib/server/content-sync";
-import { loadRemoteDataKeys, loadRemoteScriptsWithItems, uploadRemoteFiles } from "./remote";
+import { loadRemoteDataKeys, loadRemoteScripts, loadRemoteScriptsWithItems, uploadRemoteFiles } from "./remote";
 import { uploadReferencedFileIfMissing } from "@/lib/files";
 import { actingUserHeaders } from "@/lib/acting-user";
 import {
@@ -4446,5 +4446,100 @@ export async function copyProblems(params?: {
     } catch (e: any) {
         logger.error('copyProblems ERROR', e.message);
         return { errors: [e.message], success: false, copied, };
+    }
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* Import dialog: choosing the source script                                                       */
+/* ------------------------------------------------------------------------------------------------ */
+
+export type ImportSourceScript = {
+    scriptId: string;
+    title: string;
+    printTitle: string;
+    description: string;
+    type: string;
+    hospitalName: string;
+    /** Scripts on this editor that were imported from it (a later import into them merges). */
+    importedInto: { scriptId: string; title: string; }[];
+    /** A script with the same id already exists on this editor. */
+    existsHere: boolean;
+};
+
+export type ImportSourcesResult = {
+    scripts: ImportSourceScript[];
+    /** For an import into an existing script: where it was imported from last time. */
+    lastImport: {
+        sourceScriptId: string;
+        sourceSiteId: string | null;
+        importedAt: string | null;
+        syncedAt: string | null;
+        pending: boolean;
+    } | null;
+    /** The title of the script being imported into, on this editor. */
+    targetTitle?: string;
+    errors?: string[];
+};
+
+/**
+ * What the import dialog offers as sources: the other editor's published scripts (lean: no screens), with
+ * which of them were imported here before, and, for an import into an existing script, its remembered source.
+ */
+export async function getImportSources({ siteId, targetScriptId }: { siteId: string; targetScriptId?: string | null; }): Promise<ImportSourcesResult> {
+    try {
+        await isAllowed('import_scripts');
+        if (!siteId) throw new Error('Choose the editor to import from.');
+
+        const requestKey = `import-sources-${v4()}`;
+        const [remote, record] = await Promise.all([
+            loadRemoteScripts({ remoteSiteId: siteId, requestKey, logTime: false, }),
+            targetScriptId ? _getScriptImportSource(targetScriptId) : Promise.resolve(null),
+        ]);
+        if (globalThis.socketEvents) delete globalThis.socketEvents[requestKey];
+        if (remote.errors?.length) throw new Error(remote.errors.join(', '));
+
+        const remoteIds = remote.data.map(s => s.scriptId).filter(Boolean);
+        const [records, local] = await Promise.all([
+            !remoteIds.length ? [] : db.select({
+                sourceScriptId: scriptImportSourcesTable.sourceScriptId,
+                targetScriptId: scriptImportSourcesTable.targetScriptId,
+            }).from(scriptImportSourcesTable).where(and(
+                eq(scriptImportSourcesTable.sourceSiteId, siteId),
+                inArray(scriptImportSourcesTable.sourceScriptId, remoteIds),
+            )),
+            queries._getScripts({ returnDraftsIfExist: true, }),
+        ]);
+        const localById = new Map((local.data || []).map(s => [s.scriptId, s]));
+
+        const scripts: ImportSourceScript[] = remote.data
+            .map(s => ({
+                scriptId: s.scriptId,
+                title: s.title || '',
+                printTitle: s.printTitle || '',
+                description: s.description || '',
+                type: s.type || '',
+                hospitalName: (s as any).hospitalName || '',
+                importedInto: records
+                    .filter(r => r.sourceScriptId === s.scriptId && localById.has(r.targetScriptId))
+                    .map(r => ({ scriptId: r.targetScriptId, title: localById.get(r.targetScriptId)?.title || '' })),
+                existsHere: localById.has(s.scriptId),
+            }))
+            .sort((a, b) => a.title.localeCompare(b.title));
+
+        const base = record?.pendingSnapshot || record?.baseSnapshot || null;
+        return {
+            targetTitle: targetScriptId ? (localById.get(targetScriptId)?.title || '') : undefined,
+            scripts,
+            lastImport: !record ? null : {
+                sourceScriptId: record.sourceScriptId,
+                sourceSiteId: record.sourceSiteId || null,
+                importedAt: base?.importedAt || null,
+                syncedAt: record.syncedAt ? new Date(record.syncedAt as any).toISOString() : null,
+                pending: !!record.pendingSnapshot,
+            },
+        };
+    } catch (e: any) {
+        logger.error('getImportSources ERROR', e.message);
+        return { scripts: [], lastImport: null, errors: [e.message], };
     }
 }

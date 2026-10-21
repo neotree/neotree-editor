@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/loader";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/modal";
-import { ErrorCard } from "@/components/error-card";
 import socket from "@/lib/socket";
 import { IMPORT_JOB_COMPLETE_EVENT } from "@/lib/in-progress";
 import type { ScriptImportPreview } from "@/lib/script-import-preview";
@@ -175,6 +174,7 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
                     if (!open) setScriptsIdsToExport([]);
                 }}
                 title="Export script"
+                contentProps={{ className: 'sm:max-w-3xl' }}
                 actions={(
                     <>
                         <span className="text-xs text-danger">* Required</span>
@@ -196,14 +196,14 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
                             onClick={() => exportScripts(true)()}
                             disabled={disabled}
                         >
-                            {preview ? 'Refresh preview' : 'Preview export'}
+                            {preview ? 'Refresh preview' : 'Preview changes'}
                         </Button>
 
                         <Button
                             onClick={() => exportScripts(false)()}
                             disabled={disabled || !preview}
                         >
-                            Export
+                            Export as drafts
                         </Button>
                     </>
                 )}
@@ -235,12 +235,10 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
                         {!!errors.siteId?.message && <div className="text-xs text-danger mt-1">{errors.siteId.message}</div>}
                     </div>
 
-                    <ErrorCard color="warning">
-                        <div className="p-2 text-sm">
-                            The target editor imports the selected scripts from this editor as <b>new scripts</b>, saved as drafts owned by you there.
-                            To update a script that already exists on the target, open it there and use <b>Import</b> instead.
-                        </div>
-                    </ErrorCard>
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                        The target editor imports the selected scripts from this editor as <b>new scripts</b>, saved as drafts owned by you there.
+                        To update a script that already exists on the target, open it there and use <b>Import</b> instead.
+                    </div>
 
                     {!!preview?.length && (
                         <div className="flex flex-col gap-y-4 border-t pt-4">
