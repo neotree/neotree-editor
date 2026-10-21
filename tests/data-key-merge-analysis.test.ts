@@ -8,10 +8,13 @@ import {
   findOptionPresence,
 } from "../lib/data-key-merge-analysis"
 import { buildMergeReport } from "../lib/data-key-merge-report"
+import { dropRelinkCollisions } from "../databases/mutations/data-keys/_update_data_keys_refs.helpers"
 import {
   buildDataKeysMergePlan,
   findPossibleDuplicateGroups,
   getDuplicateGroupKey,
+  labelSignature,
+  labelSimilarity,
   suggestChildMergeActionsWithReasons,
 } from "../lib/data-key-merge-plan"
 
@@ -68,28 +71,36 @@ const key = (uuid: string, uniqueKey: string, name: string, label: string, dataT
 // ------------------------------------------------------- possible duplicates
 {
   const dataKeys = [
-    // exact duplicates: never repeated as "possible"
-    key("a1", "a1", "Sex", "Sex", "dropdown", ["m", "f"]),
-    key("a2", "a2", "Sex", "Sex", "dropdown", ["m", "f"]),
-    // same name, different label
-    key("b1", "b1", "Feeding", "Feeding method", "dropdown", ["breast"]),
-    key("b2", "b2", "Feeding", "Feeding at discharge", "dropdown", ["formula"]),
-    // different names, mostly the same options
-    key("c1", "c1", "AdmFrom", "Admitted from", "dropdown", ["lw", "th", "home", "ref"]),
-    key("c2", "c2", "AdmittedFrom", "Admitted from where", "dropdown", ["lw", "th", "home"]),
-    // different type: never grouped
-    key("d1", "d1", "Feeding", "Feeding method", "multi_select", ["breast"]),
-    key("m", "m", "M", "Male", "option"), key("f", "f", "F", "Female", "option"),
-    key("breast", "breast", "Breast", "Breast", "option"), key("formula", "formula", "Formula", "Formula", "option"),
-    key("lw", "lw", "LW", "Labour ward", "option"), key("th", "th", "TH", "Theatre", "option"),
-    key("home", "home", "Home", "Home", "option"), key("ref", "ref", "Ref", "Referred", "option"),
+    // exact duplicates (same words, any order/case): never repeated as "possible"
+    key("a1", "a1", "1", "1 = Poor", "option"),
+    key("a2", "a2", "1", "Poor = 1", "option"),
+    // same name and type, similar labels
+    key("b1", "b1", "TBA", "Traditional Birth Attendant (TBA)", "option"),
+    key("b2", "b2", "TBA", "Traditional birth attendant", "option"),
+    key("b3", "b3", "TBA", "HOME (Traditional Birth Attendant )", "option"),
+    // same name and type, unrelated labels: different keys (numbers are not meaning)
+    key("c1", "c1", "0", "0 = Alert", "option"),
+    key("c2", "c2", "0", "0 = None", "option"),
+    // different questions with the same answers: never duplicates
+    key("d1", "d1", "BCG", "BCG given", "dropdown", ["y", "n"]),
+    key("d2", "d2", "OPV", "OPV given", "dropdown", ["y", "n"]),
+    // similar label but different type
+    key("e1", "e1", "TBA", "Traditional birth attendant", "text"),
   ]
   const groups = findPossibleDuplicateGroups(dataKeys)
   assert.deepStrictEqual(
     groups.map((group) => [group.keys.map((k) => k.uuid).sort().join(","), group.reason, group.overlap]),
-    [["c1,c2", "shared_options", 0.75], ["b1,b2", "same_name", 0]],
+    [["b1,b2,b3", "similar_label", 0.75]],
   )
   assert.strictEqual(getDuplicateGroupKey([{ uniqueKey: "b2" }, { uniqueKey: "b1" }]), "b1|b2")
+
+  // no chaining: A~B and B~C but A!~C stay apart
+  const chain = findPossibleDuplicateGroups([
+    key("x1", "x1", "K", "red apple", "text"),
+    key("x2", "x2", "K", "red apple pie", "text"),
+    key("x3", "x3", "K", "apple pie crust", "text"),
+  ])
+  assert.ok(chain.every((group) => !(group.keys.some((k) => k.uuid === "x1") && group.keys.some((k) => k.uuid === "x3"))))
 }
 
 // --------------------------------------------------- legacy items + linking
@@ -270,3 +281,21 @@ console.log("data-key-merge-analysis tests passed")
   assert.deepStrictEqual(inPlace.totals, { relinked: 1, renamed: 1, removed: 0, added: 0, condition: 0 })
 }
 console.log("report pairing tests passed")
+
+// labels
+assert.strictEqual(labelSignature("1 = Poor"), labelSignature("Poor = 1"))
+assert.strictEqual(labelSimilarity("0 = Alert", "0 = None"), 0)
+assert.strictEqual(labelSimilarity("(expose baby)", "Tepid Sponging (expose baby)"), 1)
+assert.strictEqual(labelSimilarity("", ""), 1)
+console.log("label matching tests passed")
+
+// --- relink collisions: the relinked copy goes, the original and older duplicates stay ---
+{
+  const symptoms = [{ keyId: "yes_1" }, { keyId: "no_1" }, { keyId: "yes_1", from: "yes_2" }, { keyId: "no_1" }, { keyId: "unk_1", from: "unk_2" }]
+  assert.deepStrictEqual(dropRelinkCollisions(symptoms, new Set([2, 4])), [symptoms[0], symptoms[1], symptoms[3], symptoms[4]])
+  // two relinked entries landing on the same key keep only the first
+  const both = [{ keyId: "yes_1", from: "a" }, { keyId: "yes_1", from: "b" }]
+  assert.deepStrictEqual(dropRelinkCollisions(both, new Set([0, 1])), [both[0]])
+  assert.strictEqual(dropRelinkCollisions(symptoms, new Set()), symptoms)
+  console.log("relink collision tests passed")
+}

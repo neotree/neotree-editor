@@ -132,6 +132,27 @@ export function resolveOwnedOptionDataKeys(
         .filter((item): item is DataKey => !!item);
 }
 
+/**
+ * Relinking can point two entries of one list at the same key (a symptom list or checklist that held both
+ * the merged key and the one it was merged into). The entry that already used the key stays and the relinked
+ * copy is dropped; duplicates that existed before the relink are left alone.
+ */
+export function dropRelinkCollisions<T extends { keyId?: string | null }>(entries: T[], relinkedIndexes: Set<number>) {
+    if (!relinkedIndexes.size) return entries;
+
+    const keyOf = (entry: T) => `${entry?.keyId || ""}`.trim();
+    const taken = new Set(entries.filter((_, index) => !relinkedIndexes.has(index)).map(keyOf).filter(Boolean));
+
+    return entries.filter((entry, index) => {
+        if (!relinkedIndexes.has(index)) return true;
+        const keyId = keyOf(entry);
+        if (!keyId) return true;
+        if (taken.has(keyId)) return false;
+        taken.add(keyId);
+        return true;
+    });
+}
+
 export function syncScreenReference(current: ExistingScreenItem, dataKey?: DataKey) {
     return applyDataKeySync(current, dataKey, (item, existing) => ({
         keyId: item.uniqueKey,

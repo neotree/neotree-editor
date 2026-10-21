@@ -20,8 +20,11 @@ export async function POST(req: NextRequest) {
             survivorOptionOrder: params.survivorOptionOrder,
             survivorLabel: params.survivorLabel,
             legacyLinks: params.legacyLinks,
+            optionPlacements: params.optionPlacements,
             dryRun: true,
             userId,
+            // A newer preview replaced this one: stop working on it.
+            signal: req.signal,
         });
 
         return NextResponse.json(res);

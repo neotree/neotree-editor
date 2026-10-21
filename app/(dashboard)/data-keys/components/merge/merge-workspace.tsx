@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
 import { arrayMoveImmutable } from 'array-move';
 import { CheckIcon, ChevronDownIcon, ExternalLinkIcon, Loader2Icon, MergeIcon, RefreshCwIcon } from 'lucide-react';
 
@@ -49,6 +50,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PageContainer } from '@/app/(dashboard)/(scripts)/components/page-container';
 import type { MergeDataKeysResponse } from '@/databases/mutations/data-keys';
 import { normalizeDataKeyType } from '@/lib/data-key-types';
+import { buildDataKeyParentIndex, getDataKeyParentTitle, type DataKeyParentRef } from '@/lib/data-key-children';
 import type { LegacyItemLink, LegacyOptionItem, OptionPlacement, OptionPresence } from '@/lib/data-key-merge-analysis';
 import { CHANGELOG_ACTION_BADGE_CLASSES } from '@/lib/changelog-utils';
 import {
@@ -99,6 +101,7 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
     const idsKey = ids.join(',');
     const byId = useMemo(() => new Map(allDataKeys.map((dataKey) => [dataKey.uuid, dataKey])), [allDataKeys]);
     const byUniqueKey = useMemo(() => new Map(allDataKeys.map((dataKey) => [dataKey.uniqueKey, dataKey])), [allDataKeys]);
+    const parentIndex = useMemo(() => buildDataKeyParentIndex(allDataKeys), [allDataKeys]);
     const candidates = ids.map((id) => byId.get(id)).filter((dataKey): dataKey is DataKey => !!dataKey);
     const missingIds = allDataKeys.length ? ids.filter((id) => !byId.has(id)) : [];
 
@@ -184,9 +187,13 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
     };
     const requestKey = JSON.stringify(request);
 
+    const parentRewrites = plan.parentOptionRewrites;
     const planBlockers = [
         ...(missingIds.length ? [`${pluralize(missingIds.length, 'data key')} in this link could not be found.`] : []),
-        ...(candidates.length < 2 ? ['Choose at least two parent data keys to merge.'] : []),
+        ...(candidates.length < 2 ? ['Choose at least two data keys to merge.'] : []),
+        ...(scriptsOnly && parentRewrites.length
+            ? ['These keys are options of other parent data keys, so they can only be merged in all scripts.']
+            : []),
         ...plan.errors,
         ...(scriptsOnly && !appliedScripts.length ? ['Select at least one script to merge in.'] : []),
     ];
@@ -196,18 +203,23 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
     useEffect(() => {
         if (!canMerge || !impact || !survivorId || planBlockers.length) return;
         const run = ++previewRun.current;
+        // A newer plan cancels the request in flight, so the server stops its dry run too.
+        const controller = new AbortController();
         setPreview((current) => ({ ...current, key: requestKey, loading: true, error: '' }));
         const timer = setTimeout(async () => {
             try {
-                const res = await previewDataKeysMerge(request);
+                const res = await previewDataKeysMerge(request, controller.signal);
                 if (run !== previewRun.current) return;
                 setPreview({ key: requestKey, loading: false, data: res.preview || null, error: res.errors?.[0] || '' });
             } catch (e: any) {
-                if (run !== previewRun.current) return;
+                if (run !== previewRun.current || axios.isCancel(e)) return;
                 setPreview({ key: requestKey, loading: false, data: null, error: e.message || 'Preview failed.' });
             }
         }, 500);
-        return () => clearTimeout(timer);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [requestKey, canMerge, !!impact, planBlockers.length, refreshCount]);
 
@@ -238,12 +250,17 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
     const loading = (!impact && !impactError) || (loadingDataKeys && !allDataKeys.length);
     const title = candidates[0] ? `Merge “${candidates[0].name}”` : 'Merge data keys';
 
+    // Keys without options (standalone keys, or options of a parent) have nothing to match.
+    const groupHasOptions = candidates.some((dataKey) => (dataKey.options || []).length);
     const steps = [
         { id: 'keep', label: 'Keep', done: !!survivor },
-        { id: 'options', label: toReview.length ? `Options (${toReview.length} to review)` : 'Options', done: !plan.errors.length },
-        { id: 'where', label: 'Where', done: !scriptsOnly || !!appliedScripts.length },
+        ...(groupHasOptions
+            ? [{ id: 'options', label: toReview.length ? `Options (${toReview.length} to review)` : 'Options', done: !plan.errors.length }]
+            : []),
+        { id: 'where', label: 'Where', done: (!scriptsOnly || !!appliedScripts.length) && !(scriptsOnly && parentRewrites.length) },
         { id: 'preview', label: 'Preview', done: previewReady && !conflicts.length },
     ];
+    const stepNumber = (id: string) => steps.findIndex((step) => step.id === id) + 1;
 
     return (
         <PageContainer title={title} backLink="/data-keys/merge">
@@ -251,7 +268,8 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
 
             <div className="min-w-0 space-y-6 px-4 pb-6">
                 <div className="-mt-2 text-sm text-muted-foreground">
-                    Keep one data key, decide what each of the others’ options becomes, and choose where to apply it.
+                    Keep one data key and replace the others with it{groupHasOptions ? ', decide what each of their options becomes,' : ''} and
+                    choose where to apply it.
                     Nothing changes until you merge; changes are saved as drafts for the next publish and can be
                     reverted until then.
                 </div>
@@ -286,7 +304,7 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                         <section className="space-y-3">
                             <SectionTitle
                                 id="keep"
-                                title="1. Choose the data key to keep"
+                                title={`${stepNumber('keep')}. Choose the data key to keep`}
                                 description="The others are merged into it. Keeping the most-used key changes the fewest scripts."
                             />
                             <RadioGroup
@@ -304,6 +322,7 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                                         scriptGroups={groupScriptsByTitle(scriptsById.get(dataKey.uuid) || [])}
                                         byUniqueKey={byUniqueKey}
                                         survivorOptions={survivor?.options || []}
+                                        parents={parentIndex.get(dataKey.uniqueKey) || []}
                                         disabled={merging}
                                         onIncludedChange={(included) => state.setExcludedIds(included
                                             ? state.excludedIds.filter((id) => id !== dataKey.uuid)
@@ -313,13 +332,15 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                             </RadioGroup>
                         </section>
 
+                        {groupHasOptions && (
+                            <>
                         <Separator />
 
                         {/* 2. Options */}
                         <section className="space-y-4">
                             <SectionTitle
                                 id="options"
-                                title="2. Match the options"
+                                title={`${stepNumber('options')}. Match the options`}
                                 description={survivor
                                     ? <>What each option of the merged keys becomes under “{getMergeKeyTitle(survivor)}”. Suggestions match by name, then label, then a similar name.</>
                                     : 'Choose the key to keep first.'}
@@ -497,6 +518,8 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                                 </div>
                             )}
                         </section>
+                            </>
+                        )}
 
                         <Separator />
 
@@ -504,9 +527,21 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                         <section className="space-y-3">
                             <SectionTitle
                                 id="where"
-                                title="3. Choose where to apply it"
+                                title={`${stepNumber('where')}. Choose where to apply it`}
                                 description="Each script is listed once, with every place the merged keys appear."
                             />
+                            {!!parentRewrites.length && survivor && (
+                                <Callout variant="info">
+                                    {plan.merged.length === 1 ? 'The merged key is' : 'The merged keys are'} an option of{' '}
+                                    {pluralize(parentRewrites.length, 'parent data key')}:{' '}
+                                    <span className="text-foreground">
+                                        {parentRewrites.slice(0, 5).map((rewrite) => rewrite.parentTitle).join(', ')}
+                                        {parentRewrites.length > 5 && ` and ${parentRewrites.length - 5} more`}
+                                    </span>
+                                    . They offer “{describeKey(survivor)}” instead — in the library and in their screens — so this
+                                    merge applies to all scripts.
+                                </Callout>
+                            )}
                             <RadioGroup
                                 value={state.scope}
                                 onValueChange={(value) => state.setScope(value as 'library' | 'scripts')}
@@ -523,12 +558,22 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                                         className={cn(
                                             'flex cursor-pointer items-start gap-x-3 rounded-md border p-3 font-normal',
                                             state.scope === option.value ? 'border-primary bg-primary/5' : 'border-border',
+                                            option.value === 'scripts' && !!parentRewrites.length && 'cursor-not-allowed opacity-60',
                                         )}
                                     >
-                                        <RadioGroupItem id={`merge-scope-${option.value}`} value={option.value} className="mt-0.5" />
+                                        <RadioGroupItem
+                                            id={`merge-scope-${option.value}`}
+                                            value={option.value}
+                                            className="mt-0.5"
+                                            disabled={option.value === 'scripts' && !!parentRewrites.length}
+                                        />
                                         <span>
                                             <span className="block text-sm font-medium">{option.title}</span>
-                                            <span className="block text-xs text-muted-foreground">{option.caption}</span>
+                                            <span className="block text-xs text-muted-foreground">
+                                                {option.value === 'scripts' && !!parentRewrites.length
+                                                    ? 'Not available: a parent offers these keys, and its options are shared by every script.'
+                                                    : option.caption}
+                                            </span>
                                         </span>
                                     </Label>
                                 ))}
@@ -593,7 +638,7 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                         <section className="space-y-3">
                             <SectionTitle
                                 id="preview"
-                                title="4. Preview the changes"
+                                title={`${stepNumber('preview')}. Preview the changes`}
                                 description="The merge is run against the current drafts and rolled back, so this is exactly what will change."
                                 aside={canMerge && (
                                     <Button
@@ -656,7 +701,8 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                         <>
                             Keep <span className="text-foreground">{describeKey(survivor)}</span>
                             {' · '}merge {pluralize(plan.merged.length, 'key')}
-                            {' · '}{counts.match} matched, {counts.add} new, {counts.drop} removed
+                            {groupHasOptions && <>{' · '}{counts.match} matched, {counts.add} new, {counts.drop} removed</>}
+                            {!!parentRewrites.length && <> · {pluralize(parentRewrites.length, 'parent')} updated</>}
                             {!!placedCount && <> · {pluralize(placedCount, 'option')} placed</>}
                             {previewData && <> · {pluralize(previewData.scriptsChanged, 'script')}</>}
                         </>
@@ -688,6 +734,9 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                                     {!!counts.drop && <li className="text-destructive">{pluralize(counts.drop, 'option')} removed from the scripts</li>}
                                     {!!state.legacyLinks.length && <li>{pluralize(state.legacyLinks.length, 'unlinked option')} linked</li>}
                                     {!!placedCount && <li>{pluralize(placedCount, 'option')} shown in all or selected scripts</li>}
+                                    {!!parentRewrites.length && (
+                                        <li>{pluralize(parentRewrites.length, 'parent data key')} offer the kept key instead</li>
+                                    )}
                                     <li>
                                         {scriptsOnly
                                             ? 'The merged keys stay in the library.'
@@ -874,6 +923,7 @@ function CandidateTile({
     scriptGroups,
     byUniqueKey,
     survivorOptions,
+    parents,
     disabled,
     onIncludedChange,
 }: {
@@ -883,6 +933,8 @@ function CandidateTile({
     scriptGroups: ScriptGroup[];
     byUniqueKey: Map<string, DataKey>;
     survivorOptions: string[];
+    /** Parents that offer this key as an option. */
+    parents: DataKeyParentRef[];
     disabled?: boolean;
     onIncludedChange: (included: boolean) => void;
 }) {
@@ -905,7 +957,15 @@ function CandidateTile({
                 {kept && <span className="text-sm text-primary">Keep</span>}
             </div>
 
-            <div className="mt-3 text-xs text-muted-foreground">{pluralize((dataKey.options || []).length, 'option')}</div>
+            {!!parents.length && (
+                <div className="mt-3 text-xs text-muted-foreground">
+                    Option of {parents.slice(0, 4).map((parent) => getDataKeyParentTitle(parent)).join(', ')}
+                    {parents.length > 4 && ` and ${parents.length - 4} more`}
+                </div>
+            )}
+            {!!(dataKey.options || []).length && (
+                <div className="mt-3 text-xs text-muted-foreground">{pluralize((dataKey.options || []).length, 'option')}</div>
+            )}
             <ul className="mt-1 flex flex-wrap gap-1">
                 {(dataKey.options || []).map((option) => {
                     const child = byUniqueKey.get(option);

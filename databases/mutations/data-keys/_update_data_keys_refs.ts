@@ -13,6 +13,7 @@ import {
     shouldSyncFieldOwnedOptions,
     shouldSyncScreenOwnedOptions,
     syncDiagnosisReference,
+    dropRelinkCollisions,
     syncFieldReference,
     syncKeyOnlyReference,
     syncScreenEntityReference,
@@ -34,6 +35,12 @@ export type UpdateDataKeysRefsParams = {
      * removes them there instead.
      */
     excludeScriptIdsByAlias?: Record<string, string[]>;
+    /**
+     * Include-list counterpart for "selected scripts only": references to these
+     * alias uniqueKeys are rewritten ONLY inside the listed scripts (an empty
+     * list rewrites nothing). A reference without a known script is skipped.
+     */
+    onlyScriptIdsByAlias?: Record<string, string[]>;
     forceFullScan?: boolean;
     client?: DbOrTransaction;
 };
@@ -199,6 +206,7 @@ export async function _updateDataKeysRefs({
     matchUniqueKeysByDataKey = {},
     includePrimaryUniqueKeys = true,
     excludeScriptIdsByAlias = {},
+    onlyScriptIdsByAlias = {},
     forceFullScan = false,
     client,
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
@@ -248,6 +256,13 @@ export async function _updateDataKeysRefs({
             ] as const)
             .filter(([alias, scriptIds]) => !!alias && !!scriptIds.size));
 
+        const onlyScriptsByAlias = new Map(Object.entries(onlyScriptIdsByAlias)
+            .map(([alias, scriptIds]) => [
+                `${alias || ''}`.trim(),
+                new Set((scriptIds || []).map((scriptId) => `${scriptId || ''}`.trim()).filter(Boolean)),
+            ] as const)
+            .filter(([alias]) => !!alias));
+
         const getUpdatedDataKey = ({
             uniqueKey,
             scriptId,
@@ -262,6 +277,9 @@ export async function _updateDataKeysRefs({
                 if (normalizedScriptId && excludedScriptsByAlias.get(`${uniqueKey}`.trim())?.has(normalizedScriptId)) {
                     return {};
                 }
+
+                const onlyScripts = onlyScriptsByAlias.get(`${uniqueKey}`.trim());
+                if (onlyScripts && !onlyScripts.has(normalizedScriptId)) return {};
 
                 if (includePrimaryUniqueKeys) {
                     const keyById = byUniqueKey.get(uniqueKey);
@@ -539,7 +557,8 @@ export async function _updateDataKeysRefs({
                 currentItemsCount: (s.items || []).length,
             });
 
-            const items = `${s.type || ''}`.trim().toLowerCase() === 'progress'
+            const relinkedItems = new Set<number>();
+            const items = dropRelinkCollisions(`${s.type || ''}`.trim().toLowerCase() === 'progress'
                 ? (s.items || [])
                 : (s.items || []).map((item, itemIndex) => {
                     const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
@@ -549,6 +568,7 @@ export async function _updateDataKeysRefs({
                     trackMatchSource(itemMatchSource);
 
                     if (itemDataKey) {
+                        relinkedItems.add(itemIndex);
                         addUsage({
                             id: item.itemId || `${s.screenId}:item:${itemIndex}`,
                             kind: 'screen_item',
@@ -583,7 +603,10 @@ export async function _updateDataKeysRefs({
                         ...item,
                         ...syncedItem.value,
                     };
-                });
+                }), relinkedItems);
+            if (items.length !== (s.items || []).length) {
+                updated = true;
+            }
             if (shouldSyncScreenOptions && (items || []).some((item) => {
                 const keyId = `${item.keyId || ''}`.trim();
                 return !!keyId && !screenOptionUniqueKeys.has(keyId);
@@ -642,7 +665,8 @@ export async function _updateDataKeysRefs({
                 }
 
                 const fieldOptionUniqueKeys = new Set((fieldDataKey?.options || []).filter(Boolean));
-                const fieldItems = (field.items || []).map((item, fieldItemIndex) => {
+                const relinkedFieldItems = new Set<number>();
+                const fieldItems = dropRelinkCollisions((field.items || []).map((item, fieldItemIndex) => {
                     const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
                         uniqueKey: item.keyId,
                         scriptId: s.scriptId,
@@ -650,6 +674,7 @@ export async function _updateDataKeysRefs({
                     trackMatchSource(fieldItemMatchSource);
 
                     if (fieldItemDataKey) {
+                        relinkedFieldItems.add(fieldItemIndex);
                         addUsage({
                             id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
                             kind: 'screen_field_item',
@@ -700,7 +725,10 @@ export async function _updateDataKeysRefs({
                         ...item,
                         ...fieldItemValue,
                     };
-                });
+                }), relinkedFieldItems);
+                if (fieldItems.length !== (field.items || []).length) {
+                    updated = true;
+                }
                 const syncedField = syncFieldReference(field, fieldDataKey);
                 const syncedRefField = syncKeyOnlyReference(syncedField.value, refKeyDataKey, {
                     id: "refKeyId",
@@ -781,7 +809,8 @@ export async function _updateDataKeysRefs({
 
             let updated = false;
 
-            const symptoms = (d.symptoms || []).map((item, symptomIndex) => {
+            const relinkedSymptoms = new Set<number>();
+            const symptoms = dropRelinkCollisions((d.symptoms || []).map((item, symptomIndex) => {
                 const { dataKey: symptomDataKey, source: symptomMatchSource } = getUpdatedDataKey({
                     uniqueKey: item.keyId,
                     scriptId: d.scriptId,
@@ -789,6 +818,7 @@ export async function _updateDataKeysRefs({
                 trackMatchSource(symptomMatchSource);
 
                 if (symptomDataKey) {
+                    relinkedSymptoms.add(symptomIndex);
                     addUsage({
                         id: item?.symptomId || `${d.diagnosisId}:symptom:${symptomIndex}`,
                         kind: 'diagnosis_symptom',
@@ -808,7 +838,10 @@ export async function _updateDataKeysRefs({
                     ...item,
                     ...syncedSymptom.value,
                 };
-            });
+            }), relinkedSymptoms);
+            if (symptoms.length !== (d.symptoms || []).length) {
+                updated = true;
+            }
             const syncedDiagnosis = syncDiagnosisReference({
                 ...d,
                 key: name,
@@ -871,6 +904,7 @@ export async function _updateDataKeysRefs({
             const nuidSearchFields = script.nuidSearchFields.map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.keyId,
+                    scriptId: script.scriptId,
                 });
                 trackMatchSource(fieldMatchSource);
 

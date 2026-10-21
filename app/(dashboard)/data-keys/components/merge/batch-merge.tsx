@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2Icon, MergeIcon } from 'lucide-react';
 
 import { useDataKeysCtx, type DataKey } from '@/contexts/data-keys';
 import { ActionsBar } from '@/components/actions-bar';
-import { Loader } from '@/components/loader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -26,7 +26,7 @@ import {
 import { CHANGELOG_ACTION_BADGE_CLASSES } from '@/lib/changelog-utils';
 import { PageContainer } from '@/app/(dashboard)/(scripts)/components/page-container';
 import type { MergeBatchResult } from '@/databases/mutations/data-keys';
-import { findDuplicateParentGroups } from '@/lib/data-key-merge-plan';
+import { buildDataKeysMergePlan, findDuplicateKeyGroups } from '@/lib/data-key-merge-plan';
 import { cn } from '@/lib/utils';
 
 import { mergeDataKeyGroups } from './api';
@@ -35,6 +35,17 @@ import { MergeChangeTotals } from './merge-report';
 import { Callout, describeKey, pluralize, shortId, useMergePermission } from './shared';
 
 type Checked = { status: 'ready' | 'conflict' | 'unlinked' | 'error'; result: MergeBatchResult };
+
+// Each group is a full dry run (or merge) of a few seconds. Small requests keep
+// every one well inside proxy timeouts and let statuses appear as they come in.
+const CHUNK_SIZE = 4;
+
+const chunk = <T,>(items: T[]) => Array.from({ length: Math.ceil(items.length / CHUNK_SIZE) }, (_, index) => items.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE));
+
+const checkStatus = (result: MergeBatchResult): Checked['status'] => (!result.success ? 'error'
+    : result.preview?.conflicts.length ? 'conflict'
+    : result.preview?.legacyItems.length ? 'unlinked'
+    : 'ready');
 
 const STATUS_BADGES: Record<Checked['status'], { label: string; className: string; }> = {
     ready: { label: 'Ready', className: CHANGELOG_ACTION_BADGE_CLASSES.create },
@@ -52,95 +63,118 @@ export function BatchMerge({ canMerge: canMergeRole }: { canMerge: boolean; }) {
     const router = useRouter();
     const { editable: canMerge, notice } = useMergePermission(canMergeRole);
     const { allDataKeys, loadingDataKeys, loadDataKeys } = useDataKeysCtx();
-    const [checked, setChecked] = useState<Map<string, Checked> | null>(null);
+    const [checked, setChecked] = useState<Map<string, Checked>>(new Map());
+    const [checking, setChecking] = useState(false);
     const [checkError, setCheckError] = useState('');
+    const [progress, setProgress] = useState(0);
     const [selected, setSelected] = useState<string[]>([]);
     const [confirming, setConfirming] = useState(false);
     const [running, setRunning] = useState(false);
     const [results, setResults] = useState<MergeBatchResult[] | null>(null);
 
-    const groups = useMemo(() => findDuplicateParentGroups(allDataKeys), [allDataKeys]);
+    const groups = useMemo(() => findDuplicateKeyGroups(allDataKeys), [allDataKeys]);
     const { usage, error: usageError } = useScriptUsage(groups.flat().map((dataKey) => dataKey.uuid));
 
     const cleanGroups = useMemo(() => (usage ? groups.filter((group) => isCleanGroup(group, allDataKeys, usage)) : [])
         .map((group) => {
             const survivor = getDefaultSurvivor(group, usage);
+            const merged = group.filter((dataKey) => dataKey.uuid !== survivor.uuid);
+            const plan = buildDataKeysMergePlan({ dataKeys: allDataKeys, survivorId: survivor.uuid, mergedIds: merged.map((dataKey) => dataKey.uuid) });
             return {
                 id: group.map((dataKey) => dataKey.uuid).sort().join(','),
                 survivor,
-                merged: group.filter((dataKey) => dataKey.uuid !== survivor.uuid),
+                merged,
+                parentsUpdated: plan.parentOptionRewrites.map((rewrite) => rewrite.parentTitle),
             };
         }), [groups, allDataKeys, usage]);
     const cleanKey = cleanGroups.map((group) => group.id).join('|');
 
-    // Check every clean group with a dry run as soon as they are known.
+    // Check every clean group with a dry run as soon as they are known, a few at
+    // a time; ready groups are selected as their checks come back.
     useEffect(() => {
         if (!canMerge || !usage || results) return;
-        if (!cleanGroups.length) {
-            setChecked(new Map());
-            return;
-        }
-        let cancelled = false;
-        setChecked(null);
+        const controller = new AbortController();
+        setChecked(new Map());
+        setSelected([]);
         setCheckError('');
-        mergeDataKeyGroups(cleanGroups.map((group) => ({
-            survivorId: group.survivor.uuid,
-            mergedIds: group.merged.map((dataKey) => dataKey.uuid),
-        })), true)
-            .then((items) => {
-                if (cancelled) return;
-                const next = new Map<string, Checked>();
-                items.forEach((result, index) => {
-                    const status: Checked['status'] = !result.success ? 'error'
-                        : result.preview?.conflicts.length ? 'conflict'
-                        : result.preview?.legacyItems.length ? 'unlinked'
-                        : 'ready';
-                    next.set(cleanGroups[index].id, { status, result });
-                });
-                setChecked(next);
-                setSelected(cleanGroups.filter((group) => next.get(group.id)?.status === 'ready').map((group) => group.id));
-            })
-            .catch((e: any) => !cancelled && setCheckError(e.message || 'Could not check the groups.'));
-        return () => { cancelled = true; };
+        setChecking(!!cleanGroups.length);
+        (async () => {
+            try {
+                for (const batch of chunk(cleanGroups)) {
+                    const items = await mergeDataKeyGroups(batch.map((group) => ({
+                        survivorId: group.survivor.uuid,
+                        mergedIds: group.merged.map((dataKey) => dataKey.uuid),
+                    })), true, controller.signal);
+                    if (controller.signal.aborted) return;
+                    const ready = batch.filter((_, index) => items[index] && checkStatus(items[index]) === 'ready').map((group) => group.id);
+                    setChecked((current) => {
+                        const next = new Map(current);
+                        items.forEach((result, index) => next.set(batch[index].id, { status: checkStatus(result), result }));
+                        return next;
+                    });
+                    setSelected((current) => [...current, ...ready]);
+                }
+            } catch (e: any) {
+                if (!controller.signal.aborted && !axios.isCancel(e)) setCheckError(e.message || 'Could not check the groups.');
+            } finally {
+                if (!controller.signal.aborted) setChecking(false);
+            }
+        })();
+        return () => controller.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cleanKey, canMerge, !!usage]);
 
     const selectedGroups = cleanGroups.filter((group) => selected.includes(group.id));
-    const totalScripts = selectedGroups.reduce((sum, group) => sum + (checked?.get(group.id)?.result.preview?.scriptsChanged || 0), 0);
+    const totalScripts = selectedGroups.reduce((sum, group) => sum + (checked.get(group.id)?.result.preview?.scriptsChanged || 0), 0);
 
     const handleRun = async () => {
+        const done: MergeBatchResult[] = [];
         try {
             setRunning(true);
-            const items = await mergeDataKeyGroups(selectedGroups.map((group) => ({
-                survivorId: group.survivor.uuid,
-                mergedIds: group.merged.map((dataKey) => dataKey.uuid),
-            })), false);
-            setResults(items);
-            await loadDataKeys();
-            router.refresh();
+            setProgress(0);
+            for (const batch of chunk(selectedGroups)) {
+                done.push(...await mergeDataKeyGroups(batch.map((group) => ({
+                    survivorId: group.survivor.uuid,
+                    mergedIds: group.merged.map((dataKey) => dataKey.uuid),
+                })), false));
+                setProgress(done.length);
+            }
         } catch (e: any) {
-            setCheckError(e.message || 'The merge failed.');
+            setCheckError(`${e.message || 'The merge failed.'}${done.length ? ` ${pluralize(done.length, 'group')} were already merged — see below.` : ''}`);
         } finally {
+            // Whatever ran is reported, even when a later request failed.
+            if (done.length) setResults(done);
             setRunning(false);
             setConfirming(false);
+            if (done.length) {
+                await loadDataKeys();
+                router.refresh();
+            }
         }
     };
 
-    const loading = (loadingDataKeys && !allDataKeys.length) || !usage || (canMerge && !checked && !checkError);
+    const loading = (loadingDataKeys && !allDataKeys.length) || !usage;
+    const checkedCount = cleanGroups.filter((group) => checked.has(group.id)).length;
     const byId = new Map(allDataKeys.map((dataKey) => [dataKey.uuid, dataKey]));
 
     return (
         <PageContainer title="Merge clean groups" backLink="/data-keys/merge">
-            {running && <Loader overlay />}
 
             <div className="space-y-4 px-4 pb-6">
                 <div className="-mt-2 text-sm text-muted-foreground">
-                    These duplicate groups need no decisions: every option is already shared or matches by name or label.
-                    Each group is merged into its most-used key in all scripts, as its own merge you can revert.
+                    These duplicate groups need no decisions: the keys have the same name, type and label, and every option is
+                    already shared or matches by name or label. Each group is merged into its most-used key in all scripts —
+                    including the parents that offer it — as its own merge you can revert.
                 </div>
 
                 {!!notice && <Callout variant="warning">{notice}</Callout>}
                 {(usageError || checkError) && <Callout variant="error">{usageError || checkError}</Callout>}
+                {checking && !loading && !results && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
+                        <Loader2Icon className="h-4 w-4 animate-spin" />
+                        Checking groups… {checkedCount} of {cleanGroups.length}
+                    </div>
+                )}
 
                 {results ? (
                     <BatchResults results={results} byId={byId} />
@@ -162,9 +196,9 @@ export function BatchMerge({ canMerge: canMergeRole }: { canMerge: boolean; }) {
                                     <TableHead className="w-10">
                                         <Checkbox
                                             aria-label="Select all ready groups"
-                                            checked={!!selected.length && selected.length === cleanGroups.filter((group) => checked?.get(group.id)?.status === 'ready').length}
+                                            checked={!!selected.length && selected.length === cleanGroups.filter((group) => checked.get(group.id)?.status === 'ready').length}
                                             onCheckedChange={(value) => setSelected(value === true
-                                                ? cleanGroups.filter((group) => checked?.get(group.id)?.status === 'ready').map((group) => group.id)
+                                                ? cleanGroups.filter((group) => checked.get(group.id)?.status === 'ready').map((group) => group.id)
                                                 : [])}
                                         />
                                     </TableHead>
@@ -176,7 +210,7 @@ export function BatchMerge({ canMerge: canMergeRole }: { canMerge: boolean; }) {
                             </TableHeader>
                             <TableBody>
                                 {cleanGroups.map((group) => {
-                                    const check = checked?.get(group.id);
+                                    const check = checked.get(group.id);
                                     const ready = check?.status === 'ready';
                                     return (
                                         <TableRow key={group.id} className={cn(!ready && 'text-muted-foreground')}>
@@ -196,6 +230,12 @@ export function BatchMerge({ canMerge: canMergeRole }: { canMerge: boolean; }) {
                                                     <Badge variant="secondary" className="font-normal">{group.survivor.dataType}</Badge>
                                                     {' '}{pluralize(group.merged.length + 1, 'key')}
                                                 </div>
+                                                {!!group.parentsUpdated.length && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Also updates {pluralize(group.parentsUpdated.length, 'parent')}: {group.parentsUpdated.slice(0, 3).join(', ')}
+                                                        {group.parentsUpdated.length > 3 && ` and ${group.parentsUpdated.length - 3} more`}
+                                                    </div>
+                                                )}
                                             </TableCell>
                                             <TableCell className="font-mono text-xs">{shortId(group.survivor.uniqueKey)}</TableCell>
                                             <TableCell>
@@ -207,6 +247,12 @@ export function BatchMerge({ canMerge: canMergeRole }: { canMerge: boolean; }) {
                                                 ) : check?.result.errors?.[0]}
                                             </TableCell>
                                             <TableCell>
+                                                {!check && checking && (
+                                                    <span className="inline-flex items-center gap-1 text-xs">
+                                                        <Loader2Icon className="h-3 w-3 animate-spin" />
+                                                        Checking
+                                                    </span>
+                                                )}
                                                 {check && (
                                                     <div className="space-y-1">
                                                         <Badge variant="outline" className={cn('font-normal', STATUS_BADGES[check.status].className)}>
@@ -238,8 +284,10 @@ export function BatchMerge({ canMerge: canMergeRole }: { canMerge: boolean; }) {
                 <ActionsBar className="items-center">
                     <div className="mr-auto hidden text-sm text-muted-foreground sm:block">
                         {pluralize(selectedGroups.length, 'group')} selected · {pluralize(totalScripts, 'script')} change
+                        {checking && ` · checking ${checkedCount} of ${cleanGroups.length}`}
                     </div>
-                    <Button className="h-auto w-auto" disabled={!selectedGroups.length || running} onClick={() => setConfirming(true)}>
+                    {/* Wait for every check: merging while dry runs are still going would compete with them. */}
+                    <Button className="h-auto w-auto" disabled={!selectedGroups.length || running || checking} onClick={() => setConfirming(true)}>
                         <MergeIcon className="mr-2 h-4 w-4" />
                         Merge {pluralize(selectedGroups.length, 'group')}
                     </Button>
@@ -266,7 +314,7 @@ export function BatchMerge({ canMerge: canMergeRole }: { canMerge: boolean; }) {
                             }}
                         >
                             {running && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-                            Merge
+                            {running ? `Merging… ${progress} of ${selectedGroups.length}` : 'Merge'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

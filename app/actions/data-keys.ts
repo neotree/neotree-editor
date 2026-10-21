@@ -17,7 +17,7 @@ import { _getEditorInfo } from '@/databases/queries/editor-info';
 import { evaluateIntegrityPolicyBlockingEntries, getIntegrityPolicyState } from '@/lib/integrity-policy';
 import socket from '@/lib/socket';
 import { buildDataKeysDeleteImpact, buildDataKeyOptionUnlinkImpact } from '@/lib/data-key-delete-impact';
-import { recomputeScriptsConditionErrors } from '@/app/actions/scripts';
+import { sweepAllScriptsConditionErrors } from '@/lib/server/condition-errors-sweep';
 import { getUser } from "@/app/actions/users";
 import { _getUser } from '@/databases/queries/users';
 import { actingUserHeaders } from '@/lib/acting-user';
@@ -238,56 +238,6 @@ async function assertCanManageEditorDrafts(
 
     if (!allowed) logger.error('assertCanManageEditorDrafts ERROR', JSON.stringify({ role }));
     if (!allowed) throw new Error('Forbidden: only admin or super_user can update script integrity drafts');
-}
-
-/**
- * Refreshes every script's CE report after a data key library change.
- *
- * Scripts the save already identified go first so the most likely affected
- * badges settle soonest; the rest follow. Failures are logged, never surfaced —
- * a library save must not fail because a badge could not be refreshed.
- */
-let sweepInFlight: Promise<void> | null = null;
-let sweepQueued = false;
-
-async function sweepAllScriptsConditionErrors(prioritised?: (string | undefined)[]): Promise<void> {
-    // Bulk repairs call saveDataKeys many times in a row. Collapse overlapping
-    // sweeps into one trailing pass instead of stacking a full pass per save.
-    if (sweepInFlight) {
-        sweepQueued = true;
-        return sweepInFlight;
-    }
-
-    sweepInFlight = (async () => {
-        try {
-            do {
-                sweepQueued = false;
-                await runSweep(prioritised);
-            } while (sweepQueued);
-        } finally {
-            sweepInFlight = null;
-        }
-    })();
-
-    return sweepInFlight;
-}
-
-async function runSweep(prioritised?: (string | undefined)[]): Promise<void> {
-    try {
-        const first = Array.from(new Set((prioritised || []).map((id) => `${id || ''}`).filter(Boolean)));
-        if (first.length) await recomputeScriptsConditionErrors(first);
-
-        const rows = await db
-            .select({ scriptId: scriptsTable.scriptId })
-            .from(scriptsTable)
-            .where(isNull(scriptsTable.deletedAt));
-        const rest = rows
-            .map((row) => `${row.scriptId || ''}`)
-            .filter((id) => !!id && !first.includes(id));
-        if (rest.length) await recomputeScriptsConditionErrors(rest);
-    } catch (e: any) {
-        logger.error('sweepAllScriptsConditionErrors ERROR', e?.message);
-    }
 }
 
 export const saveDataKeys: typeof _saveDataKeys = async params => {

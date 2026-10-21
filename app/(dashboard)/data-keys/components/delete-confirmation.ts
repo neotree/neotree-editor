@@ -22,14 +22,12 @@ export type DeleteImpactItem = {
 };
 
 export async function fetchDataKeyDeleteImpact(dataKeysIds: string[]) {
-    const params = new URLSearchParams();
-    params.set('dataKeysIds', JSON.stringify(dataKeysIds));
-
-    const response = await axios.get<{
+    // POST: the harmonise pages ask about hundreds of keys at once.
+    const response = await axios.post<{
         success: boolean;
         data: DeleteImpactItem[];
         errors?: string[];
-    }>(`/api/data-keys/delete-impact?${params.toString()}`);
+    }>('/api/data-keys/delete-impact', { dataKeysIds });
 
     if (response.data.errors?.length) {
         throw new Error(response.data.errors[0]);

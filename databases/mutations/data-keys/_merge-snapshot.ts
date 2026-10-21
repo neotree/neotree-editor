@@ -48,16 +48,25 @@ const sortById = (rows: AnyRecord[]) => [...rows].sort((a, b) => Number(a.id) - 
 // Rows go through JSON (jsonb column), so compare and restore in JSON form.
 const toJson = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
-export async function captureMergeDraftRows(client: DbOrTransaction, scope: MergeSnapshotScope): Promise<MergeDraftRows> {
+/**
+ * `lock` takes row locks (FOR UPDATE) so nobody can change the captured rows
+ * until the transaction ends — a revert compares and restores them.
+ */
+export async function captureMergeDraftRows(
+    client: DbOrTransaction,
+    scope: MergeSnapshotScope,
+    opts?: { lock?: boolean },
+): Promise<MergeDraftRows> {
+    const lock = <Q extends { for: (strength: 'update') => any }>(query: Q) => (opts?.lock ? query.for('update') : query);
     const scriptIds = Array.from(new Set(scope.scriptIds.filter(Boolean)));
     const keyIds = Array.from(new Set(scope.dataKeyIds.filter(Boolean)));
     const uniqueKeys = Array.from(new Set(scope.dataKeyUniqueKeys.filter(Boolean)));
 
     const byScript = async (table: typeof scriptsDrafts | typeof screensDrafts | typeof diagnosesDrafts | typeof problemsDrafts) => (
-        !scriptIds.length ? [] : await client.select().from(table).where(or(
+        !scriptIds.length ? [] : await lock(client.select().from(table).where(or(
             inArray(table.scriptId, scriptIds),
             inArray(table.scriptDraftId, scriptIds),
-        ))
+        )))
     );
 
     const rows: MergeDraftRows = {
@@ -65,15 +74,15 @@ export async function captureMergeDraftRows(client: DbOrTransaction, scope: Merg
         screensDrafts: await byScript(screensDrafts),
         diagnosesDrafts: await byScript(diagnosesDrafts),
         problemsDrafts: await byScript(problemsDrafts),
-        dataKeysDrafts: (!keyIds.length && !uniqueKeys.length) ? [] : await client.select().from(dataKeysDrafts).where(or(
+        dataKeysDrafts: (!keyIds.length && !uniqueKeys.length) ? [] : await lock(client.select().from(dataKeysDrafts).where(or(
             keyIds.length ? inArray(dataKeysDrafts.uuid, keyIds) : undefined,
             keyIds.length ? inArray(dataKeysDrafts.dataKeyId, keyIds) : undefined,
             uniqueKeys.length ? inArray(dataKeysDrafts.uniqueKey, uniqueKeys) : undefined,
-        )),
-        pendingDeletion: !keyIds.length ? [] : await client.select().from(pendingDeletion).where(or(
+        ))),
+        pendingDeletion: !keyIds.length ? [] : await lock(client.select().from(pendingDeletion).where(or(
             inArray(pendingDeletion.dataKeyId, keyIds),
             inArray(pendingDeletion.dataKeyDraftId, keyIds),
-        )),
+        ))),
     };
 
     return toJson(Object.fromEntries(Object.entries(rows).map(([name, list]) => [name, sortById(list)])) as MergeDraftRows);

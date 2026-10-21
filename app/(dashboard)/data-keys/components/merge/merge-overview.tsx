@@ -27,24 +27,40 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useAlertModal } from '@/hooks/use-alert-modal';
+import { cn } from '@/lib/utils';
 import { PageContainer } from '@/app/(dashboard)/(scripts)/components/page-container';
 import type { DataKeyMergeListItem, DuplicateDismissal } from '@/databases/queries/data-keys';
 import {
-    findDuplicateParentGroups,
+    findDuplicateKeyGroups,
     findPossibleDuplicateGroups,
     getDuplicateGroupKey,
     type PossibleDuplicateReason,
 } from '@/lib/data-key-merge-plan';
 
+import { buildDataKeyParentIndex, getDataKeyParentTitle, type DataKeyParentRef } from '@/lib/data-key-children';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+
 import { dismissDuplicateGroup, restoreDuplicateGroup } from './api';
 import { isCleanGroup, useScriptUsage } from './groups';
 import { Callout, MergeStatusBadge, OperationKindBadge, describeKey, operationTitle, pluralize, shortId, useMergePermission } from './shared';
 
+/** parent: keys with options · option: keys a parent offers · key: any other key */
+type GroupKind = 'parent' | 'option' | 'key';
+
 type Group = {
     key: string;
+    kind: GroupKind;
     keys: DataKey[];
     possible?: { reason: PossibleDuplicateReason; overlap: number };
 };
+
+const KIND_LABELS: Record<GroupKind, string> = { parent: 'Parent', option: 'Option', key: 'Key' };
 
 export function MergeOverview({
     canMerge: canMergeRole,
@@ -61,6 +77,7 @@ export function MergeOverview({
     const { editable: canMerge, notice } = useMergePermission(canMergeRole);
     const [tab, setTab] = useQueryState('tab', { defaultValue: 'exact', clearOnDefault: true, shallow: true });
     const [search, setSearch] = useState('');
+    const [kindFilter, setKindFilter] = useQueryState('kind', { defaultValue: 'all', clearOnDefault: true, shallow: true });
     const [dismissing, setDismissing] = useState<Group | null>(null);
     const [dismissReason, setDismissReason] = useState('');
     const [busy, setBusy] = useState(false);
@@ -68,29 +85,51 @@ export function MergeOverview({
     const dismissedKeys = useMemo(() => new Set(dismissals.map((dismissal) => dismissal.groupKey)), [dismissals]);
     const byUniqueKey = useMemo(() => new Map(allDataKeys.map((dataKey) => [dataKey.uniqueKey, dataKey])), [allDataKeys]);
 
-    const exact = useMemo<Group[]>(() => findDuplicateParentGroups(allDataKeys)
-        .map((keys) => ({ key: getDuplicateGroupKey(keys), keys }))
-        .filter((group) => !dismissedKeys.has(group.key)), [allDataKeys, dismissedKeys]);
+    const parentIndex = useMemo(() => buildDataKeyParentIndex(allDataKeys), [allDataKeys]);
+    const kindOf = (keys: DataKey[]): GroupKind => keys.some((dataKey) => (dataKey.options || []).length)
+        ? 'parent'
+        : keys.some((dataKey) => (parentIndex.get(dataKey.uniqueKey) || []).length) ? 'option' : 'key';
+
+    const exact = useMemo<Group[]>(() => findDuplicateKeyGroups(allDataKeys)
+        .map((keys) => ({ key: getDuplicateGroupKey(keys), kind: kindOf(keys), keys }))
+        .filter((group) => !dismissedKeys.has(group.key)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allDataKeys, dismissedKeys, parentIndex]);
     const possible = useMemo<Group[]>(() => findPossibleDuplicateGroups(allDataKeys)
-        .map((group) => ({ key: getDuplicateGroupKey(group.keys), keys: group.keys, possible: { reason: group.reason, overlap: group.overlap } }))
-        .filter((group) => !dismissedKeys.has(group.key)), [allDataKeys, dismissedKeys]);
+        .map((group) => ({
+            key: getDuplicateGroupKey(group.keys),
+            kind: kindOf(group.keys),
+            keys: group.keys,
+            possible: { reason: group.reason, overlap: group.overlap },
+        }))
+        .filter((group) => !dismissedKeys.has(group.key)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allDataKeys, dismissedKeys, parentIndex]);
 
     const { usage, error: usageError } = useScriptUsage([...exact, ...possible].flatMap((group) => group.keys.map((dataKey) => dataKey.uuid)));
     // Until the library has loaded, counts would read as "nothing to do".
     const libraryReady = !!allDataKeys.length;
-    const cleanCount = usage && libraryReady ? exact.filter((group) => isCleanGroup(group.keys, allDataKeys, usage)).length : 0;
+    // Each check builds a full merge plan, so only recount when the inputs change.
+    const cleanCount = useMemo(
+        () => (usage && libraryReady ? exact.filter((group) => isCleanGroup(group.keys, allDataKeys, usage)).length : 0),
+        [usage, libraryReady, exact, allDataKeys],
+    );
     const count = (value: number) => (libraryReady ? ` (${value})` : '');
+
+    const unpublished = merges.filter((merge) => merge.status === 'applied');
+    const published = merges.filter((merge) => merge.status === 'published');
 
     // Scripts-only merges leave the merged key in the library: show where a
     // group was already partly merged.
     const partialMerges = (group: Group) => merges.filter((merge) => (
         merge.kind === 'merge' &&
-        merge.status === 'applied' &&
+        (merge.status === 'applied' || merge.status === 'published') &&
         merge.scope === 'scripts' &&
         merge.mergedUniqueKeys.some((uniqueKey) => group.keys.some((dataKey) => dataKey.uniqueKey === uniqueKey))
     ));
 
     const matchesSearch = (group: Group) => {
+        if (kindFilter !== 'all' && group.kind !== kindFilter) return false;
         const term = search.trim().toLowerCase();
         return !term || group.keys.some((dataKey) => [dataKey.name, dataKey.label, dataKey.uniqueKey]
             .some((value) => `${value || ''}`.toLowerCase().includes(term)));
@@ -129,7 +168,7 @@ export function MergeOverview({
             return <div className="space-y-3">{[0, 1, 2].map((index) => <Skeleton key={index} className="h-32 w-full" />)}</div>;
         }
         if (!groups.length) return <div className="py-12 text-center text-muted-foreground">{emptyMessage}</div>;
-        if (!visible.length) return <div className="py-12 text-center text-muted-foreground">No groups match your search.</div>;
+        if (!visible.length) return <div className="py-12 text-center text-muted-foreground">No groups match your filters.</div>;
         return (
             <div className="space-y-3">
                 {visible.map((group) => (
@@ -137,6 +176,7 @@ export function MergeOverview({
                         key={group.key}
                         group={group}
                         byUniqueKey={byUniqueKey}
+                        parentIndex={parentIndex}
                         usage={usage}
                         partialMerges={partialMerges(group)}
                         canMerge={canMerge}
@@ -166,8 +206,9 @@ export function MergeOverview({
         >
             <div className="space-y-4 px-4 pb-6">
                 <div className="-mt-2 text-sm text-muted-foreground">
-                    Parent data keys that look like the same key. Merging keeps one of them, matches the others’ options
-                    to its options, and updates every script that uses them — including their conditions.
+                    Data keys that look like the same key: the same name and type — parents, options and other keys alike.
+                    Merging keeps one of them, replaces the others everywhere they are used — in scripts, conditions and the
+                    parents that offer them — and deletes them on the next publish.
                 </div>
 
                 {!!notice && <Callout variant="warning">{notice}</Callout>}
@@ -179,10 +220,27 @@ export function MergeOverview({
                             <TabsTrigger value="exact">Duplicates{count(exact.length)}</TabsTrigger>
                             <TabsTrigger value="possible">Possible{count(possible.length)}</TabsTrigger>
                             <TabsTrigger value="dismissed">Dismissed ({dismissals.length})</TabsTrigger>
-                            <TabsTrigger value="history">History ({merges.length})</TabsTrigger>
+                            <TabsTrigger value="history">
+                                History ({published.length}{unpublished.length ? ` + ${unpublished.length} unpublished` : ''})
+                            </TabsTrigger>
                         </TabsList>
                         {(tab === 'exact' || tab === 'possible') && (
-                            <div className="relative ml-auto w-full min-w-[220px] sm:w-72">
+                            <Select value={kindFilter} onValueChange={(value) => setKindFilter(value)}>
+                                <SelectTrigger className="ml-auto w-full sm:w-[180px]" aria-label="Kind of key">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(['all', 'parent', 'option', 'key'] as const).map((value) => {
+                                        const list = tab === 'possible' ? possible : exact;
+                                        const total = value === 'all' ? list.length : list.filter((group) => group.kind === value).length;
+                                        const label = value === 'all' ? 'All kinds' : value === 'parent' ? 'Parents' : value === 'option' ? 'Options' : 'Other keys';
+                                        return <SelectItem key={value} value={value}>{label}{libraryReady ? ` (${total})` : ''}</SelectItem>;
+                                    })}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        {(tab === 'exact' || tab === 'possible') && (
+                            <div className="relative w-full min-w-[220px] sm:w-72">
                                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     value={search}
@@ -196,14 +254,17 @@ export function MergeOverview({
                     </div>
 
                     <TabsContent value="exact" className="mt-4">
-                        <div className="mb-3 text-sm text-muted-foreground">Same name, label and type.</div>
-                        {renderGroups(exact, 'No duplicate parent data keys — the library is harmonised.')}
+                        <div className="mb-3 text-sm text-muted-foreground">
+                            Same name, type and label (case, spacing and word order aside).
+                        </div>
+                        {renderGroups(exact, 'No duplicate data keys — the library is harmonised.')}
                     </TabsContent>
 
                     <TabsContent value="possible" className="mt-4">
                         <div className="mb-3 text-sm text-muted-foreground">
-                            Same name with a different label, or at least 70% of their options in common. Review before merging,
-                            or mark them as not duplicates.
+                            Same name and type, with labels that say much the same thing in different words. Review before merging,
+                            or mark them as not duplicates. Keys that share a name but mean different things (such as “0 = Alert”
+                            and “0 = None”) are not listed.
                         </div>
                         {renderGroups(possible, 'No possible duplicates found.')}
                     </TabsContent>
@@ -253,46 +314,32 @@ export function MergeOverview({
                         )}
                     </TabsContent>
 
-                    <TabsContent value="history" className="mt-4">
-                        <div className="mb-3 text-sm text-muted-foreground">
-                            Merges, deletes, replacements and unlinks. Each one can be reviewed, and reverted until it is published.
-                        </div>
-                        {!merges.length ? (
-                            <div className="py-12 text-center text-muted-foreground">No changes recorded yet.</div>
-                        ) : (
-                            <div className="rounded-md border border-border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Change</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead>Applied to</TableHead>
-                                            <TableHead>By</TableHead>
-                                            <TableHead>Status</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {merges.map((merge) => (
-                                            <TableRow
-                                                key={merge.mergeId}
-                                                className="cursor-pointer transition-colors hover:bg-muted/60"
-                                                onClick={() => router.push(`/data-keys/merge/history/${merge.mergeId}`)}
-                                            >
-                                                <TableCell className="whitespace-nowrap text-sm">{format(new Date(merge.createdAt), 'PP p')}</TableCell>
-                                                <TableCell>{operationTitle(merge)}</TableCell>
-                                                <TableCell><OperationKindBadge kind={merge.kind} /></TableCell>
-                                                <TableCell className="text-sm">
-                                                    {merge.scope === 'library' ? 'All scripts' : pluralize(merge.scriptIds.length, 'selected script')}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-muted-foreground">{merge.createdByName || '—'}</TableCell>
-                                                <TableCell><MergeStatusBadge status={merge.status} kind={merge.kind} /></TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                    <TabsContent value="history" className="mt-4 space-y-6">
+                        {!!unpublished.length && (
+                            <section className="space-y-3">
+                                <div>
+                                    <div className="text-base">Not yet published ({unpublished.length})</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Saved as drafts. Review each one and revert it if needed: it moves to the history when it is
+                                        published, and is dropped if its drafts are discarded.
+                                    </div>
+                                </div>
+                                <OperationsTable merges={unpublished} />
+                            </section>
                         )}
+                        <section className="space-y-3">
+                            <div>
+                                <div className="text-base">Published ({published.length})</div>
+                                <div className="text-sm text-muted-foreground">
+                                    Merges, deletes, replacements and unlinks that went out in a release.
+                                </div>
+                            </div>
+                            {!published.length ? (
+                                <div className="py-12 text-center text-muted-foreground">Nothing published yet.</div>
+                            ) : (
+                                <OperationsTable merges={published} published />
+                            )}
+                        </section>
                     </TabsContent>
                 </Tabs>
             </div>
@@ -336,6 +383,7 @@ export function MergeOverview({
 function GroupTile({
     group,
     byUniqueKey,
+    parentIndex,
     usage,
     partialMerges,
     canMerge,
@@ -343,6 +391,7 @@ function GroupTile({
 }: {
     group: Group;
     byUniqueKey: Map<string, DataKey>;
+    parentIndex: Map<string, DataKeyParentRef[]>;
     usage: Map<string, number> | null;
     partialMerges: DataKeyMergeListItem[];
     canMerge: boolean;
@@ -353,18 +402,25 @@ function GroupTile({
     const sharedOptions = new Set((keys[0].options || []).filter((option) => keys.every((dataKey) => (dataKey.options || []).includes(option))));
     const totalUsage = usage ? keys.reduce((sum, dataKey) => sum + (usage.get(dataKey.uuid) || 0), 0) : null;
     const sameName = keys.every((dataKey) => `${dataKey.name}`.toLowerCase() === `${keys[0].name}`.toLowerCase());
+    const hasOptions = keys.some((dataKey) => (dataKey.options || []).length);
+    // Labels can differ in case, order or wording — show each key's own label when they do.
+    const labelsDiffer = keys.some((dataKey) => `${dataKey.label || ''}` !== `${keys[0].label || ''}`);
 
     return (
         <div className="space-y-3 rounded-md border border-border p-3">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{sameName ? keys[0].name : keys.map((dataKey) => dataKey.name).join(' / ')}</span>
-                {sameName && keys[0].label && keys[0].label !== keys[0].name && (
+                {sameName && !labelsDiffer && keys[0].label && keys[0].label !== keys[0].name && (
                     <span className="text-muted-foreground">{keys[0].label}</span>
                 )}
                 <Badge variant="secondary" className="font-normal">{keys[0].dataType}</Badge>
+                {/* The kind adds nothing when the data type already says it ("option"). */}
+                {KIND_LABELS[group.kind].toLowerCase() !== `${keys[0].dataType || ''}`.toLowerCase() && (
+                    <Badge variant="outline" className="font-normal">{KIND_LABELS[group.kind]}</Badge>
+                )}
                 {group.possible && (
                     <Badge variant="outline" className="font-normal">
-                        {group.possible.reason === 'same_name' ? 'Same name, different label' : `${Math.round(group.possible.overlap * 100)}% options shared`}
+                        Similar labels · {Math.round(group.possible.overlap * 100)}%
                     </Badge>
                 )}
                 <span className="text-sm text-muted-foreground">
@@ -402,17 +458,26 @@ function GroupTile({
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {keys.map((dataKey) => {
                     const used = usage?.get(dataKey.uuid);
+                    const parents = parentIndex.get(dataKey.uniqueKey) || [];
                     return (
                         <div key={dataKey.uuid} className="rounded-md bg-muted/40 p-2">
+                            {(!sameName || labelsDiffer) && (
+                                <div className="mb-1 text-sm font-medium">{describeKey(dataKey)}</div>
+                            )}
                             <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                                {!sameName && <span className="font-medium text-foreground">{describeKey(dataKey)}</span>}
                                 <span className="font-mono" title={dataKey.uniqueKey}>{shortId(dataKey.uniqueKey)}</span>
                                 {dataKey.isDraft && <Badge variant="outline" className="font-normal">draft</Badge>}
                                 <span className="ml-auto">
                                     {used === undefined ? <Skeleton className="inline-block h-3 w-16" /> : `used in ${pluralize(used, 'script')}`}
                                 </span>
                             </div>
-                            <ul className="mt-2 flex flex-wrap gap-1">
+                            {!!parents.length && (
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                    Option of {parents.slice(0, 3).map((parent) => getDataKeyParentTitle(parent)).join(', ')}
+                                    {parents.length > 3 && ` and ${parents.length - 3} more`}
+                                </div>
+                            )}
+                            <ul className={cn('flex flex-wrap gap-1', hasOptions && 'mt-2')}>
                                 {(dataKey.options || []).map((option) => {
                                     const child = byUniqueKey.get(option);
                                     const shared = sharedOptions.has(option);
@@ -433,9 +498,59 @@ function GroupTile({
                     );
                 })}
             </div>
-            <div className="text-xs text-muted-foreground">
-                Filled badges are options every key offers; outlined ones are only in that key.
-            </div>
+            {hasOptions && (
+                <div className="text-xs text-muted-foreground">
+                    Filled badges are options every key offers; outlined ones are only in that key.
+                </div>
+            )}
+        </div>
+    );
+}
+
+function OperationsTable({ merges, published }: { merges: DataKeyMergeListItem[]; published?: boolean; }) {
+    const router = useRouter();
+    return (
+        <div className="rounded-md border border-border">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>{published ? 'Published' : 'Date'}</TableHead>
+                        <TableHead>Change</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Applied to</TableHead>
+                        <TableHead>By</TableHead>
+                        <TableHead>Status</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {merges.map((merge) => (
+                        <TableRow
+                            key={merge.mergeId}
+                            className="cursor-pointer transition-colors hover:bg-muted/60"
+                            onClick={() => router.push(`/data-keys/merge/history/${merge.mergeId}`)}
+                        >
+                            <TableCell className="whitespace-nowrap text-sm">
+                                {format(new Date((published && merge.publishedAt) || merge.createdAt), 'PP p')}
+                                {published && merge.publishedDataVersion != null && (
+                                    <div className="text-xs text-muted-foreground">v{merge.publishedDataVersion}</div>
+                                )}
+                            </TableCell>
+                            <TableCell>{operationTitle(merge)}</TableCell>
+                            <TableCell><OperationKindBadge kind={merge.kind} /></TableCell>
+                            <TableCell className="text-sm">
+                                {merge.scope === 'library' ? 'All scripts' : pluralize(merge.scriptIds.length, 'selected script')}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                                {merge.createdByName || '—'}
+                                {published && merge.publishedByName && merge.publishedByName !== merge.createdByName && (
+                                    <div className="text-xs">published by {merge.publishedByName}</div>
+                                )}
+                            </TableCell>
+                            <TableCell><MergeStatusBadge status={merge.status} /></TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
         </div>
     );
 }

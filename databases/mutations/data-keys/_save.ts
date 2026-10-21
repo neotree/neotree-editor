@@ -55,6 +55,7 @@ export type SaveDataKeysParams = {
 export type SaveDataKeysResponse = {
     success: boolean;
     errors?: string[];
+    /** Saved, but worth telling the user (e.g. an imported option pool that mixes data types). */
     warnings?: string[];
     info?: {
         refs?: Pick<Awaited<ReturnType<typeof _updateDataKeysRefs>>, 'info' | 'affected'>;
@@ -233,10 +234,12 @@ export async function _saveDataKeys({
 
     try {
         let refsSaved = 0;
+        let saveWarnings: string[] = [];
 
         const executeSave = async (executor: DbOrTransaction) => {
             const errors: string[] = [];
             const warnings: string[] = [];
+            saveWarnings = warnings;
             const propagationMatchUniqueKeysByDataKey: Record<string, string[]> = {};
             // Name changes (old -> new): scripts follow them, so conditions must too.
             const nameRenames: { from: string; to: string }[] = [];
@@ -317,15 +320,36 @@ export async function _saveDataKeys({
                 throw new Error(errors.join(', '));
             }
 
-            // Full-library snapshot for options validation, fetched once per save.
-            let allDataKeysCache: Awaited<ReturnType<typeof _getDataKeys>>['data'] | null = null;
-            const getAllDataKeys = async () => {
-                if (!allDataKeysCache) {
+            // The library the new options are checked against: what is stored, with this save's keys laid
+            // over it. A save can create a parent and its new options together (an import does: DEV added an
+            // option key, and the parent that lists it comes in the same batch); whichever is written first,
+            // the options it is creating count as existing, and cycles are checked on the result.
+            let validationLibraryCache: Awaited<ReturnType<typeof _getDataKeys>>['data'] | null = null;
+            const getValidationLibrary = async () => {
+                if (!validationLibraryCache) {
                     const res = await _getDataKeys({ client: executor });
                     if (res.errors?.length) throw new Error(res.errors.join(', '));
-                    allDataKeysCache = res.data;
+                    const stored = res.data;
+                    const byUuid = new Map(stored.map((k) => [`${k.uuid || ''}`, k] as const));
+                    const byUniqueKey = new Map(stored.map((k) => [`${k.uniqueKey || ''}`.trim(), k] as const));
+                    const library = new Map(byUniqueKey);
+                    data.forEach((item) => {
+                        const base = byUuid.get(`${item.uuid || ''}`) || byUniqueKey.get(`${item.uniqueKey || ''}`.trim());
+                        const uniqueKey = `${item.uniqueKey || base?.uniqueKey || ''}`.trim();
+                        if (!uniqueKey) return;
+                        library.set(uniqueKey, {
+                            ...(base || {}),
+                            uuid: base?.uuid || item.uuid,
+                            uniqueKey,
+                            name: item.name ?? base?.name ?? '',
+                            label: item.label ?? base?.label ?? '',
+                            dataType: item.dataType ?? base?.dataType ?? '',
+                            options: (item.options ?? base?.options ?? []) as string[],
+                        } as (typeof stored)[number]);
+                    });
+                    validationLibraryCache = Array.from(library.values());
                 }
-                return allDataKeysCache;
+                return validationLibraryCache;
             };
 
             let index = 0;
@@ -384,11 +408,20 @@ export async function _saveDataKeys({
                         // Newly added options must exist, keep the pool single-typed,
                         // and never create circular references.
                         if (nextOptions.some(option => !previousOptions.includes(option))) {
+                            const validationLibrary = await getValidationLibrary();
+                            const parentEntry = validationLibrary.find((k) => `${k.uniqueKey || ''}`.trim() === `${existingUniqueKey}`.trim());
+                            const parentTitle = normalizedItem.label || normalizedItem.name || parentEntry?.label || parentEntry?.name || existingUniqueKey;
                             const optionsError = validateDataKeyOptionsAddition({
-                                dataKeys: await getAllDataKeys(),
+                                dataKeys: validationLibrary,
                                 parentUniqueKey: existingUniqueKey,
                                 previousOptions,
                                 nextOptions,
+                                // an import mirrors the source editor, which already has this option pool
+                                ...(draftOrigin === 'import' ? {
+                                    onTypeMismatch: (message: string) => warnings.push(
+                                        `Data key "${parentTitle}": ${message} Imported as it is on the source editor.`,
+                                    ),
+                                } : {}),
                             });
                             if (optionsError) throw new Error(optionsError);
                         }
@@ -708,6 +741,7 @@ export async function _saveDataKeys({
             if (broadcastAction && refsSaved) socket.emit('data_changed', 'save_scripts');
         }
 
+        if (saveWarnings.length) response.warnings = Array.from(new Set(saveWarnings));
         response.success = true;
         return response;
     } catch(e: any) {

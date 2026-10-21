@@ -71,6 +71,7 @@ async function applyRequiredDeletionReplacements({
     allowMissingReplacements,
     scriptRemovals,
     excludeScriptIdsByAlias: excludeScriptIdsByAliasParam,
+    onlyScriptIdsByAlias,
     userId,
     client,
 }: {
@@ -82,6 +83,8 @@ async function applyRequiredDeletionReplacements({
     scriptRemovals?: Record<string, string[]>;
     /** Overrides the exclusions derived from `scriptRemovals` (scripts-only mode). */
     excludeScriptIdsByAlias?: Record<string, string[]>;
+    /** Scripts-only mode: the only scripts each alias may be rewritten in. */
+    onlyScriptIdsByAlias?: Record<string, string[]>;
     userId?: string | null;
     client: Parameters<typeof _updateDataKeysRefs>[0]["client"];
 }) {
@@ -175,6 +178,7 @@ async function applyRequiredDeletionReplacements({
         matchUniqueKeysByDataKey: aliasesByReplacementUniqueKey,
         includePrimaryUniqueKeys: false,
         excludeScriptIdsByAlias,
+        onlyScriptIdsByAlias,
         client,
     });
 
@@ -187,9 +191,10 @@ async function applyRequiredDeletionReplacements({
     const renamesByScriptId: Record<string, { from: string; to: string }[]> = {};
     for (const { target, replacement } of appliedReplacements) {
         const excluded = new Set(excludeScriptIdsByAlias[target.uniqueKey] || []);
+        const only = onlyScriptIdsByAlias?.[target.uniqueKey] ? new Set(onlyScriptIdsByAlias[target.uniqueKey]) : null;
         const scripts = impact.find((item) => item.dataKeyId === target.uuid)?.scripts || [];
         for (const { scriptId } of scripts) {
-            if (excluded.has(scriptId)) continue;
+            if (excluded.has(scriptId) || (only && !only.has(scriptId))) continue;
             (renamesByScriptId[scriptId] ||= []).push({ from: target.name || '', to: replacement.name || '' });
         }
     }
@@ -362,6 +367,7 @@ export async function _deleteDataKeys(
                             // Removal is the explicit choice for keys without a replacement.
                             allowMissingReplacements: true,
                             excludeScriptIdsByAlias: plan.replaceExclusionsByUniqueKey,
+                            onlyScriptIdsByAlias: plan.replaceScriptIdsByUniqueKey,
                             userId,
                             client: tx,
                         });

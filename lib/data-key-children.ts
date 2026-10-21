@@ -108,11 +108,18 @@ export function validateDataKeyOptionsAddition({
     parentUniqueKey,
     previousOptions,
     nextOptions,
+    onTypeMismatch,
 }: {
     dataKeys: DataKeyLike[];
     parentUniqueKey: string;
     previousOptions: string[];
     nextOptions: string[];
+    /**
+     * Report a mixed-type option pool here instead of failing. Imports use it: the source editor already
+     * has that pool, so refusing it here would only block the import. Missing options and circular
+     * references always fail.
+     */
+    onTypeMismatch?: (message: string) => void;
 }): string | null {
     const previous = new Set(previousOptions.map(normalizeKey).filter(Boolean));
     const added = Array.from(new Set(nextOptions.map(normalizeKey).filter(Boolean)))
@@ -148,13 +155,17 @@ export function validateDataKeyOptionsAddition({
 
         const childType = normalizeDataKeyType(child.dataType);
         if (requiredType && childType !== requiredType) {
-            return `"${childTitle}" cannot be added because its data type does not match the existing options.`;
+            const message = `"${childTitle}" cannot be added because its data type does not match the existing options.`;
+            if (!onTypeMismatch) return message;
+            onTypeMismatch(message);
         }
         if (childType) addedTypes.add(childType);
     }
 
     if (!requiredType && keptTypes.size === 0 && addedTypes.size > 1) {
-        return 'All options of a data key must share the same data type.';
+        const message = 'All options of a data key must share the same data type.';
+        if (!onTypeMismatch) return message;
+        onTypeMismatch(message);
     }
 
     return null;
