@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useDrugsLibrary } from "@/hooks/use-drugs-library";
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
+import { ContentLockNotice } from "@/components/content-lock-notice";
 import { ActionsBar } from "@/components/actions-bar";
 import { DrugsLibraryForm } from "./form";
 import { Add } from "./add";
@@ -30,7 +32,7 @@ const NO_CONDITION_KEYS: ConditionKey[] = [];
 
 export function DrugsLibrary({}: Props) {
     const { confirm } = useConfirmModal();
-    const { viewOnly } = useAppContext();
+    const viewOnly = useContentViewOnly("drugsLibrary", null);
 
     const [selected, setSelected] = useState<number[]>([]);
 
@@ -101,6 +103,8 @@ export function DrugsLibrary({}: Props) {
     return (
         <>
             {loading && <Loader overlay />}
+
+            <ContentLockNotice area="drugsLibrary" className="m-4" />
 
             <DrugsLibraryForm
                 disabled={disabled}

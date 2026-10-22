@@ -375,6 +375,7 @@ function EditSection({
                                                 type: item.type === titleProp ? title : item.type,
                                             };
                                         }),
+                                        { shouldDirty: true, },
                                     );
                                 }}
                             >

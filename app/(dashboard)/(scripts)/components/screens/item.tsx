@@ -28,7 +28,9 @@ import { SelectModal } from "@/components/select-modal"
 import { SelectDataKey } from "@/components/select-data-key"
 import { useDataKeysCtx } from "@/contexts/data-keys"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { useAlertModal } from "@/hooks/use-alert-modal"
+import { ParentKeyOptionsHint } from "./parent-key-options-hint"
 
 type Props = {
   open: boolean
@@ -54,6 +56,7 @@ export function Item<P = {}>({
   subTypes = [],
   onClose,
 }: Props & P) {
+  const { confirm: confirmDiscard } = useConfirmModal()
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
 
@@ -130,7 +133,7 @@ export function Item<P = {}>({
     register,
     handleSubmit,
     setValue,
-    formState: { errors },
+    formState: { errors, isDirty: itemFormIsDirty },
   } = useForm({
     defaultValues: getDefaultValues(),
   })
@@ -191,6 +194,7 @@ export function Item<P = {}>({
                 score: data.score ? Number(data.score) : null,
               }),
         })),
+        { shouldDirty: true },
       )
     } else {
       form.setValue("items", [...form.getValues("items"), data], { shouldDirty: true })
@@ -213,15 +217,17 @@ export function Item<P = {}>({
     return !!dataKey?.confidentialLabelOnly
   }, [dataKey?.confidentialLabelOnly])
 
+  // Follows the data key. Done on load too, so it does not count as an edit (opening an option must not
+  // leave "unsaved changes"); choosing another key marks the form changed on its own.
   useEffect(() => {
-    if (confidential !== inheritedConfidential) {
-      setValue("confidential", inheritedConfidential, { shouldDirty: true })
+    if (!!confidential !== inheritedConfidential) {
+      setValue("confidential", inheritedConfidential, { shouldDirty: false })
     }
   }, [confidential, inheritedConfidential, setValue])
 
   useEffect(() => {
-    if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
-      setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: true })
+    if (!!confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+      setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: false })
     }
   }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue])
 
@@ -238,6 +244,7 @@ export function Item<P = {}>({
     const _type = screenType + "_option"
 
     return (
+      <>
       <SelectDataKey
         modal
         value={key}
@@ -264,6 +271,10 @@ export function Item<P = {}>({
           setValue("label", label, { shouldDirty: true })
         }}
       />
+      {!!screenDataKey && !isKeyDisabled && (isChecklistScreen || isMultiSelectScreen || isSingleSelectScreen) && (
+        <ParentKeyOptionsHint dataKey={screenDataKey} owner="screen" className="mt-1" />
+      )}
+      </>
     )
   }
 
@@ -273,8 +284,22 @@ export function Item<P = {}>({
         open={open}
         title={!item ? "New item" : "Edit item"}
         onOpenChange={(open) => {
-          if (!open) onClose()
-          resetForm(getDefaultValues())
+          const applyOpenChange = () => {
+            if (!open) onClose()
+            resetForm(getDefaultValues())
+          }
+          // Closing with unsaved changes (Esc, clicking outside, Cancel) asks first, in the app's dialog
+          if (!open && itemFormIsDirty) {
+            confirmDiscard(applyOpenChange, {
+              title: "Discard changes?",
+              message: "Discard your changes to this item?",
+              positiveLabel: "Discard",
+              negativeLabel: "Keep editing",
+              danger: true,
+            })
+            return
+          }
+          applyOpenChange()
         }}
         actions={
           <>
@@ -334,9 +359,12 @@ export function Item<P = {}>({
                     <TooltipProvider delayDuration={0}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
-                            type="button"
+                          {/* not a <button>: the Switch inside is one, and buttons cannot be nested */}
+                          <div
+                            role="button"
+                            tabIndex={0}
                             className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                             onClick={() =>
                               alert({
                                 title: "Confidentiality is managed in Data Keys",
@@ -349,7 +377,7 @@ export function Item<P = {}>({
                             <Label secondary htmlFor="confidential">
                               Confidential
                             </Label>
-                          </button>
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="flex flex-col gap-y-1">
@@ -372,9 +400,12 @@ export function Item<P = {}>({
                     <TooltipProvider delayDuration={0}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
-                            type="button"
+                          {/* not a <button>: the Switch inside is one, and buttons cannot be nested */}
+                          <div
+                            role="button"
+                            tabIndex={0}
                             className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                             onClick={() =>
                               alert({
                                 title: "Confidentiality is managed in Data Keys",
@@ -387,7 +418,7 @@ export function Item<P = {}>({
                             <Label secondary htmlFor="confidentialLabelOnly">
                               Confidential (label only)
                             </Label>
-                          </button>
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="flex flex-col gap-y-1">

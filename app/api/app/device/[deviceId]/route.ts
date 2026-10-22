@@ -111,7 +111,7 @@ export async function POST(req: NextRequest, props: IParams) {
         responseData.lastPublishDate = editorInfo.lastPublishDate!;
         responseData.dataVersion = editorInfo.dataVersion!;
 
-        const changesDates = await _getDatesWhenUpdatesWereMade();
+        const changesDates = await _getDatesWhenUpdatesWereMade({ publishedOnly: true, });
 
         if (changesDates?.errors?.length) return NextResponse.json({ errors: changesDates.errors, data: responseData, });
 
@@ -128,8 +128,10 @@ export async function POST(req: NextRequest, props: IParams) {
         );
 
         if (shouldFetchData) {
-            const configKeys = await _getConfigKeys({ returnDraftsIfExist: true, });
-            const scripts = await getScriptsWithItems({ hospitalIds: [hospitalId!], returnDraftsIfExist: true, });
+            // Devices get the PUBLISHED state only. Serving drafts meant unpublished (and half-finished)
+            // edits, including option lists being reworked, reached tablets before anyone published them.
+            const configKeys = await _getConfigKeys({ returnDraftsIfExist: false, });
+            const scripts = await getScriptsWithItems({ hospitalIds: [hospitalId!], returnDraftsIfExist: false, includePendingDeletion: true, });
 
             responseData.configKeys = configKeys.data;
             responseData.scripts = scripts.data;

@@ -10,7 +10,10 @@ import { _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
 import { removeHexCharacters } from '../../utils'
 import { _getScreens } from '@/databases/queries/scripts';
 
-export type SaveScriptsData = Partial<ScriptType>;
+export type SaveScriptsData = Partial<ScriptType> & {
+    /** The revision the editor loaded (see lib/entity-revision.ts); checked by the save action. */
+    baseRevision?: string;
+};
 
 export type SaveScriptsResponse = { 
     success: boolean; 
@@ -37,7 +40,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
 
     try {
         let index = 0;
-        for (const { scriptId: itemScriptId, ...item } of data) {
+        for (const { scriptId: itemScriptId, baseRevision: _baseRevision, revision: _revision, ...item } of data) {
             try {
                 index++;
 
@@ -65,6 +68,8 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                                 position: data.position,
                                 hospitalId: data.hospitalId,
                                 draftOrigin,
+                                // an ownerless draft is taken over by whoever edits it next (see _screens_save)
+                                ...(!draft.createdByUserId && userId ? { createdByUserId: userId } : {}),
                             }).where(eq(scriptsDrafts.scriptDraftId, scriptId));
 
                         info.query = q.toSQL();

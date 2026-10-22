@@ -48,7 +48,8 @@ export function BulkEdit({
     onSaveSuccess?: () => Promise<any>;
 }) {
     const { alert } = useAlertModal();
-    const { replace: searchParamsReplace } = useSearchParams();
+    const { parsed: searchParamsParsed, replace: searchParamsReplace } = useSearchParams();
+    const hasBulkEditParam = searchParamsParsed.bulkEdit !== undefined;
 
     const [submitting, setSubmitting] = useState(false);
 
@@ -63,9 +64,10 @@ export function BulkEdit({
     });
 
     const close = useCallback(() => {
-        searchParamsReplace({ bulkEdit: undefined, });
+        // replacing the url re-renders the page: only do it when there is something to remove
+        if (hasBulkEditParam) searchParamsReplace({ bulkEdit: undefined, });
         setValue('role', '' as Role);
-    }, [onOpenChange, searchParamsReplace, setValue]);
+    }, [hasBulkEditParam, searchParamsReplace, setValue]);
 
     const onSave = handleSubmit(data => {
         if (disabled) return;
@@ -100,9 +102,11 @@ export function BulkEdit({
         })();
     });
 
+    // userIds is a new array on every render: depend on its length, or this runs (and navigates) forever
+    const hasSelection = userIds.length > 0;
     useEffect(() => { 
-        if (!userIds.length) close(); 
-    }, [userIds, close]);
+        if (!hasSelection) close(); 
+    }, [hasSelection, close]);
 
     const role = watch('role');
 
