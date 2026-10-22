@@ -433,6 +433,12 @@
       "namedRegex": "^/settings/logs(?:/)?$"
     },
     {
+      "page": "/settings/sync",
+      "regex": "^/settings/sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/settings/sync(?:/)?$"
+    },
+    {
       "page": "/settings/sys",
       "regex": "^/settings/sys(?:/)?$",
       "routeKeys": {},
