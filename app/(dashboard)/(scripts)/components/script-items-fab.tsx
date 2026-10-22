@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
@@ -15,6 +16,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScriptsImportModal } from "./scripts-import-modal";
 import { useAlertModal } from "@/hooks/use-alert-modal";
+import { useAppContext } from "@/contexts/app";
+import { useContentLock } from "@/hooks/use-content-lock";
 
 export function ScriptItemsFab({ disabled, scriptId }: {
     disabled: boolean;
@@ -23,6 +26,16 @@ export function ScriptItemsFab({ disabled, scriptId }: {
 }) {
     const [showImportModal, setShowImportsModal] = useState(false);
     const { alert } = useAlertModal();
+    const searchParams = useSearchParams();
+    const pathname = usePathname();
+    const router = useRouter();
+    const importSourceParam = searchParams.get('import') === '1' ? (searchParams.get('source') || '') : null;
+    // Opened from a link such as the content sync status page: /script/<id>?import=1&source=<id>
+    useEffect(() => { if (importSourceParam !== null && scriptId) setShowImportsModal(true); }, [importSourceParam, scriptId]);
+    const { viewOnly } = useAppContext();
+    // Content sync: a script this editor receives can only be changed by importing it.
+    const contentLock = useContentLock("scripts", scriptId || null);
+    const importOnly = !!scriptId && contentLock.locked && !viewOnly;
 
     const childItemLinks = scriptId ? [
         { label: "New screen", href: `/script/${scriptId}/new-screen` },
@@ -40,13 +53,17 @@ export function ScriptItemsFab({ disabled, scriptId }: {
         });
     };
 
-    if (disabled) return null;
+    if (disabled && !importOnly) return null;
 
     return (
         <>
             <ScriptsImportModal
                 open={showImportModal}
-                onOpenChange={setShowImportsModal}
+                defaultSourceScriptId={importSourceParam || undefined}
+                onOpenChange={(open) => {
+                    setShowImportsModal(open);
+                    if (!open && importSourceParam !== null) router.replace(pathname);
+                }}
                 onImportSuccess={() => window.location.reload()}
             />
 
@@ -73,7 +90,7 @@ export function ScriptItemsFab({ disabled, scriptId }: {
                             Import script
                         </DropdownMenuItem>
 
-                        {!scriptId && (
+                        {!scriptId && !importOnly && (
                             <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuLabel className="max-w-56 whitespace-normal text-xs font-normal text-muted-foreground">
@@ -87,7 +104,7 @@ export function ScriptItemsFab({ disabled, scriptId }: {
                             </>
                         )}
 
-                        {childItemLinks.map(item => (
+                        {!importOnly && childItemLinks.map(item => (
                             <DropdownMenuItem key={item.href} asChild>
                                 <Link href={item.href}>{item.label}</Link>
                             </DropdownMenuItem>

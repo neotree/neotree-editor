@@ -2,6 +2,7 @@ import { and, eq, gt, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
+import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { dataKeys, dataKeysDrafts, pendingDeletion, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { Pagination } from "@/types";
@@ -23,11 +24,18 @@ export type GetDataKeysParams = {
     }[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    /**
+     * Return published rows even when a deletion is queued (pending) for them. Used when another
+     * editor imports this editor's published state: an unpublished deletion is not published yet.
+     */
+    includePendingDeletion?: boolean;
     pagination?: {
         limit: number;
         page: number;
     };
     dateAfter?: string;
+    /** Read inside this transaction (sees its uncommitted writes). */
+    client?: DbOrTransaction;
 };
 
 export type GetDataKeysResults = {
@@ -75,9 +83,12 @@ export async function _getDataKeys(
             names: namesParam = [],
             uniqueKeys: uniqueKeysParam = [],
             returnDraftsIfExist = true, 
+            includePendingDeletion,
             pagination: paginationParam,
             dateAfter: _dateAfter = null,
+            client,
         } = { ...params };
+        const executor = client || db;
 
         let dataKeysIds = _dataKeysIds || [];
         const names = namesParam.map(n => `${n || ''}`.toLowerCase()).filter(n => n);
@@ -98,7 +109,7 @@ export async function _getDataKeys(
         let drafts: typeof dataKeysDrafts.$inferSelect[] = [];
 
         if (keys.length) {
-            drafts = await db.query.dataKeysDrafts.findMany({
+            drafts = await executor.query.dataKeysDrafts.findMany({
                 where: whereDraftsDateAfter,
             });
 
@@ -139,7 +150,7 @@ export async function _getDataKeys(
                     inArray(dataKeysDrafts.uniqueKey, uniqueKeys),
             ].filter(q => q);
 
-            drafts = !returnDraftsIfExist ? [] : await db.query.dataKeysDrafts.findMany({
+            drafts = !returnDraftsIfExist ? [] : await executor.query.dataKeysDrafts.findMany({
                 where: !whereDataKeysDrafts.length ? undefined : and(...whereDataKeysDrafts),
             });
         }
@@ -152,7 +163,7 @@ export async function _getDataKeys(
         const whereDataKeys = [
             wherePublishedDateAfter,
             isNull(dataKeys.deletedAt),
-            isNull(pendingDeletion),
+            includePendingDeletion ? undefined : isNull(pendingDeletion),
 
             !drafts.length ? undefined : notInArray(dataKeys.uuid, drafts.map(d => d.uuid)),
 
@@ -180,7 +191,7 @@ export async function _getDataKeys(
                 inArray(dataKeys.uniqueKey, uniqueKeys),
         ].filter(q => q);
 
-        const publishedRes = await db
+        const publishedRes = await executor
             .select({
                 dataKey: dataKeys,
                 pendingDeletion: pendingDeletion,

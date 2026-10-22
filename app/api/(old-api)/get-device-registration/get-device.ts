@@ -30,7 +30,7 @@ export async function getDevice(deviceId: string) {
             device = res.inserted[0];
         }
 
-        const lastUpdates = await _getDatesWhenUpdatesWereMade();
+        const lastUpdates = await _getDatesWhenUpdatesWereMade({ publishedOnly: true, });
         
         const dates = Object.values(lastUpdates.data).filter(d => d).map(d => new Date(d!).getTime());
 

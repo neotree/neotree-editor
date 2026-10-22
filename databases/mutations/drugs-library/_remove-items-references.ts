@@ -1,9 +1,11 @@
+import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { _getScreens } from "@/databases/queries/scripts";
 import { _saveScreens } from "@/databases/mutations/scripts";
 
 export type RemoveDrugLibraryItemsReferencesParams = {
     keys: string[];
     userId?: string;
+    client?: DbOrTransaction;
 };
 
 export type RemoveDrugLibraryItemsReferencesResponse = {
@@ -14,11 +16,13 @@ export type RemoveDrugLibraryItemsReferencesResponse = {
 export async function _removeDrugLibraryItemsReferences({
     keys,
     userId,
+    client,
 }: RemoveDrugLibraryItemsReferencesParams): Promise<RemoveDrugLibraryItemsReferencesResponse> {
     try {
         const screens = await _getScreens({
             types: ['drugs', 'fluids', 'feeds'],
             returnDraftsIfExist: true,
+            client,
         });
 
         const updated: typeof screens.data = [];
@@ -32,7 +36,10 @@ export async function _removeDrugLibraryItemsReferences({
             if (feeds.length !== screen.feeds.length) updated.push({ ...screen, feeds });
         });
 
-        if (updated.length) await _saveScreens({ data: updated, userId, });
+        if (updated.length) {
+            const res = await _saveScreens({ data: updated, userId, client, });
+            if (res.errors?.length) return { errors: res.errors, data: { success: false, }, };
+        }
 
         return { data: { success: true, } };
     } catch(e: any) {

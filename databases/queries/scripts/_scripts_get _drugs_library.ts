@@ -24,6 +24,7 @@ export async function _getScriptsDrugsLibrary(
             scriptsIds: scripts.data.map(s => s.scriptId),
             returnDraftsIfExist: params?.returnDraftsIfExist,
             withDeleted: params?.withDeleted,
+            includePendingDeletion: params?.includePendingDeletion,
         });
 
         const keys = Object.keys(
@@ -40,6 +41,7 @@ export async function _getScriptsDrugsLibrary(
             keys,
             returnDraftsIfExist: params?.returnDraftsIfExist,
             withDeleted: params?.withDeleted,
+            includePendingDeletion: params?.includePendingDeletion,
         });
     } catch(e: any) {
         logger.error('_getScriptsDrugsLibrary ERROR', e.message);

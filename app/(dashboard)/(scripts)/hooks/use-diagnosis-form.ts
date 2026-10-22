@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
@@ -7,6 +7,7 @@ import axios from "axios";
 import { DiagnosisFormDataType, useScriptsContext } from "@/contexts/scripts";
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { defaultPreferences } from "@/constants";
 import { useIsLocked } from "@/hooks/use-is-locked";
 import { ScriptType } from "@/databases/queries/scripts";
@@ -32,7 +33,7 @@ export function useDiagnosisForm({
     const { saveDiagnoses } = useScriptsContext();
     const { alert } = useAlertModal();
     const { confirm } = useConfirmModal();
-    const { viewOnly } = useAppContext();
+    const viewOnly = useContentViewOnly("scripts", formData?.scriptId || scriptId);
 
     const scriptPageHref = useMemo(() => `/script/${scriptId}?section=diagnoses`, [scriptId]);
     const isNewDiagnosis = !formData?.diagnosisId;
@@ -73,7 +74,23 @@ export function useDiagnosisForm({
         handleSubmit,
     } = form;
 
-    const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields]);
+    // dirtyFields is updated in place: a useMemo on it never sees a later edit. The form re-renders
+
+    // whenever it changes, so read it on every render.
+
+    const formIsDirty = Object.keys(dirtyFields).length > 0;
+
+    // The revision of the stored entity the form's values came from; sent back on save so the server can
+    // refuse to overwrite changes made in the meantime (see lib/entity-revision.ts).
+    const loadedRevision = useRef(formData?.revision);
+
+    // When the stored entity changes and there are no unsaved edits here, show the new version.
+    useEffect(() => {
+        if (!formData?.revision || formData.revision === loadedRevision.current) return;
+        if (formIsDirty) return;
+        loadedRevision.current = formData.revision;
+        form.reset(getDefaultValues());
+    }, [formData?.revision, formIsDirty, form, getDefaultValues]);
 
     const persist = async (data: DiagnosisFormDataType, rewrittenReferences = 0) => {
         try {
@@ -82,6 +99,7 @@ export function useDiagnosisForm({
             const diagnosisId = data.diagnosisId || generateDiagnosisId();
             const payloadData = {
                 ...data,
+                baseRevision: loadedRevision.current,
                 diagnosisId,
                 severityOrder: data.severityOrder ? Number(data.severityOrder) : null,
             };
@@ -96,6 +114,8 @@ export function useDiagnosisForm({
 
             if (res.errors?.length) throw new Error(res.errors.join(', '));
 
+            // Saved: the current values are the new baseline (no longer "unsaved").
+            form.reset(form.getValues());
             router.refresh();
             alert({
                 variant: 'success',

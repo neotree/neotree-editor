@@ -15,6 +15,7 @@ import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { pickDataKey, removeDuplicateDataKeys, scrapDataKeys } from "@/lib/data-keys";
+import { getCliUserId } from './cli-user';
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -258,7 +259,7 @@ async function resetDataKeys() {
         await db.delete(schema.dataKeysDrafts);
         await db.delete(schema.dataKeys);
 
-        await _saveDataKeys({
+        await _saveDataKeys({ userId: await getCliUserId(), 
             updateRefs: false,
             data: scrappedKeys,
         });
@@ -277,7 +278,7 @@ async function resetProdDataKeys() {
     await db.delete(schema.dataKeysDrafts);
     await db.delete(schema.dataKeys);
 
-    await _saveDataKeys({
+    await _saveDataKeys({ userId: await getCliUserId(), 
         updateRefs: false,
         data: dataKeys.map(k => ({
             uuid: k.uuid,
@@ -316,7 +317,7 @@ async function initialiseDataKeys() {
         await db.delete(schema.dataKeysDrafts);
         await db.delete(schema.dataKeys);
 
-        await _saveDataKeys({
+        await _saveDataKeys({ userId: await getCliUserId(), 
             updateRefs: false,
             data: scrappedKeys.map(k => ({
                 ...k,
@@ -464,7 +465,7 @@ async function processDataKeysRefs() {
             noDuplicates: dataKeys.length,
         });
 
-        if (updates.length) await _saveDataKeys({ data: updates, });
+        if (updates.length) await _saveDataKeys({ userId: await getCliUserId(),  data: updates, });
 
         if (deleteUniqueKeys.length) await db.delete(schema.dataKeys).where(inArray(schema.dataKeys.uniqueKey, deleteUniqueKeys));
 
@@ -565,8 +566,8 @@ async function processDataKeysRefs() {
                 };
             });
             
-            await _saveDiagnoses({ data: diagnoses, });
-            await _saveScreens({ data: screens, });
+            await _saveDiagnoses({ userId: await getCliUserId(),  data: diagnoses, });
+            await _saveScreens({ userId: await getCliUserId(),  data: screens, });
         }
     } catch(e: any) {
         console.error('ERROR:');
@@ -685,11 +686,11 @@ async function sanitizeDataKeys() {
     });
 
     console.log('dataKeys...');
-    await _saveDataKeys({ data: parsedDataKeys, updateRefs: false, });
+    await _saveDataKeys({ userId: await getCliUserId(),  data: parsedDataKeys, updateRefs: false, });
 
     console.log('screens...');
-    await _saveScreens({ data: parsedScreens as unknown as Parameters<typeof _saveScreens>[0]['data'], });
+    await _saveScreens({ userId: await getCliUserId(),  data: parsedScreens as unknown as Parameters<typeof _saveScreens>[0]['data'], });
 
     console.log('diagnoses...');
-    await _saveDiagnoses({ data: parsedDiagnoses as unknown as Parameters<typeof _saveDiagnoses>[0]['data'], });
+    await _saveDiagnoses({ userId: await getCliUserId(),  data: parsedDiagnoses as unknown as Parameters<typeof _saveDiagnoses>[0]['data'], });
 }

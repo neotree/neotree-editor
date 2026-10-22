@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
     DropdownMenu,
@@ -12,20 +12,35 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ScriptsImportModal } from "./scripts-import-modal";
+import { useAppContext } from "@/contexts/app";
+import { useContentLock } from "@/hooks/use-content-lock";
 
 export function ScriptsFab({ disabled }: {
     disabled: boolean;
 }) {
     const [showImportModal, setShowImportsModal] = useState(false);
     const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const importSourceParam = searchParams.get('import') === '1' ? (searchParams.get('source') || '') : null;
+    // Opened from a link such as the content sync status page: /?import=1&source=<id>
+    useEffect(() => { if (importSourceParam !== null) setShowImportsModal(true); }, [importSourceParam]);
+    const { viewOnly } = useAppContext();
+    // Content sync: on an editor that receives its scripts, importing is the only way to add one.
+    const contentLock = useContentLock("scripts", null);
+    const importOnly = contentLock.locked && !viewOnly;
 
-    if (disabled) return null;
+    if (disabled && !importOnly) return null;
 
     return (
         <>
             <ScriptsImportModal 
                 open={showImportModal}
-                onOpenChange={setShowImportsModal}
+                defaultSourceScriptId={importSourceParam || undefined}
+                onOpenChange={(open) => {
+                    setShowImportsModal(open);
+                    if (!open && importSourceParam !== null) router.replace(pathname);
+                }}
             />
 
             <div
@@ -47,9 +62,11 @@ export function ScriptsFab({ disabled }: {
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => router.push('/new-script')}>
-                            New script
-                        </DropdownMenuItem>
+                        {!importOnly && (
+                            <DropdownMenuItem onClick={() => router.push('/new-script')}>
+                                New script
+                            </DropdownMenuItem>
+                        )}
 
                         <DropdownMenuItem onClick={() => setTimeout(() => setShowImportsModal(true), 0)}>
                             Import script

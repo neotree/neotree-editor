@@ -178,14 +178,26 @@ export function buildDataKeyIntegrityReportFromEntries(
     };
 }
 
-function matchesIntegrityEntry(target: DataKeyIntegrityEntry, candidate: Pick<DataKeyIntegrityEntry, "kind" | "scriptId" | "screenId" | "diagnosisId" | "problemId" | "location">) {
+function matchesIntegrityEntry(
+    target: DataKeyIntegrityEntry,
+    candidate: Pick<DataKeyIntegrityEntry, "kind" | "scriptId" | "screenId" | "diagnosisId" | "problemId" | "location"> &
+        Partial<Pick<DataKeyIntegrityEntry, "fieldId" | "screenItemId" | "fieldItemId" | "symptomId" | "currentUniqueKey">>,
+) {
+    const sameIfBoth = (a?: string, b?: string) => !a || !b || a === b;
     return (
         target.kind === candidate.kind &&
         target.scriptId === candidate.scriptId &&
         (target.screenId || "") === (candidate.screenId || "") &&
         (target.diagnosisId || "") === (candidate.diagnosisId || "") &&
         (target.problemId || "") === (candidate.problemId || "") &&
-        target.location === candidate.location
+        target.location === candidate.location &&
+        // A location like "Screen > Plan > option 3" is not unique (two fields can share a label) and
+        // goes stale when options are reordered; the ids and the reference the scan saw pin it down.
+        sameIfBoth(target.fieldId, candidate.fieldId) &&
+        sameIfBoth(target.screenItemId, candidate.screenItemId) &&
+        sameIfBoth(target.fieldItemId, candidate.fieldItemId) &&
+        sameIfBoth(target.symptomId, candidate.symptomId) &&
+        (!target.currentUniqueKey || candidate.currentUniqueKey === undefined || target.currentUniqueKey === candidate.currentUniqueKey)
     );
 }
 
@@ -1287,6 +1299,15 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
     const { byUniqueKey, legacyMaps } = resolvedContext;
     const overrideTarget = overrideTargetUniqueKey ? byUniqueKey.get(overrideTargetUniqueKey) : undefined;
 
+    // A repair must touch exactly one reference. More than one match means the entry no longer pins a
+    // single place (duplicate labels, reordered options); nothing is changed then.
+    let matchCount = 0;
+    const matches = (candidate: Parameters<typeof matchesIntegrityEntry>[1]) => {
+        if (!matchesIntegrityEntry(entry, candidate)) return false;
+        matchCount++;
+        return true;
+    };
+
     const repairedScreens = screens.map((screen) => {
         let changed = false;
         const outcomeCollection = getOutcomeCollectionForScreenType(screen.type);
@@ -1298,7 +1319,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
 
         let nextScreen = screen;
 
-        if (!outcomeCollection && matchesIntegrityEntry(entry, { ...screenBase, kind: "screen" })) {
+        if (!outcomeCollection && matches({ ...screenBase, kind: "screen" })) {
             const screenDataKey = overrideTarget || resolveDataKeyMatch({
                 currentUniqueKey: screen.keyId || undefined,
                 currentKey: screen.key || undefined,
@@ -1315,7 +1336,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
         let nextItems = nextScreen.items || [];
         nextItems = !screenItemsUseDataKeys(nextScreen.type) ? nextItems : nextItems.map((item, itemIndex) => {
                 const itemLocation = `${screenBase.location} > item ${itemIndex + 1}`;
-                if (!matchesIntegrityEntry(entry, { ...screenBase, kind: "screen_item", location: itemLocation })) return item;
+                if (!matches({ ...screenBase, kind: "screen_item", location: itemLocation, screenItemId: item.itemId || undefined, currentUniqueKey: item.keyId || "" })) return item;
                 const itemDataKey = overrideTarget || resolveDataKeyMatch({
                     currentUniqueKey: item.keyId || undefined,
                     currentKey: item.key || item.id || undefined,
@@ -1336,7 +1357,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
             };
             let nextField = field;
 
-            if (matchesIntegrityEntry(entry, { ...fieldBase, kind: "field" })) {
+            if (matches({ ...fieldBase, kind: "field", fieldId: field.fieldId || undefined, currentUniqueKey: field.keyId || "" })) {
                 const fieldDataKey = overrideTarget || resolveDataKeyMatch({
                     currentUniqueKey: field.keyId || undefined,
                     currentKey: field.key || undefined,
@@ -1364,7 +1385,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
             ];
 
             keyOnlyRefSpecs.forEach((spec) => {
-                if (!matchesIntegrityEntry(entry, { ...fieldBase, kind: spec.kind })) return;
+                if (!matches({ ...fieldBase, kind: spec.kind, fieldId: field.fieldId || undefined })) return;
                 const matchedDataKey = overrideTarget || resolveDataKeyMatch({
                     currentUniqueKey: nextField[spec.id] || undefined,
                     currentKey: nextField[spec.name] || undefined,
@@ -1380,7 +1401,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
             let nextFieldItems = nextField.items || [];
             nextFieldItems = nextFieldItems.map((item, fieldItemIndex) => {
                     const itemLocation = `${fieldBase.location} > option ${fieldItemIndex + 1}`;
-                    if (!matchesIntegrityEntry(entry, { ...fieldBase, kind: "field_item", location: itemLocation })) return item;
+                    if (!matches({ ...fieldBase, kind: "field_item", location: itemLocation, fieldId: field.fieldId || undefined, fieldItemId: item.itemId || undefined, currentUniqueKey: item.keyId || "" })) return item;
                     const fieldItemDataKey = overrideTarget || resolveDataKeyMatch({
                         currentUniqueKey: item.keyId || undefined,
                         currentKey: `${item.value || ""}` || undefined,
@@ -1427,7 +1448,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
 
         let nextDiagnosis = diagnosis;
 
-        if (matchesIntegrityEntry(entry, { ...diagnosisBase, kind: "diagnosis" })) {
+        if (matches({ ...diagnosisBase, kind: "diagnosis" })) {
             const diagnosisDataKey = overrideTarget || resolveDataKeyMatch({
                 currentUniqueKey: diagnosis.keyId || undefined,
                 currentKey: diagnosis.key || undefined,
@@ -1446,7 +1467,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
 
         const nextSymptoms = (nextDiagnosis.symptoms || []).map((symptom, symptomIndex) => {
             const symptomLocation = `${diagnosisBase.location} > symptom ${symptomIndex + 1}`;
-            if (!matchesIntegrityEntry(entry, { ...diagnosisBase, kind: "diagnosis_symptom", location: symptomLocation })) return symptom;
+            if (!matches({ ...diagnosisBase, kind: "diagnosis_symptom", location: symptomLocation, symptomId: (symptom as any).symptomId || undefined, currentUniqueKey: symptom.keyId || "" })) return symptom;
             const symptomDataKey = overrideTarget || resolveDataKeyMatch({
                 currentUniqueKey: symptom.keyId || undefined,
                 currentKey: symptom.key || undefined,
@@ -1479,7 +1500,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
 
         let nextProblem = problem;
 
-        if (matchesIntegrityEntry(entry, { ...problemBase, kind: "problem" })) {
+        if (matches({ ...problemBase, kind: "problem" })) {
             const problemDataKey = overrideTarget || resolveDataKeyMatch({
                 currentUniqueKey: problem.keyId || undefined,
                 currentKey: problem.key || undefined,
@@ -1507,7 +1528,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
 
         const nuidSearchFields = (script.nuidSearchFields || []).map((field, fieldIndex) => {
             const location = buildNuidSearchFieldLocation(field, fieldIndex);
-            if (!matchesIntegrityEntry(entry, {
+            if (!matches({
                 kind: "nuid_search_field",
                 scriptId: script.scriptId,
                 location,
@@ -1535,7 +1556,18 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
         };
     });
 
+    if (matchCount > 1) {
+        return {
+            ambiguousMatches: matchCount,
+            screens: [] as typeof screens,
+            diagnoses: [] as typeof diagnoses,
+            problems: [] as typeof problems,
+            scripts: [] as typeof scripts,
+        };
+    }
+
     return {
+        ambiguousMatches: 0,
         screens: repairedScreens.filter((item) => item.changed).map((item) => item.value),
         diagnoses: repairedDiagnoses.filter((item) => item.changed).map((item) => item.value),
         problems: repairedProblems.filter((item) => item.changed).map((item) => item.value),

@@ -145,7 +145,9 @@ export function NuidSearchFieldsConfig({
 
     // Resolve current fields against the library, auto-link matches by key, and
     // (when prompting) surface anything missing/conflicting for provisioning.
-    const runResolve = useCallback((opts?: { prompt?: boolean }) => {
+    // The silent link done on load (background) does not count as an edit: opening a script must not
+    // leave it with "unsaved changes". The links are kept and saved with the next real save.
+    const runResolve = useCallback((opts?: { prompt?: boolean; background?: boolean }) => {
         const current = watch("nuidSearchFields");
         if (!current?.length) return;
 
@@ -157,7 +159,7 @@ export function NuidSearchFieldsConfig({
             return keyId && keyId !== f.keyId ? { ...f, keyId } : f;
         });
         const changed = updated.some((f, i) => f !== current[i]);
-        if (changed) setValue("nuidSearchFields", updated, { shouldDirty: true });
+        if (changed) setValue("nuidSearchFields", updated, { shouldDirty: !opts?.background });
 
         const hasWork = missing.length > 0 || conflicts.length > 0;
         if (opts?.prompt) {
@@ -175,7 +177,7 @@ export function NuidSearchFieldsConfig({
 
     useEffect(() => {
         if (loadingDataKeys) return;
-        runResolve({ prompt: false });
+        runResolve({ prompt: false, background: true });
     }, [allDataKeys, loadingDataKeys, runResolve]);
 
     useEffect(() => {
@@ -657,15 +659,17 @@ export function Field({
     const inheritedConfidential = useMemo(() => !!dataKey?.confidential, [dataKey?.confidential]);
     const inheritedConfidentialLabelOnly = useMemo(() => !!dataKey?.confidentialLabelOnly, [dataKey?.confidentialLabelOnly]);
 
+    // Follows the data key. Done on load too, so it does not count as an edit (opening a page must
+    // not leave "unsaved changes"); choosing another key marks the form changed on its own.
     useEffect(() => {
-        if (confidential !== inheritedConfidential) {
-            setValue('confidential', inheritedConfidential, { shouldDirty: true, });
+        if (!!confidential !== inheritedConfidential) {
+            setValue('confidential', inheritedConfidential, { shouldDirty: false, });
         }
     }, [confidential, inheritedConfidential, setValue]);
 
     useEffect(() => {
-        if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
-            setValue('confidentialLabelOnly', inheritedConfidentialLabelOnly, { shouldDirty: true, });
+        if (!!confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+            setValue('confidentialLabelOnly', inheritedConfidentialLabelOnly, { shouldDirty: false, });
         }
     }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
 

@@ -9,6 +9,7 @@ import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useScriptsContext, type IScriptsContext } from "@/contexts/scripts"
 import { useAppContext } from "@/contexts/app"
+import { useContentViewOnly } from "@/hooks/use-content-lock"
 import {
   type ScriptsSearchResultsItem,
   type ScriptsSearchResultsFilter,
@@ -52,7 +53,7 @@ export function useScreensTable({
   }, [screensParam])
 
   const router = useRouter()
-  const { viewOnly } = useAppContext()
+  const viewOnly = useContentViewOnly("scripts")
   const { confirm } = useConfirmModal()
   const { alert } = useAlertModal()
 

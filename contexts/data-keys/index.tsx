@@ -381,8 +381,9 @@ export function DataKeysCtxProvider({
             } else {
                 await loadDataKeys();
                 router.refresh();
+                const warnings = (res as { warnings?: string[] }).warnings || [];
                 alert({
-                    message: "Data key saved!",
+                    message: warnings.length ? `Data key saved. ${warnings.join(' ')}` : "Data key saved!",
                     variant: 'success',
                     onClose: () => cb?.(),
                 });

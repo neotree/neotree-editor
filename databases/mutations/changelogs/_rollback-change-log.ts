@@ -537,6 +537,10 @@ export async function _rollbackChangeLog({
             targetDataVersion: target.dataVersion,
           })
           const dependencyTargetVersion = normalizePublishedRollbackVersion(dependencyTarget?.version)
+          // A dependent (screen, diagnosis...) with no version at or before the data key's target was
+          // created afterwards. Rolling back a data key must never delete the screens that use it; only
+          // the key-linked fields of dependents that existed then are restored.
+          if (dependencyTargetVersion === null) continue
           const dependencyRollbackSnapshot =
             dependencyTargetVersion === null
               ? null
@@ -558,7 +562,7 @@ export async function _rollbackChangeLog({
             targetChange: dependencyTarget,
             binding: dependencyBinding,
             targetSnapshotOverride: dependencyRollbackSnapshot,
-            allowSoftDeleteIfCreated: true,
+            allowSoftDeleteIfCreated: false,
             overrideDescription: dependencyTargetVersion !== null
               ? `Restore data-key-linked fields from ${dependencyCurrent.entityType} version ${dependencyTarget!.version}`
               : `Restore data-key-linked fields after data key version ${target.version}`,

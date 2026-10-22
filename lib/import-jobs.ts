@@ -80,15 +80,31 @@ export function buildImportContentKey(params: {
     requestKey?: string;
     userId?: string | null;
     fromRemoteSiteId?: string | null;
+    toRemoteSiteId?: string | null;
     scriptsIds?: (string | null | undefined)[];
     overWriteScriptWithId?: string | null;
+    overwriteDataKeys?: boolean;
+    overwriteDrugsLibraryItems?: boolean;
+    dryRun?: boolean;
+    confirmSourceMismatch?: boolean;
+    keepTargetOnly?: boolean;
 }): string {
     const scriptsIds = Array.from(new Set((params.scriptsIds || []).filter((id): id is string => !!id))).sort();
+    // Everything that changes what the import does is part of the key. Without the options, an import
+    // re-run with different checkboxes (or the preview followed by the real import) within the cache
+    // window got the earlier run's result back and nothing was imported.
+    const flag = (value?: boolean) => (value === undefined ? "" : value ? "1" : "0");
     return [
         params.userId || "",
         params.fromRemoteSiteId || "",
+        params.toRemoteSiteId || "",
         scriptsIds.join(","),
         params.overWriteScriptWithId || "",
+        flag(params.overwriteDataKeys),
+        flag(params.overwriteDrugsLibraryItems),
+        flag(params.dryRun),
+        flag(params.confirmSourceMismatch),
+        flag(params.keepTargetOnly),
         params.requestKey || '',
     ].join("::");
 }

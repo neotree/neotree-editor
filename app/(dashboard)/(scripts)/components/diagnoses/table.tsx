@@ -7,6 +7,7 @@ import { DataTable } from "@/components/data-table";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { DiagnosesTableBottomActions } from "./table-bottom-actions";
 import { DiagnosesTableRowActions } from "./table-row-actions";
 import { useDiagnosesTable, UseDiagnosesTableParams } from '../../hooks/use-diagnoses-table';
@@ -37,7 +38,8 @@ export function DiagnosesTable(props: Props) {
         setSelected,
     } = useDiagnosesTable(props);
 
-    const { sys, viewOnly } = useAppContext();
+    const { sys } = useAppContext();
+    const viewOnly = useContentViewOnly("scripts");
     const { conditionKeys, keysReady } = useConditionKeys();
     const { conditionScreens, conditionCatalogueReady } = useScriptFormCtx();
     const producer = getOutcomeProducer(conditionScreens, "Diagnoses");
@@ -83,7 +85,9 @@ export function DiagnosesTable(props: Props) {
                     getRowOptions={({ rowIndex }) => {
                         const s = diagnosesArr[rowIndex];
                         return !s ? {} : {
-                            className: cn(!viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30')
+                            className: cn(
+                                !viewOnly && s.isDraft && 'bg-danger/20 hover:bg-danger/30',
+                            ),
                         };
                     }}
                     noDataMessage={(
