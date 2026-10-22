@@ -46,6 +46,8 @@ export interface ScriptConditionVisit {
   scope: "script" | "nuid" | "syntax";
   mode?: "boolean" | "reference";
   consumerPosition?: number | null;
+  /** For a diagnosis or problem expression: how many symptoms it has. */
+  symptoms?: number;
 }
 
 export function hrefForConditionEntity(scriptId: string, entity?: ScriptConditionEntityRef): string {
@@ -106,7 +108,7 @@ export function walkScriptConditions(script: ScriptWithItems, visit: (v: ScriptC
   for (const diagnosis of (script?.diagnoses || []) as any[]) {
     const location = `Diagnosis "${diagnosis?.name || diagnosis?.key || ""}"`;
     const entity: ScriptConditionEntityRef = { kind: "diagnosis", diagnosisId: diagnosis?.diagnosisId };
-    visit({ expression: diagnosis?.expression, field: "expression", location, entity, scope: "script", consumerPosition: diagnosisPosition });
+    visit({ expression: diagnosis?.expression, field: "expression", location, entity, scope: "script", consumerPosition: diagnosisPosition, symptoms: (diagnosis?.symptoms || []).length });
     for (const symptom of (diagnosis?.symptoms || []) as any[]) {
       visit({
         expression: symptom?.expression,
@@ -123,7 +125,7 @@ export function walkScriptConditions(script: ScriptWithItems, visit: (v: ScriptC
   for (const problem of (script?.problems || []) as any[]) {
     const location = `Problem "${problem?.name || problem?.key || ""}"`;
     const entity: ScriptConditionEntityRef = { kind: "problem", problemId: problem?.problemId };
-    visit({ expression: problem?.expression, field: "expression", location, entity, scope: "script", consumerPosition: problemPosition });
+    visit({ expression: problem?.expression, field: "expression", location, entity, scope: "script", consumerPosition: problemPosition, symptoms: (problem?.symptoms || []).length });
     for (const symptom of (problem?.symptoms || []) as any[]) {
       visit({
         expression: symptom?.expression,
@@ -224,7 +226,8 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
       consumerPosition?: number | null;
     },
   ) => {
-    const value = `${expression ?? ""}`.trim();
+    // As written: an empty line at the start or end, or a condition of only spaces, fails on tablets.
+    const value = `${expression ?? ""}`;
     if (!value) return;
     const baseCtx = opts?.ctx ?? scriptCtx;
     const ctx = baseCtx === syntaxOnlyCtx ? baseCtx : {
@@ -238,12 +241,30 @@ export function collectScriptConditionFindings(script: ScriptWithItems): ScriptC
   };
 
   const nuidScopeCtx = (): ValidationContext => ({ ...nuidCtx, unavailableKeys: getPreScriptUnavailableOutcomeKeys() });
-  walkScriptConditions(script, (v) => check(v.expression, v.field, v.location, {
-    mode: v.mode,
-    ctx: v.scope === "syntax" ? syntaxOnlyCtx : v.scope === "nuid" ? nuidScopeCtx() : undefined,
-    entity: v.entity,
-    consumerPosition: v.consumerPosition,
-  }));
+  walkScriptConditions(script, (v) => {
+    if (v.symptoms && !v.expression) {
+      findings.push({
+        location: v.location,
+        field: v.field,
+        expression: "",
+        entity: v.entity,
+        errors: [{
+          severity: "error",
+          code: "EMPTY_OUTCOME_EXPRESSION",
+          message: "Add an expression, or remove the symptoms: with symptoms and no expression, tablets never suggest it.",
+          start: 0,
+          end: 0,
+        }],
+      });
+      return;
+    }
+    check(v.expression, v.field, v.location, {
+      mode: v.mode,
+      ctx: v.scope === "syntax" ? syntaxOnlyCtx : v.scope === "nuid" ? nuidScopeCtx() : undefined,
+      entity: v.entity,
+      consumerPosition: v.consumerPosition,
+    });
+  });
 
   for (const collision of collectOutcomeKeyCollisions(script)) {
     findings.push({

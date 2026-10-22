@@ -5,6 +5,7 @@ import db from '@/databases/pg/drizzle';
 import { configKeys, configKeysDrafts, pendingDeletion, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { and } from 'drizzle-orm';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type DeleteConfigKeysData = {
     configKeysIds: string[];
@@ -34,6 +35,8 @@ export async function _deleteConfigKeys(
     const response: DeleteConfigKeysResponse = { success: false, };
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const configKeysIds = configKeysIdsParam;
 
         if (configKeysIds.length) {

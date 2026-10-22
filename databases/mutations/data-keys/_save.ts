@@ -13,6 +13,7 @@ import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import type { DataKeyDraftOrigin } from '@/databases/pg/_data-keys';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
     deletedUniqueKeys?: string[];
@@ -121,6 +122,8 @@ async function enforceDraftOriginForTouchedDataKeys({
  */
 export async function _saveDataKeys(params: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(params.userId);
         const run = (tx: DbOrTransaction) => saveDataKeysInTransaction(params, tx);
         const response = params.client
             ? await params.client.transaction(run)

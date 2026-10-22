@@ -9,6 +9,7 @@ import socket from '@/lib/socket';
 import { ProblemType } from '../../queries/scripts/_problems_get';
 import { removeHexCharacters } from '../../utils'
 import type { DraftOrigin } from './_screens_save';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type SaveProblemsData = Partial<ProblemType> & {
     /** The revision the editor loaded (see lib/entity-revision.ts); checked by the save action. */
@@ -35,6 +36,8 @@ export async function _saveProblems({ data, broadcastAction, syncSilently, userI
     const executor = client || db;
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         let index = 0;
         for (const { problemId: itemProblemId, baseRevision: _baseRevision, revision: _revision, ...item } of data) {
             try {
