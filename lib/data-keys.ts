@@ -130,7 +130,7 @@ export async function scrapDataKeys({
     linkScrappedToDataKeys = true,
 }: ScrapDataKeysParams) {
     let scriptsKeys: Scrapped[] = scripts.reduce((acc, s) => {
-        const nuidSearchFields = s.nuidSearchFields;
+        const nuidSearchFields = s.nuidSearchFields || [];
 
         nuidSearchFields.forEach(f => {
             acc.push({

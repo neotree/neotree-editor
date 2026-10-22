@@ -11,6 +11,7 @@ import { normalizeIncomingDataKeyPatch, rebaseDataKeyOptions } from '@/lib/data-
 import { validateDataKeyOptionsAddition } from '@/lib/data-key-children';
 import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
 import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
+import { assertDraftOwner } from '@/lib/server/draft-owner';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
@@ -233,6 +234,8 @@ export async function _saveDataKeys({
     const refuseOthersDrafts = draftOrigin === 'editor' && !!userId;
 
     try {
+        // Nobody can see, publish, or discard a draft without an owner.
+        await assertDraftOwner(userId);
         let refsSaved = 0;
         let saveWarnings: string[] = [];
 

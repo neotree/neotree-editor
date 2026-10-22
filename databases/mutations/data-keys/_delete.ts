@@ -11,6 +11,7 @@ import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-c
 import { getBlockedChildDeletions, getDataKeyParentTitle } from '@/lib/data-key-children';
 import { resolveScriptRemovalExclusions, resolveScriptsOnlyPlan } from '@/lib/data-key-script-removals';
 import { isNuidManagedDataKey } from '@/lib/nuid-search';
+import { assertDraftOwner } from '@/lib/server/draft-owner';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
@@ -260,6 +261,8 @@ export async function _deleteDataKeys(
     const response: DeleteDataKeysResponse = { success: false, };
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const dataKeysIds = uniqueValues(dataKeysIdsParam);
 
         if (dataKeysIds.length) {

@@ -3,6 +3,7 @@ import { parse } from "./parser";
 import { analyze } from "./semantics";
 import { findLegacyNegationDiagnostics } from "./legacy";
 import { findAlwaysTrueDiagnostics } from "./degenerate";
+import { findDeviceFaults } from "./device";
 
 export type {
   ConditionKey,
@@ -13,6 +14,7 @@ export type {
   ValidationResult,
 } from "./ast";
 export { validateReferenceExpression } from "./reference-expr";
+export { tidyCondition } from "./device";
 export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
 export {
@@ -126,11 +128,13 @@ function findTrailingWhitespace(input: string): Diagnostic[] {
  * Validate a boolean conditional expression against the script's key context.
  * Returns syntax + semantic diagnostics sorted by position.
  *
- * An empty expression is valid (it means "always true"/no condition).
+ * An empty expression is valid (it means "always true"/no condition); one that is only
+ * spaces or empty lines is not, because tablets evaluate it and it fails.
  */
 export function validateCondition(input: string, ctx: ValidationContext): ValidationResult {
   const src = input || "";
-  if (!src.trim()) return { diagnostics: [], hasErrors: false, ast: null };
+  const device = findDeviceFaults(src);
+  if (!src.trim()) return { diagnostics: device, hasErrors: device.length > 0, ast: null };
 
   const { ast, diagnostics: syntax } = parse(src);
   const semantic = analyze(ast, ctx, src);
@@ -139,7 +143,7 @@ export function validateCondition(input: string, ctx: ValidationContext): Valida
   const legacyOps = findLegacyMembershipOperators(src);
   const whitespace = findTrailingWhitespace(src);
 
-  const diagnostics: Diagnostic[] = [...syntax, ...legacy, ...alwaysTrue, ...legacyOps, ...semantic, ...whitespace].sort(
+  const diagnostics: Diagnostic[] = [...syntax, ...legacy, ...alwaysTrue, ...legacyOps, ...semantic, ...whitespace, ...device].sort(
     (a, b) => a.start - b.start || (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1),
   );
 

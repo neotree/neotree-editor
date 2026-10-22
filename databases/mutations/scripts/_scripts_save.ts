@@ -9,6 +9,7 @@ import socket from '@/lib/socket';
 import { _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
 import { removeHexCharacters } from '../../utils'
 import { _getScreens } from '@/databases/queries/scripts';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type SaveScriptsData = Partial<ScriptType> & {
     /** The revision the editor loaded (see lib/entity-revision.ts); checked by the save action. */
@@ -39,6 +40,8 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
     const executor = client || db;
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         let index = 0;
         for (const { scriptId: itemScriptId, baseRevision: _baseRevision, revision: _revision, ...item } of data) {
             try {
