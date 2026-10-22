@@ -9,6 +9,7 @@ import socket from '@/lib/socket';
 import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
 import { normalizeSelectionRuleItems, validateSelectionRules } from '@/lib/selection-rules';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 
 export type SaveScreensData = Partial<ScreenType> & {
@@ -241,6 +242,8 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
     const executor = client || db;
     
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         let index = 0;
         for (const { screenId: itemScreenId, baseRevision: _baseRevision, revision: _revision, ...item } of data) {
             try {

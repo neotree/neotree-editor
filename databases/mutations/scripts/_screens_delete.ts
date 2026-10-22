@@ -5,6 +5,7 @@ import db from '@/databases/pg/drizzle';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { screens, screensDrafts, pendingDeletion, scriptsDrafts, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type DeleteScreensData = {
     screensIds?: string[];
@@ -47,6 +48,8 @@ export async function _deleteScreens(
     const executor = client || db;
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const shouldConfirmDeleteAll = !scriptsIds.length && !screensIds.length && !confirmDeleteAll;
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the screens, please confirm this action!');
 
