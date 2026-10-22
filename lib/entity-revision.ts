@@ -31,6 +31,7 @@ const IGNORED_KEYS = new Set([
     'hasDraftedDiagnoses',
     'hasDraftedProblems',
     'itemsChangedByUserId',
+    'hasUnownedChanges',
     'itemsDeletedByUserId',
     'screensDraftsCreatedByUserId',
     'diagnosesDraftsCreatedByUserId',

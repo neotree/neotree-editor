@@ -2996,6 +2996,7 @@ const IMPORT_ROW_KEYS = [
     'hasDraftedDiagnoses',
     'hasDraftedProblems',
     'itemsChangedByUserId',
+    'hasUnownedChanges',
     'itemsDeletedByUserId',
     'screensDraftsCreatedByUserId',
     'diagnosesDraftsCreatedByUserId',

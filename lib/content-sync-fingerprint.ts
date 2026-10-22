@@ -44,6 +44,7 @@ const IGNORED = new Set([
     "hasDraftedDiagnoses",
     "hasDraftedProblems",
     "itemsChangedByUserId",
+    "hasUnownedChanges",
     "itemsDeletedByUserId",
     "screensDraftsCreatedByUserId",
     "diagnosesDraftsCreatedByUserId",

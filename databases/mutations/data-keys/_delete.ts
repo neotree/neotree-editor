@@ -12,6 +12,7 @@ import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { _saveDataKeys } from './_save';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type DeleteDataKeysParams = {
     dataKeysIds: string[];
@@ -137,6 +138,8 @@ export async function _deleteDataKeys(
     const response: DeleteDataKeysResponse = { success: false, };
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const dataKeysIds = uniqueValues(dataKeysIdsParam);
 
         if (dataKeysIds.length) {

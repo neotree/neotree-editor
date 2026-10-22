@@ -10,6 +10,7 @@ import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
 import { _saveScreens } from '@/databases/mutations/scripts';
 import { _getScreens } from '@/databases/queries/scripts';
 import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type SaveDrugsLibraryItemsData = Partial<typeof drugsLibrary.$inferSelect>;
 
@@ -185,6 +186,8 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, cl
     const executor = client || db;
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const errors = [];
         const keys: { old: string; new: string; }[] = [];
         const removeReferences: string[] = [];

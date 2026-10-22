@@ -5,6 +5,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { hospitals, hospitalsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type SaveHospitalsData = Partial<typeof hospitals.$inferSelect>;
 
@@ -21,6 +22,8 @@ export async function _saveHospitals({ data, broadcastAction = true, userId, }: 
     const response: SaveHospitalsResponse = { success: false, };
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const errors = [];
 
         let index = 0;

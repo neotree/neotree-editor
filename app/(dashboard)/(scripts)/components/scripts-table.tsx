@@ -5,6 +5,7 @@ import { Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/data-table";
 import {
@@ -354,6 +355,15 @@ export function ScriptsTable(props: Props) {
                                     <span className="inline-flex items-center gap-x-2">
                                         <span>{s?.title || ''}</span>
                                         <ScriptIssueBadge issues={issues} />
+                                        {!viewOnly && !!s?.hasUnownedChanges && (
+                                            <Badge
+                                                variant="outline"
+                                                className="whitespace-nowrap border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                                title="Some unpublished changes in this script have no owner, so nobody's &quot;publish my changes&quot; includes them. Review them, then publish or discard."
+                                            >
+                                                Unowned changes
+                                            </Badge>
+                                        )}
                                         {!!syncPair && (
                                             <ContentSyncStatusBadge
                                                 status={syncPair.status}
