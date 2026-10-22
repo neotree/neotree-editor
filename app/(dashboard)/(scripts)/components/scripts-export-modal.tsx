@@ -22,6 +22,44 @@ import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/loader";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/modal";
+import socket from "@/lib/socket";
+import { IMPORT_JOB_COMPLETE_EVENT } from "@/lib/in-progress";
+import type { ScriptImportPreview } from "@/lib/script-import-preview";
+import { ScriptImportPreviewSummary } from "./script-import-preview";
+
+type CopyResult = { started?: boolean; } & Awaited<ReturnType<ReturnType<typeof useScriptsContext>['copyScripts']>>;
+
+/**
+ * Exports run in the background on this editor, which asks the target editor to import from here and
+ * waits for it. POST once, then ask again (same body = same job) until the job has a result.
+ */
+async function runCopyJob(body: Record<string, any>): Promise<CopyResult> {
+    const post = async () => (await axios.post('/api/scripts/copy', body)).data as CopyResult;
+    let res = await post();
+    if (!res.started) return res;
+    return await new Promise<CopyResult>((resolve) => {
+        let settled = false;
+        const check = async () => {
+            if (settled) return;
+            try {
+                const next = await post();
+                if (!next.started && !settled) {
+                    settled = true;
+                    socket.off(body.requestKey, onSignal);
+                    clearInterval(timer);
+                    resolve(next);
+                }
+            } catch {
+                // the next signal or poll resolves it
+            }
+        };
+        const onSignal = (key: string) => { if (key === IMPORT_JOB_COMPLETE_EVENT) check(); };
+        socket.on(body.requestKey, onSignal);
+        const timer = setInterval(check, 10 * 1000);
+    });
+}
+
+const newRequestKey = () => Math.random().toString(12).substring(2);
 
 export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToExport, onOpenChange, }: {
     open: boolean;
@@ -35,17 +73,22 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [sites, setSites] = useState<Awaited<ReturnType<typeof getSites>>>({ data: [] });
+    const [preview, setPreview] = useState<ScriptImportPreview[] | null>(null);
 
     const {
         formState: { errors },
         setValue,
         reset: resetForm,
         handleSubmit,
+        watch,
     } = useForm({
         defaultValues: {
             siteId: '',
         },
     });
+
+    const watchedSiteId = watch('siteId');
+    useEffect(() => { setPreview(null); }, [watchedSiteId, scriptsIdsToExport]);
 
     const disabled = useMemo(() => loading, [loading]);
 
@@ -71,36 +114,39 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
         }
     }, [getSites, alert, onOpenChange]);
 
-    const exportScripts = handleSubmit(async (data) => {
+    const exportScripts = (dryRun: boolean) => handleSubmit(async (data) => {
         try {
             if (!data.siteId) throw new Error('Please select a site!');
+            if (!dryRun && !preview) throw new Error('Preview the export first.');
 
             setLoading(true);
 
-            // const res = await copyScripts({ 
-            //     toRemoteSiteId: data.siteId, 
-            //     scriptsIds: scriptsIdsToExport, 
-            //     broadcastAction: true,
-            // });
-
-            // TODO: Replace this with server action
-            const response = await axios.post('/api/scripts/copy', { 
-                toRemoteSiteId: data.siteId, 
-                scriptsIds: scriptsIdsToExport, 
+            // The target editor imports these scripts from this editor (as new scripts, saved as drafts
+            // owned by you there). The result only comes back once the target has finished.
+            const res = await runCopyJob({
+                requestKey: newRequestKey(),
+                toRemoteSiteId: data.siteId,
+                scriptsIds: scriptsIdsToExport,
                 broadcastAction: true,
+                dryRun,
             });
-            const res = response.data as Awaited<ReturnType<typeof copyScripts>>;
 
-            if (res.errors?.length) throw new Error(res.errors.join(', '));
+            if (!res.success || res.errors?.length) throw new Error(res.errors?.join(', ') || 'The target editor did not confirm the import');
+
+            if (dryRun) {
+                setPreview(res.preview || []);
+                return;
+            }
 
             router.refresh();
 
             alert({
                 variant: 'success',
                 title: 'Success',
-                message: 'Script exported successfully!',
+                message: 'The target editor imported the script as drafts. Publish it there when ready.',
                 onClose: () => {
                     resetForm({ siteId: '', });
+                    setPreview(null);
                     onOpenChange(false);
                 },
             });
@@ -108,7 +154,7 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
             alert({
                 variant: 'error',
                 title: 'Error',
-                message: 'Failed to export script: ' + e.message,
+                message: (dryRun ? 'Failed to prepare the export preview: ' : 'Failed to export script: ') + e.message,
             });
         } finally {
             setLoading(false);
@@ -128,6 +174,7 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
                     if (!open) setScriptsIdsToExport([]);
                 }}
                 title="Export script"
+                contentProps={{ className: 'sm:max-w-3xl' }}
                 actions={(
                     <>
                         <span className="text-xs text-danger">* Required</span>
@@ -145,10 +192,18 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
                         </DialogClose>
 
                         <Button
-                            onClick={() => exportScripts()}
+                            variant={preview ? "outline" : "default"}
+                            onClick={() => exportScripts(true)()}
                             disabled={disabled}
                         >
-                            Export
+                            {preview ? 'Refresh preview' : 'Preview changes'}
+                        </Button>
+
+                        <Button
+                            onClick={() => exportScripts(false)()}
+                            disabled={disabled || !preview}
+                        >
+                            Export as drafts
                         </Button>
                     </>
                 )}
@@ -179,6 +234,19 @@ export function ScriptsExportModal({ open, scriptsIdsToExport, setScriptsIdsToEx
 
                         {!!errors.siteId?.message && <div className="text-xs text-danger mt-1">{errors.siteId.message}</div>}
                     </div>
+
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                        The target editor imports the selected scripts from this editor as <b>new scripts</b>, saved as drafts owned by you there.
+                        To update a script that already exists on the target, open it there and use <b>Import</b> instead.
+                    </div>
+
+                    {!!preview?.length && (
+                        <div className="flex flex-col gap-y-4 border-t pt-4">
+                            {preview.map((p) => (
+                                <ScriptImportPreviewSummary key={p.sourceScript.scriptId} preview={p} />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </Modal>
         </>

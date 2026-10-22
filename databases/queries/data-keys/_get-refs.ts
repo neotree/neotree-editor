@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, asc, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, notExists, or, sql } from "drizzle-orm";
 import db from '@/databases/pg/drizzle';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import * as schema from "@/databases/pg/schema";
@@ -14,6 +14,9 @@ const defaultResData = [] as {
     refType: string;
     refId: string;
     data: any;
+    /** Set when `data` is a draft: who owns it (null = no owner). */
+    draftOwnerId?: string | null;
+    isDraft?: boolean;
     dataKeys: {
         key: string;
         dataKey: string;
@@ -45,19 +48,21 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.diagnosesDrafts.position),
         });
 
-        const diagnosesIds = _diagnosesDrafts.map(d => d.diagnosisId!).filter(d => d);
-
-        const _diagnoses = await executor.query.diagnoses.findMany({
-            where: and(
+        // Published rows only count when they have no draft at all: the draft is the current version.
+        // (The draft exclusion used to sit inside the or(), which returned every published row, and the
+        // published copy of an edited entity was then saved over its draft.)
+        // (plain select, not the relational query builder: that one aliases the table, and the
+        // NOT EXISTS below must reference the real table name)
+        const _diagnoses = await executor.select().from(schema.diagnoses)
+            .where(and(
                 or(
                     whereUniqueKey(schema.diagnoses.symptoms),
                     whereUniqueKey(schema.diagnoses.keyId),
-                    !diagnosesIds.length ? undefined : notInArray(schema.diagnoses.diagnosisId, diagnosesIds),
                 ),
                 isNull(schema.diagnoses.deletedAt),
-            ),
-            orderBy: asc(schema.diagnoses.position),
-        });
+                notExists(executor.select({ one: sql`1` }).from(schema.diagnosesDrafts).where(eq(schema.diagnosesDrafts.diagnosisId, schema.diagnoses.diagnosisId))),
+            ))
+            .orderBy(asc(schema.diagnoses.position));
 
         // problems
         const _problemsDrafts = await executor.query.problemsDrafts.findMany({
@@ -65,19 +70,16 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.problemsDrafts.position),
         });
 
-        const problemsIds = _problemsDrafts.map(d => d.problemId!).filter(d => d);
-
-        const _problems = await executor.query.problems.findMany({
-            where: and(
+        const _problems = await executor.select().from(schema.problems)
+            .where(and(
                 or(
                     whereUniqueKey(schema.problems.symptoms),
                     whereUniqueKey(schema.problems.keyId),
-                    !problemsIds.length ? undefined : notInArray(schema.problems.problemId, problemsIds),
                 ),
                 isNull(schema.problems.deletedAt),
-            ),
-            orderBy: asc(schema.problems.position),
-        });
+                notExists(executor.select({ one: sql`1` }).from(schema.problemsDrafts).where(eq(schema.problemsDrafts.problemId, schema.problems.problemId))),
+            ))
+            .orderBy(asc(schema.problems.position));
 
         // screens
         const _screensDrafts = await executor.query.screensDrafts.findMany({
@@ -85,21 +87,18 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.screensDrafts.position),
         });
 
-        const screensIds = _screensDrafts.map(d => d.screenId!).filter(d => d);
-
-        const _screens = await executor.query.screens.findMany({
-            where: and(
+        const _screens = await executor.select().from(schema.screens)
+            .where(and(
                 or(
                     whereUniqueKey(schema.screens.fields),
                     whereUniqueKey(schema.screens.items),
                     whereUniqueKey(schema.screens.keyId),
                     whereUniqueKey(schema.screens.refIdDataKey),
-                    !screensIds.length ? undefined : notInArray(schema.screens.screenId, screensIds),
                 ),
                 isNull(schema.screens.deletedAt),
-            ),
-            orderBy: asc(schema.screens.position),
-        });
+                notExists(executor.select({ one: sql`1` }).from(schema.screensDrafts).where(eq(schema.screensDrafts.screenId, schema.screens.screenId))),
+            ))
+            .orderBy(asc(schema.screens.position));
 
         // scripts - NUID search fields live on the script record itself
         const _scriptsDrafts = await executor.query.scriptsDrafts.findMany({
@@ -107,19 +106,22 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.scriptsDrafts.position),
         });
 
-        const scriptsIds = _scriptsDrafts.map(d => d.scriptId!).filter(d => d);
-
-        const _scripts = await executor.query.scripts.findMany({
-            where: and(
+        const _scripts = await executor.select().from(schema.scripts)
+            .where(and(
                 whereUniqueKey(schema.scripts.nuidSearchFields),
                 isNull(schema.scripts.deletedAt),
-                !scriptsIds.length ? undefined : notInArray(schema.scripts.scriptId, scriptsIds),
-            ),
-            orderBy: asc(schema.scripts.position),
-        });
+                notExists(executor.select({ one: sql`1` }).from(schema.scriptsDrafts).where(eq(schema.scriptsDrafts.scriptId, schema.scripts.scriptId))),
+            ))
+            .orderBy(asc(schema.scripts.position));
+
+        const draftOwners = new Map<string, string | null>();
+        const asDraft = <T>(id: string, owner: string | null | undefined, data: T) => {
+            draftOwners.set(id, owner || null);
+            return data;
+        };
 
         const diagnoses = [
-            ..._diagnosesDrafts.map(d => ({
+            ..._diagnosesDrafts.map(d => asDraft(d.data.diagnosisId || d.diagnosisDraftId, d.createdByUserId, {
                 ...d.data,
                 diagnosisId: d.data.diagnosisId || d.diagnosisDraftId,
             })),
@@ -127,7 +129,7 @@ export async function _getDataKeysRefs({
         ];
 
         const problems = [
-            ..._problemsDrafts.map(d => ({
+            ..._problemsDrafts.map(d => asDraft(d.data.problemId || d.problemDraftId, d.createdByUserId, {
                 ...d.data,
                 problemId: d.data.problemId || d.problemDraftId,
             })),
@@ -135,7 +137,7 @@ export async function _getDataKeysRefs({
         ];
 
         const screens = [
-            ..._screensDrafts.map(d => ({
+            ..._screensDrafts.map(d => asDraft(d.data.screenId || d.screenDraftId, d.createdByUserId, {
                 ...d.data,
                 screenId: d.data.screenId || d.screenDraftId,
             })),
@@ -143,12 +145,16 @@ export async function _getDataKeysRefs({
         ];
 
         const scripts = [
-            ..._scriptsDrafts.map(d => ({
+            ..._scriptsDrafts.map(d => asDraft(d.data.scriptId || d.scriptDraftId, d.createdByUserId, {
                 ...d.data,
                 scriptId: d.data.scriptId || d.scriptDraftId,
             })),
             ..._scripts,
         ];
+
+        const draftInfo = (id: string) => draftOwners.has(id)
+            ? { isDraft: true, draftOwnerId: draftOwners.get(id) ?? null }
+            : { isDraft: false };
 
         const extractDataKeys = (o: object, parentKey?: string) => {
             let dataKeys: typeof defaultResData[0]['dataKeys'] = [];
@@ -193,6 +199,7 @@ export async function _getDataKeysRefs({
             refId: s.diagnosisId,
             refType: 'diagnosis',
             dataKeys: extractDataKeys(s),
+            ...draftInfo(s.diagnosisId),
         }));
 
         const problemsDataKeys: typeof defaultResData = problems.map(s => ({
@@ -200,6 +207,7 @@ export async function _getDataKeysRefs({
             refId: s.problemId,
             refType: 'problem',
             dataKeys: extractDataKeys(s),
+            ...draftInfo(s.problemId),
         }));
 
         const screensDataKeys: typeof defaultResData = screens.map(s => ({
@@ -207,6 +215,7 @@ export async function _getDataKeysRefs({
             refId: s.screenId,
             refType: 'screen',
             dataKeys: extractDataKeys(s),
+            ...draftInfo(s.screenId),
         }));
 
         const scriptsDataKeys: typeof defaultResData = scripts.map(s => ({
@@ -214,6 +223,7 @@ export async function _getDataKeysRefs({
             refId: s.scriptId,
             refType: 'script',
             dataKeys: extractDataKeys(s),
+            ...draftInfo(s.scriptId),
         }));
 
         return {

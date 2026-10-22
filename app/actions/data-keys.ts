@@ -20,6 +20,9 @@ import { buildDataKeysDeleteImpact } from '@/lib/data-key-delete-impact';
 import { recomputeScriptsConditionErrors } from '@/app/actions/scripts';
 import { getUser } from "@/app/actions/users";
 import { _getUser } from '@/databases/queries/users';
+import { actingUserHeaders } from '@/lib/acting-user';
+import { assertContentEditable } from '@/lib/server/content-sync';
+import { trustedDraftOrigin } from '@/lib/server/internal-call';
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
@@ -195,6 +198,12 @@ async function prepareDataKeyIntegrityEntryRepair(entry: DataKeyIntegrityEntry, 
     };
 }
 
+/** A repair that matches more than one question changes nothing; say so instead of skipping it silently. */
+function ambiguousRepairWarning(entry: DataKeyIntegrityEntry, matches: number) {
+    const where = [entry.scriptTitle, entry.location].filter(Boolean).join(' > ') || 'This reference';
+    return `${where}: not changed. It matches ${matches} questions (for example fields with the same label), so it can't be told which one to fix. Fix it in the screen editor instead.`;
+}
+
 // Repairs only touch nuidSearchFields - send just that so the draft keeps every other
 // script value, and computed read-model fields never leak into the stored record.
 function toNuidSearchFieldsSavePayload(scripts: Awaited<ReturnType<typeof _getScripts>>["data"]) {
@@ -285,8 +294,12 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
     try {
         const session = await isAllowed();
         await assertCanManageDataKeys(session.user);
+        // where the change comes from is decided here, not by the caller (see lib/server/internal-call.ts)
+        const draftOrigin = trustedDraftOrigin(params?.draftOrigin, session);
+        await assertContentEditable({ area: 'dataKeys', userRole: session.user?.role, viaApiKey: session.viaApiKey, draftOrigin, });
         const res = await _saveDataKeys({
             ...params,
+            draftOrigin,
             userId: session.user?.userId,
         });
        
@@ -307,15 +320,20 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
 }
 
 export const saveDataKeysIfNotExist = async (
-    { user, ...params }: Parameters<typeof _saveDataKeysIfNotExist>[0] & {
+    // `user` is accepted for older callers but ignored: this is a server action, so anything in its
+    // arguments comes from the client and must not decide who the request runs as.
+    { user: _ignoredUser, ...params }: Parameters<typeof _saveDataKeysIfNotExist>[0] & {
         user?: Awaited<ReturnType<typeof _getUser>>;
     }
 ): ReturnType<typeof _saveDataKeysIfNotExist> => {
     try {
-        const session = user ? { user } : await isAllowed();
+        const session = await isAllowed();
+        const draftOrigin = trustedDraftOrigin(params?.draftOrigin, session);
+        await assertContentEditable({ area: 'dataKeys', userRole: session.user?.role, viaApiKey: session.viaApiKey, draftOrigin, });
         await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysIfNotExist({
             ...params,
+            draftOrigin,
             userId: session.user?.userId,
         });
     } catch (e: any) {
@@ -325,15 +343,20 @@ export const saveDataKeysIfNotExist = async (
 };
 
 export const saveDataKeysUpdateIfExist  = async (
-    { user, ...params }: Parameters<typeof _saveDataKeysUpdateIfExist>[0] & {
+    // `user` is accepted for older callers but ignored: this is a server action, so anything in its
+    // arguments comes from the client and must not decide who the request runs as.
+    { user: _ignoredUser, ...params }: Parameters<typeof _saveDataKeysUpdateIfExist>[0] & {
         user?: Awaited<ReturnType<typeof _getUser>>;
     }
 ): ReturnType<typeof _saveDataKeysUpdateIfExist> => {
     try {
-        const session = user ? { user } : await isAllowed();
+        const session = await isAllowed();
+        const draftOrigin = trustedDraftOrigin(params?.draftOrigin, session);
+        await assertContentEditable({ area: 'dataKeys', userRole: session.user?.role, viaApiKey: session.viaApiKey, draftOrigin, });
         await assertCanManageDataKeys(session.user, { allowApiKeyAuth: true, });
         return await _saveDataKeysUpdateIfExist({
             ...params,
+            draftOrigin,
             userId: session.user?.userId,
         });
     } catch (e: any) {
@@ -521,6 +544,8 @@ export const resolveDataKeyIntegrityEntry = async (params: {
     try {
         const session = await isAllowed();
         await assertCanManageEditorDrafts(session.user);
+        // repairs rewrite script content
+        await assertContentEditable({ area: 'scripts', scriptIds: [params.entry?.scriptId], userRole: session.user?.role, viaApiKey: session.viaApiKey, });
         const prepared = await prepareDataKeyIntegrityEntryRepair(params.entry, params.selectedTargetUniqueKey);
 
         if (!prepared.success) {
@@ -554,7 +579,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 reportAfter: null,
                 impactSummary: null,
                 errors: [],
-                warnings: [],
+                warnings: repairs.ambiguousMatches ? [ambiguousRepairWarning(params.entry, repairs.ambiguousMatches)] : [],
             };
         }
 
@@ -712,6 +737,8 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
             .filter((item) => item?.entry);
         const reviewedItems = items.filter((item) => item.reviewed !== false);
         const entries = reviewedItems.map((item) => item.entry);
+        // repairs rewrite script content
+        await assertContentEditable({ area: 'scripts', scriptIds: entries.map((entry) => entry?.scriptId), userRole: session.user?.role, viaApiKey: session.viaApiKey, });
 
         if (!reviewedItems.length) {
             return {
@@ -802,7 +829,10 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 overrideTargetUniqueKey: item.selectedTargetUniqueKey,
             });
 
-            if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length && !repairs.scripts.length) continue;
+            if (!repairs.screens.length && !repairs.diagnoses.length && !repairs.problems.length && !repairs.scripts.length) {
+                if (repairs.ambiguousMatches) warnings.push(ambiguousRepairWarning(entry, repairs.ambiguousMatches));
+                continue;
+            }
 
             resolvedCount++;
             if (repairs.screens.length) {
@@ -855,7 +885,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 resolvedCount: 0,
                 impactSummary: null,
                 errors: [],
-                warnings: [],
+                warnings,
             };
         }
 
@@ -1563,19 +1593,17 @@ export const exportDataKeys = async ({
             if (overwriteExisting) {
                 const res = await axiosClient.post<Awaited<ReturnType<typeof saveDataKeysUpdateIfExist>>>('/api/data-keys/save-and-update-if-exist', {
                     data: dataKeys.data,
-                    user: remoteUser.data,
                     broadcastAction: true,
                     draftOrigin: 'remote_export',
-                } satisfies Parameters<typeof saveDataKeysUpdateIfExist>[0]);
+                } satisfies Parameters<typeof saveDataKeysUpdateIfExist>[0], { headers: actingUserHeaders(remoteUser.data.email), });
 
                 if (res.data.errors) errors = res.data.errors;
             } else {
                 const res = await axiosClient.post<Awaited<ReturnType<typeof saveDataKeysIfNotExist>>>('/api/data-keys/save-if-not-exist', {
                     data: dataKeys.data,
-                    user: remoteUser.data,
                     broadcastAction: true,
                     draftOrigin: 'remote_export',
-                } satisfies Parameters<typeof saveDataKeysIfNotExist>[0]);
+                } satisfies Parameters<typeof saveDataKeysIfNotExist>[0], { headers: actingUserHeaders(remoteUser.data.email), });
 
                 if (res.data.errors) errors = res.data.errors;
             }

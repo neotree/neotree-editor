@@ -43,6 +43,7 @@ import { Separator } from "@/components/ui/separator";
 import { useIsLocked } from '@/hooks/use-is-locked';
 import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { cn } from "@/lib/utils";
 import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
 import type { UpdateDataKeysRefsResponse } from "@/databases/mutations/data-keys/_update_data_keys_refs";
@@ -70,7 +71,7 @@ function Form({
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, getLatestDataKeys } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
     const { alert } = useAlertModal();
-    const { viewOnly } = useAppContext();
+    const viewOnly = useContentViewOnly("dataKeys", null);
 
     const dataKey = useMemo(() => dataKeys.find(k => (
         (k.uuid === dataKeyId) ||
@@ -115,7 +116,6 @@ function Form({
             options: dataKey?.options || [],
             metadata: dataKey?.metadata || {},
             version: dataKey?.version || 1,
-            deletedUniqueKeys: [] as string[],
         },
     });
 
@@ -128,7 +128,6 @@ function Form({
     const confidentialLabelOnly = !!watch('confidentialLabelOnly');
     const optionsSignature = useMemo(() => JSON.stringify(options || []), [options]);
     const savedOptionsSignature = useMemo(() => JSON.stringify(dataKey?.options || []), [dataKey?.options]);
-    const deletedUniqueKeys = watch('deletedUniqueKeys');
 
     const [previewingImpact, setPreviewingImpact] = useState(false);
     const [impactPreview, setImpactPreview] = useState<UpdateDataKeysRefsResponse['affected']>();
@@ -158,7 +157,6 @@ function Form({
             setValue('options', dataKey?.options || []);
             setValue('metadata', dataKey?.metadata || {});
             setValue('version', dataKey?.version || 1);
-            setValue('deletedUniqueKeys', [] as string[]);
         }
     }, [dataKey, options, currentDataKey, isLocked, shouldResetForm, setValue]);
 
@@ -236,15 +234,22 @@ function Form({
         loadImpactPreview,
     ]);
 
-    const onSave = handleSubmit(async (data) => {
-        if (isReadOnly) return;
-
+    const persist = async (data: Parameters<Parameters<typeof handleSubmit>[0]>[0]) => {
         const uuid = (data as any)?.uuid || dataKey?.uuid || uuidv4();
         const uniqueKey = (data as any)?.uniqueKey ?? dataKey?.uniqueKey ?? null;
+        // Options removed in this edit, worked out from what was saved before and what is saved now.
+        // (Tracking deletions click by click went wrong when an option was removed and re-added, or when
+        // the clicked row and the removed option were not the same one.)
+        const finalOptions = data.options || [];
+        // What this form started from (it is not refreshed while you edit).
+        const baseOptions = currentDataKey?.options || [];
+        const removedOptions = baseOptions.filter(o => !finalOptions.includes(o));
         const payload = {
             ...data,
             uuid,
             uniqueKey,
+            deletedUniqueKeys: removedOptions,
+            ...(currentDataKey ? { baseOptions, } : {}),
             version: typeof data.version === "string" ? Number(data.version) : data.version,
         } as DataKeyFormData & {
             uuid: string;
@@ -261,12 +266,49 @@ function Form({
         if (res && 'info' in res) {
             setSaveImpact(res.info?.refs);
         }
+    };
+
+    const onSave = handleSubmit(async (data) => {
+        if (isReadOnly) return;
+
+        const finalOptions = data.options || [];
+        const removedOptions = (currentDataKey?.options || []).filter(o => !finalOptions.includes(o));
+        if (!removedOptions.length) return persist(data);
+
+        // Removing options also removes them from this key's own questions. Say which before saving.
+        const questions = Array.from(new Map((impactPreview?.usages || [])
+            .filter(u => ['screen', 'screen_field', 'diagnosis'].includes(u.kind))
+            .map(u => [`${u.scriptId}:${u.screenId || u.diagnosisId || ''}:${u.id}`, `${u.scriptTitle ? `${u.scriptTitle} > ` : ''}${u.location === 'Screen' ? u.title : `${u.location} > ${u.title}`}`]))
+            .values());
+        const optionNames = removedOptions.map(o => {
+            const k = dataKeys.find(dk => dk.uniqueKey === o);
+            return k ? (k.label || k.name) : o;
+        });
+        confirm(() => persist(data), {
+            title: `Remove ${removedOptions.length} option${removedOptions.length === 1 ? '' : 's'}?`,
+            message: [
+                `Removing: ${optionNames.join(', ')}.`,
+                questions.length
+                    ? `They will also be removed from ${questions.length} question${questions.length === 1 ? '' : 's'} that use this key: ${questions.slice(0, 15).join('; ')}${questions.length > 15 ? '; ...' : ''}.`
+                    : 'Questions that use this key will lose these options too.',
+                'Questions that use the same options under other keys are not changed.',
+            ].join(' '),
+            danger: true,
+        });
     });
 
     const isFormDisabled = isReadOnly || saving;
 
+    // One row per stored option, in order. Options whose data key no longer exists get a placeholder row
+    // instead of being skipped, so row actions always act on the option they show.
     const children = useMemo(() => {
-        return options.map(o => dataKeys.find(k => k.uniqueKey === o)!).filter(k => k);
+        return (options || []).map(o => dataKeys.find(k => k.uniqueKey === o) || {
+            uniqueKey: o,
+            name: '(missing data key)',
+            label: o,
+            dataType: '',
+            missing: true,
+        } as unknown as (typeof dataKeys)[0] & { missing?: boolean; });
     }, [dataKeys, options]);
 
     const displayLoader = loadingDataKeys || saving;
@@ -713,18 +755,16 @@ function Form({
                                                                             className="text-destructive"
                                                                             onClick={() => setTimeout(() => confirm(
                                                                                 () => {
+                                                                                    // remove by identity, never by position
                                                                                     setValue(
                                                                                         'options',
-                                                                                        options.filter((_, i) => i !== rowIndex),
-                                                                                    );
-                                                                                    setValue(
-                                                                                        'deletedUniqueKeys',
-                                                                                        [...deletedUniqueKeys, children[rowIndex].uniqueKey]
+                                                                                        (getValues('options') || []).filter((o) => o !== child),
+                                                                                        { shouldDirty: true, },
                                                                                     );
                                                                                 },
                                                                                 {
                                                                                     title: 'Delete',
-                                                                                    message: 'Are you sure you want to delete data key option?',
+                                                                                    message: 'Remove this option from the key? Nothing is changed until you save.',
                                                                                     danger: true,
                                                                                 },
                                                                             ), 0)}

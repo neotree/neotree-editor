@@ -29,6 +29,7 @@ import type {
   EligibilityCriteria,
 } from "@/types"
 import type { IntegrityBaseline, IntegrityPolicy } from "@/lib/integrity-policy"
+import type { ContentSyncSettings } from "@/lib/content-sync"
 import { defaultPreferences } from "@/constants"
 import { dataKeys, dataKeysDrafts } from "./_data-keys"
 
@@ -405,6 +406,8 @@ export const editorInfo = pgTable("nt_editor_info", {
     acceptedImportFingerprints: [],
     acceptedImportFingerprintRefs: {},
   }).notNull(),
+  // Content sync with another editor (source/target roles, editing lock, hotfixes): lib/content-sync.ts
+  contentSync: jsonb("content_sync").$type<Partial<ContentSyncSettings>>().default({}).notNull(),
 })
 
 // DEVICES
@@ -1569,3 +1572,75 @@ export const integrityImportSnapshotsRelations = relations(integrityImportSnapsh
     relationName: "integrityImportSnapshotAcceptedBy",
   }),
 }))
+
+// SCRIPT IMPORT SOURCES
+// One row per script on this editor that was imported from another editor (e.g. LIVE <- DEV).
+// - base_snapshot: the source content this script's PUBLISHED state corresponds to (the common ancestor
+//   for the next import's three-way merge), plus the source-id -> local-id map that keeps screen,
+//   diagnosis and problem ids stable across imports.
+// - pending_snapshot: the same for an import that has been saved as drafts but not yet published.
+//   Publishing promotes it to base_snapshot; discarding the drafts clears it.
+export type ScriptImportSnapshot = {
+  sourceScriptId: string
+  importedAt: string
+  script: Record<string, any>
+  screens: Record<string, any>[]
+  diagnoses: Record<string, any>[]
+  problems: Record<string, any>[]
+  dataKeys: Record<string, { name: string; label: string; dataType: string; options: string[] }>
+  idMap: {
+    screens: Record<string, string>
+    diagnoses: Record<string, string>
+    problems: Record<string, string>
+  }
+}
+
+export const scriptImportSources = pgTable(
+  "nt_script_import_sources",
+  {
+    id: serial("id").primaryKey(),
+    targetScriptId: uuid("target_script_id").notNull().unique(),
+    sourceSiteId: uuid("source_site_id"),
+    sourceSiteLink: text("source_site_link"),
+    sourceScriptId: uuid("source_script_id").notNull(),
+    baseSnapshot: jsonb("base_snapshot").$type<ScriptImportSnapshot | null>(),
+    pendingSnapshot: jsonb("pending_snapshot").$type<ScriptImportSnapshot | null>(),
+    pendingByUserId: uuid("pending_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    // Content sync: fingerprints of the source content imported and of this editor's published content
+    // right after that import was published (the last sync point), see lib/content-sync.ts.
+    sourceFingerprint: text("source_fingerprint"),
+    targetFingerprint: text("target_fingerprint"),
+    syncedAt: timestamp("synced_at"),
+    pendingSourceFingerprint: text("pending_source_fingerprint"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    sourceIndex: index("script_import_sources_source_index").on(table.sourceSiteId, table.sourceScriptId),
+  }),
+)
+
+// CONTENT SYNC HOTFIXES
+// On a target editor (content comes from the source editor), an admin can open a hotfix on one script so it
+// can be edited here in an emergency. While open, edits to that script are allowed; the change must then be
+// brought back to the source editor.
+export const contentSyncHotfixes = pgTable(
+  "nt_content_sync_hotfixes",
+  {
+    id: serial("id").primaryKey(),
+    hotfixId: uuid("hotfix_id").notNull().unique().defaultRandom(),
+    scriptId: uuid("script_id").notNull(),
+    reason: text("reason").notNull().default(""),
+    openedByUserId: uuid("opened_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    openedAt: timestamp("opened_at").defaultNow().notNull(),
+    closedByUserId: uuid("closed_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    closedAt: timestamp("closed_at"),
+    closeNote: text("close_note"),
+  },
+  (table) => ({
+    scriptIndex: index("content_sync_hotfixes_script_index").on(table.scriptId),
+  }),
+)

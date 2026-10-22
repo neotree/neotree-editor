@@ -10,7 +10,10 @@ import { DiagnosisType } from '../../queries/scripts/_diagnoses_get';
 import { removeHexCharacters } from '../../utils'
 import type { DraftOrigin } from './_screens_save';
 
-export type SaveDiagnosesData = Partial<DiagnosisType>;
+export type SaveDiagnosesData = Partial<DiagnosisType> & {
+    /** The revision the editor loaded (see lib/entity-revision.ts); checked by the save action. */
+    baseRevision?: string;
+};
 
 export type SaveDiagnosesResponse = { 
     success: boolean; 
@@ -58,7 +61,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
 
     try {
         let index = 0;
-        for (const { diagnosisId: itemDiagnosisId, ...item } of data) {
+        for (const { diagnosisId: itemDiagnosisId, baseRevision: _baseRevision, revision: _revision, ...item } of data) {
             try {
                 index++;
 
@@ -86,6 +89,8 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                                 data,
                                 position: data.position,
                                 draftOrigin: persistedDraftOrigin,
+                                // an ownerless draft is taken over by whoever edits it next (see _screens_save)
+                                ...(!draft.createdByUserId && userId ? { createdByUserId: userId } : {}),
                             }).where(eq(diagnosesDrafts.diagnosisDraftId, diagnosisId));
 
                         sqlInfo[`${diagnosisId} - updateDiagnosisDraft`] = q.toSQL();
