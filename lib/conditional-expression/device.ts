@@ -2,6 +2,14 @@ import type { Diagnostic } from "./ast";
 import { tokenize } from "./tokenizer";
 
 /**
+ * A condition as it is saved: no spaces or tabs at the end of a line and no empty lines, which
+ * tablets would read as a condition that fails. Lines are otherwise kept as written.
+ */
+export function tidyCondition(input: string): string {
+  return input.split("\n").map((line) => line.trimEnd()).filter(Boolean).join("\n");
+}
+
+/**
  * What tablets cannot read although the grammar accepts it.
  *
  * The app compiles a condition by text substitution (condition-pipeline.ts in the app):

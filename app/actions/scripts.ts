@@ -636,6 +636,7 @@ export async function getScriptsWithItems(
                 });
 
             const scrappedDataKeys = withDataKeys ? await scrapDataKeys({
+                scripts: [s] as any,
                 dataKeys,
                 screens: screens.data,
                 diagnoses: diagnoses.data,
@@ -1142,7 +1143,10 @@ async function computeConditionReportsLean(
             .map((k) => drugItemsByKey.get(k))
             .filter(Boolean);
 
+        const nuidSearchFields = (s?.nuidSearchFields || []) as any[];
+        // NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
         const dataKeys = await scrapDataKeys({
+            scripts: [{ nuidSearchFields }] as any,
             dataKeys: globalDataKeys,
             screens: scriptScreens as any,
             diagnoses: scriptDiagnoses as any,
@@ -1150,7 +1154,6 @@ async function computeConditionReportsLean(
             drugsLibrary: scriptDrugs as any,
         });
 
-        const nuidSearchFields = (s?.nuidSearchFields || []) as any[];
         reports[scriptId] = buildConditionReport(scriptId, {
             scriptId,
             dataKeys,
@@ -1397,14 +1400,16 @@ async function computeConditionReportsDraftInclusive(
     await runWithConcurrency(Array.from(effectiveById.entries()), 6, async ([scriptId, effective]) => {
         const drugKeys = collectDrugKeysFromScreens(effective.screens);
         const drugsLibrary = Array.from(drugKeys).map((key) => drugItemsByKey.get(key)).filter(Boolean);
+        const nuidSearchFields = (effective.script?.nuidSearchFields || effective.input?.nuidSearchFields || []) as any[];
+        // NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
         const dataKeys = await scrapDataKeys({
+            scripts: [{ nuidSearchFields }] as any,
             dataKeys: globalDataKeys as any,
             screens: effective.screens as any,
             diagnoses: effective.diagnoses as any,
             problems: effective.problems as any,
             drugsLibrary: drugsLibrary as any,
         });
-        const nuidSearchFields = (effective.script?.nuidSearchFields || effective.input?.nuidSearchFields || []) as any[];
         reports[scriptId] = buildConditionReport(scriptId, {
             ...effective.script,
             scriptId,

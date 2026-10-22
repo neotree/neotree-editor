@@ -20,7 +20,7 @@
  * report in the background.
  */
 
-export const CONDITION_REPORT_SIGNATURE_VERSION = "r4";
+export const CONDITION_REPORT_SIGNATURE_VERSION = "r5";
 
 /**
  * Versions a stored report may still carry from an earlier deploy.
@@ -48,8 +48,10 @@ export const CONDITION_REPORT_SIGNATURE_VERSION = "r4";
  * start or end, and conditions of only spaces), `and` / `or` / `=` without a
  * space on both sides, an operator touching its `$Key`, tabs, and a diagnosis or
  * problem with symptoms but no expression.
+ * r4 -> r5: keys of the script's NUID search fields count as script keys, as
+ * they do in the script editor, so conditions using them are no longer unknown keys.
  */
-export const SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS = ["r1", "r2", "r3"] as const;
+export const SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS = ["r1", "r2", "r3", "r4"] as const;
 
 /**
  * True when a stored signature is this exact signature from an earlier rule set —

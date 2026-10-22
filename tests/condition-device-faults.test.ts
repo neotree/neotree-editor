@@ -1,6 +1,6 @@
 import assert from "assert";
 
-import { validateCondition, type DiagnosticCode } from "../lib/conditional-expression";
+import { tidyCondition, validateCondition, type DiagnosticCode } from "../lib/conditional-expression";
 import { canApplySuggestion } from "../lib/conditional-expression/quick-fix";
 
 /**
@@ -69,5 +69,25 @@ for (const [condition] of flagged) {
 }
 assert.equal(validateCondition("$A = 1\n\n$B = 'x'", ctx).diagnostics.find((d) => d.code === "BLANK_LINE")!.message,
   "Remove this empty line: tablets read every line as a condition, and an empty one fails.");
+
+// What the condition editor saves: no spaces at line ends, no empty lines; everything else as written.
+const tidy: Array<[string, string]> = [
+  ["$A = 1 ", "$A = 1"],
+  ["$A = 1\t\r\n", "$A = 1"],
+  ["\n\n$A = 1\n   \n$B = 'x'  \n\n", "$A = 1\n$B = 'x'"],
+  ["  $A = 1\n  $B = 'x'", "  $A = 1\n  $B = 'x'"],
+  ["$B = 'x y'", "$B = 'x y'"],
+  ["   \n\n", ""],
+  ["", ""],
+];
+for (const [input, saved] of tidy) {
+  assert.equal(tidyCondition(input), saved, JSON.stringify(input));
+  const codes = validateCondition(tidyCondition(input), ctx).diagnostics.map((d) => d.code);
+  assert.ok(!codes.includes("BLANK_LINE") && !codes.includes("TRAILING_WHITESPACE"), `${JSON.stringify(input)} still ${codes}`);
+}
+// Linear on long runs of spaces (no regex to backtrack).
+const started = Date.now();
+tidyCondition(`$A = 1${" ".repeat(200000)}x\n`.repeat(5));
+assert.ok(Date.now() - started < 200, "tidying long whitespace must stay fast");
 
 console.log(`condition-device-faults: all assertions passed (${flagged.length} faults, ${fine.length} working forms)`);

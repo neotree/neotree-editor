@@ -14,6 +14,7 @@ export type {
   ValidationResult,
 } from "./ast";
 export { validateReferenceExpression } from "./reference-expr";
+export { tidyCondition } from "./device";
 export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
 export {
