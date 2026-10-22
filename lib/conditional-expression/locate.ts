@@ -49,24 +49,30 @@ const CONSEQUENCES: Record<string, [CeImpact, string]> = {
   "eligibility:alternative_activation_condition": ["high", "Alternative eligibility criteria are not activated"],
 };
 
-// Faults that break on the device but pass the editor's validator.
-const DEVICE_ONLY_FAULTS: Array<[RegExp, string]> = [
-  [/\n\s*\n/, "Remove the blank line: the device treats every line as a condition, and an empty one always fails."],
-  [/\)(?:and|or)\b|\b(?:and|or)\(/i, "Put a space on both sides of and/or where it touches a bracket."],
-];
+const SCREEN_BLANK_LINE: [CeImpact, string] = ["low", "Only reported: the tablet then checks each line by itself, skipping empty ones"];
 
 const EMPTY_OUTCOME = "()";
+const SYNTAX_ONLY = { keys: [], allowSelf: true, skipKeyResolution: true };
 
 export function normalizeCe(text: string): string {
   return text.replace(/\r\n?/g, "\n").split("\n").map((line) => line.trimEnd()).join("\n").trim();
 }
 
+// Their messages say what to change; their suggestion is only the replacement for one span.
+const SPAN_ONLY_SUGGESTIONS = new Set(["BLANK_LINE", "OPERATOR_SPACING", "TAB_CHARACTER"]);
+
+// The CE as the tablet reported it: an empty line at the start or end is part of the fault.
 function explainFault(ce: string): string | undefined {
   if (ce === EMPTY_OUTCOME) return "Add an expression, or remove the symptoms: with symptoms and no expression it can never be suggested.";
-  const error = validateCondition(ce, { keys: [], allowSelf: true, skipKeyResolution: true })
-    .diagnostics.find((d) => d.severity === "error");
-  if (error) return error.suggestion ? `${error.message} Suggested: ${error.suggestion}` : error.message;
-  return DEVICE_ONLY_FAULTS.find(([pattern]) => pattern.test(ce))?.[1];
+  const error = validateCondition(ce, SYNTAX_ONLY).diagnostics.find((d) => d.severity === "error");
+  if (!error) return undefined;
+  return error.suggestion && !SPAN_ONLY_SUGGESTIONS.has(error.code) ? `${error.message} Suggested: ${error.suggestion}` : error.message;
+}
+
+function onlyBlankLinesFail(condition: string): boolean {
+  const lines = condition.split("\n").map((line) => line.trim());
+  const filled = lines.filter(Boolean);
+  return filled.length > 1 && filled.length < lines.length && !validateCondition(filled.join("\n"), SYNTAX_ONLY).hasErrors;
 }
 
 export function locateConditions(expressions: string[], scripts: ScriptWithItems[], baseUrl = ""): Record<string, CeResolution> {
@@ -82,30 +88,27 @@ export function locateConditions(expressions: string[], scripts: ScriptWithItems
     const visit = (v: ScriptConditionVisit) => {
       const rule = CONSEQUENCES[`${v.entity.kind}:${v.field}`];
       if (!rule) return; // e.g. field.calculation is a formula, not a CE
-      const text = normalizeCe(`${v.expression ?? ""}`);
-      const keys = !text
-        ? (v.field === "expression" && wanted.has(EMPTY_OUTCOME) && hasSymptoms(script, v.entity) ? [EMPTY_OUTCOME] : [])
+      const raw = `${v.expression ?? ""}`;
+      const text = normalizeCe(raw);
+      const screen = v.entity.kind === "screen" && v.field === "condition";
+      const keys = v.symptoms && !v.expression
+        ? [EMPTY_OUTCOME]
         // The device also evaluates (and reports) a multi-line screen condition line by line.
-        : v.entity.kind === "screen" && v.field === "condition" && text.includes("\n")
+        : screen && text.includes("\n")
           ? [text, ...text.split("\n").map((l) => l.trim())]
           : [text];
-      const hits = keys.filter((key) => wanted.has(key));
+      const hits = keys.filter((key) => key && wanted.has(key));
       if (!hits.length) return;
 
       const href = `${baseUrl}${hrefForConditionEntity(`${script.scriptId || ""}`, v.entity)}`;
-      const location: CeLocation = {
-        script: script.title || script.name || "Untitled script",
-        where: v.location,
-        impact: rule[0],
-        consequence: rule[1],
-        href,
-      };
       for (const key of new Set(hits)) {
         const entry = wanted.get(key)!;
         const id = `${href}|${v.location}`;
         if (entry.seen.has(id)) continue;
         entry.seen.add(id);
-        entry.locations.push(location);
+        // A single line that failed by itself does skip the screen.
+        const [impact, consequence] = screen && key === text && onlyBlankLinesFail(raw) ? SCREEN_BLANK_LINE : rule;
+        entry.locations.push({ script: script.title || script.name || "Untitled script", where: v.location, impact, consequence, href });
       }
     };
     walkScriptConditions(script, visit);
@@ -123,7 +126,7 @@ export function locateConditions(expressions: string[], scripts: ScriptWithItems
     return [ce, {
       matches: locations.slice(0, MAX_MATCHES),
       total: locations.length,
-      fix: locations.length ? explainFault(key) : undefined,
+      fix: locations.length ? explainFault(ce) : undefined,
     }];
   }));
 }
@@ -168,13 +171,4 @@ export function locateForSites(
     const locations = Object.fromEntries(expressions.map((ce) => [ce, { ...own[ce], elsewhere: everywhere[ce].total - own[ce].total }]));
     return [site || "", { name: hospital?.name ?? null, scoped: Boolean(hospital), locations }];
   }));
-}
-
-function hasSymptoms(script: ScriptWithItems, entity: { kind: string; diagnosisId?: string; problemId?: string }): boolean {
-  const outcome = entity.kind === "diagnosis"
-    ? (script.diagnoses || []).find((d: any) => d?.diagnosisId === entity.diagnosisId)
-    : entity.kind === "problem"
-      ? (script.problems || []).find((p: any) => p?.problemId === entity.problemId)
-      : null;
-  return Boolean(outcome?.symptoms?.length);
 }

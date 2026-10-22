@@ -32,19 +32,31 @@ const result = locateConditions(
 );
 
 // Screen condition: exact text (despite stored CRLF/trailing whitespace) and per line, as the device evaluates it.
-for (const ce of [blankLineCondition, "$RESUSOutcome != 'DetDied'"]) {
-  assert.deepEqual(result[ce].matches, [{
-    script: "Admission",
-    where: 'Screen "Resuscitation"',
-    impact: "high",
-    consequence: "Screen is skipped",
-    href: "https://editor.example/script/s1/screen/sc1",
-  }]);
-}
-assert.match(result[blankLineCondition].fix!, /blank line/, "device-only fault the validator misses");
+// With two or more lines the device decides on each non-empty line by itself, so a blank line
+// is only reported; a single line that fails by itself does skip the screen.
+const screenMatch = { script: "Admission", where: 'Screen "Resuscitation"', href: "https://editor.example/script/s1/screen/sc1" };
+assert.deepEqual(result[blankLineCondition].matches, [{
+  ...screenMatch,
+  impact: "low",
+  consequence: "Only reported: the tablet then checks each line by itself, skipping empty ones",
+}]);
+assert.deepEqual(result["$RESUSOutcome != 'DetDied'"].matches, [{ ...screenMatch, impact: "high", consequence: "Screen is skipped" }]);
+assert.match(result[blankLineCondition].fix!, /empty line/);
+
+// One line and an empty one: nothing left to check line by line, so the screen is skipped.
+// The fix comes from the text as reported, whose only fault is the empty line at the end.
+const oneLine = "$Weight < 1500\n";
+const single = locateConditions([oneLine], [{ scriptId: "s4", title: "Admission", screens: [{ screenId: "w", title: "Weight", condition: oneLine }] }]);
+assert.deepEqual(single[oneLine].matches.map((m) => [m.impact, m.consequence]), [["high", "Screen is skipped"]]);
+assert.match(single[oneLine].fix!, /empty line/);
+
+// A blank line next to a line that is broken by itself: that line fails too, so the screen is skipped.
+const alsoBroken = "$Weight < 1500\n\n$Sex='M'";
+const blankAndBroken = locateConditions([alsoBroken], [{ scriptId: "s5", title: "Admission", screens: [{ screenId: "b", title: "Both", condition: alsoBroken }] }]);
+assert.deepEqual(blankAndBroken[alsoBroken].matches.map((m) => m.impact), ["high"]);
 
 assert.equal(result[gluedAnd].matches[0].consequence, "Diagnosis is never suggested");
-assert.match(result[gluedAnd].fix!, /space on both sides of and\/or/);
+assert.equal(result[gluedAnd].fix, 'Put a space on both sides of "and": tablets only read it with spaces.');
 
 // The same faulty text in several places resolves to all of them (all need fixing); a
 // formula field that happens to contain it is not a CE.
