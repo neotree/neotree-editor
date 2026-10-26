@@ -1,6 +1,7 @@
 {
     "name": "neotree-webeditor",
     "version": "0.1.0",
+    "engines": { "node": ">=22.23.4" },
     "private": true,
     "packageManager": "yarn@1.22.22",
     "scripts": {
@@ -8,6 +9,7 @@
         "dev": "node server/index.js",
         "build": "next build",
         "typecheck": "tsc --noEmit",
+        "test": "for f in tests/*.test.ts; do echo \"== $f\"; tsx \"$f\" || exit 1; done",
         "ci:prepare": "prisma generate && npm rebuild bcrypt",
         "lint": "next lint",
         "db:studio": "npx drizzle-kit studio",
@@ -102,7 +104,7 @@
         "jsonwebtoken": "^9.0.2",
         "lucide-react": "^0.399.0",
         "moment": "^2.31.0",
-        "next": "15.5.27",
+        "next": "15.5.28",
         "next-auth": "^4.24.15",
         "next-themes": "^0.3.0",
         "nodemailer": "^10.0.10",
@@ -127,7 +129,7 @@
         "tailwindcss-animate": "^1.0.7",
         "uuid": "^11.1.1",
         "write-excel-file": "^4.1.1",
-        "zod": "^3.23.8",
+        "zod": "^4.6.6",
         "zustand": "^4.5.4"
     },
     "devDependencies": {
@@ -139,7 +141,7 @@
         "@types/react": "^18",
         "@types/react-dom": "^18",
         "drizzle-kit": "^0.31.11",
-        "drizzle-zod": "^0.5.1",
+        "drizzle-zod": "^0.8.3",
         "eslint": "^8",
         "eslint-config-next": "14.2.4",
         "postcss": "^8.5.29",
@@ -148,7 +150,7 @@
         "tailwindcss": "^3.4.1",
         "tsx": "^4.15.7",
         "typescript": "5.5.4",
-        "zod-to-ts": "^1.2.0"
+        "zod-to-ts": "^2.1.0"
     },
     "resolutions": {
         "axios": "1.20.0",
@@ -157,7 +159,7 @@
         "**/@next/eslint-plugin-next/glob": "10.5.0",
         "node-forge": "1.4.0",
         "lodash": "4.18.1",
-        "postcss": "8.5.29",
+        "postcss": "8.5.31",
         "**/@esbuild-kit/core-utils/esbuild": "0.25.12",
         "**/refractor/prismjs": "1.30.0",
         "postcss-selector-parser": "7.1.6"

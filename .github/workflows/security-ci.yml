@@ -20,22 +20,16 @@ concurrency:
 
 jobs:
   security:
-    uses: neotree/security-ci/.github/workflows/security-ci.yml@ddd5eca85e6296dafc2dadc8b3242c05d165a76d
+    uses: neotree/security-ci/.github/workflows/security-ci.yml@4e70f356008729ed80de4e1f52419db842c407d6
     permissions:
       contents: read
       security-events: write
       packages: read
     with:
-      security-ci-ref: ddd5eca85e6296dafc2dadc8b3242c05d165a76d
+      security-ci-ref: 4e70f356008729ed80de4e1f52419db842c407d6
       node-version: "22"
-      # CodeQL runs from GitHub's Code Scanning *default setup* on this repository and has
-      # been uploading results on every push, pull request and schedule. Default setup
-      # rejects SARIF produced by an advanced configuration, so this pipeline's own CodeQL
-      # jobs could not upload and failed. Disabling them here leaves default setup as the
-      # single CodeQL source instead of two configurations fighting; scanning coverage is
-      # unchanged. To move CodeQL into this pipeline instead, turn off default setup under
-      # Settings > Security > Code scanning (needs repo admin) and delete this line.
-      enable-codeql: false
+      # CodeQL is not run here: the organisation-level code scanning configuration runs it
+      # on every repository, and a second configuration would only fail its upload.
       # upload-sarif stays enabled: this repository is public, so the OSV and Semgrep
       # SARIF uploads work normally.
       # Hosts this project's build needs beyond the npm registry:
