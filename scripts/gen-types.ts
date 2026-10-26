@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { ZodTypeAny } from 'zod';
-import { zodToTs, printNode } from 'zod-to-ts'
+import { zodToTs, printNode, createAuxiliaryTypeStore } from 'zod-to-ts'
 import fs from 'node:fs';
 
 import db from '@/databases/pg/drizzle';
@@ -99,7 +99,7 @@ async function main() {
         const arr: string[] = [];
 
         Object.keys(schemas).forEach(identifier => {
-            const { node } = zodToTs(schemas[identifier], identifier);
+            const { node } = zodToTs(schemas[identifier], { auxiliaryTypeStore: createAuxiliaryTypeStore(), });
             const nodeString = printNode(node);
             arr.push(`export type ${identifier} = ${nodeString};\n`);
         });
