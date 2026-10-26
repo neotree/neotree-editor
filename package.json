@@ -8,6 +8,7 @@
         "dev": "node server/index.js",
         "build": "next build",
         "typecheck": "tsc --noEmit",
+        "test": "for f in tests/*.test.ts; do echo \"== $f\"; tsx \"$f\" || exit 1; done",
         "ci:prepare": "prisma generate && npm rebuild bcrypt",
         "lint": "next lint",
         "db:studio": "npx drizzle-kit studio",
