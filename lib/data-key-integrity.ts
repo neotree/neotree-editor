@@ -12,6 +12,7 @@ import {
     shouldSyncScreenOwnedOptions,
     syncDiagnosisReference,
     syncFieldReference,
+    syncNuidSearchFieldReference,
     syncKeyOnlyReference,
     syncScreenEntityReference,
     syncScreenReference,
@@ -1254,7 +1255,7 @@ export function repairDataKeyIntegrityReferences<TScript extends NuidSearchSourc
                 byUniqueKey,
                 legacyMaps,
             });
-            const synced = syncFieldReference(field, fieldDataKey);
+            const synced = syncNuidSearchFieldReference(field, fieldDataKey);
             if (synced.changed) changed = true;
             return synced.value;
         });
@@ -1542,7 +1543,7 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
                 byUniqueKey,
                 legacyMaps,
             });
-            const synced = syncFieldReference(field, fieldDataKey);
+            const synced = syncNuidSearchFieldReference(field, fieldDataKey);
             if (synced.changed) changed = true;
             return synced.value;
         });

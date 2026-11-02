@@ -24,3 +24,7 @@ namespace NodeJS {
         CORS_ALLOWED_ORIGINS: string;
     }
 }
+
+// Plain stylesheet imports (app/layout.tsx). Next only declares *.module.css, and
+// TypeScript 6 checks side-effect imports.
+declare module "*.css";

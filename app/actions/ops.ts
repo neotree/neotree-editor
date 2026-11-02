@@ -27,6 +27,8 @@ import { buildReleasePublishChangeLog } from "@/databases/mutations/changelogs"
 import { getScriptsWithConditionErrors, getScriptsWithFieldKeyCollisions, recomputeScriptsConditionErrors } from "./scripts"
 import { describeFieldKeyCollisionCounts } from "@/lib/field-key-collisions"
 import type { PublishDataResponse } from "@/lib/publish-data"
+import { collectNuidSearchPublishErrors } from "@/lib/nuid-search/fields"
+import { indexDataKeysById } from "@/lib/nuid-search/resolve"
 import db from "@/databases/pg/drizzle"
 import {
   configKeysDrafts,
@@ -1446,6 +1448,32 @@ export async function publishData({ scope, allowConfidentialDowngrade }: { scope
 
       results.warnings = [...(results.warnings || []), headline, ...lines]
       results.blockingDetails = { ...(results.blockingDetails || {}), fieldKeyCollisions: keyGate }
+    }
+
+    // NUID Search is only checked here: saving a draft never blocks, so unfinished
+    // work can be kept, but a field the app cannot use must not reach devices.
+    // Every field must be a library key; drafts count, as they publish together.
+    const [nuidDraftRows, nuidLibrary] = await Promise.all([
+      db
+        .select({ data: scriptsDrafts.data })
+        .from(scriptsDrafts)
+        .where(draftScopeFilter(scriptsDrafts.createdByUserId)),
+      dataKeysQueries._getDataKeys({ returnDraftsIfExist: true }),
+    ])
+    if (nuidLibrary.errors?.length) throw new Error(nuidLibrary.errors.join(", "))
+    const nuidLibraryIndex = indexDataKeysById((nuidLibrary.data || []) as any)
+    const nuidErrors = collectNuidSearchPublishErrors(nuidDraftRows.map((row) => ({
+      title: row.data?.title,
+      nuidSearchEnabled: row.data?.nuidSearchEnabled,
+      nuidSearchFields: row.data?.nuidSearchFields,
+    })), { getLibraryKey: (keyId) => nuidLibraryIndex.get(keyId) })
+    if (nuidErrors.length) {
+      const top = nuidErrors.slice(0, 10).map((line) => `• ${line}`)
+      if (nuidErrors.length > top.length) top.push(`• …and ${nuidErrors.length - top.length} more`)
+      throw new Error([
+        "Nothing was published. These NUID Search fields can't be used by the app. Fix them on the script's NUID Search page, then publish again:",
+        ...top,
+      ].join("<br />"))
     }
 
     await db.transaction(async (tx) => {
