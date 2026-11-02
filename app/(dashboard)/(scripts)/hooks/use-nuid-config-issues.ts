@@ -7,25 +7,25 @@ import {
     validateCondition,
 } from "@/lib/conditional-expression";
 import { useDataKeysCtx } from "@/contexts/data-keys";
-import { normalizeDataKeyCompatibilityType } from "@/lib/data-key-types";
+import { validateNuidSearchFields } from "@/lib/nuid-search";
 
-const DROPDOWN_TYPES = ["dropdown", "multi_select"];
-
-export type NuidFieldIssue = {
-    /** Not linked to a compatible library key (unlinked, missing, wrong type, or a dropdown with no options). */
-    dataKey: boolean;
-    /** The field's condition has a blocking conditional-expression error. */
-    ce: boolean;
+export type NuidFieldIssues = {
+    /** Break the field on the app; publishing is blocked until they are fixed. */
+    errors: string[];
+    /** The field's condition will not evaluate; publishing warns, like every other condition. */
+    conditionErrors: string[];
+    /** Work on the app but deserve a look; they never block anything. */
+    warnings: string[];
 };
 
 /**
- * Shared source of truth for NUID Search config health, used by both the config
- * sheet and the script form so they agree on when to block saving.
+ * Shared source of truth for NUID Search config health, used by the config
+ * sheet, the field form and the script form so they report the same thing.
  *
- * A field is problematic when it isn't backed by a compatible library data key
- * (the feature only works with library keys) or its condition has a CE error.
- * While the data-key library is still loading nothing is flagged, so Save isn't
- * spuriously disabled mid-load.
+ * Nothing here blocks saving a draft: errors are what the publish gate refuses
+ * (lib/nuid-search validateNuidSearchFields), condition errors are what publish
+ * warns about, warnings are advice. Library checks wait for the library to load
+ * (`checking`), so they do not appear and disappear while it does.
  */
 export function useNuidConfigIssues(
     fields: any[] | undefined,
@@ -34,50 +34,62 @@ export function useNuidConfigIssues(
     const { conditionKeys, keysReady: conditionCatalogueReady } = useConditionKeys();
     const { extractDataKeys, loadingDataKeys } = useDataKeysCtx();
 
+    // Each field is its library key, so conditions resolve against those keys.
     const nuidFieldKeys = useMemo<ConditionKey[]>(() => {
         const keyIds = (fields || []).map((f) => f?.keyId).filter(Boolean) as string[];
         return keyIds.length ? toConditionKeys(extractDataKeys(keyIds, { withNested: true })) : [];
     }, [fields, extractDataKeys]);
 
     const keysReady = conditionCatalogueReady || nuidFieldKeys.length > 0;
+    const checking = !!enabled && !!loadingDataKeys;
 
-    const { hasIssues, issues } = useMemo(() => {
-        if (!enabled || loadingDataKeys) return { hasIssues: false, issues: [] as NuidFieldIssue[] };
+    const issues = useMemo<NuidFieldIssues[]>(() => {
+        if (!enabled) return [];
+
+        const reports = validateNuidSearchFields(fields, {
+            getLibraryKey: loadingDataKeys ? undefined : (keyId) => {
+                const [dk] = extractDataKeys([keyId]);
+                return dk || null;
+            },
+        });
 
         const merged = mergeConditionKeys(conditionKeys, nuidFieldKeys);
 
-        const issues: NuidFieldIssue[] = (fields || []).map((f) => {
-            const type = `${f?.type || ""}`.trim();
-            const expected = normalizeDataKeyCompatibilityType(type);
-
-            // Data-key health: must be linked to a compatible library key.
-            let dataKey = false;
-            const [dk] = f?.keyId ? extractDataKeys([f.keyId]) : [];
-            if (!dk) {
-                dataKey = true; // unlinked, or the key no longer exists in the library
-            } else if (normalizeDataKeyCompatibilityType(dk.dataType) !== expected) {
-                dataKey = true; // linked to the wrong type
-            } else if (DROPDOWN_TYPES.includes(type)) {
-                const opts = dk.options?.length ? extractDataKeys(dk.options) : [];
-                if (!opts.length) dataKey = true; // dropdown with no options is unanswerable
-            }
-
-            // Condition health.
-            let ce = false;
-            const cond = `${f?.condition || ""}`.trim();
-            if (cond) {
-                ce = validateCondition(cond, {
+        return (fields || []).map((f, i) => {
+            const conditionErrors: string[] = [];
+            const cond = `${f?.condition || ""}`;
+            if (cond.trim()) {
+                const result = validateCondition(cond, {
                     keys: merged,
                     allowSelf: true,
                     skipKeyResolution: !keysReady,
-                }).hasErrors;
+                });
+                result.diagnostics
+                    .filter((d) => d.severity === "error")
+                    .forEach((d) => conditionErrors.push(`Condition: ${d.message}`));
             }
 
-            return { dataKey, ce };
+            return {
+                errors: reports[i].errors,
+                conditionErrors,
+                warnings: reports[i].warnings,
+            };
         });
-
-        return { hasIssues: issues.some((i) => i.dataKey || i.ce), issues };
     }, [enabled, loadingDataKeys, fields, conditionKeys, nuidFieldKeys, extractDataKeys, keysReady]);
 
-    return { conditionKeys, keysReady, nuidFieldKeys, hasIssues, issues };
+    const errorCount = issues.reduce((n, i) => n + i.errors.length, 0);
+    const conditionErrorCount = issues.reduce((n, i) => n + i.conditionErrors.length, 0);
+    const warningCount = issues.reduce((n, i) => n + i.warnings.length, 0);
+
+    return {
+        conditionKeys,
+        keysReady,
+        nuidFieldKeys,
+        checking,
+        issues,
+        errorCount,
+        conditionErrorCount,
+        warningCount,
+        hasErrors: errorCount > 0,
+    };
 }

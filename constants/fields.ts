@@ -104,6 +104,7 @@ export const defaultNuidSearchFields = {
             type: 'text',
             key: 'patientNUID',
             label: "Search patient's NUID",
+            searchRole: 'patient',
             condition: "$BabyTransfered = 'Y'",
         },
         {
@@ -118,6 +119,7 @@ export const defaultNuidSearchFields = {
             type: 'text',
             key: 'BabyTwinNUID',
             label: "Search twin's NUID",
+            searchRole: 'twin',
             condition: "$BabyTwin = 'Y'",
         },
     ],
@@ -126,8 +128,8 @@ export const defaultNuidSearchFields = {
             ...defaultField,
             type: 'text',
             key: 'patientNUID',
-            values: 'Y,Yes\nN,No',
             label: "Search patient's NUID",
+            searchRole: 'patient',
         },
     ],
 };

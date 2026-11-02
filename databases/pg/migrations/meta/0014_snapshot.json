@@ -1,5 +1,5 @@
 {
-  "id": "67f5d043-5784-447b-be12-3c78f486ce53",
+  "id": "2cc97848-8715-4ec9-8880-cc4f17196ea6",
   "prevId": "07a30464-fb35-4e73-a58d-857339907afb",
   "version": "7",
   "dialect": "postgresql",
@@ -154,7 +154,10 @@
             "audit_log_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_api_keys": {
       "name": "nt_api_keys",
@@ -211,7 +214,10 @@
             "api_key"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_auth_clients": {
       "name": "nt_auth_clients",
@@ -288,7 +294,10 @@
             "client_token"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_change_logs": {
       "name": "nt_change_logs",
@@ -791,7 +800,10 @@
             "change_log_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_config_keys": {
       "name": "nt_config_keys",
@@ -936,7 +948,10 @@
             "label"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_config_keys_drafts": {
       "name": "nt_config_keys_drafts",
@@ -1032,7 +1047,10 @@
             "config_key_draft_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_config_keys_history": {
       "name": "nt_config_keys_history",
@@ -1094,10 +1112,13 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "public.nt_data_key_duplicate_dismissals": {
-      "name": "nt_data_key_duplicate_dismissals",
+    "public.nt_content_sync_hotfixes": {
+      "name": "nt_content_sync_hotfixes",
       "schema": "",
       "columns": {
         "id": {
@@ -1106,18 +1127,18 @@
           "primaryKey": true,
           "notNull": true
         },
-        "group_key": {
-          "name": "group_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "unique_keys": {
-          "name": "unique_keys",
-          "type": "jsonb",
+        "hotfix_id": {
+          "name": "hotfix_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "gen_random_uuid()"
+        },
+        "script_id": {
+          "name": "script_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
         },
         "reason": {
           "name": "reason",
@@ -1126,173 +1147,44 @@
           "notNull": true,
           "default": "''"
         },
-        "created_by_user_id": {
-          "name": "created_by_user_id",
+        "opened_by_user_id": {
+          "name": "opened_by_user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "nt_data_key_duplicate_dismissals_created_by_user_id_nt_users_user_id_fk": {
-          "name": "nt_data_key_duplicate_dismissals_created_by_user_id_nt_users_user_id_fk",
-          "tableFrom": "nt_data_key_duplicate_dismissals",
-          "tableTo": "nt_users",
-          "columnsFrom": [
-            "created_by_user_id"
-          ],
-          "columnsTo": [
-            "user_id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "nt_data_key_duplicate_dismissals_group_key_unique": {
-          "name": "nt_data_key_duplicate_dismissals_group_key_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "group_key"
-          ]
-        }
-      }
-    },
-    "public.nt_data_key_merges": {
-      "name": "nt_data_key_merges",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "merge_id": {
-          "name": "merge_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "status": {
-          "name": "status",
-          "type": "data_key_merge_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'applied'"
-        },
-        "scope": {
-          "name": "scope",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "survivor_unique_key": {
-          "name": "survivor_unique_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "survivor_name": {
-          "name": "survivor_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "merged_unique_keys": {
-          "name": "merged_unique_keys",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "script_ids": {
-          "name": "script_ids",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "request": {
-          "name": "request",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "report": {
-          "name": "report",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "snapshot": {
-          "name": "snapshot",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "created_by_user_id": {
-          "name": "created_by_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reverted_by_user_id": {
-          "name": "reverted_by_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
+        "opened_at": {
+          "name": "opened_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "reverted_at": {
-          "name": "reverted_at",
+        "closed_by_user_id": {
+          "name": "closed_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_at": {
+          "name": "closed_at",
           "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "close_note": {
+          "name": "close_note",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
       },
       "indexes": {
-        "data_key_merges_status_index": {
-          "name": "data_key_merges_status_index",
+        "content_sync_hotfixes_script_index": {
+          "name": "content_sync_hotfixes_script_index",
           "columns": [
             {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "data_key_merges_created_at_index": {
-          "name": "data_key_merges_created_at_index",
-          "columns": [
-            {
-              "expression": "created_at",
+              "expression": "script_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1305,12 +1197,12 @@
         }
       },
       "foreignKeys": {
-        "nt_data_key_merges_created_by_user_id_nt_users_user_id_fk": {
-          "name": "nt_data_key_merges_created_by_user_id_nt_users_user_id_fk",
-          "tableFrom": "nt_data_key_merges",
+        "nt_content_sync_hotfixes_opened_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_content_sync_hotfixes_opened_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_content_sync_hotfixes",
           "tableTo": "nt_users",
           "columnsFrom": [
-            "created_by_user_id"
+            "opened_by_user_id"
           ],
           "columnsTo": [
             "user_id"
@@ -1318,12 +1210,12 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "nt_data_key_merges_reverted_by_user_id_nt_users_user_id_fk": {
-          "name": "nt_data_key_merges_reverted_by_user_id_nt_users_user_id_fk",
-          "tableFrom": "nt_data_key_merges",
+        "nt_content_sync_hotfixes_closed_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_content_sync_hotfixes_closed_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_content_sync_hotfixes",
           "tableTo": "nt_users",
           "columnsFrom": [
-            "reverted_by_user_id"
+            "closed_by_user_id"
           ],
           "columnsTo": [
             "user_id"
@@ -1334,14 +1226,17 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "nt_data_key_merges_merge_id_unique": {
-          "name": "nt_data_key_merges_merge_id_unique",
+        "nt_content_sync_hotfixes_hotfix_id_unique": {
+          "name": "nt_content_sync_hotfixes_hotfix_id_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "merge_id"
+            "hotfix_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_devices": {
       "name": "nt_devices",
@@ -1411,7 +1306,10 @@
             "device_hash"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_diagnoses": {
       "name": "nt_diagnoses",
@@ -1643,7 +1541,10 @@
             "old_diagnosis_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_diagnoses_drafts": {
       "name": "nt_diagnoses_drafts",
@@ -1785,7 +1686,10 @@
             "diagnosis_draft_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_diagnoses_history": {
       "name": "nt_diagnoses_history",
@@ -1866,7 +1770,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_drugs_library": {
       "name": "nt_drugs_library",
@@ -2151,7 +2058,10 @@
             "key"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_drugs_library_drafts": {
       "name": "nt_drugs_library_drafts",
@@ -2261,7 +2171,10 @@
             "item_draft_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_drugs_library_history": {
       "name": "nt_drugs_library_history",
@@ -2323,7 +2236,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_editor_info": {
       "name": "nt_editor_info",
@@ -2367,12 +2283,22 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{\"capturedAt\":null,\"capturedByUserId\":null,\"totalBlockingIssues\":0,\"totalScripts\":0,\"fingerprintVersion\":2,\"ruleSetVersion\":\"2026-04-26\",\"fingerprints\":[],\"acceptedImportFingerprints\":[],\"acceptedImportFingerprintRefs\":{}}'::jsonb"
+        },
+        "content_sync": {
+          "name": "content_sync",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_email_templates": {
       "name": "nt_email_templates",
@@ -2422,7 +2348,10 @@
             "name"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_files": {
       "name": "nt_files",
@@ -2524,7 +2453,10 @@
             "file_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_files_aliases": {
       "name": "nt_files_aliases",
@@ -2566,7 +2498,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_files_chunks": {
       "name": "nt_files_chunks",
@@ -2623,7 +2558,10 @@
             "chunk_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_hospitals": {
       "name": "nt_hospitals",
@@ -2730,7 +2668,10 @@
             "name"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_hospitals_drafts": {
       "name": "nt_hospitals_drafts",
@@ -2820,7 +2761,10 @@
             "hospital_draft_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_hospitals_history": {
       "name": "nt_hospitals_history",
@@ -2882,7 +2826,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_integrity_import_snapshots": {
       "name": "nt_integrity_import_snapshots",
@@ -3115,7 +3062,10 @@
             "snapshot_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_languages": {
       "name": "nt_languages",
@@ -3178,7 +3128,10 @@
             "iso"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_mailer_settings": {
       "name": "nt_mailer_settings",
@@ -3301,7 +3254,10 @@
             "name"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_pending_deletion": {
       "name": "nt_pending_deletion",
@@ -3732,7 +3688,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_problems": {
       "name": "nt_problems",
@@ -3951,7 +3910,10 @@
             "problem_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_problems_drafts": {
       "name": "nt_problems_drafts",
@@ -4093,7 +4055,10 @@
             "problem_draft_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_problems_history": {
       "name": "nt_problems_history",
@@ -4174,7 +4139,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_screens": {
       "name": "nt_screens",
@@ -4763,7 +4731,10 @@
             "old_screen_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_screens_drafts": {
       "name": "nt_screens_drafts",
@@ -4912,7 +4883,10 @@
             "screen_draft_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_screens_history": {
       "name": "nt_screens_history",
@@ -4993,7 +4967,153 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.nt_script_import_sources": {
+      "name": "nt_script_import_sources",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "target_script_id": {
+          "name": "target_script_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_site_id": {
+          "name": "source_site_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_site_link": {
+          "name": "source_site_link",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_script_id": {
+          "name": "source_script_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_snapshot": {
+          "name": "base_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pending_snapshot": {
+          "name": "pending_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pending_by_user_id": {
+          "name": "pending_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_fingerprint": {
+          "name": "source_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_fingerprint": {
+          "name": "target_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "synced_at": {
+          "name": "synced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pending_source_fingerprint": {
+          "name": "pending_source_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "script_import_sources_source_index": {
+          "name": "script_import_sources_source_index",
+          "columns": [
+            {
+              "expression": "source_site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source_script_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "nt_script_import_sources_pending_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_script_import_sources_pending_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_script_import_sources",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "pending_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "nt_script_import_sources_target_script_id_unique": {
+          "name": "nt_script_import_sources_target_script_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "target_script_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_scripts": {
       "name": "nt_scripts",
@@ -5214,7 +5334,10 @@
             "old_script_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_scripts_drafts": {
       "name": "nt_scripts_drafts",
@@ -5337,7 +5460,10 @@
             "script_draft_id"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_scripts_history": {
       "name": "nt_scripts_history",
@@ -5399,7 +5525,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_sites": {
       "name": "nt_sites",
@@ -5515,7 +5644,10 @@
             "link"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_sys": {
       "name": "nt_sys",
@@ -5565,7 +5697,10 @@
             "key"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_tokens": {
       "name": "nt_tokens",
@@ -5621,7 +5756,10 @@
             "token"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_user_roles": {
       "name": "nt_user_roles",
@@ -5658,7 +5796,10 @@
             "name"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_users": {
       "name": "nt_users",
@@ -5814,7 +5955,10 @@
             "email"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_data_keys": {
       "name": "nt_data_keys",
@@ -6006,7 +6150,10 @@
             "unique_key"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_data_keys_drafts": {
       "name": "nt_data_keys_drafts",
@@ -6148,7 +6295,10 @@
             "uuid"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_data_keys_history": {
       "name": "nt_data_keys_history",
@@ -6210,7 +6360,10 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.nt_aliases": {
       "name": "nt_aliases",
@@ -6292,7 +6445,10 @@
             "uuid"
           ]
         }
-      }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -6323,14 +6479,6 @@
         "alias",
         "hospital",
         "release"
-      ]
-    },
-    "public.data_key_merge_status": {
-      "name": "data_key_merge_status",
-      "schema": "public",
-      "values": [
-        "applied",
-        "reverted"
       ]
     },
     "public.draft_origin": {
@@ -6449,6 +6597,10 @@
     }
   },
   "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

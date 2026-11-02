@@ -340,13 +340,13 @@ function Form({
 
     const isFormDisabled = isReadOnly || saving;
 
-    // Keep one row per stored option, even if its data key is missing, so row
-    // actions always operate on the option the user can see.
-    const children = useMemo(() => {
-        return (options || []).map(option => dataKeys.find(key => key.uniqueKey === option) || {
-            uniqueKey: option,
+    // One row per stored option, in order. Options whose data key no longer exists get a placeholder row
+    // instead of being skipped, so row actions always act on the option they show.
+    const children = useMemo((): ((typeof dataKeys)[0] & { missing?: boolean; })[] => {
+        return (options || []).map(o => dataKeys.find(k => k.uniqueKey === o) || {
+            uniqueKey: o,
             name: '(missing data key)',
-            label: option,
+            label: o,
             dataType: '',
             missing: true,
         } as unknown as (typeof dataKeys)[0] & { missing?: boolean });
@@ -684,7 +684,7 @@ function Form({
                 mode="unlink"
                 open={!!unlinkDialog}
                 impact={unlinkDialog?.impact || []}
-                dataKeys={children.filter(k => !(unlinkDialog?.children || []).some(c => c.uniqueKey === k.uniqueKey))}
+                dataKeys={children.filter(k => !k.missing && !(unlinkDialog?.children || []).some(c => c.uniqueKey === k.uniqueKey))}
                 title="Choose replacements before unlinking"
                 onOpenChange={(open) => {
                     if (!open) setUnlinkDialog(null);
@@ -972,9 +972,8 @@ function Form({
                                                     align: 'right',
                                                     cellClassName: 'w-20',
                                                     cellRenderer({ rowIndex }) {
-                                                        // Rows render from `children` (resolved keys), so index into
-                                                        // that — indexing into `options` would drift when an option
-                                                        // is missing from the library.
+                                                        // Rows render from `children` (one per option, with a
+                                                        // placeholder for an option missing from the library).
                                                         const child = children[rowIndex];
 
                                                         if (!child) return null;
@@ -987,7 +986,7 @@ function Form({
                                                                     </DropdownMenuTrigger>
 
                                                                     <DropdownMenuContent>
-                                                                        {!!child.uuid && (
+                                                                        {!child.missing && (
                                                                             <DropdownMenuItem asChild>
                                                                                 <Link
                                                                                     href={`/data-keys/edit/${child.uuid}`}

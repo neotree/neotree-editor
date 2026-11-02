@@ -404,8 +404,14 @@ export async function _saveDataKeys({
                         const nextOptions = normalizedItem.options !== undefined
                             ? (normalizedItem.options || [])
                             : previousOptions;
+                        // An option still on the published key also counts as removable when the draft
+                        // no longer lists it.
+                        const publishedOptionsForDraft = !draft?.dataKeyId ? [] : ((await executor.query.dataKeys.findFirst({
+                            where: eq(dataKeys.uuid, draft.dataKeyId),
+                            columns: { options: true, },
+                        }))?.options || []) as string[];
                         const reconciledDeletedUniqueKeys = deletedUniqueKeys.filter(key =>
-                            previousOptions.includes(key) && !nextOptions.includes(key),
+                            (previousOptions.includes(key) || publishedOptionsForDraft.includes(key)) && !nextOptions.includes(key),
                         );
 
                         // Newly added options must exist, keep the pool single-typed,
