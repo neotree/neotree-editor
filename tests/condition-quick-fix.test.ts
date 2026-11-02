@@ -35,6 +35,9 @@ const EXPRESSIONS = [
   "$Sex = 'Nope'",                                    // UNKNOWN_OPTION
   "$Diagnoses includes ('RDN') and $Sex = 'M'",       // MEMBERSHIP_BRACKETS
   "$Outcome ! = 'BID'",                               // SPACED_NOT_EQUAL
+  "$Sex = 'M'\n\n$Gestation > 20",                    // BLANK_LINE
+  "$Sex = 'M' and($Gestation > 20)",                  // OPERATOR_SPACING
+  "$Sex =\t'M'",                                      // TAB_CHARACTER
 ];
 
 const seen = new Set<string>();

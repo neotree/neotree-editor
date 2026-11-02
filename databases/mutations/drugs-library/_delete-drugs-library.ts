@@ -8,6 +8,7 @@ import socket from '@/lib/socket';
 import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
 import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
 import { and } from 'drizzle-orm';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type DeleteDrugsLibraryItemsData = {
     itemsIds: string[];
@@ -37,6 +38,8 @@ export async function _deleteDrugsLibraryItems(
     const response: DeleteDrugsLibraryItemsResponse = { success: false, };
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const itemsIds = itemsIdsParam || [];
 
         if (itemsIds.length) {

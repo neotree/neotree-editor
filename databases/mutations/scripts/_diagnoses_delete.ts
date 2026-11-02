@@ -5,6 +5,7 @@ import db from '@/databases/pg/drizzle';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { diagnoses, diagnosesDrafts, pendingDeletion, scriptsDrafts, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type DeleteDiagnosesData = {
     diagnosesIds?: string[];
@@ -47,6 +48,8 @@ export async function _deleteDiagnoses(
     const executor = client || db;
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const shouldConfirmDeleteAll = !scriptsIds.length && !diagnosesIds.length && !confirmDeleteAll;
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the diagnoses, please confirm this action!');
 

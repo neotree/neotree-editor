@@ -4,10 +4,12 @@ import logger from '@/lib/logger';
 import socket from '@/lib/socket';
 import db from '@/databases/pg/drizzle';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
-import { diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensDrafts, scripts as scriptsTable, scriptsDrafts as scriptsDraftsTable } from '@/databases/pg/schema';
+import { dataKeys as dataKeysTable, dataKeysDrafts as dataKeysDraftsTable, diagnoses, diagnosesDrafts, problems, problemsDrafts, screens, screensDrafts, scripts as scriptsTable, scriptsDrafts as scriptsDraftsTable } from '@/databases/pg/schema';
 import { _getScreens, _getDiagnoses, _getProblems } from '@/databases/queries/scripts';
 import { _saveScreens, _saveDiagnoses, _saveProblems, _saveScripts } from '@/databases/mutations/scripts';
-import { DataKey } from "@/databases/queries/data-keys";
+import { DataKey, _getDataKeys } from "@/databases/queries/data-keys";
+import { applyLibraryKeyToNuidField, type NuidLibraryKeyFull } from "@/lib/nuid-search/fields";
+import { normalizeDataKeyCompatibilityType } from "@/lib/data-key-types";
 import type { ScriptField } from "@/types";
 import {
     shouldSyncFieldOwnedOptions,
@@ -15,6 +17,7 @@ import {
     syncDiagnosisReference,
     dropRelinkCollisions,
     syncFieldReference,
+    syncNuidSearchFieldReference,
     syncKeyOnlyReference,
     syncScreenEntityReference,
     syncScreenReference,
@@ -109,6 +112,12 @@ export type UpdateDataKeysRefsResponse = {
         problems: AffectedEntity[];
         usages: AffectedUsage[];
     };
+    /**
+     * Updated entities whose current version is another user's draft. The sync is written into their
+     * draft (so it goes live with their work); the saver is told, because it reaches devices only when
+     * that user publishes.
+     */
+    othersDrafts?: { type: 'screen' | 'diagnosis' | 'problem'; title: string; scriptTitle?: string; ownerId: string | null; }[];
 };
 
 // NUID search fields hang off the script record, so they are synced from the scripts
@@ -325,6 +334,37 @@ export async function _updateDataKeysRefs({
             });
         };
 
+        // NUID Search dropdowns hold their options as text ("value,label" per line),
+        // not as references to the option keys, so nothing below would notice an
+        // option key changing. Their parent keys are found here, and every NUID
+        // dropdown on one of them has its options rebuilt from the library.
+        const changedKeyIds = Array.from(new Set(
+            dataKeys.flatMap((key) => [key.uniqueKey, key.uuid]).map((id) => `${id || ''}`.trim()).filter(Boolean),
+        ));
+        const nuidParentUniqueKeys = new Set<string>(changedUniqueKeys);
+        if (changedKeyIds.length) {
+            const idList = sql.join(changedKeyIds.map((id) => sql`${id}`), sql`, `);
+            const [publishedParents, draftParents] = await Promise.all([
+                executor
+                    .select({ uniqueKey: dataKeysTable.uniqueKey })
+                    .from(dataKeysTable)
+                    .where(and(
+                        isNull(dataKeysTable.deletedAt),
+                        sql`jsonb_exists_any(${dataKeysTable.options}, array[${idList}]::text[])`,
+                    )),
+                executor
+                    .select({ uniqueKey: dataKeysDraftsTable.uniqueKey })
+                    .from(dataKeysDraftsTable)
+                    .where(sql`jsonb_exists_any(coalesce(${dataKeysDraftsTable.data}->'options', '[]'::jsonb), array[${idList}]::text[])`),
+            ]);
+            [...publishedParents, ...draftParents].forEach((row) => {
+                if (row.uniqueKey) nuidParentUniqueKeys.add(`${row.uniqueKey}`);
+            });
+        }
+        const nuidScriptLikePatterns = Array.from(new Set([
+            ...buildJsonKeyIdPatterns(Array.from(nuidParentUniqueKeys), ['keyId']),
+        ]));
+
         const screenJsonReferenceKeys = [
             'keyId',
             'refKeyId',
@@ -441,6 +481,29 @@ export async function _updateDataKeysRefs({
             chunkCandidates.forEach(rows => rows.forEach(addCandidate));
         }
 
+        // Scripts whose NUID dropdowns sit on a parent of a changed key (their options are rebuilt below).
+        const nuidOnlyPatterns = nuidScriptLikePatterns.filter((pattern) => !likePatterns.includes(pattern));
+        for (const patternChunk of chunkArray(nuidOnlyPatterns, LIKE_PATTERN_CHUNK_SIZE)) {
+            const chunkCandidates = await Promise.all([
+                executor
+                    .select({ scriptId: scriptsTable.scriptId })
+                    .from(scriptsTable)
+                    .where(and(
+                        isNull(scriptsTable.deletedAt),
+                        buildLikeClauses(sql`${scriptsTable.nuidSearchFields}`, patternChunk),
+                    )),
+                executor
+                    .select({
+                        scriptDraftId: scriptsDraftsTable.scriptDraftId,
+                        scriptId: scriptsDraftsTable.scriptId,
+                    })
+                    .from(scriptsDraftsTable)
+                    .where(buildLikeClauses(sql`${scriptsDraftsTable.data}`, patternChunk)),
+            ]);
+
+            chunkCandidates.forEach(rows => rows.forEach(addCandidate));
+        }
+
         stats.candidateScripts = candidateScripts.size;
 
         const useFullScan = forceFullScan;
@@ -512,6 +575,37 @@ export async function _updateDataKeysRefs({
                 })),
         ].filter(record => record.scriptId && record.nuidSearchFields.length);
 
+        // The current library (drafts included) for the NUID dropdowns being rebuilt,
+        // indexed by both ids an option list may use.
+        const nuidLibraryIndex = new Map<string, DataKey>();
+        const nuidParentKeyIds = Array.from(new Set(
+            scriptRecords
+                .flatMap((record) => record.nuidSearchFields)
+                .filter((f) => (f?.type === 'dropdown') && f.keyId && nuidParentUniqueKeys.has(`${f.keyId}`))
+                .map((f) => `${f.keyId}`),
+        ));
+        if (nuidParentKeyIds.length) {
+            const parentsRes = await _getDataKeys({ uniqueKeys: nuidParentKeyIds, client: executor });
+            const optionIds = Array.from(new Set((parentsRes.data || []).flatMap((k) => k.options || []).map((id) => `${id}`)));
+            const [optionsByUniqueKey, optionsByUuid] = optionIds.length
+                ? await Promise.all([
+                    _getDataKeys({ uniqueKeys: optionIds, client: executor }),
+                    _getDataKeys({ dataKeysIds: optionIds, client: executor }),
+                ])
+                : [{ data: [] as DataKey[] }, { data: [] as DataKey[] }];
+            const libraryErrors = [
+                ...(parentsRes.errors || []),
+                ...((optionsByUniqueKey as { errors?: string[] }).errors || []),
+                ...((optionsByUuid as { errors?: string[] }).errors || []),
+            ];
+            if (libraryErrors.length) return { success: false, errors: libraryErrors, info: stats };
+            [...(parentsRes.data || []), ...(optionsByUniqueKey.data || []), ...(optionsByUuid.data || [])].forEach((k) => {
+                if (k.uniqueKey) nuidLibraryIndex.set(`${k.uniqueKey}`, k);
+                if (k.uuid) nuidLibraryIndex.set(`${k.uuid}`, k);
+            });
+        }
+        const getNuidLibraryKey = (id: string) => nuidLibraryIndex.get(id) as NuidLibraryKeyFull | undefined;
+
         stats.fetchedScreens = screensArr.length;
         stats.fetchedDiagnoses = diagnosesArr.length;
         stats.fetchedProblems = problemsArr.length;
@@ -541,7 +635,9 @@ export async function _updateDataKeysRefs({
                 });
             }
 
-            let updated = !!screenDataKey || !!refIdDataKey;
+            // Only entities that actually change are saved. Saving every entity that merely references a
+            // changed key created a draft (owned by whoever saved the key) in every script that uses it.
+            let updated = false;
             const screenOptionUniqueKeys = new Set((screenDataKey?.options || []).filter(Boolean));
             const shouldSyncScreenOptions = shouldSyncScreenOwnedOptions({
                 screenType: s.type,
@@ -560,7 +656,6 @@ export async function _updateDataKeysRefs({
                     trackMatchSource(itemMatchSource);
 
                     if (itemDataKey) {
-                        updated = true;
                         relinkedItems.add(itemIndex);
                         addUsage({
                             id: item.itemId || `${s.screenId}:item:${itemIndex}`,
@@ -597,6 +692,8 @@ export async function _updateDataKeysRefs({
                         ...syncedItem.value,
                     };
                 }), relinkedItems);
+            // relinked items that collided with a sibling were dropped
+            if (items.length !== (s.items || []).length) updated = true;
             if (shouldSyncScreenOptions && (items || []).some((item) => {
                 const keyId = `${item.keyId || ''}`.trim();
                 return !!keyId && !screenOptionUniqueKeys.has(keyId);
@@ -664,7 +761,6 @@ export async function _updateDataKeysRefs({
                     trackMatchSource(fieldItemMatchSource);
 
                     if (fieldItemDataKey) {
-                        updated = true;
                         relinkedFieldItems.add(fieldItemIndex);
                         addUsage({
                             id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
@@ -717,6 +813,7 @@ export async function _updateDataKeysRefs({
                         ...fieldItemValue,
                     };
                 }), relinkedFieldItems);
+                if (fieldItems.length !== (field.items || []).length) updated = true;
                 const syncedField = syncFieldReference(field, fieldDataKey);
                 const syncedRefField = syncKeyOnlyReference(syncedField.value, refKeyDataKey, {
                     id: "refKeyId",
@@ -795,7 +892,7 @@ export async function _updateDataKeysRefs({
                 });
             }
 
-            let updated = !!diagnosisDataKey;
+            let updated = false;
 
             const relinkedSymptoms = new Set<number>();
             const symptoms = dropRelinkCollisions((d.symptoms || []).map((item, symptomIndex) => {
@@ -806,7 +903,6 @@ export async function _updateDataKeysRefs({
                 trackMatchSource(symptomMatchSource);
 
                 if (symptomDataKey) {
-                    updated = true;
                     relinkedSymptoms.add(symptomIndex);
                     addUsage({
                         id: item?.symptomId || `${d.diagnosisId}:symptom:${symptomIndex}`,
@@ -828,6 +924,7 @@ export async function _updateDataKeysRefs({
                     ...syncedSymptom.value,
                 };
             }), relinkedSymptoms);
+            if (symptoms.length !== (d.symptoms || []).length) updated = true;
             const syncedDiagnosis = syncDiagnosisReference({
                 ...d,
                 key: name,
@@ -863,17 +960,24 @@ export async function _updateDataKeysRefs({
                 });
             }
 
-            let updated = !!problemDataKey;
-
-            return {
+            const synced = {
                 ...d,
                 key: name,
-                updated,
                 ...(!problemDataKey ? {} : {
                     keyId: problemDataKey.uniqueKey,
                     key: problemDataKey.name,
                     name: problemDataKey.label,
                 }),
+            };
+            const updated = !!problemDataKey && (
+                `${synced.keyId || ''}` !== `${d.keyId || ''}` ||
+                `${synced.key || ''}` !== `${d.key || ''}` ||
+                `${synced.name || ''}` !== `${d.name || ''}`
+            );
+
+            return {
+                ...synced,
+                updated,
             };
         }).filter(d => !!d.updated).map(({ updated, ...d }) => d);
 
@@ -887,11 +991,24 @@ export async function _updateDataKeysRefs({
                 });
                 trackMatchSource(fieldMatchSource);
 
-                if (fieldDataKey) {
+                const syncedField = syncNuidSearchFieldReference(field, fieldDataKey);
+                let value = syncedField.value;
+
+                // A dropdown on a changed key, or on a key whose options changed:
+                // everything the key owns, options included, comes from the library.
+                const libraryKey = (value.type === 'dropdown') && value.keyId && nuidParentUniqueKeys.has(`${value.keyId}`)
+                    ? getNuidLibraryKey(`${value.keyId}`)
+                    : undefined;
+                if (libraryKey && (normalizeDataKeyCompatibilityType(libraryKey.dataType) === normalizeDataKeyCompatibilityType(value.type))) {
+                    value = applyLibraryKeyToNuidField(value, libraryKey, getNuidLibraryKey);
+                }
+
+                const changed = JSON.stringify(value) !== JSON.stringify(field);
+                if (fieldDataKey || changed) {
                     addUsage({
                         id: field.fieldId || `${script.scriptId}:nuidSearchField:${fieldIndex}`,
                         kind: 'script_nuid_search_field',
-                        title: field.label || field.key || `${fieldIndex + 1}`,
+                        title: value.label || value.key || `${fieldIndex + 1}`,
                         location: 'NUID search',
                         scriptId: script.scriptId,
                         scriptTitle: script.scriptTitle,
@@ -899,9 +1016,8 @@ export async function _updateDataKeysRefs({
                     });
                 }
 
-                const syncedField = syncFieldReference(field, fieldDataKey);
-                if (syncedField.changed) updated = true;
-                return syncedField.value;
+                if (changed) updated = true;
+                return value;
             });
 
             return {
@@ -971,9 +1087,18 @@ export async function _updateDataKeysRefs({
             usages: Array.from(usagesMap.values()),
         };
 
+        const isOthersDraft = (e: { isDraft?: boolean; draftCreatedByUserId?: string | null; }) =>
+            !!e.isDraft && (e.draftCreatedByUserId || null) !== (userId || null);
+        const othersDrafts: NonNullable<UpdateDataKeysRefsResponse['othersDrafts']> = [
+            ...screensUpdatedData.filter(isOthersDraft).map(s => ({ type: 'screen' as const, title: s.title || s.label || s.screenId, scriptTitle: s.scriptTitle || undefined, ownerId: s.draftCreatedByUserId || null })),
+            ...diagnosesUpdatedData.filter(isOthersDraft).map(d => ({ type: 'diagnosis' as const, title: d.name || d.diagnosisId, scriptTitle: d.scriptTitle || undefined, ownerId: d.draftCreatedByUserId || null })),
+            ...problemsUpdatedData.filter(isOthersDraft).map(p => ({ type: 'problem' as const, title: p.name || p.problemId, scriptTitle: p.scriptTitle || undefined, ownerId: p.draftCreatedByUserId || null })),
+        ];
+
         if (dryRun) {
             return {
                 success: true,
+                othersDrafts,
                 info: stats,
                 preview: {
                     screens: screensUpdatedData,
@@ -1081,7 +1206,7 @@ export async function _updateDataKeysRefs({
         const saved = stats.savedDiagnoses + stats.savedProblems + stats.savedScreens + stats.savedScriptRecords;
         if (broadcastAction && saved) socket.emit('data_changed', 'save_scripts');
 
-        return { success: true, info: stats, affected };
+        return { success: true, info: stats, affected, othersDrafts };
     } catch(e: any) {
         logger.error('_updateDataKeysRefs ERROR', e.message);
         return {

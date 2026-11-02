@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, asc, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, notExists, or, sql } from "drizzle-orm";
 import db from '@/databases/pg/drizzle';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import * as schema from "@/databases/pg/schema";
-import { PgColumn, PgTable } from "drizzle-orm/pg-core";
+import { PgColumn } from "drizzle-orm/pg-core";
 
 export type GetDataKeysRefsParams = {
     uniqueKeys: string[];
@@ -14,6 +14,9 @@ const defaultResData = [] as {
     refType: string;
     refId: string;
     data: any;
+    /** Set when `data` is a draft: who owns it (null = no owner). */
+    draftOwnerId?: string | null;
+    isDraft?: boolean;
     dataKeys: {
         key: string;
         dataKey: string;
@@ -40,32 +43,27 @@ export async function _getDataKeysRefs({
             ...uniqueKeys.map(k => sql`${column}::text like ${`%${escapeLikePattern(k)}%`}`),
         );
 
-        // Published rows superseded by a draft must always be excluded, whether or
-        // not that draft still matches the keys — the draft is the current state.
-        // NOT EXISTS keeps that in the database instead of shipping every draft id
-        // back as a NOT IN list.
-        // The draft column goes in by name: findMany re-aliases every column object in
-        // `where` to the queried table, which would compare the published row with itself.
-        const notDrafted = (draftTable: PgTable, draftColumn: PgColumn, publishedColumn: PgColumn) =>
-            sql`not exists (select 1 from ${draftTable} d where d.${sql.identifier(draftColumn.name)} = ${publishedColumn})`;
-
         // diagnoses
         const _diagnosesDrafts = await executor.query.diagnosesDrafts.findMany({
             where: whereUniqueKey(schema.diagnosesDrafts.data),
             orderBy: asc(schema.diagnosesDrafts.position),
         });
 
-        const _diagnoses = await executor.query.diagnoses.findMany({
-            where: and(
+        // Published rows only count when they have no draft at all: the draft is the current version.
+        // (The draft exclusion used to sit inside the or(), which returned every published row, and the
+        // published copy of an edited entity was then saved over its draft.)
+        // (plain select, not the relational query builder: that one aliases the table, and the
+        // NOT EXISTS below must reference the real table name)
+        const _diagnoses = await executor.select().from(schema.diagnoses)
+            .where(and(
                 or(
                     whereUniqueKey(schema.diagnoses.symptoms),
                     whereUniqueKey(schema.diagnoses.keyId),
                 ),
-                notDrafted(schema.diagnosesDrafts, schema.diagnosesDrafts.diagnosisId, schema.diagnoses.diagnosisId),
                 isNull(schema.diagnoses.deletedAt),
-            ),
-            orderBy: asc(schema.diagnoses.position),
-        });
+                notExists(executor.select({ one: sql`1` }).from(schema.diagnosesDrafts).where(eq(schema.diagnosesDrafts.diagnosisId, schema.diagnoses.diagnosisId))),
+            ))
+            .orderBy(asc(schema.diagnoses.position));
 
         // problems
         const _problemsDrafts = await executor.query.problemsDrafts.findMany({
@@ -73,17 +71,16 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.problemsDrafts.position),
         });
 
-        const _problems = await executor.query.problems.findMany({
-            where: and(
+        const _problems = await executor.select().from(schema.problems)
+            .where(and(
                 or(
                     whereUniqueKey(schema.problems.symptoms),
                     whereUniqueKey(schema.problems.keyId),
                 ),
-                notDrafted(schema.problemsDrafts, schema.problemsDrafts.problemId, schema.problems.problemId),
                 isNull(schema.problems.deletedAt),
-            ),
-            orderBy: asc(schema.problems.position),
-        });
+                notExists(executor.select({ one: sql`1` }).from(schema.problemsDrafts).where(eq(schema.problemsDrafts.problemId, schema.problems.problemId))),
+            ))
+            .orderBy(asc(schema.problems.position));
 
         // screens
         const _screensDrafts = await executor.query.screensDrafts.findMany({
@@ -91,19 +88,18 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.screensDrafts.position),
         });
 
-        const _screens = await executor.query.screens.findMany({
-            where: and(
+        const _screens = await executor.select().from(schema.screens)
+            .where(and(
                 or(
                     whereUniqueKey(schema.screens.fields),
                     whereUniqueKey(schema.screens.items),
                     whereUniqueKey(schema.screens.keyId),
                     whereUniqueKey(schema.screens.refIdDataKey),
                 ),
-                notDrafted(schema.screensDrafts, schema.screensDrafts.screenId, schema.screens.screenId),
                 isNull(schema.screens.deletedAt),
-            ),
-            orderBy: asc(schema.screens.position),
-        });
+                notExists(executor.select({ one: sql`1` }).from(schema.screensDrafts).where(eq(schema.screensDrafts.screenId, schema.screens.screenId))),
+            ))
+            .orderBy(asc(schema.screens.position));
 
         // scripts - NUID search fields live on the script record itself
         const _scriptsDrafts = await executor.query.scriptsDrafts.findMany({
@@ -111,18 +107,22 @@ export async function _getDataKeysRefs({
             orderBy: asc(schema.scriptsDrafts.position),
         });
 
-        const _scripts = await executor.query.scripts.findMany({
-            where: and(
+        const _scripts = await executor.select().from(schema.scripts)
+            .where(and(
                 whereUniqueKey(schema.scripts.nuidSearchFields),
                 isNull(schema.scripts.deletedAt),
-                // Every drafted script, not only drafts that still match: same rule as above.
-                notDrafted(schema.scriptsDrafts, schema.scriptsDrafts.scriptId, schema.scripts.scriptId),
-            ),
-            orderBy: asc(schema.scripts.position),
-        });
+                notExists(executor.select({ one: sql`1` }).from(schema.scriptsDrafts).where(eq(schema.scriptsDrafts.scriptId, schema.scripts.scriptId))),
+            ))
+            .orderBy(asc(schema.scripts.position));
+
+        const draftOwners = new Map<string, string | null>();
+        const asDraft = <T>(id: string, owner: string | null | undefined, data: T) => {
+            draftOwners.set(id, owner || null);
+            return data;
+        };
 
         const diagnoses = [
-            ..._diagnosesDrafts.map(d => ({
+            ..._diagnosesDrafts.map(d => asDraft(d.data.diagnosisId || d.diagnosisDraftId, d.createdByUserId, {
                 ...d.data,
                 diagnosisId: d.data.diagnosisId || d.diagnosisDraftId,
             })),
@@ -130,7 +130,7 @@ export async function _getDataKeysRefs({
         ];
 
         const problems = [
-            ..._problemsDrafts.map(d => ({
+            ..._problemsDrafts.map(d => asDraft(d.data.problemId || d.problemDraftId, d.createdByUserId, {
                 ...d.data,
                 problemId: d.data.problemId || d.problemDraftId,
             })),
@@ -138,7 +138,7 @@ export async function _getDataKeysRefs({
         ];
 
         const screens = [
-            ..._screensDrafts.map(d => ({
+            ..._screensDrafts.map(d => asDraft(d.data.screenId || d.screenDraftId, d.createdByUserId, {
                 ...d.data,
                 screenId: d.data.screenId || d.screenDraftId,
             })),
@@ -146,12 +146,16 @@ export async function _getDataKeysRefs({
         ];
 
         const scripts = [
-            ..._scriptsDrafts.map(d => ({
+            ..._scriptsDrafts.map(d => asDraft(d.data.scriptId || d.scriptDraftId, d.createdByUserId, {
                 ...d.data,
                 scriptId: d.data.scriptId || d.scriptDraftId,
             })),
             ..._scripts,
         ];
+
+        const draftInfo = (id: string) => draftOwners.has(id)
+            ? { isDraft: true, draftOwnerId: draftOwners.get(id) ?? null }
+            : { isDraft: false };
 
         const extractDataKeys = (o: object, parentKey?: string) => {
             let dataKeys: typeof defaultResData[0]['dataKeys'] = [];
@@ -196,6 +200,7 @@ export async function _getDataKeysRefs({
             refId: s.diagnosisId,
             refType: 'diagnosis',
             dataKeys: extractDataKeys(s),
+            ...draftInfo(s.diagnosisId),
         }));
 
         const problemsDataKeys: typeof defaultResData = problems.map(s => ({
@@ -203,6 +208,7 @@ export async function _getDataKeysRefs({
             refId: s.problemId,
             refType: 'problem',
             dataKeys: extractDataKeys(s),
+            ...draftInfo(s.problemId),
         }));
 
         const screensDataKeys: typeof defaultResData = screens.map(s => ({
@@ -210,6 +216,7 @@ export async function _getDataKeysRefs({
             refId: s.screenId,
             refType: 'screen',
             dataKeys: extractDataKeys(s),
+            ...draftInfo(s.screenId),
         }));
 
         const scriptsDataKeys: typeof defaultResData = scripts.map(s => ({
@@ -217,6 +224,7 @@ export async function _getDataKeysRefs({
             refId: s.scriptId,
             refType: 'script',
             dataKeys: extractDataKeys(s),
+            ...draftInfo(s.scriptId),
         }));
 
         return {

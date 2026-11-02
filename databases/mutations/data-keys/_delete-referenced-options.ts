@@ -4,6 +4,8 @@ import { _saveScreens, _saveDiagnoses, _saveProblems, _saveScripts, } from '../s
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 
+type RefRow = Awaited<ReturnType<typeof _getDataKeysRefs>>['data'][0];
+
 export type UnlinkReplacementDataKey = {
     uniqueKey: string;
     name: string;
@@ -28,17 +30,28 @@ export type DeleteReferencedDataKeyOptionsScope = {
     replacements?: Record<string, UnlinkReplacementDataKey>;
 };
 
+/**
+ * Remove data-key options from the screens, diagnoses and problems that use them.
+ *
+ * With a `scope` (or `parentUniqueKey`: options removed from one key's option list) only the parents' own
+ * questions lose the option. Without one (the keys themselves were deleted) every reference is removed.
+ *
+ * Drafts owned by another user are never rewritten; they are reported in `skipped` instead.
+ */
 export async function _deleteReferencedDataKeyOptions({
     uniqueKeys,
     userId,
     client,
-    scope,
+    scope: scopeParam,
+    parentUniqueKey,
     scriptIdsByUniqueKey,
 }: {
     uniqueKeys: string[];
     userId?: string;
     client?: DbOrTransaction;
     scope?: DeleteReferencedDataKeyOptionsScope;
+    /** Shorthand for `scope: { parentUniqueKeys: [parentUniqueKey] }`. */
+    parentUniqueKey?: string | null;
     /**
      * "Selected scripts only": a key's references are removed only inside
      * these scripts (deleted uniqueKey -> scriptIds); a key missing from the
@@ -48,8 +61,13 @@ export async function _deleteReferencedDataKeyOptions({
 }): Promise<{
     errors?: string[];
     success: boolean;
+    skipped?: { refType: string; refId: string; title: string; draftOwnerId: string | null }[];
 }> {
     try {
+        const scope: DeleteReferencedDataKeyOptionsScope | undefined = scopeParam
+            || (parentUniqueKey ? { parentUniqueKeys: [parentUniqueKey] } : undefined);
+        const skipped: NonNullable<Awaited<ReturnType<typeof _deleteReferencedDataKeyOptions>>['skipped']> = [];
+
         if (uniqueKeys.length) {
             const refs = await _getDataKeysRefs({ uniqueKeys, client, });
             if (refs.errors?.length) throw new Error(refs.errors[0]);
@@ -81,6 +99,13 @@ export async function _deleteReferencedDataKeyOptions({
                 .filter(Boolean));
             const isOwnedByScope = (ownerKeyId?: string | null) =>
                 !scope || scopeParents.has(`${ownerKeyId || ''}`.trim());
+
+            // Another user's (or an ownerless) unpublished draft is never rewritten.
+            const writable = (ref: RefRow, title: string) => {
+                if (!ref.isDraft || ref.draftOwnerId === (userId || null)) return true;
+                skipped.push({ refType: ref.refType, refId: ref.refId, title, draftOwnerId: ref.draftOwnerId ?? null });
+                return false;
+            };
 
             /**
              * Replace-or-remove within one owned option collection. An item whose
@@ -213,7 +238,8 @@ export async function _deleteReferencedDataKeyOptions({
                         { id: 'refIdDataKey' },
                     ], markChanged);
 
-                    return changed ? { ...clearedScreen, items, fields } : null;
+                    if (!changed || !writable(d, screen?.title || screen?.label || d.refId)) return null;
+                    return { ...clearedScreen, items, fields };
                 })
                 .filter((screen): screen is NonNullable<typeof screen> => !!screen);
 
@@ -247,8 +273,9 @@ export async function _deleteReferencedDataKeyOptions({
 
             // Diagnosis/problem symptoms reference keys directly, not through a
             // parent's option pool. An unlink leaves the child in the library, so
-            // those references stay valid and must not be stripped.
-            if (!scope) {
+            // those references stay valid and are only stripped from diagnoses and
+            // problems keyed by the parent itself (its own questions).
+            {
                 const saveDiagnosesData = refs.data
                     .filter(d => d.refType === 'diagnosis')
                     .map(d => {
@@ -257,15 +284,17 @@ export async function _deleteReferencedDataKeyOptions({
                         let changed = false;
                         const markChanged = () => { changed = true; };
 
+                        const ownsSymptoms = isOwnedByScope(diagnosis?.keyId);
                         const symptoms = (diagnosis?.symptoms || []).filter(symptom => {
-                            const keep = !referencesDeletedKey(symptom.keyId);
+                            const keep = !ownsSymptoms || !referencesDeletedKey(symptom.keyId);
                             if (!keep) changed = true;
                             return keep;
                         });
 
-                        const clearedDiagnosis = clearScalarRefs(referencesDeletedKey, diagnosis, [{ id: 'keyId' }], markChanged);
+                        const clearedDiagnosis = scope ? diagnosis : clearScalarRefs(referencesDeletedKey, diagnosis, [{ id: 'keyId' }], markChanged);
 
-                        return changed ? { ...clearedDiagnosis, symptoms } : null;
+                        if (!changed || !writable(d, (diagnosis as any)?.name || d.refId)) return null;
+                        return { ...clearedDiagnosis, symptoms };
                     })
                     .filter((diagnosis): diagnosis is NonNullable<typeof diagnosis> => !!diagnosis);
 
@@ -287,15 +316,17 @@ export async function _deleteReferencedDataKeyOptions({
                         let changed = false;
                         const markChanged = () => { changed = true; };
 
+                        const ownsSymptoms = isOwnedByScope(problem?.keyId);
                         const symptoms = (problem?.symptoms || []).filter(symptom => {
-                            const keep = !referencesDeletedKey(symptom.keyId);
+                            const keep = !ownsSymptoms || !referencesDeletedKey(symptom.keyId);
                             if (!keep) changed = true;
                             return keep;
                         });
 
-                        const clearedProblem = clearScalarRefs(referencesDeletedKey, problem, [{ id: 'keyId' }], markChanged);
+                        const clearedProblem = scope ? problem : clearScalarRefs(referencesDeletedKey, problem, [{ id: 'keyId' }], markChanged);
 
-                        return changed ? { ...clearedProblem, symptoms } : null;
+                        if (!changed || !writable(d, (problem as any)?.name || d.refId)) return null;
+                        return { ...clearedProblem, symptoms };
                     })
                     .filter((problem): problem is NonNullable<typeof problem> => !!problem);
 
@@ -310,7 +341,8 @@ export async function _deleteReferencedDataKeyOptions({
                 }
             }
 
-            const saveScriptsData = refs.data
+            // NUID search fields are keys, not options: only touched when the keys themselves are deleted.
+            const saveScriptsData = !!scope ? [] : refs.data
                 .filter(d => d.refType === 'script')
                 .map(d => {
                     const script: Parameters<typeof _saveScripts>[0]['data'][0] = d.data;
@@ -319,6 +351,7 @@ export async function _deleteReferencedDataKeyOptions({
                     const nuidSearchFields = script?.nuidSearchFields || [];
                     const keptFields = nuidSearchFields.filter(f => !referencesDeletedKey(f.keyId));
                     if (keptFields.length === nuidSearchFields.length) return null;
+                    if (!writable(d, script?.title || d.refId)) return null;
 
                     return {
                         scriptId: script.scriptId,
@@ -328,17 +361,19 @@ export async function _deleteReferencedDataKeyOptions({
                 .filter((script): script is NonNullable<typeof script> => !!script);
 
             if (saveScriptsData.length) {
-                await _saveScripts({
+                const res = await _saveScripts({
                     userId: userId || undefined,
                     data: saveScriptsData,
                     draftOrigin: 'data_key_sync',
                     client,
                 });
+                if (res.errors?.length) throw new Error(res.errors[0]);
             }
         }
 
         return {
             success: true,
+            skipped,
         };
     } catch(e: any) {
         logger.error('_deleteReferencedDataKeyOptions ERROR', e.message);

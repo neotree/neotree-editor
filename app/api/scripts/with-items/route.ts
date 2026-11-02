@@ -11,7 +11,10 @@ export async function POST(req: NextRequest) {
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], }, { status: 200, });
 
         const body = await req.json();
-        const { data: scripts, } = body.data as Parameters<typeof saveScriptsWithItems>[0];
+        // Callers send { data: [...scripts] }; older code read body.data.data, which is undefined for
+        // that shape ("a is not iterable"), so every export through this route failed.
+        const scripts = (Array.isArray(body?.data) ? body.data : body?.data?.data) as Parameters<typeof saveScriptsWithItems>[0]['data'];
+        if (!Array.isArray(scripts)) return NextResponse.json({ success: false, errors: ['Missing scripts'], }, { status: 200, });
 
         const res = await saveScriptsWithItems({ data: scripts, });
 

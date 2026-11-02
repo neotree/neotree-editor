@@ -44,6 +44,7 @@ import { Separator } from "@/components/ui/separator";
 import { useIsLocked } from '@/hooks/use-is-locked';
 import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { cn } from "@/lib/utils";
 import type { SaveDataKeysResponse } from "@/databases/mutations/data-keys/_save";
 import type { UpdateDataKeysRefsResponse } from "@/databases/mutations/data-keys/_update_data_keys_refs";
@@ -89,7 +90,7 @@ function Form({
     const { allDataKeys: dataKeys, loadingDataKeys, saving, saveDataKeys, getLatestDataKeys } = useDataKeysCtx();
     const { confirm, } = useConfirmModal();
     const { alert } = useAlertModal();
-    const { viewOnly } = useAppContext();
+    const viewOnly = useContentViewOnly("dataKeys", null);
 
     const dataKey = useMemo(() => dataKeys.find(k => (
         (k.uuid === dataKeyId) ||
@@ -196,7 +197,6 @@ function Form({
             setValue('options', dataKey?.options || []);
             setValue('metadata', dataKey?.metadata || {});
             setValue('version', dataKey?.version || 1);
-            setValue('deletedUniqueKeys', [] as string[]);
         }
     }, [dataKey, options, currentDataKey, isLocked, shouldResetForm, setValue]);
 
@@ -279,10 +279,14 @@ function Form({
 
         const uuid = (data as any)?.uuid || dataKey?.uuid || uuidv4();
         const uniqueKey = (data as any)?.uniqueKey ?? dataKey?.uniqueKey ?? null;
+        // What this form started from (it is not refreshed while you edit). When the key changed since
+        // (another user, an import), the server applies only this edit's own additions and removals.
+        const baseOptions = currentDataKey?.options || [];
         const payload = {
             ...data,
             uuid,
             uniqueKey,
+            ...(currentDataKey ? { baseOptions, } : {}),
             version: typeof data.version === "string" ? Number(data.version) : data.version,
         } as DataKeyFormData & {
             uuid: string;
@@ -333,8 +337,16 @@ function Form({
 
     const isFormDisabled = isReadOnly || saving;
 
-    const children = useMemo(() => {
-        return options.map(o => dataKeys.find(k => k.uniqueKey === o)!).filter(k => k);
+    // One row per stored option, in order. Options whose data key no longer exists get a placeholder row
+    // instead of being skipped, so row actions always act on the option they show.
+    const children = useMemo((): ((typeof dataKeys)[0] & { missing?: boolean; })[] => {
+        return (options || []).map(o => dataKeys.find(k => k.uniqueKey === o) || {
+            uniqueKey: o,
+            name: '(missing data key)',
+            label: o,
+            dataType: '',
+            missing: true,
+        } as unknown as (typeof dataKeys)[0] & { missing?: boolean; });
     }, [dataKeys, options]);
 
     // Parents that link this key as a child option — shown so users understand
@@ -669,7 +681,7 @@ function Form({
                 mode="unlink"
                 open={!!unlinkDialog}
                 impact={unlinkDialog?.impact || []}
-                dataKeys={children.filter(k => !(unlinkDialog?.children || []).some(c => c.uniqueKey === k.uniqueKey))}
+                dataKeys={children.filter(k => !k.missing && !(unlinkDialog?.children || []).some(c => c.uniqueKey === k.uniqueKey))}
                 title="Choose replacements before unlinking"
                 onOpenChange={(open) => {
                     if (!open) setUnlinkDialog(null);
@@ -957,9 +969,8 @@ function Form({
                                                     align: 'right',
                                                     cellClassName: 'w-20',
                                                     cellRenderer({ rowIndex }) {
-                                                        // Rows render from `children` (resolved keys), so index into
-                                                        // that — indexing into `options` would drift when an option
-                                                        // is missing from the library.
+                                                        // Rows render from `children` (one per option, with a
+                                                        // placeholder for an option missing from the library).
                                                         const child = children[rowIndex];
 
                                                         if (!child) return null;
@@ -972,23 +983,25 @@ function Form({
                                                                     </DropdownMenuTrigger>
 
                                                                     <DropdownMenuContent>
-                                                                        <DropdownMenuItem asChild>
-                                                                            <Link
-                                                                                href={`/data-keys/edit/${child.uuid}`}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
-                                                                            >
-                                                                                {isReadOnly ? (
-                                                                                    <>
-                                                                                        <EyeIcon className="h-4 w-4 mr-2" /> View
-                                                                                    </>
-                                                                                ) : (
-                                                                                    <>
-                                                                                        <EditIcon className="h-4 w-4 mr-2" /> Edit
-                                                                                    </>
-                                                                                )}
-                                                                            </Link>
-                                                                        </DropdownMenuItem>
+                                                                        {!child.missing && (
+                                                                            <DropdownMenuItem asChild>
+                                                                                <Link
+                                                                                    href={`/data-keys/edit/${child.uuid}`}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                >
+                                                                                    {isReadOnly ? (
+                                                                                        <>
+                                                                                            <EyeIcon className="h-4 w-4 mr-2" /> View
+                                                                                        </>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <EditIcon className="h-4 w-4 mr-2" /> Edit
+                                                                                        </>
+                                                                                    )}
+                                                                                </Link>
+                                                                            </DropdownMenuItem>
+                                                                        )}
 
                                                                         {!optionsLocked && (
                                                                             <DropdownMenuItem

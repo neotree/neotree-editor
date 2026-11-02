@@ -37,6 +37,8 @@ import { ScreenReviewConfig } from "./screen-review-config";
 import { LockStatus } from '@/components/lock-status';
 import { EligibilityCriteriaForm } from "./eligibility-criteria-form";
 import { useScriptFormCtx } from '@/contexts/script-form';
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { ContentSyncBanner } from "./content-sync-banner";
 
 export function ScriptForm() {
     const searchParams = useSearchParams();
@@ -51,6 +53,7 @@ export function ScriptForm() {
         hospitals,
         loading,
         disabled,
+        viewOnly,
         isLocked,
         lockedByUserId,
         reset: resetForm,
@@ -62,7 +65,9 @@ export function ScriptForm() {
         getDefaultScreenReviewConfigurations,
         onSubmit,
         saveDraft,
+        formIsDirty,
     } = form;
+    const { confirmLeave } = useUnsavedChangesGuard(!!formIsDirty && !loading);
 
     const { mode } = useAppContext();
 
@@ -72,7 +77,26 @@ export function ScriptForm() {
     const nuidSearchFields = watch('nuidSearchFields');
     const nuidSearchEnabled = watch('nuidSearchEnabled');
 
-    const { hasIssues: nuidHasIssues } = useNuidConfigIssues(nuidSearchFields, nuidSearchEnabled);
+    const {
+        checking: nuidChecking,
+        errorCount: nuidErrorCount,
+    } = useNuidConfigIssues(nuidSearchFields, nuidSearchEnabled);
+
+    const nuidErrorsNotice = nuidErrorCount
+        ? `NUID Search has ${nuidErrorCount} error${nuidErrorCount === 1 ? '' : 's'}. The draft is saved, but publishing is blocked until ${nuidErrorCount === 1 ? 'it is' : 'they are'} fixed.`
+        : undefined;
+
+    // Said next to the button, not in a tooltip: a disabled button shows no tooltip in most browsers.
+    const saveStatus = (() => {
+        if (disabled) {
+            if (isLocked) return 'Locked: another user has unpublished changes to this script.';
+            if (viewOnly) return 'View only: you cannot edit this script.';
+        }
+        if (nuidChecking) return 'Checking NUID Search…';
+        if (formIsDirty) return 'Unsaved changes';
+        if (formData?.scriptId) return 'All changes saved';
+        return null;
+    })();
     const eligibilityCriteria = watch('eligibilityCriteria');
     const preferences = watch('preferences');
     const reviewable = watch('reviewable');
@@ -91,6 +115,8 @@ export function ScriptForm() {
                 className="flex flex-col gap-y-4 [&>*]:px-4"
             >
                 <>
+                    <ContentSyncBanner scriptId={scriptFormCtx.formData?.scriptId} showEntityDiff />
+
                     {isLocked && (
                         <div>
                             <LockStatus 
@@ -292,20 +318,28 @@ export function ScriptForm() {
 
                 </>
 
-                <div className={cn('flex gap-x-2 py-4')}>
+                <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 py-4')}>
+                    <div className="flex flex-col text-xs">
+                        {!!saveStatus && <span className="text-muted-foreground">{saveStatus}</span>}
+                        {!disabled && !!nuidErrorCount && (
+                            <span className="text-danger">
+                                NUID Search has {nuidErrorCount} error{nuidErrorCount === 1 ? '' : 's'}. You can save; publishing is blocked until {nuidErrorCount === 1 ? 'it is' : 'they are'} fixed.
+                            </span>
+                        )}
+                    </div>
+
                     <div className="ml-auto" />
 
                     <Button
                         variant="ghost"
-                        onClick={() => onCancelScriptForm()}
+                        onClick={() => confirmLeave(() => onCancelScriptForm())}
                     >
                         Cancel
                     </Button>
 
                     <Button
-                        onClick={() => onSubmit()}
-                        disabled={disabled || nuidHasIssues}
-                        title={nuidHasIssues ? 'Resolve the NUID Search data key / condition issues before saving.' : undefined}
+                        onClick={() => onSubmit({ notice: nuidErrorsNotice })}
+                        disabled={disabled}
                     >
                         Save draft
                     </Button>

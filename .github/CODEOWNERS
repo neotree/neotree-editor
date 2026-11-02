@@ -27,3 +27,8 @@
 /.github/CODEOWNERS         @neotree/core-devs
 /.github/dependabot.yml     @neotree/core-devs
 /LICENSE                    @neotree/core-devs
+
+# Scanner scope and suppression files: each can silence a scanner for the whole repository.
+/.gitleaksignore            @neotree/core-devs
+/.osv-scanner.toml          @neotree/core-devs
+/osv-scanner.toml           @neotree/core-devs

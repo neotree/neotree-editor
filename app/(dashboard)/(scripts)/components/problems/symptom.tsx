@@ -18,6 +18,7 @@ import { Title } from "../title";
 import { useProblemForm } from "../../hooks/use-problem-form";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
+import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { collectNewOutcomeKeyCollisions } from "@/lib/conditional-expression";
 
 type Props = {
@@ -39,6 +40,7 @@ export function Symptom<P = {}>({
     unavailableOutcomeKeys,
     ...extraProps
 }: Props & P) {
+    const { confirm: confirmDiscard } = useConfirmModal();
     const { data: symptom, index: symptomIndex, } = { ...symptomProp, };
 
     const [open, setOpen] = useState(false);
@@ -67,6 +69,7 @@ export function Symptom<P = {}>({
         register,
         handleSubmit,
         setValue,
+        formState: { isDirty: symptomFormIsDirty },
     } = useForm({
         defaultValues: getDefaultValues(),
     });
@@ -91,7 +94,7 @@ export function Symptom<P = {}>({
             form.setValue('symptoms', form.getValues('symptoms').map((f, i) => ({
                 ...f,
                 ...(i === symptomIndex ? data : null),
-            })));
+            })), { shouldDirty: true, });
         } else {
             form.setValue('symptoms', [...form.getValues('symptoms'), data], { shouldDirty: true, })
         }
@@ -107,8 +110,22 @@ export function Symptom<P = {}>({
                 title={symptom ? 'Edit symptom' : 'Add symptom'}
                 trigger={typeof children === 'function' ? children({ extraProps }) : children}
                 onOpenChange={open => {
-                    setOpen(open);
-                    resetForm(getDefaultValues());
+                    const applyOpenChange = () => {
+                        setOpen(open);
+                        resetForm(getDefaultValues());
+                    };
+                    // Closing with unsaved changes (Esc, clicking outside, Cancel) asks first, in the app's dialog
+                    if (!open && symptomFormIsDirty) {
+                        confirmDiscard(applyOpenChange, {
+                            title: 'Discard changes?',
+                            message: 'Discard your changes to this symptom?',
+                            positiveLabel: 'Discard',
+                            negativeLabel: 'Keep editing',
+                            danger: true,
+                        });
+                        return;
+                    }
+                    applyOpenChange();
                 }}
                 actions={(
                     <>

@@ -7,7 +7,7 @@ import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { dataKeys, dataKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getDataKeys, _getDataKeysRefs } from '@/databases/queries/data-keys';
-import { normalizeIncomingDataKeyPatch } from '@/lib/data-key-save';
+import { normalizeIncomingDataKeyPatch, rebaseDataKeyOptions } from '@/lib/data-key-save';
 import { validateDataKeyOptionsAddition } from '@/lib/data-key-children';
 import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
 import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
@@ -19,6 +19,7 @@ import {
     _deleteReferencedDataKeyOptions,
     type UnlinkReplacementDataKey,
 } from './_delete-referenced-options';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
     deletedUniqueKeys?: string[];
@@ -28,6 +29,11 @@ export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
      * `options` array; unmapped unlinked children are removed from owned screens.
      */
     optionReplacements?: Record<string, string>;
+    /**
+     * The option list the editor started from. When the key changed since (another user, an import),
+     * only this edit's own additions and removals are applied to the current list instead of replacing it.
+     */
+    baseOptions?: string[];
 };
 
 export type SaveDataKeysParams = {
@@ -62,6 +68,10 @@ export type SaveDataKeysResponse = {
     /** The recorded operation, for its report and revert. */
     operationId?: string;
 };
+
+const describeOthersDrafts = (items: { title: string; scriptTitle?: string; }[]) =>
+    items.slice(0, 10).map(e => `${e.scriptTitle ? `${e.scriptTitle} > ` : ''}${e.title}`).join('; ') +
+    (items.length > 10 ? '; ...' : '');
 
 const uniqueValues = (values: string[]) => Array.from(new Set(values.map((value) => `${value || ''}`.trim()).filter(Boolean)));
 
@@ -216,8 +226,13 @@ export async function _saveDataKeys({
     dryRun,
 }: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     const response: SaveDataKeysResponse = { success: false, };
+    // an editor save never writes into another user's (or an ownerless) unpublished draft
+    const refuseOthersDrafts = draftOrigin === 'editor' && !!userId;
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
+
         let refsSaved = 0;
         let saveWarnings: string[] = [];
 
@@ -346,8 +361,9 @@ export async function _saveDataKeys({
                     publishDate,
                     deletedAt,
                     updatedAt,
-                    deletedUniqueKeys = [],
+                    deletedUniqueKeys: requestedDeletedUniqueKeys = [],
                     optionReplacements = {},
+                    baseOptions,
                     ...item
                 } of data
             ) {
@@ -370,6 +386,16 @@ export async function _saveDataKeys({
                                 !normalizedItem.uniqueKey ? undefined : eq(dataKeys.uniqueKey, normalizedItem.uniqueKey)
                             ),
                         });
+
+                        // The editor's list was made from `baseOptions`: apply only its own additions and
+                        // removals to what is stored now, so a concurrent change is not overwritten.
+                        if (Array.isArray(baseOptions) && Array.isArray(normalizedItem.options) && (draft || published)) {
+                            normalizedItem.options = rebaseDataKeyOptions({
+                                incoming: normalizedItem.options,
+                                base: baseOptions,
+                                current: ((draft ? draft.data?.options : published?.options) || []) as string[],
+                            });
+                        }
 
                         const existingUniqueKey = draft?.data?.uniqueKey || published?.uniqueKey || normalizedItem.uniqueKey || '';
                         const previousOptions = (draft?.data?.options || published?.options || []) as string[];
@@ -397,6 +423,16 @@ export async function _saveDataKeys({
                             });
                             if (optionsError) throw new Error(optionsError);
                         }
+
+                        // Only options that really left this key's list. The form's list of deleted options
+                        // could still name an option deleted and added back, or deleted from the wrong row.
+                        const publishedOptionsForDraft = !draft?.dataKeyId ? [] : ((await executor.query.dataKeys.findFirst({
+                            where: eq(dataKeys.uuid, draft.dataKeyId),
+                            columns: { options: true, },
+                        }))?.options || []) as string[];
+                        const removableOptions = new Set([...previousOptions, ...publishedOptionsForDraft]);
+                        const deletedUniqueKeys = requestedDeletedUniqueKeys
+                            .filter(uk => removableOptions.has(uk) && !nextOptions.includes(uk));
 
                         // Validate the unlink plan BEFORE writing the draft so a bad
                         // replacement can never leave a half-applied save behind.
@@ -457,7 +493,10 @@ export async function _saveDataKeys({
                                     name: data.name,
                                     uniqueKey: data.uniqueKey,
                                     draftOrigin,
-                                }).where(eq(dataKeysDrafts.uuid, dataKeyUuid));
+                                    // an ownerless draft is taken over by whoever edits it next
+                                    ...(!draft.createdByUserId && userId ? { createdByUserId: userId } : {}),
+                                // the draft may have been found by uniqueKey under a different uuid
+                                }).where(eq(dataKeysDrafts.uuid, draft.uuid));
                             trackRename(draft.data?.name, data.name);
 
                             if (data.uniqueKey) {
@@ -529,6 +568,20 @@ export async function _saveDataKeys({
                                 client: executor,
                             });
                             if (unlinkRes.errors?.length) throw new Error(unlinkRes.errors.join(', '));
+                            const skipped = unlinkRes.skipped || [];
+                            if (skipped.length && refuseOthersDrafts) {
+                                throw new Error(
+                                    `Not saved: removing ${unlinkPlan.deletedUniqueKeys.length === 1 ? 'this option' : 'these options'} would change ${skipped.length === 1 ? 'a question' : `${skipped.length} questions`} that another user is still editing (unpublished): ` +
+                                    describeOthersDrafts(skipped) +
+                                    '. Ask them to publish or discard their changes first (an admin can take over drafts that have no owner).',
+                                );
+                            } else if (skipped.length) {
+                                warnings.push(
+                                    `${skipped.length} question${skipped.length === 1 ? '' : 's'} still list the removed option${unlinkPlan.deletedUniqueKeys.length === 1 ? '' : 's'} because another user has unpublished changes there: ` +
+                                    skipped.slice(0, 10).map(item => item.title).join(', ') +
+                                    (skipped.length > 10 ? ', ...' : ''),
+                                );
+                            }
                         }
                     }
                 } catch(e: any) {
@@ -576,6 +629,20 @@ export async function _saveDataKeys({
                         affected: updateRefsRes.affected,
                     },
                 };
+
+                const othersDrafts = updateRefsRes.othersDrafts || [];
+                if (othersDrafts.length && refuseOthersDrafts) {
+                    throw new Error(
+                        `Not saved: this change would also update ${othersDrafts.length === 1 ? 'a question' : `${othersDrafts.length} questions`} that another user is still editing (unpublished): ` +
+                        describeOthersDrafts(othersDrafts) +
+                        '. Ask them to publish or discard their changes first (an admin can take over drafts that have no owner).',
+                    );
+                }
+                if (othersDrafts.length) {
+                    warnings.push(
+                        `${othersDrafts.length} question${othersDrafts.length === 1 ? ' is' : 's are'} in another user's unpublished draft and ${othersDrafts.length === 1 ? 'was' : 'were'} updated there; ${othersDrafts.length === 1 ? 'it goes' : 'they go'} live when that user publishes: ${describeOthersDrafts(othersDrafts)}`,
+                    );
+                }
 
                 // The refs sync renamed field keys and option values in these
                 // scripts; bring their conditions along ($Old, $Parent = 'Old').
@@ -695,7 +762,7 @@ export async function _saveDataKeysIfNotExist({
     try {
         const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
 
-        const saved = await _getDataKeys({ uniqueKeys, });
+        const saved = await _getDataKeys({ uniqueKeys, client: params.client, });
 
         data = data.filter(item => {
             const existing = saved.data.find(dk => dk.uniqueKey === item.uniqueKey);
@@ -736,7 +803,7 @@ export async function _saveDataKeysUpdateIfExist({
     try {
         const uniqueKeys = data.map(item => item.uniqueKey!).filter(n => n);
 
-        const saved = await _getDataKeys({ uniqueKeys, });
+        const saved = await _getDataKeys({ uniqueKeys, client: params.client, });
 
         const res = await _saveDataKeys({
             ...params,

@@ -43,7 +43,11 @@ export type DiagnosticCode =
   | "EMPTY_VALUE"
   | "NULL_VALUE"
   | "VALUE_WHITESPACE"
-  | "TRAILING_WHITESPACE";
+  | "TRAILING_WHITESPACE"
+  | "BLANK_LINE"
+  | "OPERATOR_SPACING"
+  | "TAB_CHARACTER"
+  | "EMPTY_OUTCOME_EXPRESSION";
 
 export interface Diagnostic {
   severity: Severity;

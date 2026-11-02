@@ -15,6 +15,7 @@ import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type DeleteDataKeysParams = {
     dataKeysIds: string[];
@@ -260,6 +261,8 @@ export async function _deleteDataKeys(
     const response: DeleteDataKeysResponse = { success: false, };
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const dataKeysIds = uniqueValues(dataKeysIdsParam);
 
         if (dataKeysIds.length) {
@@ -426,7 +429,13 @@ export async function _deleteDataKeys(
                         client: tx,
                     });
 
-                    const deletedUniqueKeys = uniqueValues(targets.map((dataKey) => dataKey.uniqueKey || ''));
+                    // Keys with a replacement were just rewritten to it; removing their leftover references
+                    // everywhere would delete whatever the rewrite could not reach. They are only stripped
+                    // from the scripts the user chose to remove them from instead of replacing.
+                    const replacedIds = new Set(Object.keys(replacements || {}).filter(id => !!replacements[id]));
+                    const deletedUniqueKeys = uniqueValues(targets
+                        .filter((dataKey) => !replacedIds.has(dataKey.uuid))
+                        .map((dataKey) => dataKey.uniqueKey || ''));
                     if (deletedUniqueKeys.length) {
                         const deleteReferencedOptionsRes = await _deleteReferencedDataKeyOptions({
                             userId: userId || undefined,
@@ -436,6 +445,24 @@ export async function _deleteDataKeys(
 
                         if (deleteReferencedOptionsRes.errors?.length) {
                             throw new Error(deleteReferencedOptionsRes.errors[0]);
+                        }
+                    }
+
+                    const removalScriptIdsByUniqueKey = Object.fromEntries(Object.entries(resolveScriptRemovalExclusions({
+                        impact,
+                        replacements: replacements || {},
+                        scriptRemovals: scriptRemovals || {},
+                    })).filter(([, scriptIds]) => scriptIds.length));
+                    if (Object.keys(removalScriptIdsByUniqueKey).length) {
+                        const removalsRes = await _deleteReferencedDataKeyOptions({
+                            userId: userId || undefined,
+                            uniqueKeys: Object.keys(removalScriptIdsByUniqueKey),
+                            scriptIdsByUniqueKey: removalScriptIdsByUniqueKey,
+                            client: tx,
+                        });
+
+                        if (removalsRes.errors?.length) {
+                            throw new Error(removalsRes.errors[0]);
                         }
                     }
 

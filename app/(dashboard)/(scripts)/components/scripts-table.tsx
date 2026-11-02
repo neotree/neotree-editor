@@ -5,6 +5,7 @@ import { Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/data-table";
 import {
@@ -20,6 +21,9 @@ import { useScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
+import { useContentSyncStatus } from "@/hooks/use-content-sync-status";
+import { ContentSyncStatusBadge } from "@/components/content-sync-status-badge";
 import { ScriptsTableBottomActions } from "./scripts-table-bottom-actions";
 import { ScriptsTableActions } from "./scripts-table-row-actions";
 import { ScriptsExportModal } from "./scripts-export-modal";
@@ -47,7 +51,11 @@ export function ScriptsTable(props: Props) {
         onDuplicate,
     } = useScriptsTable(props);
 
-    const { sys, viewOnly } = useAppContext();
+    const { sys, viewOnly: viewMode, isSuperUser } = useAppContext();
+    const viewOnly = useContentViewOnly("scripts", null);
+    const contentSyncStatus = useContentSyncStatus();
+    // Content sync: on a target editor super users can still delete scripts (e.g. ones deleted on the source).
+    const canDeleteOnTarget = viewOnly && !viewMode && !!isSuperUser;
     const { hospitals, } = useScriptsContext();
 
     const [conditionErrors, setConditionErrors] = useState<Record<string, ScriptConditionReport>>({});
@@ -138,7 +146,9 @@ export function ScriptsTable(props: Props) {
                     getRowOptions={({ rowIndex }) => {
                         const s = scriptsArr[rowIndex];
                         return !s ? {} : {
-                            className: cn(!viewOnly && (s.isDraft || s.hasChangedItems) && 'bg-danger/20 hover:bg-danger/30')
+                            className: cn(
+                                !viewOnly && (s.isDraft || s.hasChangedItems) && 'bg-danger/20 hover:bg-danger/30',
+                            ),
                         };
                     }}
                     rowRenderer={!search.value ? undefined : ({ props, cells, rowIndex, }) => {
@@ -339,10 +349,28 @@ export function ScriptsTable(props: Props) {
                                     })),
                                 ];
 
+                                const syncPair = s && contentSyncStatus.settings?.showStatus ? contentSyncStatus.pairsByLocalScriptId.get(s.scriptId) : undefined;
+
                                 return (
                                     <span className="inline-flex items-center gap-x-2">
                                         <span>{s?.title || ''}</span>
                                         <ScriptIssueBadge issues={issues} />
+                                        {!viewOnly && !!s?.hasUnownedChanges && (
+                                            <Badge
+                                                variant="outline"
+                                                className="whitespace-nowrap border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                                title="Some unpublished changes in this script have no owner, so nobody's &quot;publish my changes&quot; includes them. Review them, then publish or discard."
+                                            >
+                                                Unowned changes
+                                            </Badge>
+                                        )}
+                                        {!!syncPair && (
+                                            <ContentSyncStatusBadge
+                                                status={syncPair.status}
+                                                sourceName={contentSyncStatus.sourceName}
+                                                targetName={contentSyncStatus.targetName}
+                                            />
+                                        )}
                                     </span>
                                 );
                             },
@@ -389,6 +417,7 @@ export function ScriptsTable(props: Props) {
                                     <ScriptsTableActions 
                                         item={s}
                                         disabled={disabled}
+                                        deleteDisabled={disabled && !canDeleteOnTarget}
                                         onRecheckIssues={() => onRecheckIssues(s.scriptId)}
                                         setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
                                         onDelete={() => onDelete([s.scriptId])}

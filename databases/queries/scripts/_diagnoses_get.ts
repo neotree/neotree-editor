@@ -5,6 +5,7 @@ import db from "@/databases/pg/drizzle";
 import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { diagnoses, diagnosesDrafts, hospitals, pendingDeletion, scripts, scriptsDrafts } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { computeEntityRevision } from "@/lib/entity-revision";
 import { DiagnosisSymptom, Preferences, FileReference } from "@/types";
 
 export type GetDiagnosesParams = {
@@ -13,6 +14,11 @@ export type GetDiagnosesParams = {
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
     withImagesOnly?: boolean;
+    /**
+     * Return published rows even when a deletion is queued (pending) for them. Used when another
+     * editor imports this editor's published state: an unpublished deletion is not published yet.
+     */
+    includePendingDeletion?: boolean;
     client?: DbOrTransaction;
 };
 
@@ -27,6 +33,8 @@ export type DiagnosisType = typeof diagnoses.$inferSelect & {
     scriptTitle?: string;
     hospitalName?: string;
     draftCreatedByUserId?: string | null;
+    /** Content fingerprint for save conflict checks (set by the single-entity query). */
+    revision?: string;
 };
 
 export type GetDiagnosesResults = {
@@ -42,6 +50,7 @@ export async function _getDiagnoses(
             scriptsIds: scriptsIds = [],
             diagnosesIds: diagnosesIds = [],
             returnDraftsIfExist = true,
+            includePendingDeletion,
             withImagesOnly,
             client,
         } = { ...params };
@@ -149,7 +158,7 @@ export async function _getDiagnoses(
             ))
             .where(and(
                 isNull(diagnoses.deletedAt),
-                isNull(pendingDeletion),
+                includePendingDeletion ? undefined : isNull(pendingDeletion),
                 !returnDraftsIfExist ? undefined : isNull(diagnosesDrafts.diagnosisId),
                 !scriptsIds?.length ? undefined : inArray(diagnoses.scriptId, scriptsIds),
                 !diagnosesIds?.length ? undefined : inArray(diagnoses.diagnosisId, diagnosesIds),
@@ -198,7 +207,7 @@ export async function _getDiagnoses(
             }))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.diagnosisId).includes(s.diagnosisId))
+            .filter(s => includePendingDeletion || !inPendingDeletion.map(s => s.diagnosisId).includes(s.diagnosisId))
             .map(s => ({
                 ...s,
                 scriptTitle: s.scriptTitle || '',
@@ -249,7 +258,7 @@ export async function _getDiagnosis(
             isDeleted: false,
         } as GetDiagnosisResults['data'];
 
-        if (responseData) return { data: responseData, };
+        if (responseData) return { data: { ...responseData, revision: computeEntityRevision(responseData), }, };
 
         const publishedRes = await db
             .select({
@@ -288,7 +297,7 @@ export async function _getDiagnosis(
         if (!responseData) return { data: null, };
 
         return  {
-            data: responseData,
+            data: { ...responseData, revision: computeEntityRevision(responseData), },
         };
     } catch(e: any) {
         logger.error('_getDiagnosis ERROR', e.message);

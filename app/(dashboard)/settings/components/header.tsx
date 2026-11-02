@@ -29,6 +29,12 @@ const navItems = [
     href: "/settings/app",
     section: "app",
   },
+  {
+    label: "Content Sync",
+    title: "Content Sync",
+    href: "/settings/sync",
+    section: "sync",
+  },
   // {
   //     label: 'System',
   //     title: 'System Settings',

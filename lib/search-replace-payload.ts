@@ -30,6 +30,25 @@ export type ReplaceItem = {
 /** A partial update aimed at one entry of a JSON list column, by position. */
 export type IndexedPatch = { index: number; data: Record<string, any> };
 
+/** A partial update aimed at one option of one field: fields[fieldIndex].items[index]. */
+export type FieldItemPatch = IndexedPatch & { fieldIndex: number };
+
+/** Option properties a match on a field option can replace (match field -> option property). */
+const FIELD_ITEM_REPLACEABLE: Record<string, string> = {
+    field_item_label: 'label',
+    field_item_manual_label: 'enterValueManuallyLabel',
+};
+
+/** Apply option patches onto a screen's fields (see FieldItemPatch). */
+export function applyFieldItemPatches<T extends { items?: any[] }>(fields: T[] = [], patches: FieldItemPatch[] = []): T[] {
+    if (!patches.length) return fields;
+    return fields.map((field, fieldIndex) => {
+        const own = patches.filter(p => p.fieldIndex === fieldIndex);
+        if (!own.length) return field;
+        return { ...field, items: applyIndexedPatches(field.items || [], own) };
+    });
+}
+
 /**
  * Apply index-addressed patches onto a JSON list column — the server half of
  * the contract the builders above produce.
@@ -180,16 +199,25 @@ export function toOutcomeData(matches: ReplaceMatch[]): Record<string, any> & { 
     return { ...data, _symptoms };
 }
 
-/** Payload for a screen: plain columns plus patches for its fields and items. */
+/** Payload for a screen: plain columns plus patches for its fields, their options, and its items. */
 export function toScreenData(
     matches: ReplaceMatch[],
-): Record<string, any> & { _fields: IndexedPatch[]; _items: IndexedPatch[] } {
+): Record<string, any> & { _fields: IndexedPatch[]; _items: IndexedPatch[]; _fieldItems: FieldItemPatch[] } {
     const data: Record<string, any> = {};
     const _fields: IndexedPatch[] = [];
     const _items: IndexedPatch[] = [];
+    const _fieldItems: FieldItemPatch[] = [];
 
     for (const m of matches) {
-        if (m.fieldIndex === undefined) {
+        if (m.field.startsWith('field_item_')) {
+            // A match on one of a field's options. It used to fall into the field branch below, so
+            // replacing an option's label rewrote the field's (question's) label instead.
+            const prop = FIELD_ITEM_REPLACEABLE[m.field];
+            if (!prop || m.fieldIndex === undefined || m.fieldItemIndex === undefined) continue;
+            const existing = _fieldItems.find(p => p.fieldIndex === m.fieldIndex && p.index === m.fieldItemIndex);
+            if (existing) existing.data[prop] = m.newValue;
+            else _fieldItems.push({ fieldIndex: m.fieldIndex, index: m.fieldItemIndex, data: { [prop]: m.newValue } });
+        } else if (m.fieldIndex === undefined) {
             data[m.field] = m.newValue;
         } else if (m.field.startsWith('field_')) {
             collectPatch(_fields, m.fieldIndex, unprefixMatchField(m.field), m.newValue);
@@ -198,7 +226,7 @@ export function toScreenData(
         }
     }
 
-    return { ...data, _fields, _items };
+    return { ...data, _fields, _items, _fieldItems };
 }
 
 /**

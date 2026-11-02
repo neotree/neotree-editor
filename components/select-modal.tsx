@@ -99,20 +99,33 @@ function Modal({
     const searchValueDebounced = useDebounce(searchValue);
 
     const [selectedPending, setSelectedPending] = useState<SelectModalOption['value'][]>([]);
+    const [isOpen, setIsOpen] = useState(false);
+
+    // The parent passes new arrays on every render; key the derived values on their content.
+    const selectedSignature = JSON.stringify(selectedProp || []);
+    const optionsSignature = JSON.stringify(optionsProp.map(o => o.value));
 
     const selected = useMemo(() => {
         if (!selectedProp) {
             return [] as typeof optionsProp;
         } else if (Array.isArray(selectedProp)) {
-            return selectedProp.map(v => optionsProp.find(o => o?.value === v)!).map(o => o);
+            // A selected value that is not in the offered list (e.g. filtered out by the caller) stays
+            // selected. Dropping it here meant pressing Save removed it.
+            return selectedProp.map(v => optionsProp.find(o => o?.value === v) || {
+                value: v,
+                label: v,
+                description: 'Not in the current list',
+            });
         } else {
             return optionsProp.filter(o => o?.value === selectedProp) || [];
         }
-
-    }, [selectedProp, optionsProp]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSignature, optionsSignature]);
 
     const options = useMemo(() => {
-        const filtered = optionsProp
+        // Show selected values that are not in the offered list too, so they can be seen and deselected.
+        const unlisted = selected.filter(s => !!s && !optionsProp.some(o => o.value === s.value));
+        const filtered = [...optionsProp, ...unlisted]
             .map(o => {
                 const selectedValues = selected.map(o => o?.value).map(s => `${s || ''}`).filter(s => s);
                 let isSelected = selectedValues.includes(`${o?.value}`);
@@ -152,10 +165,11 @@ function Modal({
 
     useEffect(() => () => setSearchValue(''), []);
 
+    // Follow the saved selection while the dialog is closed; never reset choices the user is making.
     useEffect(() => {
-        if (!multiple) return;
+        if (!multiple || isOpen) return;
         setSelectedPending(selected.map(o => o.value));
-    }, [multiple, selected]);
+    }, [multiple, selected, isOpen]);
 
     const hasPendingChanges = useMemo(() => {
         if (!multiple) return false;
@@ -170,6 +184,7 @@ function Modal({
             <Dialog
                 modal={modal}
                 onOpenChange={open => {
+                    setIsOpen(open);
                     setSearchValue('');
                     if (multiple) {
                         setSelectedPending(selected.map(o => o.value));
@@ -281,8 +296,11 @@ function Modal({
                             <DialogClose asChild>
                                 <Button
                                     onClick={() => {
+                                        // Resolve against every option (and the current selection), not just the
+                                        // ones the search shows: hidden selections used to be dropped on Save.
                                         onSelect?.(
-                                            selectedPending.map(v => options.find(o => o.value === v)!)
+                                            selectedPending
+                                                .map(v => optionsProp.find(o => o.value === v) || selected.find(o => o.value === v)!)
                                                 .filter(o => o)
                                         );
                                     }}

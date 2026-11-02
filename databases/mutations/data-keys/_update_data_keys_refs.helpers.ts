@@ -175,6 +175,26 @@ export function syncFieldReference(current: ScriptField, dataKey?: DataKey) {
     }));
 }
 
+/**
+ * A NUID Search field follows its library key in everything the key owns: name,
+ * label and confidentiality. Whether the question is required is set per script
+ * on the NUID Search page (the library has no such setting), so it is kept.
+ */
+export function syncNuidSearchFieldReference(current: ScriptField, dataKey?: DataKey) {
+    const synced = syncFieldReference(current, dataKey);
+    if (!dataKey) return synced;
+
+    const value: ScriptField = {
+        ...synced.value,
+        optional: current.optional,
+    };
+
+    return {
+        value,
+        changed: JSON.stringify(value) !== JSON.stringify(current),
+    };
+}
+
 export function syncScreenEntityReference<T extends { key?: string; keyId?: string; label?: string; confidential?: boolean; confidentialLabelOnly?: boolean }>(
     current: T,
     dataKey?: DataKey,

@@ -20,6 +20,8 @@ import { LockStatus } from "@/components/lock-status";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
 import { collectNewOutcomeKeyCollisions, getOutcomeProducer, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { ContentSyncBanner } from "../content-sync-banner";
 
 type Props = UseDiagnosisFormParams;
 
@@ -40,7 +42,9 @@ export function DiagnosisForm(props: Props) {
         watch,
         setValue,
         save,
+        formIsDirty,
     } = form;
+    const { confirmLeave } = useUnsavedChangesGuard(formIsDirty && !saving);
 
     const { conditionKeys, keysLoading, keysReady } = useConditionKeys();
     const [expressionHasErrors, setExpressionHasErrors] = useState(false);
@@ -65,13 +69,14 @@ export function DiagnosisForm(props: Props) {
         [key, name, props.formData?.diagnosisId, symptoms],
     );
 
-    const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
+    const goToScriptPage = useCallback(() => { confirmLeave(() => router.push(scriptPageHref)); }, [confirmLeave, router, scriptPageHref]);
 
     return (
         <>
             {saving && <Loader overlay />}
 
             <div className="flex flex-col gap-y-5 [&>*]:px-4">
+                <ContentSyncBanner scriptId={props.scriptId} />
                 {(isLocked || isScriptLocked) && (
                     <div>
                         <LockStatus 
