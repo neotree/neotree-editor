@@ -110,7 +110,8 @@ export function useScriptForm(params: UseScriptFormParams) {
     form.reset(getDefaultFormValues())
   }, [formData?.revision, formIsDirty, form, getDefaultFormValues])
 
-  const saveDraft = useCallback(async (data: ScriptFormDataType) => {
+  /** `notice` is added to the success message, e.g. issues that will block publishing. */
+  const saveDraft = useCallback(async (data: ScriptFormDataType, opts?: { notice?: string }) => {
     setLoading(true)
 
     const generateScriptId = () =>
@@ -144,9 +145,9 @@ export function useScriptForm(params: UseScriptFormParams) {
       router.refresh()
       alert({
         title: "Success",
-        message: isNewScript
+        message: (isNewScript
           ? "Draft saved successfully. You can now add screens, diagnoses, problems, and print sections."
-          : "Draft saved successfully!",
+          : "Draft saved successfully!") + (opts?.notice ? `<br /><br />${opts.notice}` : ""),
         variant: "success",
         onClose: isNewScript && scriptId ? () => router.replace(`/script/${scriptId}`) : undefined,
       })
@@ -161,9 +162,9 @@ export function useScriptForm(params: UseScriptFormParams) {
     router,
   ])
 
-  const onSubmit = handleSubmit(async (data) => {
-    await saveDraft(data)
-  })
+  const onSubmit = (opts?: { notice?: string }) => handleSubmit(async (data) => {
+    await saveDraft(data, opts)
+  })()
 
   const lockedByUserId = params.formData?.draftCreatedByUserId || params.formData?.itemsChangedByUserId
 
@@ -180,6 +181,7 @@ export function useScriptForm(params: UseScriptFormParams) {
     formIsDirty,
     loading,
     disabled,
+    viewOnly,
     isLocked,
     lockedByUserId: !isLocked ? null : lockedByUserId,
     setLoading,
