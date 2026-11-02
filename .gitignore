@@ -50,3 +50,5 @@ deploy.command
 #zencoder
 .zencoder
 .zenflow
+# per-developer record of applied manual migrations
+.migrations-tracker.json

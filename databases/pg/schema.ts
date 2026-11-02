@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm"
 import {
   boolean,
+  check,
   customType,
   doublePrecision,
   index,
@@ -274,6 +275,47 @@ export const apiKeys = pgTable("nt_api_keys", {
   validUntil: timestamp("valid_until"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 })
+
+// MOBILE ANALYTICS (Superset) CONFIGURATION
+// Single-row table (enforced by the singleton unique + check constraint). versionNumber is
+// incremented transactionally by the mutation layer, only on an actual change.
+export const mobileAnalyticsConfig = pgTable(
+  "nt_mobile_analytics_config",
+  {
+    id: serial("id").primaryKey(),
+    singleton: boolean("singleton").notNull().default(true).unique(),
+    supersetUrl: text("superset_url").notNull(),
+    inactivityTimeoutMinutes: integer("inactivity_timeout_minutes").notNull(),
+    versionNumber: integer("version_number").notNull().default(1),
+    updatedByUserId: uuid("updated_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    singletonCheck: check("nt_mobile_analytics_config_singleton_check", sql`${table.singleton} = true`),
+    timeoutCheck: check("nt_mobile_analytics_config_timeout_check", sql`${table.inactivityTimeoutMinutes} > 0`),
+  }),
+)
+
+// Dedicated, revocable key for the mobile analytics config endpoints ONLY. Deliberately NOT stored in
+// nt_api_keys so that general API keys can never read analytics config and this key can never
+// authenticate anywhere else. Only a SHA-256 hash is stored; the plaintext is shown once on generation.
+// Single-row table: regenerating overwrites the hash, which immediately invalidates the previous key.
+export const mobileAnalyticsApiKey = pgTable(
+  "nt_mobile_analytics_api_key",
+  {
+    id: serial("id").primaryKey(),
+    singleton: boolean("singleton").notNull().default(true).unique(),
+    keyHash: text("key_hash").notNull().unique(),
+    keyHint: text("key_hint").notNull(),
+    generatedByUserId: uuid("generated_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    generatedAt: timestamp("generated_at").defaultNow().notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+  },
+  (table) => ({
+    singletonCheck: check("nt_mobile_analytics_api_key_singleton_check", sql`${table.singleton} = true`),
+  }),
+)
 
 export const sites = pgTable("nt_sites", {
   id: serial("id").primaryKey(),
