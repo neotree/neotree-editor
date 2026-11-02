@@ -147,7 +147,9 @@ export async function _getDataKeys(
                 !uniqueKeys?.length ? 
                     undefined 
                     : 
-                    inArray(dataKeysDrafts.uniqueKey, uniqueKeys),
+                    // The drafts column is a uuid: a legacy non-uuid key cannot match it, and
+                    // would otherwise make Postgres reject the whole query.
+                    inArray(dataKeysDrafts.uniqueKey, uniqueKeys.map(k => uuid.validate(k) ? k : uuid.v4())),
             ].filter(q => q);
 
             drafts = !returnDraftsIfExist ? [] : await executor.query.dataKeysDrafts.findMany({
