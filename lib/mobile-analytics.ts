@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import net from 'node:net';
 
 import { MAX_INACTIVITY_TIMEOUT_MINUTES, MIN_INACTIVITY_TIMEOUT_MINUTES } from './mobile-analytics-constants';
 
@@ -14,6 +15,35 @@ export function hashMobileAnalyticsKey(key: string) {
 
 export function getMobileAnalyticsKeyHint(key: string) {
     return `${MOBILE_ANALYTICS_KEY_PREFIX}…${key.slice(-4)}`;
+}
+
+function isUnsafeIpLiteral(hostname: string): boolean {
+    const ipVersion = net.isIP(hostname);
+    if (!ipVersion) return false;
+
+    if (ipVersion === 4) {
+        const [a, b] = hostname.split('.').map(Number);
+        if (a === 10) return true;
+        if (a === 127) return true;
+        if (a === 0) return true;
+        if (a === 169 && b === 254) return true;
+        if (a === 172 && b >= 16 && b <= 31) return true;
+        if (a === 192 && b === 168) return true;
+        if (a >= 224) return true; // multicast/reserved
+        return false;
+    }
+
+    const normalized = hostname.toLowerCase();
+    if (normalized === '::1' || normalized === '::') return true;
+    if (normalized.startsWith('fe80:')) return true; // link-local
+    if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true; // unique local
+    return false;
+}
+
+function isUnsafeSupersetHost(hostname: string): boolean {
+    const normalized = hostname.toLowerCase();
+    if (normalized === 'localhost' || normalized.endsWith('.localhost')) return true;
+    return isUnsafeIpLiteral(normalized);
 }
 
 /** Returns the normalised URL (no trailing slash) or an error message. */
@@ -32,6 +62,7 @@ export function validateSupersetUrl(value: unknown): { url?: string; error?: str
     if (parsed.protocol !== 'https:') return { error: 'Superset URL must use HTTPS' };
     if (parsed.username || parsed.password) return { error: 'Superset URL must not contain credentials' };
     if (parsed.search || parsed.hash) return { error: 'Superset URL must not contain a query string or fragment' };
+    if (isUnsafeSupersetHost(parsed.hostname)) return { error: 'Superset URL host is not allowed' };
 
     return { url: `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, '') };
 }
