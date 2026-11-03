@@ -2,14 +2,20 @@ import { getDrugsLibraryMetadata } from "@/app/actions/drugs-library";
 import { DrugsLibraryMetaActions } from "./components/actions";
 
 type Props = {
-    params: {
+    params: Promise<{
         itemId: string;
-    };
+    }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function DrugsLibraryMetadataPage({ params: { itemId } }: Props) {
+export default async function DrugsLibraryMetadataPage(props: Props) {
+    const params = await props.params;
+
+    const {
+        itemId
+    } = params;
+
     const metadata = await getDrugsLibraryMetadata({
         itemsIds: [itemId],
         returnDraftsIfExist: true,

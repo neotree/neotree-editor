@@ -90,6 +90,28 @@ async function findRollbackTargetChangeLog(
   return legacyTarget ?? null
 }
 
+/**
+ * True when the entity already had history (any changelog row, baselines included) at or before the
+ * release being restored. Such an entity was not created after that release, even when none of its
+ * rows carries a snapshot (baseline rows are empty), so the "created after the target" soft delete
+ * must not apply to it. That rule soft-deleted pre-existing data keys whose only older row was a baseline.
+ */
+async function hadHistoryAtOrBefore(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  current: typeof changeLogs.$inferSelect,
+  dataVersion: number,
+) {
+  const row = await tx.query.changeLogs.findFirst({
+    where: and(
+      eq(changeLogs.entityId, current.entityId),
+      eq(changeLogs.entityType, current.entityType),
+      lte(changeLogs.dataVersion, dataVersion),
+    ),
+    columns: { id: true },
+  })
+  return !!row
+}
+
 export async function _rollbackDataVersion({
   dataVersion: requestedDataVersion,
   toDataVersion: requestedTargetDataVersion,
@@ -238,14 +260,17 @@ export async function _rollbackDataVersion({
             currentVersion: scriptChange.version,
             directPreviousPublishedVersion: scriptTarget?.version,
             fallbackPreviousVersion: effectiveScriptTarget?.version,
-          }),
+          }) && !(await hadHistoryAtOrBefore(tx, scriptChange, restoreSourceDataVersion)),
         })
 
         const childTypes = [...SCRIPT_CHILD_ENTITY_TYPES] as (typeof changeLogs.$inferSelect)["entityType"][]
+        // Children are restored to the release being restored. Bounding them by the script record's
+        // own last change (scriptTargetDataVersion) restored screens to whatever release last touched
+        // the script row — often far older — and dropped every screen and option change since.
         const targetBundleChildren = await tx.query.changeLogs.findMany({
           where: and(
             eq(changeLogs.scriptId, scriptScopeId),
-            lte(changeLogs.dataVersion, scriptTargetDataVersion),
+            lte(changeLogs.dataVersion, restoreSourceDataVersion),
             nonEmptySnapshot,
           ),
           orderBy: (changeLogs, { desc, asc }) => [
@@ -294,7 +319,7 @@ export async function _rollbackDataVersion({
             !!childActive &&
             isChangeAlreadyAlignedToRollbackTarget({
               currentDataVersion: childCurrent.dataVersion,
-              targetDataVersion: scriptTargetDataVersion,
+              targetDataVersion: restoreSourceDataVersion,
             })
           ) {
             await ensureActiveChangeApplied({
@@ -319,7 +344,7 @@ export async function _rollbackDataVersion({
               currentVersion: childCurrent.version,
               directPreviousPublishedVersion: targetChild?.version,
               fallbackPreviousVersion: effectiveChildTarget?.version,
-            }),
+            }) && !(await hadHistoryAtOrBefore(tx, childCurrent, restoreSourceDataVersion)),
           })
         }
 
@@ -419,7 +444,7 @@ export async function _rollbackDataVersion({
           currentVersion: current.version,
           directPreviousPublishedVersion: target?.version,
           fallbackPreviousVersion: effectiveTarget?.version,
-        })
+        }) && !(await hadHistoryAtOrBefore(tx, current, restoreSourceDataVersion))
         const shouldSoftDelete = shouldSoftDeleteCreated && createdInCurrentVersion
         if (shouldSoftDelete) {
           targetSnapshot = applySoftDeleteRollbackSideEffects({

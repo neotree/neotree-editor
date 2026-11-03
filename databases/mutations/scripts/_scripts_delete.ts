@@ -7,6 +7,7 @@ import socket from '@/lib/socket';
 import { _deleteScreens } from './_screens_delete';
 import { _deleteDiagnoses } from './_diagnoses_delete';
 import { _deleteProblems } from './_problems_delete';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type DeleteScriptsData = {
     scriptsIds?: string[];
@@ -38,6 +39,8 @@ export async function _deleteScripts(
     const response: DeleteScriptsResponse = { success: false, };
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const shouldConfirmDeleteAll = !scriptsIds.length && !confirmDeleteAll;
         if (shouldConfirmDeleteAll) throw new Error('You&apos;re about to delete all the scripts, please confirm this action!');
 

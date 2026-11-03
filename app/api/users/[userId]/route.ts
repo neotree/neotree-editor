@@ -5,13 +5,19 @@ import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { getUser } from "@/app/actions/users";
 
 interface IParams {
-    params: {
+    params: Promise<{
         userId: string;
-    };
+    }>;
 }
 
-export async function GET(_: NextRequest, { params: { userId } }: IParams) {
-	try {
+export async function GET(_: NextRequest, props: IParams) {
+    const params = await props.params;
+
+    const {
+        userId
+    } = params;
+
+    try {
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });

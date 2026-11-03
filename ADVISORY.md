@@ -198,5 +198,6 @@ That is expected, and it is not an indication that the current code is affected.
 ## Reporting
 
 If you find anything further, or if you believe you were affected and want help
-assessing it, please use the private reporting channel described in `SECURITY.md`.
+assessing it, please use the private reporting channel in the organisation security
+policy (https://github.com/neotree/neotree-editor/security/policy).
 We would rather hear about it.

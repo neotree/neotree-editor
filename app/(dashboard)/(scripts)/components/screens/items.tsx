@@ -18,6 +18,8 @@ import { Label } from "@/components/ui/label";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { isNumericQueryValue } from "@/lib/query-state";
 import { ItemsBottomActions } from "./items-bottom-actions";
+import { useFieldKeyCollisions } from "@/components/field-key-collisions";
+import { ScriptIssueBadge, collisionIssues } from "@/components/script-issues";
 import { Item } from "./item";
 
 type Props = {
@@ -45,6 +47,16 @@ export function Items({
 
     const items = watch('items');
     const rankItems = watch('rankItems');
+
+    // A single/multi select screen keeps its options here rather than on a
+    // field, so this is the only place a duplicate option value can be shown
+    // next to the option that caused it.
+    const optionCollisions = useFieldKeyCollisions({
+        fields: [],
+        items,
+        screenId: getValues('screenId'),
+        screenTitle: getValues('title'),
+    });
     const preferences = watch('preferences');
     
     const canRankItems = screenType === 'multi_select';
@@ -204,6 +216,16 @@ export function Items({
                     },
                     {
                         name: 'Label',
+                        cellRenderer({ rowIndex }) {
+                            const item = items[rowIndex];
+                            const issues = collisionIssues(optionCollisions.forScreenOptionIndex(rowIndex));
+                            return (
+                                <span className="inline-flex items-center gap-x-2">
+                                    <span>{item?.label}</span>
+                                    {!!issues.length && <ScriptIssueBadge issues={issues} />}
+                                </span>
+                            );
+                        },
                     },
                     ...(!isDiagnosisScreen ? [] : [{
                         name: 'Severity order',

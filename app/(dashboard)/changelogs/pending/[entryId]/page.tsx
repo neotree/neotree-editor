@@ -58,7 +58,8 @@ function humanizeDraftDiff(entry: PendingDraftQueueEntry) {
   })
 }
 
-export default async function PendingDraftDiffPage({ params }: { params: Params }) {
+export default async function PendingDraftDiffPage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   const entryId = decodeURIComponent(params.entryId)
   const pendingDraftQueue = await getPendingDraftQueue({
     entryId,

@@ -413,9 +413,6 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         ...(() => {
                             switch (screen.type) {
                                 default:
-
-                                    // console.log("SCREEN", screen);
-
                                     return {
                                         dataType: screen.dataType,
                                         value: null,

@@ -30,10 +30,17 @@ export async function POST(req: NextRequest) {
         const job = startOrJoinImportJob({
             requestKey,
             contentKey: buildImportContentKey({
+                requestKey,
                 userId: isAuthorised.user?.userId,
                 fromRemoteSiteId: body.fromRemoteSiteId,
+                toRemoteSiteId: body.toRemoteSiteId,
                 scriptsIds: body.scriptsIds,
                 overWriteScriptWithId: body.overWriteScriptWithId,
+                overwriteDataKeys: !!body.overwriteDataKeys,
+                overwriteDrugsLibraryItems: !!body.overwriteDrugsLibraryItems,
+                dryRun: !!body.dryRun,
+                confirmSourceMismatch: !!body.confirmSourceMismatch,
+                keepTargetOnly: body.keepTargetOnly !== false,
             }),
             run: () => copyScripts({ ...body, requestKey, }),
         });

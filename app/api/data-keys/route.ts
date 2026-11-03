@@ -5,6 +5,7 @@ import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { GetDataKeysParams, GetDataKeysResults, _getDataKeys } from "@/databases/queries/data-keys";
 import { _deleteDataKeys } from "@/databases/mutations/data-keys";
+import { assertContentEditable } from "@/lib/server/content-sync";
 
 function parseOptionalBoolean(value: unknown) {
     if (value === "true") return true;
@@ -20,14 +21,34 @@ export async function GET(req: NextRequest) {
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
 
-        const parsed = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams & {
+        const { data: dataParam, ...flat } = queryString.parse(req.nextUrl.searchParams.toString()) as GetDataKeysParams & {
+            data?: string;
             returnDraftsIfExist?: string | boolean;
             withDeleted?: string | boolean;
+            includePendingDeletion?: string | boolean;
         };
+        // Other endpoints take their params as JSON in ?data=...; remote imports call this route the
+        // same way. Without reading it, returnDraftsIfExist fell back to true and another editor's
+        // import received this editor's unpublished data-key drafts.
+        const wrapped = (typeof dataParam === "string" && dataParam ? JSON.parse(dataParam) : {}) as GetDataKeysParams & {
+            returnDraftsIfExist?: string | boolean;
+            withDeleted?: string | boolean;
+            includePendingDeletion?: string | boolean;
+        };
+        const parsed = { ...flat, ...wrapped };
+        // The data-keys page sends list filters as JSON strings (names=["..."]).
+        const parseList = (value: unknown) => {
+            if (typeof value !== 'string') return value;
+            try { return JSON.parse(value); } catch { return [value]; }
+        };
+        (['names', 'uniqueKeys', 'dataKeysIds', 'keys'] as const).forEach((key) => {
+            if (parsed[key] !== undefined) (parsed as any)[key] = parseList(parsed[key]);
+        });
         const params: GetDataKeysParams = {
             ...parsed,
             returnDraftsIfExist: parseOptionalBoolean(parsed.returnDraftsIfExist),
             withDeleted: parseOptionalBoolean(parsed.withDeleted),
+            includePendingDeletion: parseOptionalBoolean(parsed.includePendingDeletion),
         };
 
         res = await _getDataKeys(params);
@@ -53,6 +74,11 @@ export async function DELETE(req: NextRequest) {
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], });
         if (!['admin', 'super_user'].includes(isAuthorised.user?.role || '')) {
             return NextResponse.json({ errors: ['Forbidden'] }, { status: 403 });
+        }
+        try {
+            await assertContentEditable({ area: 'dataKeys', userRole: isAuthorised.user?.role, viaApiKey: isAuthorised.viaApiKey, });
+        } catch (e: any) {
+            return NextResponse.json({ success: false, errors: [e.message] });
         }
 
         let params = {} as Parameters<typeof _deleteDataKeys>[0];

@@ -2,6 +2,8 @@ import type { Diagnostic, ValidationContext, ValidationResult } from "./ast";
 import { parse } from "./parser";
 import { analyze } from "./semantics";
 import { findLegacyNegationDiagnostics } from "./legacy";
+import { findAlwaysTrueDiagnostics } from "./degenerate";
+import { findDeviceFaults } from "./device";
 
 export type {
   ConditionKey,
@@ -12,6 +14,7 @@ export type {
   ValidationResult,
 } from "./ast";
 export { validateReferenceExpression } from "./reference-expr";
+export { tidyCondition } from "./device";
 export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";
 export {
@@ -62,10 +65,43 @@ export {
 export {
   collectScriptConditionFindings,
   getScriptConditionErrorCount,
+  hrefForConditionEntity,
   type ScriptWithItems,
   type ScriptConditionFinding,
   type ScriptConditionEntityRef,
 } from "./collect";
+
+/**
+ * `or_includes` / `or_excludes` are legacy, mobile-only operators that this
+ * grammar does not know. The runtime still honours them, so these are warnings
+ * rather than errors — but they cannot be validated here, and `or_includes` is
+ * now exactly `includes`.
+ *
+ * No quick fix is offered for `or_excludes`: it means "at least one is absent",
+ * which is NOT what `excludes` ("none of these") means, so swapping it would
+ * silently change the logic.
+ */
+function findLegacyMembershipOperators(input: string): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const pattern = /\bor_(includes|excludes)\b/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(input)) !== null) {
+    const isIncludes = match[1].toLowerCase() === "includes";
+    diagnostics.push({
+      severity: "warning",
+      code: "LEGACY_MEMBERSHIP_OP",
+      message: isIncludes
+        ? '"or_includes" is deprecated. Use "includes", which already means "any of these".'
+        : '"or_excludes" is deprecated. It means "at least one is absent"; use "excludes" only if you mean "none of these".',
+      start: match.index,
+      end: match.index + match[0].length,
+      suggestion: isIncludes ? "includes" : undefined,
+    });
+  }
+
+  return diagnostics;
+}
 
 /** Flags trailing whitespace on each non-empty line of the expression. */
 function findTrailingWhitespace(input: string): Diagnostic[] {
@@ -92,18 +128,22 @@ function findTrailingWhitespace(input: string): Diagnostic[] {
  * Validate a boolean conditional expression against the script's key context.
  * Returns syntax + semantic diagnostics sorted by position.
  *
- * An empty expression is valid (it means "always true"/no condition).
+ * An empty expression is valid (it means "always true"/no condition); one that is only
+ * spaces or empty lines is not, because tablets evaluate it and it fails.
  */
 export function validateCondition(input: string, ctx: ValidationContext): ValidationResult {
   const src = input || "";
-  if (!src.trim()) return { diagnostics: [], hasErrors: false, ast: null };
+  const device = findDeviceFaults(src);
+  if (!src.trim()) return { diagnostics: device, hasErrors: device.length > 0, ast: null };
 
   const { ast, diagnostics: syntax } = parse(src);
   const semantic = analyze(ast, ctx, src);
   const legacy = findLegacyNegationDiagnostics(ast, src);
+  const alwaysTrue = findAlwaysTrueDiagnostics(ast, src);
+  const legacyOps = findLegacyMembershipOperators(src);
   const whitespace = findTrailingWhitespace(src);
 
-  const diagnostics: Diagnostic[] = [...syntax, ...legacy, ...semantic, ...whitespace].sort(
+  const diagnostics: Diagnostic[] = [...syntax, ...legacy, ...alwaysTrue, ...legacyOps, ...semantic, ...whitespace, ...device].sort(
     (a, b) => a.start - b.start || (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1),
   );
 

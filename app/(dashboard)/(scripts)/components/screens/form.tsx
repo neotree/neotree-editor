@@ -56,6 +56,9 @@ import { LockStatus } from "@/components/lock-status";
 import { ScriptType } from "@/databases/queries/scripts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAlertModal } from "@/hooks/use-alert-modal";
+import { useConfirmModal } from "@/hooks/use-confirm-modal";
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { ContentSyncBanner } from "../content-sync-banner";
 import { useDataKeysCtx } from "@/contexts/data-keys";
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal";
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression";
@@ -81,6 +84,7 @@ export function ScreenForm(props: Props) {
 
     const router = useRouter();
     const { alert } = useAlertModal();
+    const { confirm } = useConfirmModal();
     const { extractDataKeys } = useDataKeysCtx();
     const [showForm, setShowForm] = useState(!!formData);
 
@@ -100,6 +104,7 @@ export function ScreenForm(props: Props) {
         setValue,
         save,
     } = form;
+    const { confirmLeave } = useUnsavedChangesGuard(formIsDirty && !saving);
     const [alias, setAlias] = useState('');
     const { conditionKeys, keysLoading, keysReady } = useConditionKeys();
     const [conditionHasErrors, setConditionHasErrors] = useState(false);
@@ -193,7 +198,7 @@ export function ScreenForm(props: Props) {
     const inheritedConfidential = !!selectedDataKey?.confidential;
     const inheritedConfidentialLabelOnly = !!selectedDataKey?.confidentialLabelOnly;
 
-    const goToScriptPage = useCallback(() => { router.push(scriptPageHref); }, [router, scriptPageHref]);
+    const goToScriptPage = useCallback(() => { confirmLeave(() => router.push(scriptPageHref)); }, [confirmLeave, router, scriptPageHref]);
 
     const displayLoader = saving;
 
@@ -212,20 +217,23 @@ export function ScreenForm(props: Props) {
         getAlias(key)
     }, [getAlias,key]);
 
+    // Follows the data key. Done on load too, so it does not count as an edit (opening a page must
+    // not leave "unsaved changes"); choosing another key marks the form changed on its own.
     useEffect(() => {
-        if (confidential !== inheritedConfidential) {
-            setValue('confidential', inheritedConfidential, { shouldDirty: true, });
+        if (!!confidential !== inheritedConfidential) {
+            setValue('confidential', inheritedConfidential, { shouldDirty: false, });
         }
     }, [confidential, inheritedConfidential, setValue]);
 
     useEffect(() => {
-        if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
-            setValue('confidentialLabelOnly', inheritedConfidentialLabelOnly, { shouldDirty: true, });
+        if (!!confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+            setValue('confidentialLabelOnly', inheritedConfidentialLabelOnly, { shouldDirty: false, });
         }
     }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
 
-    const lockStatus = !(isLocked || isScriptLocked) ? null : (
+    const lockStatus = !(isLocked || isScriptLocked) ? <ContentSyncBanner scriptId={scriptId} /> : (
         <div>
+            <ContentSyncBanner scriptId={scriptId} />
             <LockStatus 
                 card
                 isDraft={!!formData?.isDraft || isScriptLocked}
@@ -362,13 +370,35 @@ export function ScreenForm(props: Props) {
                     const key = dataKey?.name || '';
                     const children = dataKey?.children || [];
 
-                    setValue('key', key, { shouldDirty: true, });
-                    setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
-                    setValue('label', label, { shouldDirty: true, });
-                    setValue('confidential', !!dataKey?.confidential, { shouldDirty: true, });
-                    setValue('confidentialLabelOnly', !!dataKey?.confidentialLabelOnly, { shouldDirty: true, });
-                    if (hasItems) setValue('items', [], { shouldDirty: true, });
-                    if (hasFields) setValue('fields', [], { shouldDirty: true, });
+                    const applyKey = (clearChildren: boolean) => {
+                        setValue('key', key, { shouldDirty: true, });
+                        setValue('keyId', dataKey?.uniqueKey, { shouldDirty: true, });
+                        setValue('label', label, { shouldDirty: true, });
+                        setValue('confidential', !!dataKey?.confidential, { shouldDirty: true, });
+                        setValue('confidentialLabelOnly', !!dataKey?.confidentialLabelOnly, { shouldDirty: true, });
+                        if (clearChildren && hasItems) setValue('items', [], { shouldDirty: true, });
+                        if (clearChildren && hasFields) setValue('fields', [], { shouldDirty: true, });
+                    };
+
+                    // Picking the key the screen already has used to clear every item and field on it.
+                    if (!dataKey || dataKey.uniqueKey === keyId) {
+                        if (dataKey) applyKey(false);
+                    } else {
+                        const itemsCount = hasItems ? (form.getValues('items') || []).length : 0;
+                        const fieldsCount = hasFields ? (form.getValues('fields') || []).length : 0;
+                        if (!itemsCount && !fieldsCount) {
+                            applyKey(true);
+                        } else {
+                            confirm(() => applyKey(true), {
+                                title: 'Change the screen key?',
+                                message: `This screen has ${[
+                                    itemsCount && `${itemsCount} item${itemsCount === 1 ? '' : 's'}`,
+                                    fieldsCount && `${fieldsCount} field${fieldsCount === 1 ? '' : 's'}`,
+                                ].filter(Boolean).join(' and ')}. Changing the key removes them from the screen. Nothing is saved until you save the screen.`,
+                                danger: true,
+                            });
+                        }
+                    }
 
                     // if (hasItems) {
                     //     const items = children.map((k, i) => {
@@ -959,9 +989,12 @@ export function ScreenForm(props: Props) {
                         <TooltipProvider delayDuration={0}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <button
-                                        type="button"
+                                    {/* not a <button>: the Switch inside is one, and buttons cannot be nested */}
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
                                         className="flex-1 flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                                        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                                         onClick={() =>
                                             alert({
                                                 title: "Confidentiality is managed in Data Keys",
@@ -976,7 +1009,7 @@ export function ScreenForm(props: Props) {
                                             disabled
                                         />
                                         <Label secondary htmlFor="confidential">Confidential</Label>
-                                    </button>
+                                    </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <div className="flex flex-col gap-y-1">
@@ -999,9 +1032,12 @@ export function ScreenForm(props: Props) {
                         <TooltipProvider delayDuration={0}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <button
-                                        type="button"
+                                    {/* not a <button>: the Switch inside is one, and buttons cannot be nested */}
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
                                         className="flex-1 flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                                        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                                         onClick={() =>
                                             alert({
                                                 title: "Confidentiality is managed in Data Keys",
@@ -1016,7 +1052,7 @@ export function ScreenForm(props: Props) {
                                             disabled
                                         />
                                         <Label secondary htmlFor="confidentialLabelOnly">Confidential (label only)</Label>
-                                    </button>
+                                    </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <div className="flex flex-col gap-y-1">

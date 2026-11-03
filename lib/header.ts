@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 
-export function getHeaders() {
-    const headersList = headers();
+export async function getHeaders() {
+    const headersList = await headers();
 
     const apiKey = headersList.get('x-api-key');
     const bearerToken = headersList.get('x-bearer-token');

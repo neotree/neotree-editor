@@ -4,13 +4,19 @@ import { _getFullFileByFileId } from "@/databases/queries/files";
 import logger from "@/lib/logger";
 
 interface IParams {
-    params: {
+    params: Promise<{
         fileId: string;
-    };
+    }>;
 }
 
-export async function GET(_: Request, { params: { fileId } }: IParams) {
-	try {
+export async function GET(_: Request, props: IParams) {
+    const params = await props.params;
+
+    const {
+        fileId
+    } = params;
+
+    try {
 		if (!fileId) return NextResponse.json({ errors: ['Missing fileId'] });
 
         const { data: file, errors } = await _getFullFileByFileId(fileId);

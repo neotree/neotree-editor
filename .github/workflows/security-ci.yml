@@ -1,0 +1,47 @@
+name: Security CI
+
+# Thin caller. All logic lives in neotree/security-ci, pinned by SHA.
+# Update the SHA in BOTH the `uses:` line and `security-ci-ref` together - Dependabot
+# opens a pull request for the `uses:` line, and the gate fails loudly if they disagree.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  security:
+    uses: neotree/security-ci/.github/workflows/security-ci.yml@4e70f356008729ed80de4e1f52419db842c407d6
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+    with:
+      security-ci-ref: 4e70f356008729ed80de4e1f52419db842c407d6
+      # Exact version, matching .nvmrc and package.json engines (>=22.23.4). A bare "22"
+      # resolves to whatever 22.x the runner has cached, which can be older and fail the engines check.
+      node-version: "22.23.4"
+      # CodeQL is not run here: the organisation-level code scanning configuration runs it
+      # on every repository, and a second configuration would only fail its upload.
+      # upload-sarif stays enabled: this repository is public, so the OSV and Semgrep
+      # SARIF uploads work normally.
+      # Hosts this project's build needs beyond the npm registry:
+      #   binaries.prisma.sh - `prisma generate` (ci:prepare) downloads its engines here,
+      #     because install runs with scripts disabled so Prisma's postinstall never fetches them.
+      #   fonts.googleapis.com, fonts.gstatic.com - next/font/google in app/layout.tsx
+      #     downloads Roboto at build time; `next build` fails if it cannot.
+      # Folded (`>-`) on purpose: harden-runner splits this list on spaces only, so a
+      # literal block (`|`) arrives as one malformed entry and every host is blocked.
+      extra-egress-endpoints: >-
+        binaries.prisma.sh:443
+        fonts.googleapis.com:443
+        fonts.gstatic.com:443

@@ -6,6 +6,7 @@ import {
   collectNewOutcomeKeyCollisions,
   collectOutcomeKeyCollisions,
   collectScriptOutcomeReferences,
+  collectScriptConditionFindings,
   getConfigurationConditionKeySignature,
   getUnavailableOutcomeKeys,
   getScriptConditionErrorCount,
@@ -60,7 +61,6 @@ const validExpressions = [
   "$Sex = 'M' or $Gestation > 39\n[$Diagnoses includes ('LBW','Sepsis')]",
   "[$Diagnoses includes ('LBW')]",
   "[$Diagnoses excludes ('LBW','Sepsis')]",
-  "$Diagnoses = ['Sepsis', 'Jaundice', 'Premature']",
   "($Sex = 'M' and $Gestation < 20) or $Temp > 37",
   "$self = 'Yes' or $Gestation > 78",
 ];
@@ -68,6 +68,14 @@ const validExpressions = [
 for (const expr of validExpressions) {
   assert.equal(errors(expr).length, 0, `expected no errors for: ${JSON.stringify(expr)} -> ${JSON.stringify(errors(expr))}`);
 }
+
+// A list on the right of a comparison is rejected: the runtime compiles
+// `[ ... ]` as a bracket group and leaves a comma expression, so only the last
+// item is ever checked. Membership is the only correct form.
+assert.ok(
+  codes("$Diagnoses = ['Sepsis', 'Jaundice', 'Premature']").includes("ARRAY_COMPARISON"),
+  "a list cannot be compared with =",
+);
 
 // ---- Syntax errors ----------------------------------------------------------
 
@@ -749,7 +757,12 @@ assert.ok(warnings("[$Diagnoses includes (LBW)]").some((d) => d.code === "UNQUOT
 
 // Option-value checking inside lists (typo'd choice codes) + duplicates.
 const listCtx: ValidationContext = {
-  keys: [{ name: "Diagnoses", dataType: "multi_select", options: ["LBW", "Sepsis", "Jaundice"] }],
+  keys: [
+    { name: "Diagnoses", dataType: "multi_select", options: ["LBW", "Sepsis", "Jaundice"] },
+    // Same shape, but not one of the reserved outcome collections, so it can
+    // still be compared with "=" (see COLLECTION_COMPARISON below).
+    { name: "Signs", dataType: "multi_select", options: ["LBW", "Sepsis", "Jaundice"] },
+  ],
 };
 assert.equal(
   errors("[$Diagnoses includes ('LBW','Sepsis')]", listCtx).filter((d) => d.code === "UNKNOWN_OPTION").length,
@@ -769,7 +782,18 @@ assert.ok(
   "duplicate list value warns",
 );
 // Equality option check still works via the shared helper.
-assert.ok(errors("$Diagnoses = 'Nope'", listCtx).some((d) => d.code === "UNKNOWN_OPTION"), "equality option error");
+assert.ok(errors("$Signs = 'Nope'", listCtx).some((d) => d.code === "UNKNOWN_OPTION"), "equality option error");
+
+// $Diagnoses / $Problems are outcome collections, so a comparison is rejected
+// outright and never reaches the option check — membership is required.
+assert.ok(
+  errors("$Diagnoses = 'LBW'", listCtx).some((d) => d.code === "COLLECTION_COMPARISON"),
+  "= on an outcome collection is rejected",
+);
+assert.ok(
+  errors("$Diagnoses != 'LBW'", listCtx).some((d) => d.code === "COLLECTION_COMPARISON"),
+  "!= on an outcome collection is rejected",
+);
 
 // ---- Stray whitespace ------------------------------------------------------
 
@@ -1045,10 +1069,26 @@ assert.equal(
   getScriptConditionErrorCount({
     dataKeys: scriptKeys,
     screens: [{ title: "Items", items: [{ label: "Bad item", condition: "$MissingItemKey = 'x'" }] }],
-    diagnoses: [{ name: "Diagnosis", symptoms: [{ name: "Bad symptom", expression: "$MissingSymptomKey = 'x'" }] }],
+    diagnoses: [{ name: "Diagnosis", expression: "$Gestation > 20", symptoms: [{ name: "Bad symptom", expression: "$MissingSymptomKey = 'x'" }] }],
   }),
   2,
   "publish validation includes nested screen-item and CDS symptom expressions",
+);
+// Tablets evaluate a diagnosis or problem that has symptoms even with no expression, and it fails.
+assert.deepEqual(
+  collectScriptConditionFindings({
+    dataKeys: scriptKeys,
+    diagnoses: [
+      { diagnosisId: "d1", name: "Symptoms only", symptoms: [{ name: "Any", expression: "$Gestation > 20" }] },
+      { diagnosisId: "d2", name: "Nothing at all" },
+    ],
+    problems: [{ problemId: "p1", name: "Problem, symptoms only", expression: null, symptoms: [{ name: "Any", expression: "$Gestation > 20" }] }],
+  }).map((f) => [f.location, f.errors[0].code]),
+  [
+    ['Diagnosis "Symptoms only"', "EMPTY_OUTCOME_EXPRESSION"],
+    ['Problem "Problem, symptoms only"', "EMPTY_OUTCOME_EXPRESSION"],
+  ],
+  "a diagnosis or problem with symptoms and no expression is a finding; one with neither is not",
 );
 
 // NUID conditions resolve against the NUID fields' LINKED registry keys

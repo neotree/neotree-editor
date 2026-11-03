@@ -6,6 +6,7 @@ import { AlertCircleIcon, AlertTriangleIcon, Wand2Icon } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { mergeConditionKeys, type ConditionKey, type Diagnostic } from "@/lib/conditional-expression";
+import { canApplySuggestion } from "@/lib/conditional-expression/quick-fix";
 import {
   getConditionValueMatches,
   getTokenAtCursor,
@@ -15,6 +16,7 @@ import {
   sortKeyMatches,
 } from "./autocomplete";
 import { useConditionValidation } from "./use-condition-validation";
+import { tidyCondition } from "@/lib/conditional-expression/device";
 
 // Render cap: every match is reachable by typing to narrow, but we bound the
 // number of DOM nodes per keystroke so very large key sets stay responsive.
@@ -237,27 +239,6 @@ export function ConditionEditor({
     moveCursorAfterChange(diagnostic.start + diagnostic.suggestion.length);
   };
 
-  // Codes whose suggestion is a drop-in replacement for its own span. A code
-  // may still omit the suggestion case by case (e.g. no close option match, or
-  // a membership that needs restructuring), hence the presence check.
-  const canApplySuggestion = (diagnostic: Diagnostic) => (
-    diagnostic.suggestion !== undefined
-    && [
-      "LEGACY_NEGATION",
-      "LEGACY_REVERSED_COMPARISON",
-      "SPACED_NOT_EQUAL",
-      "MISMATCHED_QUOTED_VALUE",
-      "DOUBLED_QUOTED_VALUE",
-      "KEY_CASE",
-      "UNKNOWN_KEY",
-      "UNKNOWN_OPTION",
-      "UNQUOTED_VALUE",
-      "VALUE_WHITESPACE",
-      "TRAILING_WHITESPACE",
-      "DUPLICATE_VALUE",
-      "MEMBERSHIP_BRACKETS",
-    ].includes(diagnostic.code)
-  );
 
   return (
     <div className="space-y-2">
@@ -277,6 +258,11 @@ export function ConditionEditor({
         onClick={(event) => {
           setAcceptedSuggestion(null);
           setCursor(event.currentTarget.selectionStart ?? 0);
+        }}
+        // Leaving the field drops spaces at line ends and empty lines, so they are never saved.
+        onBlur={() => {
+          const tidy = tidyCondition(value);
+          if (tidy !== value) onChange(tidy);
         }}
         onKeyDown={(event) => {
           if (!suggestionCount) return;
@@ -419,6 +405,8 @@ export function ConditionEditor({
                       type="button"
                       className="font-medium text-primary underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={disabled}
+                      // Keeps focus in the field: a blur would tidy it before the fix is applied at its old position.
+                      onMouseDown={(event) => event.preventDefault()}
                       onClick={() => applySuggestion(diagnostic)}
                     >
                       Apply suggestion

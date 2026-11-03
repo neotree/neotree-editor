@@ -10,6 +10,7 @@ import { type ScreenFormDataType, useScriptsContext } from "@/contexts/scripts"
 import { isEmpty } from "@/lib/isEmpty"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { useAppContext } from "@/contexts/app"
+import { useContentViewOnly } from "@/hooks/use-content-lock"
 import { defaultPreferences } from "@/constants"
 import { useIsLocked } from "@/hooks/use-is-locked"
 import type { ScriptType } from "@/databases/queries/scripts"
@@ -28,7 +29,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
   const { saveScreens } = useScriptsContext()
   const { alert } = useAlertModal()
-  const { viewOnly } = useAppContext()
+  const viewOnly = useContentViewOnly("scripts", formData?.scriptId || scriptId)
 
   const scriptPageHref = useMemo(() => `/script/${scriptId}?section=screens`, [scriptId])
   const isNewScreen = !formData?.screenId
@@ -115,20 +116,33 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
     defaultValues: getDefaultValues(),
   })
 
-  useEffect(() => {
-    if (mounted.current) {
-      // form.reset(getDefaultValues())
-    } else {
-      mounted.current = true
-    }
-  }, [formData?.drugs, formData?.feeds, formData?.fluids, form.reset, getDefaultValues])
-
   const {
     formState: { dirtyFields },
     handleSubmit,
   } = form
 
-  const formIsDirty = useMemo(() => !!Object.keys(dirtyFields).length, [dirtyFields])
+  // dirtyFields is updated in place: a useMemo on it never sees a later edit. The form re-renders
+
+  // whenever it changes, so read it on every render.
+
+  const formIsDirty = Object.keys(dirtyFields).length > 0
+
+  // The revision of the screen the form's values came from; sent back on save so the server can refuse
+  // to overwrite changes made in the meantime.
+  const loadedRevision = useRef(formData?.revision)
+
+  // When the stored screen changes (refresh after someone else's save, an import, a data key update)
+  // and there are no unsaved edits here, show the new version instead of keeping stale values.
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
+    if (!formData?.revision || formData.revision === loadedRevision.current) return
+    if (formIsDirty) return
+    loadedRevision.current = formData.revision
+    form.reset(getDefaultValues())
+  }, [formData?.revision, formIsDirty, form, getDefaultValues])
 
   const save = handleSubmit(async (data) => {
     try {
@@ -137,6 +151,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       const screenId = data.screenId || generateScreenId()
       const payloadData = {
         ...data,
+        baseRevision: loadedRevision.current,
         screenId,
         timerValue: data.timerValue ? Number(data.timerValue) : null,
         multiplier: data.multiplier ? Number(data.multiplier) : null,
@@ -154,6 +169,8 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
 
       if (res.errors?.length) throw new Error(res.errors.join(", "))
 
+      // Saved: the current values are the new baseline (no longer "unsaved").
+      form.reset(form.getValues())
       router.refresh()
       alert({
         variant: res.warnings?.length ? "info" : "success",

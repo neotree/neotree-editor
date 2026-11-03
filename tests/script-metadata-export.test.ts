@@ -1,6 +1,6 @@
 import assert from "assert";
 
-import { buildScriptScreenMetadataRows } from "../lib/scripts/metadata-export";
+import { buildScriptScreenMetadataRows, buildScriptsMetadataWorkbookSheets } from "../lib/scripts/metadata-export";
 
 const script = {
     scriptId: "script-1",
@@ -60,5 +60,33 @@ assert.equal(rows[1]["Disable other options if selected"], "Yes", "option exclus
 assert.equal(rows[1]["Forbid With"], "U", "option incompatibilities are exported");
 assert.equal(rows[2].Value, "0", "valid falsy scalar values are not blanked");
 assert.equal(rows[2]["Value Label"], "Zero");
+
+const singleSheets = buildScriptsMetadataWorkbookSheets([script]);
+assert.deepEqual(
+    singleSheets.map((sheet) => sheet.name),
+    ["Screens - Admission", "Diagnoses - Admission"],
+    "a single script keeps the per-script sheet layout",
+);
+
+const longTitle = "Neonatal admission / discharge script";
+const batch = [
+    { ...script, scriptId: "a", title: longTitle },
+    { ...script, scriptId: "b", title: longTitle },
+    { ...script, scriptId: "c", title: "Discharge" },
+];
+const names = buildScriptsMetadataWorkbookSheets(batch).map((sheet) => sheet.name);
+
+assert.deepEqual(
+    names,
+    [
+        "Screens - Neonatal admission   ",
+        "Screens - Neonatal admissio (2)",
+        "Screens - Discharge",
+        "Diagnoses - Neonatal admission ",
+        "Diagnoses - Neonatal admiss (2)",
+        "Diagnoses - Discharge",
+    ],
+    "batch exports keep the per-script sheet order and only adjust names the xlsx writer would reject",
+);
 
 console.log("script metadata export tests passed");

@@ -27,7 +27,9 @@ export async function GET(req: NextRequest) {
         if (errors) return NextResponse.json({ errors, });
 
         const withDeleted = false;
-        const returnDraftsIfExist = true;
+        // Devices get the PUBLISHED state only (queued deletions are not published yet either).
+        const returnDraftsIfExist = false;
+        const includePendingDeletion = true;
 
         const [
             hospitals,
@@ -37,9 +39,9 @@ export async function GET(req: NextRequest) {
             aliases
         ] = await Promise.all([
             _getHospitals(),
-            _getScripts({ withDeleted, returnDraftsIfExist, hospitalIds: hospitalId ? [hospitalId] : undefined, }),
+            _getScripts({ withDeleted, returnDraftsIfExist, includePendingDeletion, hospitalIds: hospitalId ? [hospitalId] : undefined, }),
             _getConfigKeys({ withDeleted, returnDraftsIfExist, }),
-            _getDrugsLibraryItems({ withDeleted, returnDraftsIfExist, }),
+            _getDrugsLibraryItems({ withDeleted, returnDraftsIfExist, includePendingDeletion, }),
             _getAllAliases()
         ]);
 
@@ -50,9 +52,9 @@ export async function GET(req: NextRequest) {
             getDiagnoses,
             getProblems,
         ] = await Promise.all([
-            !getScripts.data.length ? { data: [], } : _getScreens({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
-            !getScripts.data.length ? { data: [], } : _getDiagnoses({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
-            !getScripts.data.length ? { data: [], } : _getProblems({ withDeleted, returnDraftsIfExist, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
+            !getScripts.data.length ? { data: [], } : _getScreens({ withDeleted, returnDraftsIfExist, includePendingDeletion, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
+            !getScripts.data.length ? { data: [], } : _getDiagnoses({ withDeleted, returnDraftsIfExist, includePendingDeletion, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
+            !getScripts.data.length ? { data: [], } : _getProblems({ withDeleted, returnDraftsIfExist, includePendingDeletion, scriptsIds: getScripts?.data?.map(s => s.scriptId) }),
         ]);
 
         const getImageUrl = (suffix: string) => {

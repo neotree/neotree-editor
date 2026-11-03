@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { MoreVertical, EditIcon, EyeIcon, TrashIcon, ExternalLink } from 'lucide-react';
+import { Copy, MoreVertical, EditIcon, EyeIcon, TrashIcon, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
 import { useDataKeysCtx } from '@/contexts/data-keys';
@@ -12,6 +12,8 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { Clipboard } from "@/components/clipboard";
 import { useConfirmModal } from '@/hooks/use-confirm-modal';
 import { Loader } from '@/components/loader';
 import { LockStatus, type LockStatusProps } from "@/components/lock-status";
@@ -91,6 +93,15 @@ export function DataKeysTableRowActions({
                             )}
                         </Link>
                     </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                            asChild
+                        >
+                            <Clipboard showValueOnToast value={dataKey.uuid}>
+                                <Copy className="mr-2 h-4 w-4" />
+                                Copy ID
+                            </Clipboard>
+                        </DropdownMenuItem>
 
                     <DropdownMenuItem asChild>
                         <Link target="_blank" href={`/data-keys/${dataKey.uuid}/metadata`}>

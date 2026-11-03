@@ -67,7 +67,8 @@ function isMeaningfulRestoreSnapshot(snapshot: unknown): boolean {
   return !!snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) && Object.keys(snapshot).length > 0
 }
 
-export default async function ChangeDetailsPage({ params }: { params: Params }) {
+export default async function ChangeDetailsPage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   const numericVersion = parseDataVersionParam(params.version)
   if (numericVersion === null) {
     notFound()

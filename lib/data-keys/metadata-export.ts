@@ -1,6 +1,6 @@
 'use client';
 
-import * as XLSX from 'xlsx';
+import { downloadExcel } from "@/lib/excel-export";
 
 import { DataKey } from "@/databases/queries/data-keys/_get";
 
@@ -66,10 +66,7 @@ export function downloadDataKeysMetadataExcel(
     data: DataKeyMetadataExportItem[],
     filename = 'data-keys-metadata.xlsx',
 ) {
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(data.map(toWorksheetRow));
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Keys Metadata');
-    XLSX.writeFile(workbook, filename);
+    return downloadExcel([{ name: 'Data Keys Metadata', rows: data.map(toWorksheetRow), }], filename);
 }
 
 export function downloadDataKeysMetadataJSON(

@@ -7,7 +7,7 @@ import { _saveScripts } from '@/databases/mutations/scripts/_scripts_save';
 import { _saveScreens } from '@/databases/mutations/scripts/_screens_save';
 import { _saveDiagnoses } from '@/databases/mutations/scripts/_diagnoses_save';
 import { _saveProblems } from '@/databases/mutations/scripts/_problems_save';
-import { applyIndexedPatches, type IndexedPatch } from '@/lib/search-replace-payload';
+import { applyFieldItemPatches, applyIndexedPatches, type FieldItemPatch, type IndexedPatch } from '@/lib/search-replace-payload';
 
 export type SavePartialParams = {
     broadcastAction?: boolean;
@@ -21,6 +21,7 @@ export type SavePartialParams = {
         data: Partial<(typeof schema.screens.$inferSelect & {
             _fields?: IndexedPatch[];
             _items?: IndexedPatch[];
+            _fieldItems?: FieldItemPatch[];
         })>;
     }[];
     diagnoses?: {
@@ -74,10 +75,19 @@ export async function savePartial({
             const res = await _saveScripts({
                 userId,
                 broadcastAction,
-                data: scripts.data.map(s => ({
-                    ...s,
-                    ...(scriptsParam.find(script => script.scriptId === s.scriptId)?.data as typeof s),
-                })),
+                data: scripts.data.map(s => {
+                    const {
+                        _nuidSearchFields = [],
+                        ...partialData
+                    } = scriptsParam.find(script => script.scriptId === s.scriptId)?.data as (typeof s & {
+                        _nuidSearchFields: IndexedPatch[];
+                    });
+                    return {
+                        ...s,
+                        ...partialData,
+                        nuidSearchFields: applyIndexedPatches(s.nuidSearchFields, _nuidSearchFields),
+                    };
+                }),
             });
 
             if (res.errors) errors = [...errors, ...res.errors];
@@ -93,16 +103,18 @@ export async function savePartial({
                     const {
                         _fields = [],
                         _items = [],
+                        _fieldItems = [],
                         ...partialData
                     } = screensParam.find(screen => screen.screenId === s.screenId)?.data as (typeof s & {
                         _fields: NonNullable<SavePartialParams['screens']>[0]['data']['_fields'];
                         _items: NonNullable<SavePartialParams['screens']>[0]['data']['_items'];
+                        _fieldItems: NonNullable<SavePartialParams['screens']>[0]['data']['_fieldItems'];
                     });
 
                     return {
                         ...s,
                         ...partialData,
-                        fields: applyIndexedPatches(s.fields, _fields),
+                        fields: applyFieldItemPatches(applyIndexedPatches(s.fields, _fields), _fieldItems),
                         items: applyIndexedPatches(s.items, _items),
                     };
                 }),

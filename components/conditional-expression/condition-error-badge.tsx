@@ -54,7 +54,8 @@ export function collectConditionErrorMessages({
   const mergedKeys = extraKeys?.length ? mergeConditionKeys(keys, extraKeys) : keys;
   const out: string[] = [];
   for (const expression of expressions || []) {
-    const value = `${expression?.value ?? ""}`.trim();
+    // As written: an empty line at the start or end, or a condition of only spaces, fails on tablets.
+    const value = `${expression?.value ?? ""}`;
     if (!value) continue;
     const ctx = { keys: mergedKeys, allowSelf: expression.allowSelf, unavailableKeys, skipKeyResolution: !keysReady };
     const result =

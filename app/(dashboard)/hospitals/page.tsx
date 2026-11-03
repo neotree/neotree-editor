@@ -10,13 +10,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { HospitalsTable } from "./components/table";
 
 type Props = {
-    params: { [key: string]: string; };
-    searchParams: { [key: string]: string; };
+    params: Promise<{ [key: string]: string; }>;
+    searchParams: Promise<{ [key: string]: string; }>;
 };
 
 export const dynamic = 'force-dynamic';
 
-export default async function Hospitals({ searchParams: { page } }: Props) {
+export default async function Hospitals(props: Props) {
+    const searchParams = await props.searchParams;
+
+    const {
+        page
+    } = searchParams;
+
     const [hospitals] = await Promise.all([
         getHospitals(),
     ]);

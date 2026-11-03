@@ -9,6 +9,7 @@ import { getSitesWithoutConfidentialData } from "@/app/actions/sites";
 import * as sysActions from "@/app/actions/sys";
 import * as opsActions from "@/app/actions/ops";
 import * as dataKeysActions from '@/app/actions/data-keys';
+import * as socketEventsActions from '@/app/actions/socket-events';
 import { getMode, setMode } from '@/lib/mode';
 import socket from "@/lib/socket";
 import { SocketEventsListener } from "@/components/socket-events-listener";
@@ -26,6 +27,7 @@ export const useAppContext = () => useContext(AppContext);
 type AppContextProviderProps = Omit<typeof opsActions, 'setMode' | 'getMode'> & 
     typeof sysActions &
     typeof dataKeysActions &
+    typeof socketEventsActions &
     Awaited<ReturnType<typeof opsActions.getEditorDetails>> &
     Awaited<ReturnType<typeof getAuthenticatedUserWithRoles>> &
     {
@@ -59,6 +61,17 @@ export function AppContextProvider({
                     {
                         name: 'mode_changed',
                         onEvent: { callback: ctx.onModeChange, },
+                    },
+                    // content sync settings and hotfixes come from the root layout: reload it everywhere
+                    {
+                        name: 'data_changed',
+                        action: 'content_sync_settings',
+                        onEvent: { refreshRouter: true, },
+                    },
+                    {
+                        name: 'data_changed',
+                        action: 'content_sync_hotfix',
+                        onEvent: { refreshRouter: true, },
                     },
                     // {
                     //     name: 'update_system',

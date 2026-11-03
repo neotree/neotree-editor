@@ -38,6 +38,7 @@ import { getDataKeyIntegrityEntryFingerprint, getDataKeyIntegrityStatusLabel, is
 import { getDataKeyIntegrityRulesHref } from "@/lib/data-key-integrity-rules";
 import type { IntegrityPolicy } from "@/lib/integrity-policy";
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { pendingChangesAPI } from "@/lib/indexed-db";
 
 const statusStyles = {
@@ -233,7 +234,8 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
 }) {
     type BulkPreviewItem = Awaited<ReturnType<typeof previewDataKeyIntegrityEntriesBulk>>["previews"][number];
     const router = useRouter();
-    const { viewOnly, authenticatedUser } = useAppContext();
+    const { authenticatedUser } = useAppContext();
+    const viewOnly = useContentViewOnly("scripts");
     const { alert } = useAlertModal();
     const [isRepairing, startRepairTransition] = useTransition();
     const [resolvingKey, setResolvingKey] = useState<string | null>(null);
@@ -522,7 +524,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                     return;
                 }
 
-                if (!res.changed) {
+                if (!res.changed && res.warnings?.length) {
+                    alert({
+                        title: "Not changed",
+                        message: res.warnings.join("<br />"),
+                        variant: "info",
+                        buttonLabel: "Close",
+                    });
+                } else if (!res.changed) {
                     toast.message("No safe change was applied for this reference");
                 } else {
                     await trackIntegrityDraftChange({
@@ -642,7 +651,14 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                     return;
                 }
 
-                if (!res.changed) {
+                if (!res.changed && res.warnings?.length) {
+                    alert({
+                        title: "Not changed",
+                        message: res.warnings.join("<br />"),
+                        variant: "info",
+                        buttonLabel: "Close",
+                    });
+                } else if (!res.changed) {
                     toast.message(`No ${bulkResolveStatus.replace(/_/g, " ")} references needed changes`);
                 } else {
                     await trackIntegrityDraftChange({

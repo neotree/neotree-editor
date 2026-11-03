@@ -1,6 +1,6 @@
 import http from 'node:http';
 import https from 'node:https';
-import sizeOf from 'image-size';
+import { imageSize } from 'image-size';
 
 export async function getRemoteImageSize(url: string) {
     try {
@@ -16,12 +16,7 @@ export async function getRemoteImageSize(url: string) {
                 .on('end', function () {
                     const buffer = Buffer.concat(chunks);
                     try {
-                        // @ts-ignore
-                        const res = sizeOf(buffer, function(e) {
-                            if (e) reject(e);
-                        });
-                        // @ts-ignore
-                        resolve(res);
+                        resolve(imageSize(buffer));
                     } catch(e) {
                         reject(e);
                     }

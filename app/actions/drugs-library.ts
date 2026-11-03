@@ -18,10 +18,13 @@ import {
 } from "@/databases/queries/drugs-library";
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
+import { actingUserHeaders } from "@/lib/acting-user";
+import { assertContentEditable } from "@/lib/server/content-sync";
 
 export const saveDrugsLibraryItemsIfKeysNotExist: typeof _saveDrugsLibraryItemsIfKeysNotExist = async params => {
     try {
         const session = await isAllowed();
+        await assertContentEditable({ area: 'drugsLibrary', userRole: session.user?.role, viaApiKey: session.viaApiKey, });
         return await _saveDrugsLibraryItemsIfKeysNotExist({
             ...params,
             userId: session.user?.userId,
@@ -35,6 +38,7 @@ export const saveDrugsLibraryItemsIfKeysNotExist: typeof _saveDrugsLibraryItemsI
 export const saveDrugsLibraryItemsUpdateIfExists: typeof _saveDrugsLibraryItemsUpdateIfExists = async params => {
     try {
         const session = await isAllowed();
+        await assertContentEditable({ area: 'drugsLibrary', userRole: session.user?.role, viaApiKey: session.viaApiKey, });
         return await _saveDrugsLibraryItemsUpdateIfExists({
             ...params,
             userId: session.user?.userId,
@@ -48,6 +52,7 @@ export const saveDrugsLibraryItemsUpdateIfExists: typeof _saveDrugsLibraryItemsU
 export const copyDrugsLibraryItems: typeof _copyDrugsLibraryItems = async params => {
     try {
         const session = await isAllowed();
+        await assertContentEditable({ area: 'drugsLibrary', userRole: session.user?.role, viaApiKey: session.viaApiKey, });
         return await _copyDrugsLibraryItems({
             ...params,
             userId: session.user?.userId,
@@ -61,6 +66,7 @@ export const copyDrugsLibraryItems: typeof _copyDrugsLibraryItems = async params
 export const deleteDrugsLibraryItems: typeof _deleteDrugsLibraryItems = async params => {
     try {
         const session = await isAllowed();
+        await assertContentEditable({ area: 'drugsLibrary', userRole: session.user?.role, viaApiKey: session.viaApiKey, });
         return await _deleteDrugsLibraryItems({
             ...params,
             userId: session.user?.userId,
@@ -109,6 +115,7 @@ export const getDrugsLibraryMetadata: typeof _getDrugsLibraryMetadata = async (.
 export const saveDrugsLibraryItems: typeof _saveDrugsLibraryItems = async params => {
     try {
         const session = await isAllowed();
+        await assertContentEditable({ area: 'drugsLibrary', userRole: session.user?.role, viaApiKey: session.viaApiKey, });
         return await _saveDrugsLibraryItems({
             ...params,
             userId: session.user?.userId,
@@ -122,6 +129,7 @@ export const saveDrugsLibraryItems: typeof _saveDrugsLibraryItems = async params
 export const removeDrugLibraryItemsReferences: typeof _removeDrugLibraryItemsReferences = async params => {
     try {
         const session = await isAllowed();
+        await assertContentEditable({ area: 'drugsLibrary', userRole: session.user?.role, viaApiKey: session.viaApiKey, });
         return await _removeDrugLibraryItemsReferences({
             ...params,
             userId: session.user?.userId,
@@ -145,6 +153,8 @@ export const exportDrugLibraryItems = async ({
     errors?: string[];
 }> => {
     try {
+        const session = await isAllowed();
+
         const axiosClient = await getSiteAxiosClient(siteId);
         
         const drugLibraryItems = await _getDrugsLibraryItems({
@@ -166,14 +176,14 @@ export const exportDrugLibraryItems = async ({
                 const res = await axiosClient.post<Awaited<ReturnType<typeof saveDrugsLibraryItemsIfKeysNotExist>>>('/api/drugs-library/save-and-update-if-exist', {
                     data: drugLibraryItems.data,
                     broadcastAction: true,
-                } satisfies Parameters<typeof saveDrugsLibraryItemsIfKeysNotExist>[0]);
+                } satisfies Parameters<typeof saveDrugsLibraryItemsIfKeysNotExist>[0], { headers: actingUserHeaders(session.user?.email), });
 
                 if (res.data.errors) errors = res.data.errors;
             } else {
                 const res = await axiosClient.post<Awaited<ReturnType<typeof saveDrugsLibraryItemsIfKeysNotExist>>>('/api/drugs-library/save-if-not-exist', {
                     data: drugLibraryItems.data,
                     broadcastAction: true,
-                } satisfies Parameters<typeof saveDrugsLibraryItemsIfKeysNotExist>[0]);
+                } satisfies Parameters<typeof saveDrugsLibraryItemsIfKeysNotExist>[0], { headers: actingUserHeaders(session.user?.email), });
 
                 if (res.data.errors) errors = res.data.errors;
             }

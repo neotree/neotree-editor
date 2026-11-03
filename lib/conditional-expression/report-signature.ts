@@ -20,7 +20,7 @@
  * report in the background.
  */
 
-export const CONDITION_REPORT_SIGNATURE_VERSION = "r2";
+export const CONDITION_REPORT_SIGNATURE_VERSION = "r5";
 
 /**
  * Versions a stored report may still carry from an earlier deploy.
@@ -39,8 +39,19 @@ export const CONDITION_REPORT_SIGNATURE_VERSION = "r2";
  *
  * r1 -> r2: case-variant keys (`$RESUS` / `$Resus`) stopped being reported as
  * wrong-casing errors with bogus unknown-option errors behind them.
+ * r2 -> r3: NEOAPP-1514. Comparing `$Diagnoses` / `$Problems` with `=`, `!=` or
+ * an ordering operator became an error, as did comparing any key against a
+ * list literal; `!=` chained with `or`, the legacy `or_includes` /
+ * `or_excludes` operators, and membership on keys older app builds cannot
+ * evaluate became warnings.
+ * r3 -> r4: what tablets cannot read became errors: empty lines (also at the
+ * start or end, and conditions of only spaces), `and` / `or` / `=` without a
+ * space on both sides, an operator touching its `$Key`, tabs, and a diagnosis or
+ * problem with symptoms but no expression.
+ * r4 -> r5: keys of the script's NUID search fields count as script keys, as
+ * they do in the script editor, so conditions using them are no longer unknown keys.
  */
-export const SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS = ["r1"] as const;
+export const SUPERSEDED_CONDITION_REPORT_SIGNATURE_VERSIONS = ["r1", "r2", "r3", "r4"] as const;
 
 /**
  * True when a stored signature is this exact signature from an earlier rule set —

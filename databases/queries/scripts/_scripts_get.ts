@@ -1,9 +1,10 @@
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import * as uuid from "uuid";
 
 import db from "@/databases/pg/drizzle";
 import { scripts, scriptsDrafts, pendingDeletion, hospitals, screensDrafts, diagnosesDrafts, problemsDrafts, } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
+import { computeEntityRevision } from "@/lib/entity-revision";
 import { ScriptField, Preferences, PrintSection, ScreenReviewField, Alias, EligibilityCriteria } from "@/types";
 import { _getScreens } from "./_screens_get";
 
@@ -13,6 +14,11 @@ export type GetScriptsParams = {
     hospitalIds?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    /**
+     * Return published rows even when a deletion is queued (pending) for them. Used when another
+     * editor imports this editor's published state: an unpublished deletion is not published yet.
+     */
+    includePendingDeletion?: boolean;
 };
 
 export type ScriptType = typeof scripts.$inferSelect & {
@@ -27,8 +33,12 @@ export type ScriptType = typeof scripts.$inferSelect & {
     printSections: PrintSection[];
     hospitalName: string;
     draftCreatedByUserId?: string | null;
+    /** Content fingerprint for save conflict checks (set by _getScript). */
+    revision?: string;
     hasChangedItems?: boolean;
     itemsChangedByUserId?: string | null;
+    /** Some unpublished changes in the script have no owner (see _getScriptsItemsChanges). */
+    hasUnownedChanges?: boolean;
 };
 
 export type GetScriptsResults = {
@@ -68,6 +78,7 @@ export async function _getScripts(
             scriptsIds = [], 
             hospitalIds = [],
             returnDraftsIfExist = true, 
+            includePendingDeletion,
         } = { ...params };
 
         const oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
@@ -136,7 +147,7 @@ export async function _getScripts(
             ))
             .where(and(
                 isNull(scripts.deletedAt),
-                isNull(pendingDeletion),
+                includePendingDeletion ? undefined : isNull(pendingDeletion),
                 !returnDraftsIfExist ? undefined : isNull(scriptsDrafts.scriptId),
                 !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds),
                 !hospitalIds.length ? undefined : inArray(scripts.hospitalId, hospitalIds),
@@ -168,7 +179,7 @@ export async function _getScripts(
             } as GetScriptsResults['data'][0])))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.scriptId).includes(s.scriptId))
+            .filter(s => includePendingDeletion || !inPendingDeletion.map(s => s.scriptId).includes(s.scriptId))
             .map(s => ({
                 ...s,
                 hospitalId: s.hospitalName ? s.hospitalId : null,
@@ -179,6 +190,7 @@ export async function _getScripts(
             const { data: [item],  } = await _getScriptsItemsChanges({ scriptsIds: [s.scriptId], });
             responseData[i].hasChangedItems = !!item?.hasChangedItems;
             responseData[i].itemsChangedByUserId = item?.itemsChangedByUserId || null;
+            responseData[i].hasUnownedChanges = !!item?.hasUnownedChanges;
             i++;
         }
         
@@ -237,8 +249,9 @@ export async function _getScript(
             const { data: [item],  } = await _getScriptsItemsChanges({ scriptsIds: [responseData.scriptId], });
             responseData.hasChangedItems = !!item?.hasChangedItems;
             responseData.itemsChangedByUserId = item.itemsChangedByUserId || null;
+            responseData.hasUnownedChanges = !!item?.hasUnownedChanges;
 
-            return { data: responseData, };
+            return { data: { ...responseData, revision: computeEntityRevision(responseData), }, };
         }
 
         const publishedRes = await db
@@ -287,9 +300,10 @@ export async function _getScript(
         const { data: [item],  } = await _getScriptsItemsChanges({ scriptsIds: [responseData.scriptId], });
         responseData.hasChangedItems = !!item?.hasChangedItems;
         responseData.itemsChangedByUserId = item.itemsChangedByUserId || null;
+        responseData.hasUnownedChanges = !!item?.hasUnownedChanges;
 
         return  { 
-            data: responseData, 
+            data: { ...responseData, revision: computeEntityRevision(responseData), }, 
         };
     } catch(e: any) {
         logger.error('_getScript ERROR', e.message);
@@ -307,6 +321,8 @@ export async function _getScriptsItemsChanges({ scriptsIds = [], userId, }: {
         hasDraftedProblems: boolean;
         hasDeletedItems: boolean;
         hasChangedItems: boolean;
+        /** Some of the changes have no owner: nobody's "publish my changes" includes them. */
+        hasUnownedChanges: boolean;
         screensDraftsCreatedByUserId: string | null | undefined;
         diagnosesDraftsCreatedByUserId: string | null | undefined;
         problemsDraftsCreatedByUserId: string | null | undefined;
@@ -314,64 +330,59 @@ export async function _getScriptsItemsChanges({ scriptsIds = [], userId, }: {
         itemsChangedByUserId: string | null | undefined;
     }[] = [];
 
+    // Every draft counts, whoever owns it. Drafts without an owner used to be left out, so a script
+    // with unpublished changes nobody owned looked clean in the scripts list.
+    const summarize = async (table: typeof screensDrafts | typeof diagnosesDrafts | typeof problemsDrafts | typeof pendingDeletion, where: SQL | undefined) => {
+        const [row] = await db
+            .select({
+                total: sql<number>`count(*)::int`,
+                unowned: sql<number>`(count(*) filter (where ${table.createdByUserId} is null))::int`,
+                owner: sql<string | null>`max(${table.createdByUserId}::text)`,
+            })
+            .from(table)
+            .where(where);
+        return { total: Number(row?.total) || 0, unowned: Number(row?.unowned) || 0, owner: row?.owner || null, };
+    };
+
     try {
         for (const scriptId of scriptsIds) {
-            const screenDraft = await db.query.screensDrafts.findFirst({
-                where: or(
-                    eq(screensDrafts.scriptDraftId, scriptId),
-                    eq(screensDrafts.scriptId, scriptId),
-                ),
-                columns: {
-                    createdByUserId: true,
-                },
-            });
+            const screenDrafts = await summarize(screensDrafts, or(
+                eq(screensDrafts.scriptDraftId, scriptId),
+                eq(screensDrafts.scriptId, scriptId),
+            ));
 
-            const diagnosisDraft = await db.query.diagnosesDrafts.findFirst({
-                where: or(
-                    eq(diagnosesDrafts.scriptDraftId, scriptId),
-                    eq(diagnosesDrafts.scriptId, scriptId),
-                ),
-                columns: {
-                    createdByUserId: true,
-                },
-            });
+            const diagnosisDrafts = await summarize(diagnosesDrafts, or(
+                eq(diagnosesDrafts.scriptDraftId, scriptId),
+                eq(diagnosesDrafts.scriptId, scriptId),
+            ));
 
-            const problemDraft = await db.query.problemsDrafts.findFirst({
-                where: or(
-                    eq(problemsDrafts.scriptDraftId, scriptId),
-                    eq(problemsDrafts.scriptId, scriptId),
-                ),
-                columns: {
-                    createdByUserId: true,
-                },
-            });
+            const problemDrafts = await summarize(problemsDrafts, or(
+                eq(problemsDrafts.scriptDraftId, scriptId),
+                eq(problemsDrafts.scriptId, scriptId),
+            ));
 
-            const _pendingDeletion = await db.query.pendingDeletion.findMany({
-                where: or(
-                    eq(pendingDeletion.scriptDraftId, scriptId),
-                    eq(pendingDeletion.screenScriptId, scriptId),
-                    eq(pendingDeletion.diagnosisScriptId, scriptId),
-                    eq(pendingDeletion.problemScriptId, scriptId),
-                    // eq(pendingDeletion.scriptId, scriptId),
-                ),
-                columns: {
-                    createdByUserId: true,
-                },
-            });
+            const deletions = await summarize(pendingDeletion, or(
+                eq(pendingDeletion.scriptDraftId, scriptId),
+                eq(pendingDeletion.screenScriptId, scriptId),
+                eq(pendingDeletion.diagnosisScriptId, scriptId),
+                eq(pendingDeletion.problemScriptId, scriptId),
+                // eq(pendingDeletion.scriptId, scriptId),
+            ));
 
-            const pendingDeletionBy = _pendingDeletion.find(s => s.createdByUserId);
+            const all = [screenDrafts, diagnosisDrafts, problemDrafts, deletions];
 
             const _data: typeof data[0] = {
-                hasDraftedScreens: !!screenDraft?.createdByUserId,
-                hasDraftedDiagnoses: !!diagnosisDraft?.createdByUserId,
-                hasDraftedProblems: !!problemDraft?.createdByUserId,
-                hasDeletedItems: !!_pendingDeletion?.length,
-                hasChangedItems: !!screenDraft?.createdByUserId || !!diagnosisDraft?.createdByUserId || !!problemDraft?.createdByUserId || !!_pendingDeletion?.length,
-                screensDraftsCreatedByUserId: screenDraft?.createdByUserId,
-                diagnosesDraftsCreatedByUserId: diagnosisDraft?.createdByUserId,
-                problemsDraftsCreatedByUserId: problemDraft?.createdByUserId,
-                itemsDeletedByUserId: pendingDeletionBy?.createdByUserId,
-                itemsChangedByUserId: screenDraft?.createdByUserId || diagnosisDraft?.createdByUserId || problemDraft?.createdByUserId || pendingDeletionBy?.createdByUserId,
+                hasDraftedScreens: screenDrafts.total > 0,
+                hasDraftedDiagnoses: diagnosisDrafts.total > 0,
+                hasDraftedProblems: problemDrafts.total > 0,
+                hasDeletedItems: deletions.total > 0,
+                hasChangedItems: all.some(d => d.total > 0),
+                hasUnownedChanges: all.some(d => d.unowned > 0),
+                screensDraftsCreatedByUserId: screenDrafts.owner,
+                diagnosesDraftsCreatedByUserId: diagnosisDrafts.owner,
+                problemsDraftsCreatedByUserId: problemDrafts.owner,
+                itemsDeletedByUserId: deletions.owner,
+                itemsChangedByUserId: screenDrafts.owner || diagnosisDrafts.owner || problemDrafts.owner || deletions.owner,
             };
 
             data.push(_data);

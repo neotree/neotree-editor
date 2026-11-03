@@ -24,6 +24,7 @@ import { recordPendingDeletionChange } from "@/lib/change-tracker";
 import { useAppContext } from "@/contexts/app";
 import { matchesDataKeySearch } from "@/lib/data-keys-search";
 import { SocketEventsListener } from "@/components/socket-events-listener";
+import { boolean } from "drizzle-orm/gel-core";
 
 function paginateData<T>(
     data: T[],
@@ -125,6 +126,8 @@ export type tDataKeysCtx = {
         show: boolean;
         errors: string[];
     };
+    exportRequestKey: string;
+    setExportRequestKey: React.Dispatch<React.SetStateAction<string>>;
     getLatestDataKeys: () => Promise<void>;
     setUnusedDataKeys: React.Dispatch<React.SetStateAction<tDataKeysCtx['unusedDataKeys']>>;
     setCurrentPage: (page: number) => void;
@@ -209,7 +212,7 @@ export function DataKeysCtxProvider({
         params?: GetDataKeysParams,
         opts?: LoadDataKeysOpts,
     ) => {
-        setLoadingDataKeys(true);
+        setLoadingDataKeys(!opts?.silent);
 
         try {
             // Build query params (without pagination)
@@ -297,7 +300,7 @@ export function DataKeysCtxProvider({
         if (filter) {
             if (filter === 'published') {
                 filtered = filtered.filter(dataKey => !dataKey?.isDraft);
-            } else if (filter === 'draft') {
+            } else if (filter === 'drafts') {
                 filtered = filtered.filter(dataKey => !!dataKey?.isDraft);
             } else {
                 filtered = filtered.filter(dataKey => dataKey?.dataType === filter);
@@ -378,8 +381,9 @@ export function DataKeysCtxProvider({
             } else {
                 await loadDataKeys();
                 router.refresh();
+                const warnings = (res as { warnings?: string[] }).warnings || [];
                 alert({
-                    message: "Data key saved!",
+                    message: warnings.length ? `Data key saved. ${warnings.join(' ')}` : "Data key saved!",
                     variant: 'success',
                     onClose: () => cb?.(),
                 });
@@ -478,25 +482,56 @@ export function DataKeysCtxProvider({
      ************ EXPORT
     ******************************************************/
     const [exporting, setExporting] = useState(false);
+    const [exportRequestKey, setExportRequestKey] = useState(Math.random().toString(12).substring(2));
 
-    const exportDataKeys: tDataKeysCtx['exportDataKeys'] = useCallback(async (data) => {
+    const exportDataKeys = useCallback(async (
+        data: Parameters<tDataKeysCtx['exportDataKeys']>[0],
+    ) => {
         try {
             setExporting(true);
 
-            const response = await axios.post<Awaited<ReturnType<typeof actions.exportDataKeys>>>(`/api/data-keys/export`, data);
-            const res = response.data;
+            const payload = { ...data, requestKey: exportRequestKey, };
 
-            if (res.errors?.length) throw new Error(res.errors[0]);
+            let res = null as (Awaited<ReturnType<typeof actions.exportDataKeys>> & {
+                started?: boolean;
+            }) | null;
 
-            await loadDataKeys();
+            await new Promise<any>(resolve => {
+                (async () => {
+                    const exportFn = async () => {
+                        const response = await axios.post<
+                            { started?: boolean; } & Awaited<ReturnType<typeof actions.exportDataKeys>>
+                        >(`/api/data-keys/export`, payload);
+                        return response.data;
+                    };
 
-            setSelected([]);
+                    res = await exportFn();
 
-            alert({
-                title: 'Success',
-                message: 'Data exported successfully!',
-                variant: 'success',
+                    let exportInterval = setInterval(() => {
+                        (async () => {
+                            res = await exportFn();
+                            if (!res?.started) {
+                                resolve(null);
+                                clearInterval(exportInterval);
+                            }
+                        })();
+                    }, 10000);
+                })();
             });
+
+            if (res && !res?.started) {
+                if (res.errors?.length) throw new Error(res.errors[0]);
+
+                await loadDataKeys();
+
+                setSelected([]);
+
+                alert({
+                    title: 'Success',
+                    message: 'Data exported successfully!',
+                    variant: 'success',
+                });
+            }
         } catch(e: any) {
             alert({
                 title: 'Error',
@@ -506,7 +541,7 @@ export function DataKeysCtxProvider({
         } finally {
             setExporting(false);
         }
-    }, [loadDataKeys, alert]);
+    }, [exportRequestKey, alert]);
 
 
     /*****************************************************/
@@ -563,6 +598,8 @@ export function DataKeysCtxProvider({
                     currentPage,
                     itemsPerPage,
                     unusedDataKeys,
+                    exportRequestKey,
+                    setExportRequestKey,
                     getLatestDataKeys,
                     setUnusedDataKeys,
                     setCurrentPage,

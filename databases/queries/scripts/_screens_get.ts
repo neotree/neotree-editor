@@ -6,6 +6,7 @@ import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { screens, screensDrafts, pendingDeletion, scripts, scriptsDrafts, hospitals } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import { DrugField, ScriptField, ScriptItem, FileReference, Preferences } from "@/types";
+import { computeEntityRevision } from "@/lib/entity-revision";
 
 export type GetScreensParams = {
     screensIds?: string[];
@@ -13,6 +14,11 @@ export type GetScreensParams = {
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
     withImagesOnly?: boolean;
+    /**
+     * Return published rows even when a deletion is queued (pending) for them. Used when another
+     * editor imports this editor's published state: an unpublished deletion is not published yet.
+     */
+    includePendingDeletion?: boolean;
     types?: (typeof screens.$inferSelect)['type'][];
     client?: DbOrTransaction;
 };
@@ -33,6 +39,8 @@ export type ScreenType = typeof screens.$inferSelect & {
     scriptTitle?: string;
     hospitalName?: string;
     draftCreatedByUserId?: string | null;
+    /** Content fingerprint for save conflict checks (set by _getScreen). */
+    revision?: string;
 };
 
 export type GetScreensResults = {
@@ -49,6 +57,7 @@ export async function _getScreens(
             screensIds: screensIds = [],
             types = [],
             returnDraftsIfExist = true,
+            includePendingDeletion,
             withImagesOnly,
             client,
         } = { ...params };
@@ -157,7 +166,7 @@ export async function _getScreens(
             ))
             .where(and(
                 isNull(screens.deletedAt),
-                isNull(pendingDeletion),
+                includePendingDeletion ? undefined : isNull(pendingDeletion),
                 !returnDraftsIfExist ? undefined : isNull(screensDrafts.screenId),
                 !scriptsIds?.length ? undefined : inArray(screens.scriptId, scriptsIds),
                 !screensIds?.length ? undefined : inArray(screens.screenId, screensIds),
@@ -207,7 +216,7 @@ export async function _getScreens(
             }))
         ]
             .sort((a, b) => a.position - b.position)
-            .filter(s => !inPendingDeletion.map(s => s.screenId).includes(s.screenId));
+            .filter(s => includePendingDeletion || !inPendingDeletion.map(s => s.screenId).includes(s.screenId));
 
         return  {
             data: responseData,
@@ -253,7 +262,7 @@ export async function _getScreen(
             isDeleted: false,
         } as GetScreenResults['data'];
 
-        if (responseData) return { data: responseData, };
+        if (responseData) return { data: { ...responseData, revision: computeEntityRevision(responseData), }, };
 
         const publishedRes = await db
             .select({
@@ -273,12 +282,10 @@ export async function _getScreen(
                 or(whereScreenId, whereOldScreenId),
             ));
 
-        const published = !publishedRes[0] ? null : {
-            ...publishedRes[0].screen,
-            draft: publishedRes[0].draft || undefined,
-        };
+        const publishedDraft = publishedRes[0]?.draft || undefined;
+        const published = !publishedRes[0] ? null : publishedRes[0].screen;
 
-        draft = returnDraftIfExists ? published?.draft : undefined;
+        draft = returnDraftIfExists ? publishedDraft : undefined;
 
         const data = (draft?.data || published) as GetScreenResults['data'];
 
@@ -291,7 +298,7 @@ export async function _getScreen(
 
         if (!responseData) return { data: null, };
         return  {
-            data: responseData,
+            data: { ...responseData, revision: computeEntityRevision(responseData), },
         };
     } catch(e: any) {
         logger.error('_getScreen ERROR', e.message);

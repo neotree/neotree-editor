@@ -5,6 +5,7 @@ import { Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/data-table";
 import {
@@ -20,6 +21,9 @@ import { useScriptsContext } from "@/contexts/scripts";
 import { Loader } from "@/components/loader";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/app";
+import { useContentViewOnly } from "@/hooks/use-content-lock";
+import { useContentSyncStatus } from "@/hooks/use-content-sync-status";
+import { ContentSyncStatusBadge } from "@/components/content-sync-status-badge";
 import { ScriptsTableBottomActions } from "./scripts-table-bottom-actions";
 import { ScriptsTableActions } from "./scripts-table-row-actions";
 import { ScriptsExportModal } from "./scripts-export-modal";
@@ -47,7 +51,11 @@ export function ScriptsTable(props: Props) {
         onDuplicate,
     } = useScriptsTable(props);
 
-    const { sys, viewOnly } = useAppContext();
+    const { sys, viewOnly: viewMode, isSuperUser } = useAppContext();
+    const viewOnly = useContentViewOnly("scripts", null);
+    const contentSyncStatus = useContentSyncStatus();
+    // Content sync: on a target editor super users can still delete scripts (e.g. ones deleted on the source).
+    const canDeleteOnTarget = viewOnly && !viewMode && !!isSuperUser;
     const { hospitals, } = useScriptsContext();
 
     const [conditionErrors, setConditionErrors] = useState<Record<string, ScriptConditionReport>>({});
@@ -115,7 +123,9 @@ export function ScriptsTable(props: Props) {
             <ScriptsFab disabled={disabled} />
 
             <div className="flex flex-col gap-y-4">
-                <div className="pt-4 px-4 text-2xl">Scripts</div>
+                <div className="pt-4 px-4 flex items-center gap-x-2">
+                    <div className="text-2xl">Scripts</div>
+                </div>
 
                 <div className="px-4">
                     <ScriptsTableSearch 
@@ -128,7 +138,7 @@ export function ScriptsTable(props: Props) {
                 <DataTable 
                     selectedIndexes={selected}
                     onSelect={setSelected}
-                    selectable={!disabled}
+                    selectable
                     sortable={!disabled && !search.value}
                     loading={loading}
                     maxRows={25}
@@ -136,14 +146,36 @@ export function ScriptsTable(props: Props) {
                     getRowOptions={({ rowIndex }) => {
                         const s = scriptsArr[rowIndex];
                         return !s ? {} : {
-                            className: cn(!viewOnly && (s.isDraft || s.hasChangedItems) && 'bg-danger/20 hover:bg-danger/30')
+                            className: cn(
+                                !viewOnly && (s.isDraft || s.hasChangedItems) && 'bg-danger/20 hover:bg-danger/30',
+                            ),
                         };
                     }}
                     rowRenderer={!search.value ? undefined : ({ props, cells, rowIndex, }) => {
                         const s = scriptsArr[rowIndex];
                         const searchResults = search.results.find(r => r?.scriptId === s?.scriptId);
 
+                        const nuidSearchFields = !searchResults ? [] : searchResults.matches.filter(f => f.field.includes('nuidSearchField'))
+
+                        const scriptLink = !searchResults ? '' : `/script/${searchResults.scriptId}`;
+
                         const items = !searchResults ? [] : [
+                            {
+                                id: searchResults.scriptId,
+                                title: searchResults.title,
+                                type: 'script',
+                                link: scriptLink,
+                                fields: nuidSearchFields.map(f => {
+                                    return {
+                                        id: f.field,
+                                        title: f.fieldValue,
+                                        type: f.type,
+                                        link: scriptLink+`?nuidSearchField=${f.fieldIndex}`,
+                                        fields: [],
+                                    };
+                                }),
+                            },
+
                             ...searchResults.screens.map(s => {
                                 const link = `/script/${searchResults.scriptId}/screen/${s.screenId}`;
                                 return {
@@ -242,7 +274,7 @@ export function ScriptsTable(props: Props) {
                                                                                 {
                                                                                     name: '',
                                                                                     align: 'right',
-                                                                                    cellClassName: 'w-20 text-right',
+                                                                                    cellClassName: 'w-30 text-right',
                                                                                     thClassName: 'hidden',
                                                                                     cellRenderer({ rowIndex }) {
                                                                                         const _item = item.fields[rowIndex];
@@ -251,7 +283,7 @@ export function ScriptsTable(props: Props) {
                                                                                             <Link
                                                                                                 href={_item.link}
                                                                                                 target="_blank"
-                                                                                                className="flex items-center gap-x-1"
+                                                                                                className="flex items-center gap-x-1 justify-end"
                                                                                             >
                                                                                                 {_item.type}
                                                                                                 <ExternalLink className="h-3 w-3" />
@@ -317,10 +349,28 @@ export function ScriptsTable(props: Props) {
                                     })),
                                 ];
 
+                                const syncPair = s && contentSyncStatus.settings?.showStatus ? contentSyncStatus.pairsByLocalScriptId.get(s.scriptId) : undefined;
+
                                 return (
                                     <span className="inline-flex items-center gap-x-2">
                                         <span>{s?.title || ''}</span>
                                         <ScriptIssueBadge issues={issues} />
+                                        {!viewOnly && !!s?.hasUnownedChanges && (
+                                            <Badge
+                                                variant="outline"
+                                                className="whitespace-nowrap border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                                title="Some unpublished changes in this script have no owner, so nobody's &quot;publish my changes&quot; includes them. Review them, then publish or discard."
+                                            >
+                                                Unowned changes
+                                            </Badge>
+                                        )}
+                                        {!!syncPair && (
+                                            <ContentSyncStatusBadge
+                                                status={syncPair.status}
+                                                sourceName={contentSyncStatus.sourceName}
+                                                targetName={contentSyncStatus.targetName}
+                                            />
+                                        )}
                                     </span>
                                 );
                             },
@@ -367,6 +417,7 @@ export function ScriptsTable(props: Props) {
                                     <ScriptsTableActions 
                                         item={s}
                                         disabled={disabled}
+                                        deleteDisabled={disabled && !canDeleteOnTarget}
                                         onRecheckIssues={() => onRecheckIssues(s.scriptId)}
                                         setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
                                         onDelete={() => onDelete([s.scriptId])}
@@ -389,8 +440,10 @@ export function ScriptsTable(props: Props) {
 
             <ScriptsTableBottomActions 
                 selected={selected}
-                onDelete={() => onDelete(selected.map(i => scriptsArr[i].scriptId).filter(s => s))}
-                setScriptsIdsToExport={() => setScriptsIdsToExport(selected.map(i => scriptsArr[i].scriptId).filter(s => s))}
+                disabled={disabled}
+                selectedScriptsIds={selected.map(i => scriptsArr[i]?.scriptId).filter(s => s)}
+                onDelete={() => onDelete(selected.map(i => scriptsArr[i]?.scriptId).filter(s => s))}
+                setScriptsIdsToExport={() => setScriptsIdsToExport(selected.map(i => scriptsArr[i]?.scriptId).filter(s => s))}
             />
         </>
     )

@@ -70,6 +70,8 @@ export type ScriptField = {
     key: string;
     keyId?: string;
     label: string;
+    /** NUID Search only: what a Neotree ID search field does on the app. */
+    searchRole?: 'patient' | 'transfer' | 'twin' | 'lookup';
     refKey: string;
     refKeyId?: string;
     calculation: string;

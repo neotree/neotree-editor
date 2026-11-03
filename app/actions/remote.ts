@@ -85,7 +85,10 @@ export const loadRemoteScripts = async ({
 
         const url = '/api/scripts?' + queryString.stringify({
             data: JSON.stringify({
+                // Another editor's PUBLISHED state: no drafts, and rows whose deletion is only queued
+                // (not published yet) are still part of it.
                 returnDraftsIfExist: false,
+                includePendingDeletion: true,
                 ...params
             }),
         });
@@ -126,7 +129,10 @@ export const loadRemoteScreens = async ({
 
         const url = '/api/screens?' + queryString.stringify({
             data: JSON.stringify({
+                // Another editor's PUBLISHED state: no drafts, and rows whose deletion is only queued
+                // (not published yet) are still part of it.
                 returnDraftsIfExist: false,
+                includePendingDeletion: true,
                 ...params
             }),
         });
@@ -175,7 +181,10 @@ export const loadRemoteDiagnoses = async ({
 
         const url = '/api/diagnoses?' + queryString.stringify({
             data: JSON.stringify({
+                // Another editor's PUBLISHED state: no drafts, and rows whose deletion is only queued
+                // (not published yet) are still part of it.
                 returnDraftsIfExist: false,
+                includePendingDeletion: true,
                 ...params
             }),
         });
@@ -224,7 +233,10 @@ export const loadRemoteProblems = async ({
 
         const url = '/api/problems?' + queryString.stringify({
             data: JSON.stringify({
+                // Another editor's PUBLISHED state: no drafts, and rows whose deletion is only queued
+                // (not published yet) are still part of it.
                 returnDraftsIfExist: false,
+                includePendingDeletion: true,
                 ...params
             }),
         });
@@ -271,14 +283,17 @@ export const loadRemoteDrugsLibraryItems = async ({
 
         await broadcastActionInProgress(requestKey, BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_dff, true);
 
-        const url = '/api/problems?' + queryString.stringify({
+        const url = '/api/drugs-library?' + queryString.stringify({
             data: JSON.stringify({
+                // Another editor's PUBLISHED state: no drafts, and rows whose deletion is only queued
+                // (not published yet) are still part of it.
                 returnDraftsIfExist: false,
+                includePendingDeletion: true,
                 ...params
             }),
         });
 
-        const problemsRes = await axiosClient.get<GetDrugsLibraryItemsResults>(url);
+        const drugsRes = await axiosClient.get<GetDrugsLibraryItemsResults>(url);
 
         time = Date.now() - startedAt;
 
@@ -286,7 +301,7 @@ export const loadRemoteDrugsLibraryItems = async ({
 
         await broadcastActionInProgress(requestKey, BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_dff, false);
 
-        const data = problemsRes.data;
+        const data = drugsRes.data;
 
         if (throwError && data.errors?.length) throw new Error(data.errors .join(', '));
 
@@ -314,8 +329,14 @@ export const loadRemoteDataKeys = async ({
         await broadcastActionInProgress(requestKey, BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_datakeys, true);
 
         const url = '/api/data-keys?' + queryString.stringify({
+            // Editors before the ?data= fix only read flat params; without this they returned drafts.
+            returnDraftsIfExist: (params as any).returnDraftsIfExist ?? false,
+            includePendingDeletion: (params as any).includePendingDeletion ?? true,
             data: JSON.stringify({
+                // Another editor's PUBLISHED state: no drafts, and rows whose deletion is only queued
+                // (not published yet) are still part of it.
                 returnDraftsIfExist: false,
+                includePendingDeletion: true,
                 ...params
             }),
         });
@@ -412,20 +433,22 @@ export const loadRemoteScriptsWithItems = async ({
             logTime: false,
         });
 
-        const dffItemsIds = screens.data
+        const getDrugKeys = (scriptScreens: typeof screens.data) => Array.from(new Set(scriptScreens
             .filter(s => ['drugs', 'fluids', 'feeds'].includes(s.type))
             .reduce((acc, s) => {
-                (s.drugs || []).forEach(f => acc.push(f.key));
-                (s.feeds || []).forEach(f => acc.push(f.key));
-                (s.fluids || []).forEach(f => acc.push(f.key));
+                (s.drugs || []).forEach(f => f?.key && acc.push(f.key));
+                (s.feeds || []).forEach(f => f?.key && acc.push(f.key));
+                (s.fluids || []).forEach(f => f?.key && acc.push(f.key));
                 return acc;
-            }, [] as string[]);
+            }, [] as string[])));
 
-        const drugsLibrary: Awaited<ReturnType<typeof loadRemoteDrugsLibraryItems>> = !dffItemsIds.length ? 
+        const dffItemsKeys = getDrugKeys(screens.data);
+
+        const drugsLibrary: Awaited<ReturnType<typeof loadRemoteDrugsLibraryItems>> = !dffItemsKeys.length ? 
             { data: [], time: 0, } 
             : 
             await loadRemoteDrugsLibraryItems({
-                itemsIds: dffItemsIds,
+                keys: dffItemsKeys,
                 remoteSiteId,
                 requestKey,
                 axiosClient,
@@ -452,12 +475,14 @@ export const loadRemoteScriptsWithItems = async ({
         });
 
         const data = scripts.data.map(script => {
+            const scriptScreens = screens.data.filter(s => s.scriptId === script.scriptId);
+            const scriptDrugKeys = new Set(getDrugKeys(scriptScreens));
             return {
                 ...script,
-                screens: screens.data.filter(s => s.scriptId === script.scriptId),
+                screens: scriptScreens,
                 diagnoses: diagnoses.data.filter(s => s.scriptId === script.scriptId),
                 problems: problems.data.filter(s => s.scriptId === script.scriptId),
-                drugsLibrary: drugsLibrary.data,
+                drugsLibrary: drugsLibrary.data.filter(item => scriptDrugKeys.has(item.key)),
                 dataKeys: scrappedDataKeys,
             };
         });

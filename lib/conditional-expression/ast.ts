@@ -23,6 +23,10 @@ export type DiagnosticCode =
   | "MEMBERSHIP_BRACKETS"
   | "MEMBERSHIP_EMPTY"
   | "STANDALONE_EXPRESSION"
+  | "ALWAYS_TRUE"
+  | "LEGACY_MEMBERSHIP_OP"
+  | "COLLECTION_COMPARISON"
+  | "ARRAY_COMPARISON"
   | "MISSING_KEY"
   // Semantic (needs the script key context)
   | "UNKNOWN_KEY"
@@ -39,7 +43,11 @@ export type DiagnosticCode =
   | "EMPTY_VALUE"
   | "NULL_VALUE"
   | "VALUE_WHITESPACE"
-  | "TRAILING_WHITESPACE";
+  | "TRAILING_WHITESPACE"
+  | "BLANK_LINE"
+  | "OPERATOR_SPACING"
+  | "TAB_CHARACTER"
+  | "EMPTY_OUTCOME_EXPRESSION";
 
 export interface Diagnostic {
   severity: Severity;

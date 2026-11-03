@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { eq, isNotNull, or } from "drizzle-orm";
-import sizeOf from 'image-size';
 import axios from 'axios';
 
 import { isAuthenticated } from "@/app/actions/is-authenticated";

@@ -10,8 +10,6 @@ import { DataTable } from "@/components/data-table";
 export function FilesTable({ data }: {
     data: Awaited<ReturnType<typeof loadData>>;
 }) {
-    console.log('data', data);
-    
     const sites = useMemo(() => data.map(item => item.site), [data]);
 
     const [selectedSiteId, setSelectedSiteId] = useState('all');

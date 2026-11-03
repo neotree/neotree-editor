@@ -11,6 +11,8 @@ import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-c
 import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
+import { _saveDataKeys } from './_save';
+import { assertDraftOwner } from "@/lib/server/draft-owner";
 
 export type DeleteDataKeysParams = {
     dataKeysIds: string[];
@@ -136,6 +138,8 @@ export async function _deleteDataKeys(
     const response: DeleteDataKeysResponse = { success: false, };
 
     try {
+        // nobody could see, publish or discard a draft without an owner
+        await assertDraftOwner(userId);
         const dataKeysIds = uniqueValues(dataKeysIdsParam);
 
         if (dataKeysIds.length) {
@@ -182,7 +186,12 @@ export async function _deleteDataKeys(
                     client: tx,
                 });
 
-                const deletedUniqueKeys = uniqueValues(targets.map((dataKey) => dataKey.uniqueKey || ''));
+                // Keys with a replacement were just rewritten to it; removing their leftover references
+                // as well would delete whatever the rewrite could not reach.
+                const replacedIds = new Set(Object.keys(replacements || {}).filter(id => !!replacements[id]));
+                const deletedUniqueKeys = uniqueValues(targets
+                    .filter((dataKey) => !replacedIds.has(dataKey.uuid))
+                    .map((dataKey) => dataKey.uniqueKey || ''));
                 if (deletedUniqueKeys.length) {
                     const deleteReferencedOptionsRes = await _deleteReferencedDataKeyOptions({
                         userId: userId || undefined,
@@ -214,6 +223,35 @@ export async function _deleteDataKeys(
                 }));
 
                 if (pendingDeletionInsertData.length) await tx.insert(pendingDeletion).values(pendingDeletionInsertData);
+
+                // Keys that listed a deleted key as an option keep pointing at it otherwise (a dead option row
+                // in the data-key form, and an option the pickers can no longer resolve). Point them at the
+                // replacement, or drop the option.
+                const replacementUniqueKeyByDeleted = new Map<string, string>();
+                targets.forEach((target) => {
+                    const replacement = dataKeysRes.data.find(k => k.uuid === replacements?.[target.uuid]);
+                    if (target.uniqueKey && replacement?.uniqueKey) replacementUniqueKeyByDeleted.set(target.uniqueKey, replacement.uniqueKey);
+                });
+                const deletedUniqueKeySet = new Set(targets.map(t => t.uniqueKey).filter(Boolean));
+                const parentUpdates = dataKeysRes.data
+                    .filter(k => !dataKeysIds.includes(k.uuid) && (k.options || []).some(o => deletedUniqueKeySet.has(o)))
+                    .map(k => ({
+                        uuid: k.uuid,
+                        uniqueKey: k.uniqueKey,
+                        options: uniqueValues((k.options || [])
+                            .map(o => (deletedUniqueKeySet.has(o) ? (replacementUniqueKeyByDeleted.get(o) || '') : o))),
+                    }));
+                if (parentUpdates.length) {
+                    const parentsRes = await _saveDataKeys({
+                        data: parentUpdates,
+                        userId: userId || undefined,
+                        updateRefs: false,
+                        draftOrigin: 'data_key_sync',
+                        client: tx,
+                    });
+                    // part of the delete: if the parents can't be repaired, nothing is deleted
+                    if (parentsRes.errors?.length) throw new Error(parentsRes.errors.join(', '));
+                }
             });
         }
 

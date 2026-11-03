@@ -12,9 +12,9 @@ import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getHeaders } from "@/lib/header";
 
 interface IParams {
-    params: {
+    params: Promise<{
         deviceId: string;
-    };
+    }>;
 }
 
 type ReqBody = {
@@ -37,17 +37,23 @@ const data = {
     configKeys: [] as GetConfigKeysResults['data'],
 };
 
-export async function POST(req: NextRequest, { params: { deviceId } }: IParams) {
+export async function POST(req: NextRequest, props: IParams) {
+    const params = await props.params;
+
+    const {
+        deviceId
+    } = params;
+
     const responseData = { ...data, deviceId, };
 
-	try {
+    try {
         logger.log(`[POST] /api/app/device/${deviceId}`);
         
         const isAuthorised = await isAuthenticated();
 
         if (!isAuthorised.yes) return NextResponse.json({ errors: ['Unauthorised'], data: responseData, });
 
-        const { bearerToken } = getHeaders();
+        const { bearerToken } = await getHeaders();
 
         let isLoggedIn = false;
         if (bearerToken) {
@@ -105,7 +111,7 @@ export async function POST(req: NextRequest, { params: { deviceId } }: IParams) 
         responseData.lastPublishDate = editorInfo.lastPublishDate!;
         responseData.dataVersion = editorInfo.dataVersion!;
 
-        const changesDates = await _getDatesWhenUpdatesWereMade();
+        const changesDates = await _getDatesWhenUpdatesWereMade({ publishedOnly: true, });
 
         if (changesDates?.errors?.length) return NextResponse.json({ errors: changesDates.errors, data: responseData, });
 
@@ -122,8 +128,10 @@ export async function POST(req: NextRequest, { params: { deviceId } }: IParams) 
         );
 
         if (shouldFetchData) {
-            const configKeys = await _getConfigKeys({ returnDraftsIfExist: true, });
-            const scripts = await getScriptsWithItems({ hospitalIds: [hospitalId!], returnDraftsIfExist: true, });
+            // Devices get the PUBLISHED state only. Serving drafts meant unpublished (and half-finished)
+            // edits, including option lists being reworked, reached tablets before anyone published them.
+            const configKeys = await _getConfigKeys({ returnDraftsIfExist: false, });
+            const scripts = await getScriptsWithItems({ hospitalIds: [hospitalId!], returnDraftsIfExist: false, includePendingDeletion: true, });
 
             responseData.configKeys = configKeys.data;
             responseData.scripts = scripts.data;

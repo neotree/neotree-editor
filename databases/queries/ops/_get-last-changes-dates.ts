@@ -32,7 +32,13 @@ export const defaultChangesDates = {
     latestChangesDate: null as null | Date,
 };
 
-export async function _getDatesWhenUpdatesWereMade(): Promise<{ data: typeof defaultChangesDates; errors?: string[]; }> {
+export async function _getDatesWhenUpdatesWereMade(opts?: {
+    /**
+     * Devices only receive published data, so only published changes count for them. Draft and queued
+     * deletion timestamps made every tablet re-download everything whenever someone edited a draft.
+     */
+    publishedOnly?: boolean;
+}): Promise<{ data: typeof defaultChangesDates; errors?: string[]; }> {
     try {
         const editorInfo = await db.query.editorInfo.findFirst();
         const { lastPublishDate } = { ...editorInfo };
@@ -108,9 +114,14 @@ export async function _getDatesWhenUpdatesWereMade(): Promise<{ data: typeof def
             lastPublished: lastPublishDate || null,
         };
 
+        const draftDateKeys = new Set(['configKeysDrafts', 'diagnosesDrafts', 'problemsDrafts', 'screensDrafts', 'scriptsDrafts', 'pendingDeletion']);
         const dates = [
             lastPublishDate ? new Date(lastPublishDate).getTime() : null!,
-            ...Object.values(data).filter(d => d).map(d => new Date(d!).getTime()),
+            ...Object.entries(data)
+                .filter(([key]) => !opts?.publishedOnly || !draftDateKeys.has(key))
+                .map(([, d]) => d)
+                .filter(d => d)
+                .map(d => new Date(d!).getTime()),
         ].filter(d => d);
 
         let latestChangesDate = lastPublishDate!;

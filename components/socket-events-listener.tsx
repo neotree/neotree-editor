@@ -37,7 +37,6 @@ export function SocketEventsListener({ events }: {
                     onEvent.callback?.(...args);
 
                     if (onEvent?.refreshRouter) {
-                        console.log(eventName, 'refreshing...')
                         router.refresh();
                     }
 

@@ -41,7 +41,9 @@ import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
 import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
 import { useFieldKeyCollisions } from "@/components/field-key-collisions"
+import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { collectNewOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
+import { ParentKeyOptionsHint } from "./parent-key-options-hint"
 
 type Props = {
   open: boolean
@@ -59,6 +61,7 @@ type Props = {
 }
 
 export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
+  const { confirm: confirmDiscard } = useConfirmModal()
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
 
@@ -92,6 +95,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
     watch,
     setValue,
     handleSubmit,
+    formState: { isDirty: fieldFormIsDirty },
   } = useForm({
     defaultValues: getDefaultValues(),
   })
@@ -248,12 +252,15 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
     }
 
     if (!isEmpty(fieldIndex) && field) {
+      // shouldDirty: editing an existing field must count as an unsaved change of the screen, or
+      // leaving the page dropped the edit without a warning.
       form.setValue(
         "fields",
         form.getValues("fields").map((f, i) => ({
           ...f,
           ...(i === fieldIndex ? normalizedData : null),
         })),
+        { shouldDirty: true },
       )
     } else {
       form.setValue("fields", [...form.getValues("fields"), normalizedData], { shouldDirty: true })
@@ -285,15 +292,17 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
     return !!dataKey?.confidentialLabelOnly
   }, [dataKey?.confidentialLabelOnly])
 
+  // Follows the data key. Done on load too, so it does not count as an edit (opening a page must
+  // not leave "unsaved changes"); choosing another key marks the form changed on its own.
   useEffect(() => {
-    if (confidential !== inheritedConfidential) {
-      setValue("confidential", inheritedConfidential, { shouldDirty: true })
+    if (!!confidential !== inheritedConfidential) {
+      setValue("confidential", inheritedConfidential, { shouldDirty: false, })
     }
   }, [confidential, inheritedConfidential, setValue]);
 
   useEffect(() => {
-    if (confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
-      setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: true })
+    if (!!confidentialLabelOnly !== inheritedConfidentialLabelOnly) {
+      setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: false, })
     }
   }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
 
@@ -304,9 +313,23 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
       <Modal
         open={open}
         onOpenChange={(open) => {
-          if (!open) onClose()
-          resetForm(getDefaultValues())
-          setShowForm(!!field)
+          const applyOpenChange = () => {
+            if (!open) onClose()
+            resetForm(getDefaultValues())
+            setShowForm(!!field)
+          }
+          // Closing with unsaved changes (Esc, clicking outside, Cancel) asks first, in the app's dialog
+          if (!open && fieldFormIsDirty) {
+            confirmDiscard(applyOpenChange, {
+              title: "Discard changes?",
+              message: "Discard your changes to this field?",
+              positiveLabel: "Discard",
+              negativeLabel: "Keep editing",
+              danger: true,
+            })
+            return
+          }
+          applyOpenChange()
         }}
         title={field ? "Edit field" : "New field"}
         actions={
@@ -443,6 +466,9 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                       setValue("confidentialLabelOnly", !!item?.confidentialLabelOnly, { shouldDirty: true })
                     }}
                   />
+                  {!!screenDataKey && !isKeyDisabled && (
+                    <ParentKeyOptionsHint dataKey={screenDataKey} owner="screen" className="mt-1 max-w-[280px]" />
+                  )}
 
                   {currentKeyCollisions.map((collision, i) => (
                     <p
@@ -545,9 +571,12 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                 <TooltipProvider delayDuration={0}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
-                        type="button"
+                      {/* not a <button>: the Switch inside is one, and buttons cannot be nested */}
+                      <div
+                        role="button"
+                        tabIndex={0}
                         className="flex-1 flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                         onClick={() =>
                           alert({
                             title: "Confidentiality is managed in Data Keys",
@@ -558,7 +587,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                       >
                         <Switch id="confidential" disabled checked={inheritedConfidential} />
                         <Label htmlFor="confidential">Confidential</Label>
-                      </button>
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="flex flex-col gap-y-1">
@@ -592,9 +621,12 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
               <TooltipProvider delayDuration={0}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button
-                      type="button"
+                    {/* not a <button>: the Switch inside is one, and buttons cannot be nested */}
+                    <div
+                      role="button"
+                      tabIndex={0}
                       className="flex items-center space-x-2 opacity-70 cursor-not-allowed text-left"
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                       onClick={() =>
                         alert({
                           title: "Confidentiality is managed in Data Keys",
@@ -605,7 +637,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                     >
                       <Switch id="confidentialLabelOnly" disabled checked={inheritedConfidentialLabelOnly} />
                       <Label htmlFor="confidentialLabelOnly">Confidential (label only)</Label>
-                    </button>
+                    </div>
                   </TooltipTrigger>
                   <TooltipContent>
                     <div className="flex flex-col gap-y-1">

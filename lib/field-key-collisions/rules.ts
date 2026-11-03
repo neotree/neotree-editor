@@ -1,6 +1,8 @@
 export type FieldKeyCollisionKind =
   | "duplicate_key_same_screen"
-  | "duplicate_key_repeatable";
+  | "duplicate_key_repeatable"
+  | "duplicate_option_value"
+  | "option_value_case_variant";
 
 export type FieldKeyCollisionSeverity = "blocking" | "warning";
 
@@ -44,6 +46,30 @@ export const FIELD_KEY_COLLISION_RULES = [
       "A repeatable screen skips a field before it assigns a key, so mutually exclusive fields render correctly — but both still write to the same slot in every collection entry.",
     howToFix:
       "Keep the shared key only when one shared answer per entry is intended; otherwise give each field its own key.",
+  },
+  {
+    id: "duplicate_option_value",
+    label: "Duplicate option value",
+    publishLabel: "duplicate option value",
+    publishLabelPlural: "duplicate option values",
+    appliesTo: "Two or more options in one list",
+    detectedWhen: "Two options on the same field, or in the same screen's list, store exactly the same value.",
+    whyItMatters:
+      "The app saves the option's value, not its label, so two options that look different to the clinician are the same answer in the data. Nobody can tell them apart afterwards, a conditional expression cannot distinguish them, and on a multi-select the two selections collapse into one.",
+    howToFix:
+      "Give each option its own value. If they really are the same answer, delete the duplicate rather than leaving two ways to record it.",
+  },
+  {
+    id: "option_value_case_variant",
+    label: "Option values differ only by case",
+    publishLabel: "pair of option values differing only by case",
+    publishLabelPlural: "pairs of option values differing only by case",
+    appliesTo: "Two or more options in one list",
+    detectedWhen: "Two options in the same list store values that are identical apart from upper/lower case, e.g. \"Pn\" and \"PN\".",
+    whyItMatters:
+      "These are stored and exported as written, so the answers stay distinct — but the app lowercases a conditional expression before evaluating it, so no condition can tell them apart. A rule meant for one of them silently matches both.",
+    howToFix:
+      "If they are different answers, make the values differ by more than case. If they are the same answer, remove one.",
   },
 ] as const satisfies readonly FieldKeyCollisionRule[];
 
