@@ -4,13 +4,14 @@ import net from 'node:net';
 import { MAX_INACTIVITY_TIMEOUT_MINUTES, MIN_INACTIVITY_TIMEOUT_MINUTES } from './mobile-analytics-constants';
 
 export const MOBILE_ANALYTICS_KEY_PREFIX = 'nta_';
+const MOBILE_ANALYTICS_KDF_SALT = 'mobile-analytics-key-hash-v1';
 
 export function generateMobileAnalyticsKey() {
     return `${MOBILE_ANALYTICS_KEY_PREFIX}${crypto.randomBytes(32).toString('base64url')}`;
 }
 
 export function hashMobileAnalyticsKey(key: string) {
-    return crypto.createHash('sha256').update(key).digest('hex');
+    return crypto.scryptSync(key, MOBILE_ANALYTICS_KDF_SALT, 32).toString('hex');
 }
 
 export function getMobileAnalyticsKeyHint(key: string) {
