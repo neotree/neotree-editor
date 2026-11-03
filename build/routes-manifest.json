@@ -397,6 +397,12 @@
       "namedRegex": "^/new\\-script(?:/)?$"
     },
     {
+      "page": "/reporting-configurations",
+      "regex": "^/reporting\\-configurations(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reporting\\-configurations(?:/)?$"
+    },
+    {
       "page": "/screens",
       "regex": "^/screens(?:/)?$",
       "routeKeys": {},
