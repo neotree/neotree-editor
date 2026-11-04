@@ -6,7 +6,10 @@
     "packageManager": "yarn@1.22.22",
     "scripts": {
         "start": "node server/index.js",
+        "predev": "node scripts/check-dev-environment.js",
         "dev": "node server/index.js",
+        "migrations:list": "node scripts/check-dev-environment.js list",
+        "migrations:ack": "node scripts/check-dev-environment.js ack",
         "build": "next build",
         "typecheck": "tsc --noEmit",
         "test": "for f in tests/*.test.ts; do echo \"== $f\"; tsx \"$f\" || exit 1; done",
