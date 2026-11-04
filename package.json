@@ -116,7 +116,7 @@
         "**/@next/eslint-plugin-next/glob": "10.5.0",
         "node-forge": "1.4.0",
         "lodash": "4.18.1",
-        "postcss": "8.5.31",
+        "postcss": "8.5.32",
         "**/@esbuild-kit/core-utils/esbuild": "0.25.12",
         "**/refractor/prismjs": "1.30.0",
         "postcss-selector-parser": "7.1.6"
