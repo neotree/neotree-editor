@@ -4067,9 +4067,9 @@ json5@^1.0.2:
     minimist "^1.2.0"
 
 jsondiffpatch@^0.7.6:
-  version "0.7.6"
-  resolved "https://registry.yarnpkg.com/jsondiffpatch/-/jsondiffpatch-0.7.6.tgz#5b71221911ef1bc2725a42da66a4aea83ec7220a"
-  integrity sha512-zE9+AXFq+MkTolDor2Cw1nJzLC0aleqPkYf52Kb4Kn4mJcka/gFHpGI2JBVEJCfWOvBl0OoxZS+wuLdislQcqg==
+  version "0.7.7"
+  resolved "https://registry.yarnpkg.com/jsondiffpatch/-/jsondiffpatch-0.7.7.tgz#34043b1f0994857cb774d70d8f161351005897f9"
+  integrity sha512-C3375q+xluwQYS6Je613YqXpZhW9uSi2YFRR+8QTJVYhdk0GZiDr7HD9bXNrdV9PJCpmwsCgJM9ZXXESSZPCzA==
   dependencies:
     "@dmsnell/diff-match-patch" "^1.1.0"
 
