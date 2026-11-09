@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, Controller } from 'react-hook-form';
 import { EditIcon, ExternalLinkIcon, EyeIcon, MoreVertical, PlusIcon, TrashIcon } from 'lucide-react';
 import { arrayMoveImmutable } from "array-move";
@@ -64,7 +64,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataKeySaveProgress } from '@/components/data-key-save-progress';
 
 type SaveRefsImpact = NonNullable<NonNullable<SaveDataKeysResponse['info']>['refs']>;
 
@@ -161,6 +161,8 @@ function Form({
         loading: boolean;
         preview: OperationPreview | null;
         error: string;
+        /** The preview's progress channel. */
+        progressKey: string;
     } | null>(null);
     // In the URL: saving reloads the library, which remounts this form.
     const [savedUnlinkOperationId, setSavedUnlinkOperationId] = useQueryState('change', {
@@ -321,9 +323,10 @@ function Form({
     };
 
     const reviewUnlinks = async (payload: DataKeyFormData) => {
-        setUnlinkReview({ payload, loading: true, preview: null, error: '' });
+        const progressKey = uuidv4();
+        setUnlinkReview({ payload, loading: true, preview: null, error: '', progressKey });
         try {
-            const response = await axios.post<SaveDataKeysResponse>('/api/data-keys/save/preview', { data: [payload] });
+            const response = await axios.post<SaveDataKeysResponse>('/api/data-keys/save/preview', { data: [payload], progressKey });
             setUnlinkReview((current) => current && ({
                 ...current,
                 loading: false,
@@ -479,7 +482,8 @@ function Form({
         }
     }, [getValues, setValue]);
 
-    const displayLoader = loadingDataKeys || saving || preparingUnlink;
+    // While saving, the save progress dialog (data keys context) shows what is happening instead.
+    const displayLoader = loadingDataKeys || preparingUnlink;
 
     const renderAffectedTables = useCallback((affected?: UpdateDataKeysRefsResponse['affected']) => {
         if (!affected) return null;
@@ -563,13 +567,13 @@ function Form({
                         if (!row) return null;
 
                         return (
-                            <>
+                            <Fragment key={row.scriptId || rowIndex}>
                                 <TableRow {...props}>
                                     {cells}
                                 </TableRow>
 
                                 {!!row.usages.length && (
-                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 hover:bg-yellow-50 p-0')}>
+                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 dark:bg-yellow-950/40 hover:bg-yellow-50 dark:hover:bg-yellow-950/60 p-0')}>
                                         <TableCell colSpan={cells.length} className="p-0">
                                             <div className="flex flex-col gap-y-2">
                                                 {row.usages.map((usage, index) => {
@@ -598,7 +602,7 @@ function Form({
                                         </TableCell>
                                     </TableRow>
                                 )}
-                            </>
+                            </Fragment>
                         );
                     }}
                     columns={[
@@ -1054,11 +1058,7 @@ function Form({
                                 </DialogHeader>
                                 <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
                                     {unlinkReview?.loading ? (
-                                        <div role="status" aria-live="polite" className="space-y-2">
-                                            <span className="sr-only">Preparing preview…</span>
-                                            <Skeleton className="h-9 w-full" />
-                                            <Skeleton className="h-9 w-full" />
-                                        </div>
+                                        <DataKeySaveProgress requestKey={unlinkReview.progressKey} preview />
                                     ) : unlinkReview?.error ? (
                                         <Callout variant="error">{unlinkReview.error}</Callout>
                                     ) : unlinkReview?.preview ? (
@@ -1104,18 +1104,18 @@ function Form({
                         </Dialog>
 
                         {!!pendingUnlinks.length && !isReadOnly && (
-                            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-3">
-                                <div className="font-medium text-amber-950">
+                            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 space-y-3">
+                                <div className="font-medium text-amber-950 dark:text-amber-100">
                                     Pending unlinks ({pendingUnlinks.length})
                                 </div>
-                                <div className="text-sm text-amber-900">
+                                <div className="text-sm text-amber-900 dark:text-amber-100">
                                     Applied when you save. Linked screens will be updated accordingly; cancelling discards these.
                                 </div>
                                 <div className="space-y-1">
                                     {pendingUnlinks.map(item => (
                                         <div
                                             key={item.uniqueKey}
-                                            className="flex items-center justify-between gap-x-2 rounded border border-amber-200 bg-white px-2 py-1 text-sm"
+                                            className="flex items-center justify-between gap-x-2 rounded border border-amber-200 dark:border-amber-800 bg-white dark:bg-background px-2 py-1 text-sm"
                                         >
                                             <div className="min-w-0 truncate">
                                                 <span className="font-medium">{item.title}</span>

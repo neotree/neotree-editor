@@ -45,6 +45,8 @@ export type UpdateDataKeysRefsParams = {
      */
     onlyScriptIdsByAlias?: Record<string, string[]>;
     forceFullScan?: boolean;
+    /** Progress for a long save: finding and loading the scripts, then "done of total" entities updated. */
+    onProgress?: (stage: 'finding' | 'loading' | 'updating', done?: number, total?: number) => void;
     client?: DbOrTransaction;
 };
 
@@ -211,6 +213,7 @@ export async function _updateDataKeysRefs({
     excludeScriptIdsByAlias = {},
     onlyScriptIdsByAlias = {},
     forceFullScan = false,
+    onProgress,
     client,
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
     try {
@@ -381,6 +384,7 @@ export async function _updateDataKeysRefs({
         // Chunked so every key is covered no matter how many are updated at once;
         // truncating the pattern list would silently skip references.
         const likePatternChunks = chunkArray(likePatterns, LIKE_PATTERN_CHUNK_SIZE);
+        onProgress?.('finding');
 
         const candidateScripts = new Set<string>();
         const addCandidate = (row: { scriptId?: string | null; scriptDraftId?: string | null }) => {
@@ -523,6 +527,7 @@ export async function _updateDataKeysRefs({
         }
 
         const scriptsIds = useFullScan ? undefined : Array.from(candidateScripts);
+        onProgress?.('loading', 0, candidateScripts.size);
         const [
             { data: screensArr, errors: screensGetErrors },
             { data: diagnosesArr, errors: diagnosesGetErrors },
@@ -606,6 +611,7 @@ export async function _updateDataKeysRefs({
         }
         const getNuidLibraryKey = (id: string) => nuidLibraryIndex.get(id) as NuidLibraryKeyFull | undefined;
 
+        onProgress?.('loading', candidateScripts.size, candidateScripts.size);
         stats.fetchedScreens = screensArr.length;
         stats.fetchedDiagnoses = diagnosesArr.length;
         stats.fetchedProblems = problemsArr.length;
@@ -1112,6 +1118,15 @@ export async function _updateDataKeysRefs({
 
         const saveErrors: string[] = [];
 
+        // Entities written so far, for "updated 12 of 40".
+        const totalToSave = diagnosesUpdatedData.length + problemsUpdatedData.length + screensUpdatedData.length + scriptRecordsUpdatedData.length;
+        let savedSoFar = 0;
+        const reportSaved = (count: number) => {
+            savedSoFar += count;
+            onProgress?.('updating', savedSoFar, totalToSave);
+        };
+        onProgress?.('updating', 0, totalToSave);
+
         const saveDiagnosesTask = async () => {
             await mapWithConcurrency(chunkArray(diagnosesUpdatedData, SAVE_CHUNK_SIZE), SAVE_CHUNK_CONCURRENCY, async (chunk) => {
                 const res = await _saveDiagnoses({ data: chunk, userId, draftOrigin, client: executor });
@@ -1128,6 +1143,7 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedDiagnoses += chunk.length;
                 }
+                reportSaved(chunk.length);
             });
         };
 
@@ -1147,6 +1163,7 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedProblems += chunk.length;
                 }
+                reportSaved(chunk.length);
             });
         };
 
@@ -1166,6 +1183,7 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedScreens += chunk.length;
                 }
+                reportSaved(chunk.length);
             });
         };
 
@@ -1189,6 +1207,7 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedScriptRecords += chunk.length;
                 }
+                reportSaved(chunk.length);
             });
         };
 

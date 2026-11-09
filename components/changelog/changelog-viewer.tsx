@@ -153,7 +153,7 @@ export function ChangeLogViewer({ changes, className, showFilters = true, maxHei
           {filteredChanges.map((change) => {
             const isExpanded = expandedItems.has(change.changeLogId)
             const actionColor =
-              actionColors[change.action as keyof typeof actionColors] || "bg-gray-500/10 text-gray-700"
+              actionColors[change.action as keyof typeof actionColors] || "bg-gray-500/10 text-gray-700 dark:text-gray-300"
             const dataVersion = getDataVersion(change)
 
             return (

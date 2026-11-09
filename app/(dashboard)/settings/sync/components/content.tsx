@@ -127,7 +127,7 @@ export function Content({ initialSettings, sites, canManage, appUrl }: Props) {
 
                     <CardContent className="space-y-6">
                         {!canManage && (
-                            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
                                 You can view these settings, but only super users can change them.
                             </div>
                         )}
@@ -286,7 +286,7 @@ export function Content({ initialSettings, sites, canManage, appUrl }: Props) {
                         </CardHeader>
                         <CardContent>
                             {!!sync.status?.errors?.length && (
-                                <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                                <div className="mb-4 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-900 dark:text-red-100">
                                     {sync.status.errors.join(" ")}
                                 </div>
                             )}
@@ -307,7 +307,7 @@ export function Content({ initialSettings, sites, canManage, appUrl }: Props) {
                                             <TableCell>
                                                 {pair.targetTitle || <span className="text-muted-foreground">—</span>}
                                                 {!!pair.hotfix && (
-                                                    <div className="mt-1 text-xs text-amber-700">
+                                                    <div className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                                                         Hotfix open{pair.hotfix.openedByName ? ` by ${pair.hotfix.openedByName}` : ""}: {pair.hotfix.reason}
                                                         {saved.role === "target" && pair.targetScriptId && (
                                                             <Button variant="link" size="sm" className="h-auto p-0 pl-2 text-xs" onClick={() => closeHotfix(pair.targetScriptId!)}>

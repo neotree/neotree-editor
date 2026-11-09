@@ -39,3 +39,20 @@ export function ParentKeyOptionsHint({
         </p>
     );
 }
+
+/**
+ * An existing option's data key is locked: swapping it in place would change what a saved answer means
+ * while every condition that names the old value stays behind. Say so, and point to the ways that do it safely.
+ */
+export function LockedOptionKeyHint({ className }: { className?: string; }) {
+    return (
+        <p className={cn("text-xs text-muted-foreground", className)}>
+            The data key of an existing option can&apos;t be changed here. To use another key, delete this option and add
+            the other one, or replace or merge the key from the{" "}
+            <Link href="/data-keys" target="_blank" rel="noopener noreferrer" className="underline">
+                Data keys library
+            </Link>
+            , which also updates the conditions that use it.
+        </p>
+    );
+}

@@ -5,6 +5,7 @@ import { useCallback, useMemo } from "react";
 import { SelectModal, SelectModalOption } from "@/components/select-modal";
 import { type DataKey, useDataKeysCtx } from "@/contexts/data-keys";
 import { Loader } from "@/components/loader";
+import { dataKeyTypeFamily } from "@/lib/data-key-types";
 
 type OnChangeValue = DataKey & {
     children: DataKey[];
@@ -43,8 +44,12 @@ export function SelectDataKey({
         let keys = allDataKeys;
         
         // Filter by type if provided
+        // Same kind of key, not the exact type name: a dropdown field can use a
+        // single select key (and the reverse), as merging keys of both kinds leaves
+        // one of them in use for both.
         if (type && type.trim() !== '') {
-            keys = keys.filter(k => k.dataType === type);
+            const family = dataKeyTypeFamily(type);
+            keys = keys.filter(k => dataKeyTypeFamily(k.dataType) === family);
         }
         
         // Apply custom filter if provided
