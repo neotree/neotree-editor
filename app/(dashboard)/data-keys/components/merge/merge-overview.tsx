@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAlertModal } from '@/hooks/use-alert-modal';
 import { cn } from '@/lib/utils';
+import { CHANGELOG_ACTION_BADGE_CLASSES } from '@/lib/changelog-utils';
 import { PageContainer } from '@/app/(dashboard)/(scripts)/components/page-container';
 import type { DataKeyMergeListItem, DuplicateDismissal } from '@/databases/queries/data-keys';
 import {
@@ -405,6 +406,13 @@ function GroupTile({
     const hasOptions = keys.some((dataKey) => (dataKey.options || []).length);
     // Labels can differ in case, order or wording — show each key's own label when they do.
     const labelsDiffer = keys.some((dataKey) => `${dataKey.label || ''}` !== `${keys[0].label || ''}`);
+    // A dropdown and a single select of the same name are grouped: show both kinds.
+    const dataTypes = Array.from(new Set(keys.map((dataKey) => `${dataKey.dataType || ''}`.trim().toLowerCase()).filter(Boolean))).sort();
+    // Keys with options that have no option in common are likely different questions.
+    const keysWithOptions = keys.filter((dataKey) => (dataKey.options || []).length);
+    const noOptionsInCommon = keysWithOptions.length > 1 && !keysWithOptions.some((dataKey, index) => keysWithOptions
+        .slice(index + 1)
+        .some((other) => (dataKey.options || []).some((option) => (other.options || []).includes(option))));
 
     return (
         <div className="space-y-3 rounded-md border border-border p-3">
@@ -413,10 +421,19 @@ function GroupTile({
                 {sameName && !labelsDiffer && keys[0].label && keys[0].label !== keys[0].name && (
                     <span className="text-muted-foreground">{keys[0].label}</span>
                 )}
-                <Badge variant="secondary" className="font-normal">{keys[0].dataType}</Badge>
+                <Badge variant="secondary" className="font-normal">{dataTypes.map((type) => type.replace(/_/g, ' ')).join(' · ')}</Badge>
                 {/* The kind adds nothing when the data type already says it ("option"). */}
                 {KIND_LABELS[group.kind].toLowerCase() !== `${keys[0].dataType || ''}`.toLowerCase() && (
                     <Badge variant="outline" className="font-normal">{KIND_LABELS[group.kind]}</Badge>
+                )}
+                {noOptionsInCommon && (
+                    <Badge
+                        variant="outline"
+                        className={cn('font-normal', CHANGELOG_ACTION_BADGE_CLASSES.restore)}
+                        title="These keys have no option in common, so they may be different questions with the same name."
+                    >
+                        No options in common
+                    </Badge>
                 )}
                 {group.possible && (
                     <Badge variant="outline" className="font-normal">

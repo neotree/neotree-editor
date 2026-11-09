@@ -838,7 +838,7 @@ export function DataKeyDeleteReplacementDialog({
                                             disabled={!candidates.length || deleting}
                                         />
                                         {!candidates.length && (
-                                            <p className={isUnlink ? 'mt-2 text-xs text-amber-600' : 'mt-2 text-xs text-destructive'}>
+                                            <p className={isUnlink ? 'mt-2 text-xs text-amber-600 dark:text-amber-400' : 'mt-2 text-xs text-destructive'}>
                                                 {isUnlink
                                                     ? 'No compatible fellow child key was found. This option will be removed from screens linked to this data key.'
                                                     : (scriptsOnly

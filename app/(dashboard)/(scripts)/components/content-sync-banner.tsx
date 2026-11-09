@@ -111,7 +111,7 @@ function ContentSyncBannerBody({ scriptId }: { scriptId?: string | null }) {
 
     if (isTarget && lock.hotfix) {
         return (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">Hotfix open</span>
                     {status}
@@ -132,7 +132,7 @@ function ContentSyncBannerBody({ scriptId }: { scriptId?: string | null }) {
     if (isTarget && lock.locked) {
         return (
             <>
-                <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-4 py-3 text-sm text-blue-900 dark:text-blue-100">
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">This script comes from {sync.sourceName}</span>
                         {status}
@@ -181,7 +181,7 @@ function ContentSyncBannerBody({ scriptId }: { scriptId?: string | null }) {
 
     if (!isTarget && pair && (pair.status === "target_ahead" || pair.status === "diverged")) {
         return (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{sync.targetName} has changes to this script that are not here</span>
                     {status}

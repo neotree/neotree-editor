@@ -19,7 +19,8 @@ import {
   normalizeChanges,
   resolveEntityTitle,
 } from "@/lib/changelog-utils"
-import { buildHumanDiffRows, type HumanDiffRow } from "@/lib/changelog-human-diff"
+import { buildHumanDiffRows, collectDataKeyReferences, type DescribeDataKey, type HumanDiffRow } from "@/lib/changelog-human-diff"
+import { _describeDataKeys } from "@/databases/queries/data-keys"
 import { getChangeLifecycleStatus, type ChangeLifecycleState } from "@/lib/changelog-status"
 import { getRollbackButtonTargetVersion } from "@/lib/changelog-publish"
 import { isRollbackTargetOlderThanMaxAge, SCRIPT_CHILD_ENTITY_TYPES } from "@/lib/changelog-rollback"
@@ -97,6 +98,11 @@ export default async function ChangeDetailsPage(props: { params: Promise<Params>
   const systemInsights = fieldInsights.filter((entry) => systemFieldNames.has(entry.field))
   const visibleInsights = userFacingInsights.length ? userFacingInsights : fieldInsights
   const highlightEntries = buildHighlightEntries(visibleInsights)
+  // Names for the data keys the diff refers to (relinked items, option lists).
+  const dataKeyNames = await _describeDataKeys(
+    visibleInsights.flatMap((insight) => collectDataKeyReferences([insight.previousValue, insight.newValue], insight.field)),
+  )
+  const describeDataKey: DescribeDataKey = (uniqueKey) => dataKeyNames.get(uniqueKey)
   const groupedSummaries = groupFieldChangeInsights(visibleInsights).filter((group) => group.stats.total > 0)
   const hasAnyDiffs = visibleInsights.some((entry) => entry.stats.total > 0)
   const rollbackTargetVersion = getRollbackButtonTargetVersion({
@@ -220,6 +226,7 @@ export default async function ChangeDetailsPage(props: { params: Promise<Params>
                         key={`${change.changeLogId}-${insight.field}-${index}`}
                         insight={insight}
                         defaultOpen={index === 0}
+                        describeDataKey={describeDataKey}
                       />
                     ))}
                   </div>
@@ -295,12 +302,21 @@ function ChangeSummaryCard({
   )
 }
 
-function FieldDiffDetails({ insight, defaultOpen }: { insight: FieldChangeInsight; defaultOpen?: boolean }) {
+function FieldDiffDetails({
+  insight,
+  defaultOpen,
+  describeDataKey,
+}: {
+  insight: FieldChangeInsight
+  defaultOpen?: boolean
+  describeDataKey?: DescribeDataKey
+}) {
   const hasOperations = insight.operations.length > 0
   const readableRows = buildHumanDiffRows({
     field: insight.field,
     before: insight.previousValue,
     after: insight.newValue,
+    describeDataKey,
   })
 
   if (!hasOperations && !readableRows.length) {

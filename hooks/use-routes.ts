@@ -58,6 +58,12 @@ export function useRoutes() {
       hidden: false,
     },
     {
+      label: "Reporting Configurations",
+      href: "/reporting-configurations",
+      id: v4(),
+      hidden: isDefaultUser,
+    },
+    {
       label: "Users",
       href: "/users",
       id: v4(),

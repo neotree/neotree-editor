@@ -6,6 +6,8 @@ import {
   applyOptionPlacements,
   findLegacyOptionItems,
   findOptionPresence,
+  findSameScriptUses,
+  isQuestionKeyGroup,
 } from "../lib/data-key-merge-analysis"
 import { buildMergeReport } from "../lib/data-key-merge-report"
 import { dropRelinkCollisions } from "../databases/mutations/data-keys/_update_data_keys_refs.helpers"
@@ -298,4 +300,33 @@ console.log("label matching tests passed")
   assert.deepStrictEqual(dropRelinkCollisions(both, new Set([0, 1])), [both[0]])
   assert.strictEqual(dropRelinkCollisions(symptoms, new Set()), symptoms)
   console.log("relink collision tests passed")
+}
+
+// --- keys of one group used in the same script ---
+{
+  const survivor = { uuid: "a", uniqueKey: "ka", name: "Gender" }
+  const same = { uuid: "b", uniqueKey: "kb", name: "Gender" }
+  const cased = { uuid: "c", uniqueKey: "kc", name: "gender" }
+  const impact = [
+    { dataKeyId: "a", scripts: [{ scriptId: "s1", scriptTitle: "Admission" }, { scriptId: "s2", scriptTitle: "Discharge" }] },
+    { dataKeyId: "b", scripts: [{ scriptId: "s1", scriptTitle: "Admission" }] },
+    { dataKeyId: "c", scripts: [{ scriptId: "s2", scriptTitle: "Discharge" }, { scriptId: "s3", scriptTitle: "Outcome" }] },
+  ]
+  const uses = findSameScriptUses({ impact, survivor, merged: [same, cased] })
+  assert.deepStrictEqual(uses.map((use) => [use.scriptId, use.keys.map((key) => key.uniqueKey), use.becomesShared]), [
+    ["s1", ["ka", "kb"], false], // identical names: already one answer
+    ["s2", ["ka", "kc"], true], // case differs: would become one answer
+  ])
+  // selected scripts only: merged keys elsewhere don't count
+  assert.deepStrictEqual(findSameScriptUses({ impact, survivor, merged: [same, cased], scriptIds: ["s1"] }).map((use) => use.scriptId), ["s1"])
+  console.log("same-script use tests passed")
+}
+
+// --- only question keys can end up sharing an answer ---
+{
+  const offered = new Set(["yes_1"])
+  assert.strictEqual(isQuestionKeyGroup([{ uniqueKey: "g1", dataType: "dropdown" }, { uniqueKey: "g2", dataType: "single_select" }], (k) => offered.has(k)), true)
+  assert.strictEqual(isQuestionKeyGroup([{ uniqueKey: "o1", dataType: "option" }, { uniqueKey: "o2", dataType: "option" }], (k) => offered.has(k)), false)
+  assert.strictEqual(isQuestionKeyGroup([{ uniqueKey: "yes_1", dataType: "text" }, { uniqueKey: "yes_2", dataType: "text" }], (k) => offered.has(k)), false)
+  console.log("question key group tests passed")
 }

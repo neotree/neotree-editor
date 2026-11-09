@@ -57,6 +57,14 @@ export function Modal({
                 </DialogTrigger>
             );
 
+    // A confirm or alert opened from inside this modal is its own top-level dialog, so a
+    // click or focus in it reads as "outside" here. Without this, answering "Keep
+    // editing" in a discard prompt asked to close the modal again, reopening the prompt.
+    const fromAlertDialog = (event: Event) => {
+        const target = event.target as Element | null;
+        return !!target?.closest?.('[role="alertdialog"]') || !!document.querySelector('[role="alertdialog"]');
+    };
+
     useEffect(() => {
         if (id) set({ [id]: false, });
     }, [id, set]);
@@ -75,6 +83,10 @@ export function Modal({
 
                 <DialogContent 
                     {...contentProps}
+                    onInteractOutside={event => {
+                        if (fromAlertDialog(event)) event.preventDefault();
+                        contentProps?.onInteractOutside?.(event);
+                    }}
                     hideCloseButton
                     className={cn(
                         '!flex min-h-0 max-h-[90dvh] flex-col overflow-hidden gap-y-4 p-0 m-0 sm:max-w-xl',

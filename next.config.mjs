@@ -12,6 +12,13 @@ export default (phase) => {
         //     ignoreDuringBuilds: true,
         // },
         distDir: phase === PHASE_DEVELOPMENT_SERVER ? undefined : 'build',
+        // The server talks to the socket.io relay (lib/socket) through these. Bundled,
+        // `ws` gets a stub for its optional native masking helper and every frame of
+        // 48 bytes or more throws "bufferUtil.mask is not a function" — which
+        // engine.io-client swallows, so those events were silently dropped (progress
+        // and "import complete" signals carry a 36-character requestKey). Loaded as
+        // plain Node packages, `ws` falls back to its own masking.
+        serverExternalPackages: ['socket.io-client', 'engine.io-client', 'ws'],
         images: {
             domains: [
                 'localhost',

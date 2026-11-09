@@ -5,6 +5,8 @@ import {
   findDuplicateKeyGroups,
   suggestChildMergeActions,
 } from "../lib/data-key-merge-plan"
+import { dataKeyTypeFamily } from "../lib/data-key-types"
+import { getDataKeyReplacementCompatibilityError } from "../lib/data-key-option-compatibility"
 
 const key = (uuid: string, uniqueKey: string, name: string, label: string, dataType: string, options: string[] = []) =>
   ({ uuid, uniqueKey, name, label, dataType, options, isDeleted: false })
@@ -139,6 +141,26 @@ const dataKeys = [
 
   // a key cannot be merged into its own parent or option
   assert.ok(buildDataKeysMergePlan({ dataKeys, survivorId: "p1", mergedIds: ["c1"] }).errors.length)
+}
+
+// --- dropdown and single select are one kind of key; EDLIZ tables stay per country ---
+{
+  assert.strictEqual(dataKeyTypeFamily("dropdown"), dataKeyTypeFamily("single_select"))
+  assert.notStrictEqual(dataKeyTypeFamily("zw_edliz_summary_table"), dataKeyTypeFamily("mwi_edliz_summary_table"))
+
+  const mixed = [
+    key("g1", "gender_dd", "Gender", "Sex", "dropdown", ["m", "f"]),
+    key("g2", "gender_ss", "Gender", "Sex", "single_select", ["m", "f", "u"]),
+    key("t1", "zw", "EDLIZSummaryTableScore", "Score", "zw_edliz_summary_table"),
+    key("t2", "mw", "EDLIZSummaryTableScore", "Score", "mwi_edliz_summary_table"),
+    key("m", "m", "Male", "Male", "option"), key("f", "f", "Female", "Female", "option"), key("u", "u", "Unknown", "Unknown", "option"),
+  ]
+  assert.deepStrictEqual(findDuplicateKeyGroups(mixed).map((group) => group.map((dataKey) => dataKey.uuid).sort()), [["g1", "g2"]])
+  assert.deepStrictEqual(buildDataKeysMergePlan({ dataKeys: mixed, survivorId: "g2", mergedIds: ["g1"] }).errors, [])
+  assert.ok(buildDataKeysMergePlan({ dataKeys: mixed, survivorId: "t1", mergedIds: ["t2"] }).errors.some((error) => error.includes("different data type")))
+
+  // replace accepts the other kind too, as long as it offers the same options
+  assert.strictEqual(getDataKeyReplacementCompatibilityError({ target: mixed[0], replacement: mixed[1] }), null)
 }
 
 console.log("data-key-merge-plan tests passed")

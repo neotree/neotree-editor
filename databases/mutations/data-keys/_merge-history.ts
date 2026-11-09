@@ -1,10 +1,11 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import socket from '@/lib/socket';
-import { dataKeyDuplicateDismissals, dataKeyMerges } from '@/databases/pg/schema';
+import { changeLogs, dataKeyDuplicateDismissals, dataKeyMerges } from '@/databases/pg/schema';
+import { appendChangeReason, dataKeyOperationChangeReason } from '@/lib/data-key-operation-change-reason';
 import { getDuplicateGroupKey } from '@/lib/data-key-merge-plan';
 import {
     captureMergeDraftRows,
@@ -86,14 +87,81 @@ export async function _settleDataKeyOperations({
     client: DbOrTransaction;
 }) {
     const now = new Date();
+    const scope = and(
+        eq(dataKeyMerges.status, 'applied'),
+        userId ? eq(dataKeyMerges.createdByUserId, userId) : undefined,
+    );
+
+    if (outcome === 'published' && dataVersion != null) {
+        await tagReleaseChangeLogs({ where: scope, dataVersion, client });
+    }
+
     await client.update(dataKeyMerges)
         .set(outcome === 'published'
             ? { status: 'published', publishedAt: now, publishedByUserId: actorUserId || null, publishedDataVersion: dataVersion ?? null, snapshot: {} }
             : { status: 'discarded', discardedAt: now, snapshot: {} })
-        .where(and(
-            eq(dataKeyMerges.status, 'applied'),
-            userId ? eq(dataKeyMerges.createdByUserId, userId) : undefined,
-        ));
+        .where(scope);
+}
+
+const SCRIPT_ENTITY_TYPES = ['script', 'screen', 'diagnosis', 'problem'] as const;
+
+// Older rows hold the JSON as a string.
+const asObject = (value: unknown): any => {
+    if (typeof value !== 'string') return value || {};
+    try { return JSON.parse(value); } catch { return {}; }
+};
+
+/**
+ * Names the operation in the change reason of this release's changelog
+ * entries it is behind: the scripts its report says it changed (their script,
+ * screen, diagnosis and problem entries) and the data keys it involved or
+ * deleted. Must run before the snapshot is cleared.
+ */
+async function tagReleaseChangeLogs({
+    where,
+    dataVersion,
+    client,
+}: {
+    where: ReturnType<typeof and>;
+    dataVersion: number;
+    client: DbOrTransaction;
+}) {
+    const operations = await client.select({
+        kind: dataKeyMerges.kind,
+        title: dataKeyMerges.title,
+        survivorName: dataKeyMerges.survivorName,
+        report: dataKeyMerges.report,
+        snapshot: dataKeyMerges.snapshot,
+    }).from(dataKeyMerges).where(where);
+
+    for (const operation of operations) {
+        const report = asObject(operation.report);
+        const snapshot = asObject(operation.snapshot);
+        const scriptIds: string[] = Array.from(new Set<string>((report.scripts || []).map((script: any) => `${script?.scriptId || ''}`).filter(Boolean)));
+        const dataKeyIds: string[] = Array.from(new Set<string>([...(snapshot.scope?.dataKeyIds || []), ...(report.deletedDataKeyIds || [])].map((id: any) => `${id || ''}`).filter(Boolean)));
+        if (!scriptIds.length && !dataKeyIds.length) continue;
+
+        const entries = await client.select({ id: changeLogs.id, changeReason: changeLogs.changeReason })
+            .from(changeLogs)
+            .where(and(
+                eq(changeLogs.dataVersion, dataVersion),
+                or(
+                    scriptIds.length ? and(inArray(changeLogs.entityType, [...SCRIPT_ENTITY_TYPES]), or(
+                        inArray(changeLogs.scriptId, scriptIds),
+                        and(eq(changeLogs.entityType, 'script'), inArray(changeLogs.entityId, scriptIds)),
+                    )) : undefined,
+                    dataKeyIds.length ? and(eq(changeLogs.entityType, 'data_key'), inArray(changeLogs.entityId, dataKeyIds)) : undefined,
+                ),
+            ));
+
+        const reason = dataKeyOperationChangeReason(operation);
+        for (const entry of entries) {
+            const next = appendChangeReason(entry.changeReason, reason);
+            if (next !== entry.changeReason) {
+                await client.update(changeLogs).set({ changeReason: next }).where(eq(changeLogs.id, entry.id));
+            }
+        }
+    }
 }
 
 export async function _dismissDuplicateGroup({

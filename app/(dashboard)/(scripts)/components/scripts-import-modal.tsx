@@ -605,7 +605,7 @@ export function ScriptsImportModal({
                         {!!importReview.details?.summary?.length && (
                             <div className="space-y-2">
                                 {importReview.details.summary.map((summary, index) => (
-                                    <div key={`${summary}-${index}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                                    <div key={`${summary}-${index}`} className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
                                         {summary}
                                     </div>
                                 ))}
@@ -644,13 +644,13 @@ export function ScriptsImportModal({
 
                                         <div className="mt-3 space-y-3">
                                             {script.issues.map((issue, index) => (
-                                                <div key={`${script.scriptId}-${issue.location}-${index}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
-                                                    <div className="text-xs font-medium uppercase tracking-wide text-amber-800">
+                                                <div key={`${script.scriptId}-${issue.location}-${index}`} className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
+                                                    <div className="text-xs font-medium uppercase tracking-wide text-amber-800 dark:text-amber-200">
                                                         {issue.ruleLabel}
                                                     </div>
-                                                    <div className="mt-1 font-medium text-amber-950">{issue.displayName}</div>
-                                                    <div className="mt-1 text-sm text-amber-900">{issue.reason}</div>
-                                                    <div className="mt-1 text-xs text-amber-800">Location: {issue.location}</div>
+                                                    <div className="mt-1 font-medium text-amber-950 dark:text-amber-100">{issue.displayName}</div>
+                                                    <div className="mt-1 text-sm text-amber-900 dark:text-amber-100">{issue.reason}</div>
+                                                    <div className="mt-1 text-xs text-amber-800 dark:text-amber-200">Location: {issue.location}</div>
                                                     <div className="mt-2 flex flex-wrap gap-2">
                                                         <Button size="sm" variant="outline" asChild>
                                                             <a href={issue.usageHref}>Open usage</a>
@@ -662,7 +662,7 @@ export function ScriptsImportModal({
                                                 </div>
                                             ))}
                                             {!!script.hiddenIssuesCount && (
-                                                <div className="rounded-md border border-dashed border-amber-300 px-3 py-2 text-sm text-amber-900">
+                                                <div className="rounded-md border border-dashed border-amber-300 dark:border-amber-800 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
                                                     {script.hiddenIssuesCount} more blocking issue{script.hiddenIssuesCount === 1 ? "" : "s"} in this script are not shown here. Open the integrity registry to review the full list.
                                                 </div>
                                             )}

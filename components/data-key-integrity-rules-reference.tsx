@@ -14,17 +14,17 @@ const severityMeta: Record<DataKeyIntegrityRule["severity"], {
     blocking: {
         label: "Blocks publish",
         summaryLabel: "Blocking rules",
-        className: "border-red-200 bg-red-50 text-red-700",
+        className: "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300",
     },
     review: {
         label: "Needs review",
         summaryLabel: "Review states",
-        className: "border-amber-200 bg-amber-50 text-amber-700",
+        className: "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300",
     },
     healthy: {
         label: "Healthy state",
         summaryLabel: "Healthy state",
-        className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        className: "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300",
     },
 };
 

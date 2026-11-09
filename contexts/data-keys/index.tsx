@@ -26,6 +26,9 @@ import { useAppContext } from "@/contexts/app";
 import { buildDataKeyParentIndex } from "@/lib/data-key-children";
 import { matchesDataKeySearch } from "@/lib/data-keys-search";
 import { SocketEventsListener } from "@/components/socket-events-listener";
+import { DataKeySaveProgress } from "@/components/data-key-save-progress";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { v4 as uuidv4 } from "uuid";
 import { boolean } from "drizzle-orm/gel-core";
 
 function paginateData<T>(
@@ -382,10 +385,14 @@ export function DataKeysCtxProvider({
      ************ SAVE
     ******************************************************/
     const [saving, setSaving] = useState(false);
+    // A save also updates every script using the key, which can take a while: show how far it got.
+    const [saveProgressKey, setSaveProgressKey] = useState<string | null>(null);
 
     const saveDataKeys: tDataKeysCtx['saveDataKeys'] = useCallback(async (data, cb) => {
+        const progressKey = uuidv4();
         try {
             setSaving(true);
+            setSaveProgressKey(progressKey);
 
             const dataWithNumberVersion = data.map(d => ({
                 ...d,
@@ -395,8 +402,11 @@ export function DataKeysCtxProvider({
             const response = await axios.post('/api/data-keys/save', {
                 data: dataWithNumberVersion,
                 broadcastAction: true,
+                progressKey,
             } satisfies SaveDataKeysParams);
             const res = response.data as Awaited<ReturnType<typeof actions.saveDataKeys>>;
+            // Close the progress before the result alert opens, so two dialogs never close at once.
+            setSaveProgressKey(null);
 
             if (res.errors?.length) {
                 alert({
@@ -424,6 +434,7 @@ export function DataKeysCtxProvider({
                 return res;
             }
         } catch(e: any) {
+            setSaveProgressKey(null);
             alert({
                 title: 'Error',
                 message: 'Failed to save data key: ' + e.message,
@@ -432,6 +443,7 @@ export function DataKeysCtxProvider({
             return { success: false, errors: [e.message], };
         } finally {
             setSaving(false);
+            setSaveProgressKey(null);
         }
     }, [alert, router.refresh, loadDataKeys]);
 
@@ -706,6 +718,14 @@ export function DataKeysCtxProvider({
             >
                 {children}
             </DataKeysCtx.Provider>
+
+            <AlertDialog open={!!saveProgressKey}>
+                <AlertDialogContent className="sm:max-w-md">
+                    <AlertDialogTitle className="sr-only">Saving the data key</AlertDialogTitle>
+                    <AlertDialogDescription className="sr-only">Progress of the save</AlertDialogDescription>
+                    {!!saveProgressKey && <DataKeySaveProgress requestKey={saveProgressKey} />}
+                </AlertDialogContent>
+            </AlertDialog>
 
             <SocketEventsListener
                 events={[

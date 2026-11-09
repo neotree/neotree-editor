@@ -11,11 +11,15 @@ import {
     applyOptionPlacements,
     findLegacyOptionItems,
     findOptionPresence,
+    findSameScriptUses,
+    describeSameScriptBlock,
+    isQuestionKeyGroup,
     type LegacyItemLink,
     type LegacyOptionItem,
     type OptionPlacement,
     type OptionPresence,
     type OptionUsage,
+    type SameScriptUse,
 } from '@/lib/data-key-merge-analysis';
 import type { MergeReport } from '@/lib/data-key-merge-report';
 import { isNuidManagedDataKey } from '@/lib/nuid-search';
@@ -104,6 +108,8 @@ export type MergePreview = {
     scriptsChanged: number;
     addedOptions: string[];
     deletedDataKeyIds: string[];
+    /** Scripts that use two of these keys together (already one answer; merging doesn't change that). */
+    sameScriptUses: SameScriptUse[];
 };
 
 export type MergeDataKeysResponse = {
@@ -193,6 +199,22 @@ export async function _mergeDataKeys({
         if (scriptsOnly && !appliedScriptIds.length) {
             throw new Error('Select at least one script that uses the data keys being merged.');
         }
+
+        // Answers are stored under the key's name as written. Keys whose names
+        // differ only in case are separate answers where both are used; merging
+        // would join them, so that is refused for those scripts.
+        // Options are values under their parent question, not answers, so only question keys count.
+        const parentIndexForGroup = buildDataKeyParentIndex(allDataKeys);
+        const sameScriptUses = !isQuestionKeyGroup([survivor, ...merged], (uniqueKey) => !!parentIndexForGroup.get(uniqueKey)?.length)
+            ? []
+            : findSameScriptUses({
+                impact,
+                survivor,
+                merged,
+                scriptIds: scriptsOnly ? appliedScriptIds : undefined,
+            });
+        const sameScriptBlock = describeSameScriptBlock(sameScriptUses);
+        if (sameScriptBlock) throw new Error(sameScriptBlock);
 
         // Unselected scripts keep their references to the merged parents.
         // The include-list is the fail-safe: a usage missing from the impact is never rewritten.
@@ -526,6 +548,7 @@ export async function _mergeDataKeys({
             optionPresence: result.optionPresence,
             addedOptions: plan.addedOptions,
             deletedDataKeyIds: result.deletedDataKeyIds,
+            sameScriptUses,
         };
         const mergeId = operationId;
 

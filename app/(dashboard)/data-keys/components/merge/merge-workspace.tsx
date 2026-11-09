@@ -51,7 +51,7 @@ import { PageContainer } from '@/app/(dashboard)/(scripts)/components/page-conta
 import type { MergeDataKeysResponse } from '@/databases/mutations/data-keys';
 import { normalizeDataKeyType } from '@/lib/data-key-types';
 import { buildDataKeyParentIndex, getDataKeyParentTitle, type DataKeyParentRef } from '@/lib/data-key-children';
-import type { LegacyItemLink, LegacyOptionItem, OptionPlacement, OptionPresence } from '@/lib/data-key-merge-analysis';
+import { describeSameScriptBlock, findSameScriptUses, isQuestionKeyGroup, type LegacyItemLink, type LegacyOptionItem, type OptionPlacement, type OptionPresence } from '@/lib/data-key-merge-analysis';
 import { CHANGELOG_ACTION_BADGE_CLASSES } from '@/lib/changelog-utils';
 import {
     buildDataKeysMergePlan,
@@ -187,6 +187,28 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
     };
     const requestKey = JSON.stringify(request);
 
+    // Keys of the group used together in one script: answers are stored under the
+    // name as written, so names that differ only in case would become one answer.
+    // Options are values under their parent question, not answers, so only question keys count.
+    const isQuestionGroup = isQuestionKeyGroup(candidates, (uniqueKey) => !!parentIndex.get(uniqueKey)?.length);
+    const sameScriptUses = useMemo(() => (!impact || !survivor || !isQuestionGroup ? [] : findSameScriptUses({
+        impact,
+        survivor,
+        merged: candidates.filter((dataKey) => mergedIds.includes(dataKey.uuid)),
+        scriptIds: scriptsOnly ? appliedScripts.map((script) => script.scriptId) : undefined,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    })), [impact, survivor?.uuid, mergedKey, scriptsOnly, isQuestionGroup, appliedScripts.map((script) => script.scriptId).join(',')]);
+    const sameScriptBlock = describeSameScriptBlock(sameScriptUses);
+    const alreadyShared = sameScriptUses.filter((use) => !use.becomesShared);
+
+    // Different kinds of question for the same value (a dropdown field and a single select screen).
+    const includedKeys = candidates.filter((dataKey) => dataKey.uuid === survivorId || mergedIds.includes(dataKey.uuid));
+    const rawTypes = Array.from(new Set(includedKeys.map((dataKey) => `${dataKey.dataType || ''}`.trim().toLowerCase()).filter(Boolean)));
+    // Keys with options that have none in common are likely different questions.
+    const sharesNoOptions = !!survivor && !!(survivor.options || []).length && candidates
+        .filter((dataKey) => mergedIds.includes(dataKey.uuid) && (dataKey.options || []).length)
+        .some((dataKey) => !(dataKey.options || []).some((option) => (survivor.options || []).includes(option)));
+
     const parentRewrites = plan.parentOptionRewrites;
     const planBlockers = [
         ...(missingIds.length ? [`${pluralize(missingIds.length, 'data key')} in this link could not be found.`] : []),
@@ -196,6 +218,7 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
             : []),
         ...plan.errors,
         ...(scriptsOnly && !appliedScripts.length ? ['Select at least one script to merge in.'] : []),
+        ...(sameScriptBlock ? [sameScriptBlock] : []),
     ];
 
     // Re-run the dry run shortly after the plan settles.
@@ -330,6 +353,29 @@ export function MergeWorkspace({ ids, canMerge: canMergeRole }: { ids: string[];
                                     />
                                 ))}
                             </RadioGroup>
+
+                            {rawTypes.length > 1 && !!survivor && (
+                                <Callout variant="info">
+                                    These keys are different kinds of question ({rawTypes.map(typeLabel).join(' and ')}) that store one chosen
+                                    value each, so they can be merged. “{getMergeKeyTitle(survivor)}” stays a {typeLabel(survivor.dataType)}; the
+                                    fields and screens of the other {mergedIds.length === 1 ? 'key use' : 'keys use'} it from now on.
+                                </Callout>
+                            )}
+                            {sharesNoOptions && (
+                                <Callout variant="warning">
+                                    {mergedIds.length === 1 ? 'The key being merged shares' : 'A key being merged shares'} no options with
+                                    “{getMergeKeyTitle(survivor!)}”, so they may be different questions with the same name. Check the
+                                    options below before merging, or mark the group as not a duplicate.
+                                </Callout>
+                            )}
+                            {!!alreadyShared.length && (
+                                <Callout variant="warning">
+                                    {alreadyShared.map((use) => `“${use.scriptTitle}”`).join(', ')} already
+                                    {alreadyShared.length === 1 ? ' uses' : ' use'} two of these keys, and they save to the same answer
+                                    {' '}“{alreadyShared[0].keys[0].name}” there. Merging doesn&apos;t change that, but one answer may
+                                    overwrite the other — check {alreadyShared.length === 1 ? 'that script' : 'those scripts'}.
+                                </Callout>
+                            )}
                         </section>
 
                         {groupHasOptions && (
@@ -1241,4 +1287,9 @@ function ScriptRow({
             </ul>
         </li>
     );
+}
+
+/** "single_select" -> "single select" */
+function typeLabel(dataType?: string | null) {
+    return `${dataType || 'key'}`.trim().toLowerCase().replace(/_/g, ' ');
 }

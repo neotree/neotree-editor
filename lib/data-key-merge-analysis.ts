@@ -1,3 +1,4 @@
+import { normalizeDataKeyType } from './data-key-types';
 import { renameConditionReferences } from './conditional-expression/rename-references';
 
 type AnyRecord = Record<string, any>;
@@ -405,4 +406,79 @@ export function applyOptionPlacements(
     if (fieldsChanged) patch.fields = fields;
 
     return patch.items || patch.fields ? patch : null;
+}
+
+export type SameScriptUse = {
+    scriptId: string;
+    scriptTitle: string;
+    /** The keys of the group this script uses (the kept key first when it is one of them). */
+    keys: { uniqueKey: string; name: string; }[];
+    /**
+     * True when the keys' names differ (only in case or spacing — duplicates
+     * share a name otherwise). Answers are stored under the name as written,
+     * so they are separate answers today and would become one after the merge.
+     * False when the names are identical: they already share one answer and the
+     * merge doesn't change that.
+     */
+    becomesShared: boolean;
+};
+
+/**
+ * Scripts where two or more keys of a merge group are used together. Merged
+ * keys only count in the scripts the merge applies to (all of them, or the
+ * selected ones); the kept key counts wherever it is used.
+ */
+export function findSameScriptUses({
+    impact,
+    survivor,
+    merged,
+    scriptIds,
+}: {
+    impact: { dataKeyId: string; scripts: { scriptId: string; scriptTitle?: string | null; }[]; }[];
+    survivor: { uuid: string; uniqueKey: string; name?: string | null; };
+    merged: { uuid: string; uniqueKey: string; name?: string | null; }[];
+    /** "Selected scripts only": the scripts the merge applies to. */
+    scriptIds?: string[];
+}): SameScriptUse[] {
+    const applied = scriptIds ? new Set(scriptIds) : null;
+    const byScript = new Map<string, SameScriptUse>();
+    const add = (dataKey: { uuid: string; uniqueKey: string; name?: string | null; }, onlyApplied: boolean) => {
+        for (const script of impact.find((item) => item.dataKeyId === dataKey.uuid)?.scripts || []) {
+            if (onlyApplied && applied && !applied.has(script.scriptId)) continue;
+            const use = byScript.get(script.scriptId) || { scriptId: script.scriptId, scriptTitle: script.scriptTitle || script.scriptId, keys: [], becomesShared: false };
+            if (!use.keys.some((key) => key.uniqueKey === dataKey.uniqueKey)) use.keys.push({ uniqueKey: dataKey.uniqueKey, name: `${dataKey.name || ''}` });
+            byScript.set(script.scriptId, use);
+        }
+    };
+    add(survivor, false);
+    merged.forEach((dataKey) => add(dataKey, true));
+
+    return Array.from(byScript.values())
+        .filter((use) => use.keys.length > 1)
+        .map((use) => ({ ...use, becomesShared: new Set(use.keys.map((key) => key.name.trim())).size > 1 }))
+        .sort((a, b) => a.scriptTitle.localeCompare(b.scriptTitle));
+}
+
+/**
+ * Whether a group's keys are questions (their name is the key an answer is
+ * stored under) rather than options (their name is a value stored under the
+ * parent question). Only questions can end up sharing an answer, so the
+ * same-script check applies to them alone.
+ */
+export function isQuestionKeyGroup(
+    keys: { uniqueKey: string; dataType?: string | null; }[],
+    isOfferedByParent: (uniqueKey: string) => boolean,
+) {
+    return keys.every((dataKey) => normalizeDataKeyType(dataKey.dataType) !== 'option' && !isOfferedByParent(dataKey.uniqueKey));
+}
+
+/** Why a merge can't go ahead in scripts where it would join separate answers. */
+export function describeSameScriptBlock(uses: SameScriptUse[]) {
+    const blocked = uses.filter((use) => use.becomesShared);
+    if (!blocked.length) return '';
+    const titles = blocked.map((use) => `"${use.scriptTitle}"`);
+    const names = Array.from(new Set(blocked.flatMap((use) => use.keys.map((key) => `"${key.name}"`))));
+    return `${names.join(' and ')} are separate answers in ${titles.slice(0, 3).join(', ')}${titles.length > 3 ? ` and ${titles.length - 3} more` : ''} `
+        + `(their names differ only in case), and the merge would make them one answer there. `
+        + `Merge in the other scripts only, or rename one of the keys first.`;
 }

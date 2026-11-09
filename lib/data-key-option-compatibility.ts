@@ -1,11 +1,14 @@
+import { dataKeyTypeFamily } from './data-key-types';
+
 type DataKeyOptionShape = {
     dataType?: string | null;
     name?: string | null;
     options?: string[] | null;
 };
 
+// Same kind of key as merging and the key picker use (dropdown = single select, …).
 function normalizeDataType(value?: string | null) {
-    return `${value || ''}`.trim().toLowerCase();
+    return dataKeyTypeFamily(value);
 }
 
 function normalizeOptionKeys(options?: string[] | null) {

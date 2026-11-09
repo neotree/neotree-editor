@@ -1,5 +1,5 @@
 import { validateDataKeyOptionsAddition } from './data-key-children';
-import { normalizeDataKeyType } from './data-key-types';
+import { dataKeyTypeFamily, normalizeDataKeyType } from './data-key-types';
 
 export type MergeDataKey = {
     uuid: string;
@@ -116,7 +116,7 @@ export function labelSimilarity(a?: string | null, b?: string | null) {
 }
 
 /** The name + type a key is matched on (its "key identity"). */
-const nameTypeKey = (dataKey: MergeDataKey) => `${lower(dataKey.name)}::${normalizeDataKeyType(dataKey.dataType)}`;
+const nameTypeKey = (dataKey: MergeDataKey) => `${lower(dataKey.name)}::${dataKeyTypeFamily(dataKey.dataType)}`;
 
 const isCandidate = (dataKey: MergeDataKey) => !dataKey.isDeleted && !!norm(dataKey.uuid) && !!lower(dataKey.name);
 
@@ -276,9 +276,9 @@ export function buildDataKeysMergePlan({
             plan.errors.push(`"${getMergeKeyTitle(survivor)}" is an option of "${getMergeKeyTitle(dataKey)}" — a key cannot be merged into one of its own options.`);
         }
     }
-    const survivorType = normalizeDataKeyType(survivor.dataType);
+    const survivorType = dataKeyTypeFamily(survivor.dataType);
     for (const dataKey of plan.merged) {
-        if (normalizeDataKeyType(dataKey.dataType) !== survivorType) {
+        if (dataKeyTypeFamily(dataKey.dataType) !== survivorType) {
             plan.errors.push(`"${getMergeKeyTitle(dataKey)}" uses a different data type from "${getMergeKeyTitle(survivor)}".`);
         }
     }

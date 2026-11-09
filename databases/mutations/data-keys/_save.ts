@@ -14,6 +14,7 @@ import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
 import { assertDraftOwner } from '@/lib/server/draft-owner';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
+import { createProgressReporter } from '@/lib/in-progress';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
 import type { DataKeyDraftOrigin } from '@/databases/pg/_data-keys';
 import {
@@ -51,6 +52,8 @@ export type SaveDataKeysParams = {
      * they can be previewed and reverted.
      */
     dryRun?: boolean;
+    /** Reports the save's stages to the client that started it (see lib/in-progress). */
+    progressKey?: string;
 };
 
 export type SaveDataKeysResponse = {
@@ -229,8 +232,11 @@ export async function _saveDataKeys({
     propagatedDraftOrigin,
     client,
     dryRun,
+    progressKey,
 }: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
     const response: SaveDataKeysResponse = { success: false, };
+    const progress = createProgressReporter(progressKey);
+    // an editor save never writes into another user's (or an ownerless) unpublished draft
     const refuseOthersDrafts = draftOrigin === 'editor' && !!userId;
 
     try {
@@ -240,6 +246,7 @@ export async function _saveDataKeys({
         let saveWarnings: string[] = [];
 
         const executeSave = async (executor: DbOrTransaction) => {
+            progress.step('checking');
             const errors: string[] = [];
             const warnings: string[] = [];
             saveWarnings = warnings;
@@ -560,6 +567,7 @@ export async function _saveDataKeys({
                         }
 
                         if (unlinkPlan) {
+                            progress.step('unlinking');
                             const unlinkRes = await _deleteReferencedDataKeyOptions({
                                 userId,
                                 uniqueKeys: unlinkPlan.deletedUniqueKeys,
@@ -614,6 +622,10 @@ export async function _saveDataKeys({
                     draftOrigin: propagatedDraftOrigin || (draftOrigin === "import" ? "import" : "data_key_sync"),
                     matchUniqueKeysByDataKey: propagationMatchUniqueKeysByDataKey,
                     client: executor,
+                    onProgress: (stage, done, total) => {
+                        progress.step(stage);
+                        if (total) progress.count(stage, done || 0, total);
+                    },
                 });
                 if (updateRefsRes.errors?.length || !updateRefsRes.success) {
                     throw new Error(updateRefsRes.errors?.length
@@ -651,6 +663,7 @@ export async function _saveDataKeys({
                 // Each rename is only applied where the script itself shows it.
                 const affectedScriptIds = (updateRefsRes.affected?.scripts || []).map((script) => script.scriptId).filter(Boolean);
                 if (nameRenames.length && affectedScriptIds.length) {
+                    progress.step('conditions');
                     const conditionsRes = await _syncConditionRefsAfterReplacement({
                         renamesByScriptId: Object.fromEntries(affectedScriptIds.map((scriptId) => [scriptId, nameRenames])),
                         userId,
@@ -712,7 +725,11 @@ export async function _saveDataKeys({
                     dataKey: (id) => byId.get(id)?.name || 'a data key',
                 },
                 describeKey: reportKeyDescriber(byUniqueKey),
-                run: (tx) => executeSave(tx),
+                run: async (tx) => {
+                    await executeSave(tx);
+                    // the report and the before/after snapshot are built next
+                    progress.step('recording');
+                },
                 record: () => ({
                     kind: 'unlink',
                     title: `Unlink ${unlinkedCount} option${unlinkedCount === 1 ? '' : 's'} from “${parentTitle}”`,
@@ -758,6 +775,8 @@ export async function _saveDataKeys({
         response.errors = [e.message];
         logger.error('_saveDataKeys ERROR', e.message);
         return { success: false, errors: [e.message], };
+    } finally {
+        progress.finish();
     }
 }
 

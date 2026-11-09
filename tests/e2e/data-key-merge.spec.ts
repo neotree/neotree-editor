@@ -189,9 +189,12 @@ test('the batch page checks clean groups before merging', async ({ page }) => {
 async function waitForDialogPreview(page: Page) {
     const dialog = page.getByRole('dialog');
     const report = dialog.getByText(/^\d+ changes?$/).or(dialog.getByText('No script changes.'));
-    const conflict = dialog.getByText('Other people have unpublished changes here.');
-    await expect(report.first().or(conflict)).toBeVisible({ timeout: 120_000 });
-    return !(await conflict.isVisible());
+    // Other people's drafts block it: reported by the preview, or refused up front when one of
+    // them is a question someone else is still editing (or a draft with no owner).
+    const conflict = dialog.getByText('Other people have unpublished changes here.')
+        .or(dialog.getByText(/^Not saved: .*another user is still editing/));
+    await expect(report.first().or(conflict.first())).toBeVisible({ timeout: 120_000 });
+    return !(await conflict.first().isVisible());
 }
 
 test('deleting a used key previews the exact changes, then can be reverted', async ({ page }) => {
