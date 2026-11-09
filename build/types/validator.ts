@@ -416,6 +416,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../app/(dashboard)/reporting-configurations/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/reporting-configurations">> = Specific
+  const handler = {} as typeof import("../../app/(dashboard)/reporting-configurations/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../app/(dashboard)/sessions/[sessionId]/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/sessions/[sessionId]">> = Specific
@@ -1743,6 +1752,24 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/users/update">> = Specific
   const handler = {} as typeof import("../../app/api/users/update/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/v1/mobile-analytics/config/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/v1/mobile-analytics/config">> = Specific
+  const handler = {} as typeof import("../../app/api/v1/mobile-analytics/config/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../app/api/v1/mobile-analytics/version/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/v1/mobile-analytics/version">> = Specific
+  const handler = {} as typeof import("../../app/api/v1/mobile-analytics/version/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check
