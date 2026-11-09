@@ -53,3 +53,6 @@ deploy.command
 # Playwright
 /test-results/
 /playwright-report/
+
+# per-developer record of applied manual migrations
+.migrations-tracker.json
