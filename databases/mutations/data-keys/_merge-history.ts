@@ -1,4 +1,4 @@
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
@@ -71,6 +71,22 @@ export async function _revertDataKeyMerge({
  * this exactly like the publish/discard does ("my changes"); null or undefined
  * means everyone's. Runs inside the publish/discard transaction.
  */
+/**
+ * Whether the database has the operation history at its current shape
+ * (manual_migrations/2026-11-09-add_data_key_merges.sql). Publish and discard
+ * settle the history inside their own transaction, so on a database that
+ * hasn't had the migration yet they must skip it rather than fail outright.
+ */
+async function hasOperationHistory(client: DbOrTransaction) {
+    const rows = await client.execute<{ ready: boolean }>(sql`
+        select exists (
+            select 1 from information_schema.columns
+            where table_schema = 'public' and table_name = 'nt_data_key_merges' and column_name = 'discarded_at'
+        ) as ready
+    `);
+    return !!(rows as unknown as { ready: boolean }[])[0]?.ready;
+}
+
 export async function _settleDataKeyOperations({
     outcome,
     userId,
@@ -86,6 +102,11 @@ export async function _settleDataKeyOperations({
     dataVersion?: number | null;
     client: DbOrTransaction;
 }) {
+    if (!(await hasOperationHistory(client))) {
+        logger.error('_settleDataKeyOperations', 'nt_data_key_merges is missing or out of date: run manual_migrations/2026-11-09-add_data_key_merges.sql. Publish/discard went ahead without settling the data key operation history.');
+        return;
+    }
+
     const now = new Date();
     const scope = and(
         eq(dataKeyMerges.status, 'applied'),

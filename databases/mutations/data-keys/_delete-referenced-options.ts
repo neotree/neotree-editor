@@ -141,6 +141,14 @@ export async function _deleteReferencedDataKeyOptions({
                     .filter((item): item is T => !!item);
             };
 
+            // A symptom names its data key (key) and shows its label (name), like syncDiagnosisReference.
+            const rebuildSymptom = <T extends { keyId?: string | null; key?: string; name?: string; }>(symptom: T, replacement: UnlinkReplacementDataKey): T => ({
+                ...symptom,
+                keyId: replacement.uniqueKey,
+                key: replacement.name,
+                name: replacement.label || replacement.name,
+            });
+
             /**
              * Library deletes (unscoped) must also clear scalar references —
              * screen/diagnosis/problem keyIds, ref-ID keys, and field date/time
@@ -259,28 +267,12 @@ export async function _deleteReferencedDataKeyOptions({
                 if (res.errors?.length) throw new Error(res.errors[0]);
             }
 
-            // Replacing an option changes its value text, so conditions such as
-            // `$Parent = 'Old'` (and `$Old` for checklist items) follow it.
-            if (appliedReplacementsByScript.size) {
-                const conditionsRes = await _syncConditionRefsAfterReplacement({
-                    renamesByScriptId: Object.fromEntries(Array.from(appliedReplacementsByScript.entries())
-                        .map(([scriptId, replacements]) => [
-                            scriptId,
-                            Array.from(replacements).map((replacement) => ({
-                                from: replacement.replacedName || '',
-                                to: replacement.name,
-                            })),
-                        ])),
-                    userId: userId || undefined,
-                    client,
-                });
-                if (conditionsRes.errors?.length) throw new Error(conditionsRes.errors[0]);
-            }
-
             // Diagnosis/problem symptoms reference keys directly, not through a
             // parent's option pool. An unlink leaves the child in the library, so
-            // those references stay valid and are only stripped from diagnoses and
-            // problems keyed by the parent itself (its own questions).
+            // those references stay valid and are only touched in diagnoses and
+            // problems keyed by the parent itself (its own questions): re-keyed to
+            // the replacement when there is one (a merge's match, an unlink's
+            // chosen replacement), otherwise removed.
             {
                 const saveDiagnosesData = refs.data
                     .filter(d => d.refType === 'diagnosis')
@@ -290,16 +282,23 @@ export async function _deleteReferencedDataKeyOptions({
                         let changed = false;
                         const markChanged = () => { changed = true; };
 
+                        // Replaced like an option (a merge's match, an unlink's replacement), or removed.
+                        const appliedReplacements = new Set<UnlinkReplacementDataKey>();
                         const ownsSymptoms = isOwnedByScope(diagnosis?.keyId);
-                        const symptoms = (diagnosis?.symptoms || []).filter(symptom => {
-                            const keep = !ownsSymptoms || !referencesDeletedKey(symptom.keyId);
-                            if (!keep) changed = true;
-                            return keep;
-                        });
+                        const symptoms = !ownsSymptoms
+                            ? (diagnosis?.symptoms || [])
+                            : syncOwnedItems(referencesDeletedKey, getEntityScriptId(diagnosis as any), diagnosis?.symptoms || [], rebuildSymptom, appliedReplacements, markChanged);
 
                         const clearedDiagnosis = scope ? diagnosis : clearScalarRefs(referencesDeletedKey, diagnosis, [{ id: 'keyId' }], markChanged);
 
                         if (!changed || !writable(d, (diagnosis as any)?.name || d.refId)) return null;
+                        // Conditions follow only the replacements that are actually written.
+                        const diagnosisScriptId = getEntityScriptId(diagnosis as any);
+                        if (diagnosisScriptId && appliedReplacements.size) {
+                            const applied = appliedReplacementsByScript.get(diagnosisScriptId) || new Set();
+                            appliedReplacements.forEach(replacement => applied.add(replacement));
+                            appliedReplacementsByScript.set(diagnosisScriptId, applied);
+                        }
                         return { ...clearedDiagnosis, symptoms };
                     })
                     .filter((diagnosis): diagnosis is NonNullable<typeof diagnosis> => !!diagnosis);
@@ -322,16 +321,22 @@ export async function _deleteReferencedDataKeyOptions({
                         let changed = false;
                         const markChanged = () => { changed = true; };
 
+                        const appliedReplacements = new Set<UnlinkReplacementDataKey>();
                         const ownsSymptoms = isOwnedByScope(problem?.keyId);
-                        const symptoms = (problem?.symptoms || []).filter(symptom => {
-                            const keep = !ownsSymptoms || !referencesDeletedKey(symptom.keyId);
-                            if (!keep) changed = true;
-                            return keep;
-                        });
+                        const symptoms = !ownsSymptoms
+                            ? (problem?.symptoms || [])
+                            : syncOwnedItems(referencesDeletedKey, getEntityScriptId(problem as any), problem?.symptoms || [], rebuildSymptom, appliedReplacements, markChanged);
 
                         const clearedProblem = scope ? problem : clearScalarRefs(referencesDeletedKey, problem, [{ id: 'keyId' }], markChanged);
 
                         if (!changed || !writable(d, (problem as any)?.name || d.refId)) return null;
+                        // Conditions follow only the replacements that are actually written.
+                        const problemScriptId = getEntityScriptId(problem as any);
+                        if (problemScriptId && appliedReplacements.size) {
+                            const applied = appliedReplacementsByScript.get(problemScriptId) || new Set();
+                            appliedReplacements.forEach(replacement => applied.add(replacement));
+                            appliedReplacementsByScript.set(problemScriptId, applied);
+                        }
                         return { ...clearedProblem, symptoms };
                     })
                     .filter((problem): problem is NonNullable<typeof problem> => !!problem);
@@ -345,6 +350,24 @@ export async function _deleteReferencedDataKeyOptions({
                     });
                     if (res.errors?.length) throw new Error(res.errors[0]);
                 }
+            }
+
+            // Replacing an option (in screens, fields and symptoms) changes its value text, so conditions such as
+            // `$Parent = 'Old'` (and `$Old` for checklist items) follow it.
+            if (appliedReplacementsByScript.size) {
+                const conditionsRes = await _syncConditionRefsAfterReplacement({
+                    renamesByScriptId: Object.fromEntries(Array.from(appliedReplacementsByScript.entries())
+                        .map(([scriptId, replacements]) => [
+                            scriptId,
+                            Array.from(replacements).map((replacement) => ({
+                                from: replacement.replacedName || '',
+                                to: replacement.name,
+                            })),
+                        ])),
+                    userId: userId || undefined,
+                    client,
+                });
+                if (conditionsRes.errors?.length) throw new Error(conditionsRes.errors[0]);
             }
 
             // NUID search fields are keys, not options: only touched when the keys themselves are deleted.

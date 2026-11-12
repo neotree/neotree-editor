@@ -22,6 +22,7 @@ import {
     syncScreenEntityReference,
     syncScreenReference,
 } from './_update_data_keys_refs.helpers';
+import { escapeLikePattern } from '@/lib/sql-like';
 
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
@@ -165,9 +166,6 @@ function buildLikeClauses(column: SQL, patterns: string[]): SQL | undefined {
     return or(...clauses) as SQL;
 }
 
-function escapeLikePattern(value: string) {
-    return value.replace(/[\\%_]/g, '\\$&');
-}
 
 function buildJsonKeyIdPatterns(uniqueKeys: string[], jsonKeys: string[]) {
     return uniqueKeys

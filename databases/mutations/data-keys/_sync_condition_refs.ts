@@ -22,11 +22,18 @@ export async function _syncConditionRefsAfterReplacement({
     renamesByScriptId,
     userId,
     client,
+    refuseOthersDrafts,
 }: {
     /** scriptId -> old name -> new name, for the replacements applied in that script. */
     renamesByScriptId: Record<string, ConditionNameRename[]>;
     userId?: string;
     client?: DbOrTransaction;
+    /**
+     * An editor save never writes into another user's (or an ownerless)
+     * unpublished draft: refuse instead, like the references update does.
+     * Merges and deletes check every script they touch for such drafts first.
+     */
+    refuseOthersDrafts?: boolean;
 }): Promise<SyncConditionRefsResponse> {
     try {
         const isValidRename = (rename: ConditionNameRename) => (
@@ -70,6 +77,29 @@ export async function _syncConditionRefsAfterReplacement({
             screenPatches.push(...plan.screens);
             diagnosisPatches.push(...plan.diagnoses);
             problemPatches.push(...plan.problems);
+        }
+
+        if (refuseOthersDrafts) {
+            type Owned = { isDraft?: boolean | null; draftCreatedByUserId?: string | null; scriptTitle?: string | null; };
+            const othersDraft = (entity?: Owned) => !!entity?.isDraft && (entity.draftCreatedByUserId || null) !== (userId || null);
+            const screensById = new Map(screensRes.data.map((screen) => [screen.screenId, screen]));
+            const diagnosesById = new Map(diagnosesRes.data.map((diagnosis) => [diagnosis.diagnosisId, diagnosis]));
+            const problemsById = new Map(problemsRes.data.map((problem) => [problem.problemId, problem]));
+            const blocked = [
+                ...screenPatches.map((patch: any) => screensById.get(patch.screenId)).filter(othersDraft)
+                    .map((screen: any) => `“${screen.title || screen.label || screen.refId || screen.screenId}”${screen.scriptTitle ? ` (${screen.scriptTitle})` : ''}`),
+                ...diagnosisPatches.map((patch: any) => diagnosesById.get(patch.diagnosisId)).filter(othersDraft)
+                    .map((diagnosis: any) => `“${diagnosis.name || diagnosis.diagnosisId}”${diagnosis.scriptTitle ? ` (${diagnosis.scriptTitle})` : ''}`),
+                ...problemPatches.map((patch: any) => problemsById.get(patch.problemId)).filter(othersDraft)
+                    .map((problem: any) => `“${problem.name || problem.problemId}”${problem.scriptTitle ? ` (${problem.scriptTitle})` : ''}`),
+            ];
+            if (blocked.length) {
+                throw new Error(
+                    `Not saved: the new name would also be written into the conditions of ${blocked.length === 1 ? 'a question' : `${blocked.length} questions`} that another user is still editing (unpublished): ` +
+                    blocked.slice(0, 5).join(', ') + (blocked.length > 5 ? ` and ${blocked.length - 5} more` : '') +
+                    '. Ask them to publish or discard their changes first (an admin can take over drafts that have no owner).',
+                );
+            }
         }
 
         if (screenPatches.length) {

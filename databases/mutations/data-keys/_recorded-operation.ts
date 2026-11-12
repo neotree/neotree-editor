@@ -6,6 +6,7 @@ import { dataKeyMerges, users } from '@/databases/pg/schema';
 import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
 import { buildMergeReport, type MergeReport } from '@/lib/data-key-merge-report';
 import { captureMergeDraftRows, type MergeDraftRows, type MergeSnapshotScope } from './_merge-snapshot';
+import { uniqueValues } from '@/lib/unique-values';
 
 /**
  * Data key operations that change scripts — merge, delete/replace, replace or
@@ -53,7 +54,6 @@ export type OperationRecord = {
     reportExtras?: Record<string, unknown>;
 };
 
-const uniqueValues = (values: string[]) => Array.from(new Set(values.map((value) => `${value || ''}`.trim()).filter(Boolean)));
 
 /** Thrown inside the transaction to roll a dry run back while keeping its result. */
 class DryRunRollback<T> extends Error {

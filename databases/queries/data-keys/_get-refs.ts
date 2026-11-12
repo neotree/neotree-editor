@@ -4,6 +4,7 @@ import db from '@/databases/pg/drizzle';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import * as schema from "@/databases/pg/schema";
 import { PgColumn } from "drizzle-orm/pg-core";
+import { escapeLikePattern } from "@/lib/sql-like";
 
 export type GetDataKeysRefsParams = {
     uniqueKeys: string[];
@@ -38,7 +39,6 @@ export async function _getDataKeysRefs({
         if (!uniqueKeys.length) return defaultRes;
         const executor = client || db;
 
-        const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, '\\$&');
         const whereUniqueKey = (column: PgColumn) => or(
             ...uniqueKeys.map(k => sql`${column}::text like ${`%${escapeLikePattern(k)}%`}`),
         );
