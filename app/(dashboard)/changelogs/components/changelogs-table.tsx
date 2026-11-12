@@ -444,7 +444,7 @@ export function ChangelogsTable(props: Props) {
                                 setAllowDeepRollback(false)
                                 setTargetRollbackVersion(entry.dataVersion - 1)
                               }}
-                              className="cursor-pointer text-orange-600 focus:text-orange-700"
+                              className="cursor-pointer text-orange-600 dark:text-orange-400 focus:text-orange-700"
                             >
                               {rollbacking === entry.dataVersion ? "Rolling back..." : `Rollback to v${entry.dataVersion - 1}`}
                             </DropdownMenuItem>

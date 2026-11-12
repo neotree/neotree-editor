@@ -42,12 +42,12 @@ import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { pendingChangesAPI } from "@/lib/indexed-db";
 
 const statusStyles = {
-    resolved: "bg-emerald-100 text-emerald-800",
-    out_of_sync: "bg-amber-100 text-amber-800",
-    missing: "bg-red-100 text-red-800",
-    legacy_match: "bg-blue-100 text-blue-800",
-    conflict: "bg-rose-100 text-rose-800",
-    unmanaged: "bg-slate-100 text-slate-800",
+    resolved: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200",
+    out_of_sync: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200",
+    missing: "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200",
+    legacy_match: "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200",
+    conflict: "bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-200",
+    unmanaged: "bg-slate-100 dark:bg-slate-900/40 text-slate-800 dark:text-slate-200",
 } satisfies Record<NonNullable<DataKeyIntegrityReport>["entries"][number]["status"], string>;
 
 const kindLabels: Record<DataKeyIntegrityReport["entries"][number]["kind"], string> = {
@@ -261,6 +261,11 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
     const pendingBulkScrollTopRef = useRef<number | null>(null);
     const bulkPreviewRequestIdRef = useRef(0);
     const [repairEntryParam, setRepairEntryParam] = useQueryState("dataKeyRepair", {
+        defaultValue: "",
+        clearOnDefault: true,
+    });
+    // Set when coming back from "New data key" after choosing an existing key for the reference.
+    const [repairTargetParam, setRepairTargetParam] = useQueryState("dataKeyRepairTarget", {
         defaultValue: "",
         clearOnDefault: true,
     });
@@ -479,7 +484,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
         };
     };
 
-    const openRepairModal = useCallback(async (entry: DataKeyIntegrityReport["entries"][number]) => {
+    const openRepairModal = useCallback(async (entry: DataKeyIntegrityReport["entries"][number], targetUniqueKey?: string) => {
         if (!scriptId || viewOnly || isRepairing || loadingRepairPreview) return;
         await setBulkStatusParam("");
         await setRepairEntryParam(getEntryKey(entry));
@@ -487,7 +492,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
         setRepairPreview(null);
         setSelectedTargetUniqueKey("");
         setReviewAcknowledged(false);
-        const res = await loadRepairPreview({ entry });
+        const res = await loadRepairPreview({ entry, nextSelectedTargetUniqueKey: targetUniqueKey || undefined });
         if (!res.success) {
             setRepairModalEntry(null);
             setRepairPreview(null);
@@ -688,7 +693,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
     };
 
     const renderActions = (entry: DataKeyIntegrityReport["entries"][number]) => {
-        const createHref = `/data-keys/new?name=${encodeURIComponent(entry.currentKey || "")}&label=${encodeURIComponent(entry.currentLabel || entry.currentKey || "")}&dataType=${encodeURIComponent(entry.expectedDataType || "")}`;
+        // "Use this key" on the new data key page brings you back here with this reference's repair open.
+        const returnTo = `/script/${scriptId}/data-keys?dataKeyRepair=${encodeURIComponent(getEntryKey(entry))}`;
+        const createHref = `/data-keys/new?name=${encodeURIComponent(entry.currentKey || "")}&label=${encodeURIComponent(entry.currentLabel || entry.currentKey || "")}&dataType=${encodeURIComponent(entry.expectedDataType || "")}&returnTo=${encodeURIComponent(returnTo)}`;
         const editHref = entry.matchedUniqueKey ? `/data-keys/edit/${entry.matchedUniqueKey}` : undefined;
         const usageHref = buildUsageHref(entry);
         const canSafeResolve = !viewOnly && (
@@ -772,6 +779,15 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                             Open data key library
                         </Link>
                     </DropdownMenuItem>
+
+                    {entry.kind === "duplicate_parent_data_key" && (
+                        <DropdownMenuItem asChild>
+                            <Link href="/data-keys/merge" target="_blank" rel="noreferrer">
+                                <ExternalLinkIcon className="mr-2 h-4 w-4" />
+                                Harmonise duplicate parents
+                            </Link>
+                        </DropdownMenuItem>
+                    )}
 
                     {(canSafeResolve || editHref || entry.status === "missing" || entry.status === "unmanaged") && (
                         <DropdownMenuSeparator />
@@ -883,8 +899,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
             void setRepairEntryParam("");
             return;
         }
-        void openRepairModal(matchedEntry);
-    }, [entries, isRepairing, loadingRepairPreview, openRepairModal, repairEntryParam, repairModalEntry, setRepairEntryParam, viewOnly]);
+        void openRepairModal(matchedEntry, repairTargetParam || undefined);
+        if (repairTargetParam) void setRepairTargetParam("");
+    }, [entries, isRepairing, loadingRepairPreview, openRepairModal, repairEntryParam, repairModalEntry, repairTargetParam, setRepairEntryParam, setRepairTargetParam, viewOnly]);
 
     useEffect(() => {
         if (viewOnly) return;
@@ -972,9 +989,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                         </div>
 
                         {!!resolveOutcomeModal.warnings.length && (
-                            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
-                                <div className="font-medium text-amber-950">Additional notes</div>
-                                <ul className="list-disc pl-5 space-y-1 text-amber-900">
+                            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 space-y-2">
+                                <div className="font-medium text-amber-950 dark:text-amber-100">Additional notes</div>
+                                <ul className="list-disc pl-5 space-y-1 text-amber-900 dark:text-amber-100">
                                     {resolveOutcomeModal.warnings.map((warning, index) => (
                                         <li key={`${warning}-${index}`}>{warning}</li>
                                     ))}
@@ -1019,28 +1036,28 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                             <div className="text-muted-foreground">
                                 This repair will update the current script draft so this reference points to the data key shown below.
                             </div>
-                            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+                            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-amber-900 dark:text-amber-100">
                                 This saves the affected screen, diagnosis, or problem draft as a whole entity, not just this one row. After save, the registry rescans the script, so sibling issues in the same entity may also be reclassified.
                             </div>
 
                             <div className="grid gap-3 md:grid-cols-2">
-                                <div className="rounded-md border border-red-200 bg-red-50 p-3 space-y-2">
-                                    <div className="text-xs font-semibold uppercase tracking-wide text-red-700">From</div>
-                                    <div className="font-medium text-red-950">{formatReferenceLabel(repairModalEntry)}</div>
-                                    <div className="text-red-900">
+                                <div className="rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 space-y-2">
+                                    <div className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">From</div>
+                                    <div className="font-medium text-red-950 dark:text-red-100">{formatReferenceLabel(repairModalEntry)}</div>
+                                    <div className="text-red-900 dark:text-red-100">
                                         {formatIssueLabel(repairModalEntry.status)}
                                     </div>
-                                    <div className="text-sm text-red-900">
+                                    <div className="text-sm text-red-900 dark:text-red-100">
                                         {repairModalEntry.reason}
                                     </div>
-                                    <div className="text-xs text-red-800">
+                                    <div className="text-xs text-red-800 dark:text-red-200">
                                         Used in {repairModalEntry.location}
                                     </div>
                                 </div>
 
-                                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 space-y-2">
-                                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">To</div>
-                                    <div className="font-medium text-emerald-950">Suggested data key</div>
+                                <div className="rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 space-y-2">
+                                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">To</div>
+                                    <div className="font-medium text-emerald-950 dark:text-emerald-100">Suggested data key</div>
                                     <SelectDataKey
                                         modal
                                         value={repairPreview?.targetDataKey?.name || repairPreview?.targetDataKey?.label || ""}
@@ -1065,16 +1082,16 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                                             }
                                         }}
                                     />
-                                    <div className="text-sm text-emerald-900">
+                                    <div className="text-sm text-emerald-900 dark:text-emerald-100">
                                         Use the suggested data key, or pick a different one.
                                     </div>
                                     {!!repairPreview?.targetDataKey?.dataType && (
-                                        <div className="text-xs text-emerald-800">
+                                        <div className="text-xs text-emerald-800 dark:text-emerald-200">
                                             Type: {repairPreview.targetDataKey.dataType}
                                         </div>
                                     )}
                                     {!!repairPreview?.targetDataKey?.optionsCount && (
-                                        <div className="text-xs text-emerald-800">
+                                        <div className="text-xs text-emerald-800 dark:text-emerald-200">
                                             Linked options: {repairPreview.targetDataKey.optionsCount}
                                         </div>
                                     )}
@@ -1317,19 +1334,19 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                                                     </Label>
 
                                                     <div className="grid gap-3 md:grid-cols-2">
-                                                        <div className="rounded-md border border-red-200 bg-red-50 p-3 space-y-2">
-                                                            <div className="text-xs font-semibold uppercase tracking-wide text-red-700">From</div>
-                                                            <div className="font-medium text-red-950">{formatReferenceLabel(item.entry)}</div>
-                                                            <div className="text-sm text-red-900">{item.entry.reason}</div>
-                                                            <Link href={usageHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-red-900 underline-offset-4 hover:underline">
+                                                        <div className="rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 space-y-2">
+                                                            <div className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">From</div>
+                                                            <div className="font-medium text-red-950 dark:text-red-100">{formatReferenceLabel(item.entry)}</div>
+                                                            <div className="text-sm text-red-900 dark:text-red-100">{item.entry.reason}</div>
+                                                            <Link href={usageHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-red-900 dark:text-red-100 underline-offset-4 hover:underline">
                                                                 <span>Open usage</span>
                                                                 <ExternalLinkIcon className="h-3 w-3" />
                                                             </Link>
                                                         </div>
 
-                                                        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 space-y-2">
-                                                            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">To</div>
-                                                            <div className="font-medium text-emerald-950">Suggested data key</div>
+                                                        <div className="rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 space-y-2">
+                                                            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">To</div>
+                                                            <div className="font-medium text-emerald-950 dark:text-emerald-100">Suggested data key</div>
                                                             <SelectDataKey
                                                                 modal
                                                                 value={item.targetDataKey?.name || item.targetDataKey?.label || ""}
@@ -1372,11 +1389,11 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                                                                     });
                                                                 }}
                                                             />
-                                                            <div className="text-sm text-emerald-900">
+                                                            <div className="text-sm text-emerald-900 dark:text-emerald-100">
                                                                 Use the suggested data key, or pick a different one.
                                                             </div>
                                                             {!!item.targetDataKey?.label && (
-                                                                <div className="text-xs text-emerald-800">Label: {item.targetDataKey.label}</div>
+                                                                <div className="text-xs text-emerald-800 dark:text-emerald-200">Label: {item.targetDataKey.label}</div>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1505,7 +1522,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                                         : "Review issues from the row menu, or use bulk resolve for safe deterministic fixes in this script."}
                                 </div>
                             </div>
-                            <div>
+                            <div className="flex flex-wrap gap-2">
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -1514,6 +1531,16 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                                 >
                                     <Link href={getDataKeyIntegrityRulesHref(scriptId)}>
                                         Validation rules
+                                    </Link>
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    asChild
+                                >
+                                    <Link href="/data-keys/merge">
+                                        Harmonise data keys
                                     </Link>
                                 </Button>
                             </div>
@@ -1650,12 +1677,12 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
                             const issue = pagedEntries[rowIndex];
                             return {
                                 className: cn(
-                                    issue?.status === "resolved" && "bg-emerald-50 hover:bg-emerald-100",
-                                    issue?.status === "missing" && "bg-red-50 hover:bg-red-100",
-                                    issue?.status === "conflict" && "bg-rose-50 hover:bg-rose-100",
-                                    issue?.status === "legacy_match" && "bg-blue-50 hover:bg-blue-100",
-                                    issue?.status === "out_of_sync" && "bg-amber-50 hover:bg-amber-100",
-                                    issue?.status === "unmanaged" && "bg-slate-50 hover:bg-slate-100",
+                                    issue?.status === "resolved" && "bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50",
+                                    issue?.status === "missing" && "bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50",
+                                    issue?.status === "conflict" && "bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50",
+                                    issue?.status === "legacy_match" && "bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50",
+                                    issue?.status === "out_of_sync" && "bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50",
+                                    issue?.status === "unmanaged" && "bg-slate-50 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900/50",
                                 ),
                             };
                         }}

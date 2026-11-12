@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useState } from "react";
-import DOMPurify from "dompurify";
 import { FiAlertTriangle, FiCheckCircle } from "react-icons/fi";
 
 import {
@@ -15,6 +14,7 @@ import {
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SafeHtml } from "@/components/safe-html";
   
 export function AlertModal() {
     const { 
@@ -50,13 +50,13 @@ export function AlertModal() {
                         >
                             {variant === 'error' && (
                                 <div className="flex justify-center">
-                                    <FiAlertTriangle className="text-red-600 min-w-12 min-h-12 w-12 h-12" />
+                                    <FiAlertTriangle className="text-red-600 dark:text-red-400 min-w-12 min-h-12 w-12 h-12" />
                                 </div>
                             )}
 
                             {variant === 'success' && (
                                 <div className="flex justify-center">
-                                    <FiCheckCircle className="text-green-600 min-w-12 min-h-12 w-12 h-12" />
+                                    <FiCheckCircle className="text-green-600 dark:text-green-400 min-w-12 min-h-12 w-12 h-12" />
                                 </div>
                             )}
                             
@@ -65,14 +65,7 @@ export function AlertModal() {
                                     (display names, entity titles), so they must be sanitized
                                     before being rendered as HTML. whitespace-pre-line keeps
                                     plain-text messages joined with \n readable. */}
-                                <div
-                                    className="whitespace-pre-line"
-                                    dangerouslySetInnerHTML={{
-                                        // DOMPurify needs a DOM; during SSR the modal is closed
-                                        // (message is empty), so rendering nothing is safe.
-                                        __html: typeof window === "undefined" ? "" : DOMPurify.sanitize(message),
-                                    }}
-                                />
+                                <SafeHtml className="whitespace-pre-line" html={message} />
                             </div>
                         </div>
                     )}

@@ -30,7 +30,8 @@ import { useDataKeysCtx } from "@/contexts/data-keys"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { useAlertModal } from "@/hooks/use-alert-modal"
-import { ParentKeyOptionsHint } from "./parent-key-options-hint"
+import { applyItemEdit } from "@/lib/apply-item-edit"
+import { LockedOptionKeyHint, ParentKeyOptionsHint } from "./parent-key-options-hint"
 
 type Props = {
   open: boolean
@@ -183,19 +184,19 @@ export function Item<P = {}>({
     }
 
     if (!isEmpty(itemIndex) && item) {
-      form.setValue(
-        "items",
-        form.getValues("items").map((f, i) => ({
-          ...f,
-          ...(i !== itemIndex
-            ? null
-            : {
-                ...data,
-                score: data.score ? Number(data.score) : null,
-              }),
-        })),
-        { shouldDirty: true },
-      )
+      const items = form.getValues("items")
+      // Saving an item unchanged must not mark the screen as edited.
+      const { next, changed } = applyItemEdit(items[itemIndex!], {
+        ...data,
+        score: data.score ? Number(data.score) : null,
+      })
+      if (changed) {
+        form.setValue(
+          "items",
+          items.map((f, i) => (i === itemIndex ? next : f)),
+          { shouldDirty: true },
+        )
+      }
     } else {
       form.setValue("items", [...form.getValues("items"), data], { shouldDirty: true })
     }
@@ -274,6 +275,7 @@ export function Item<P = {}>({
       {!!screenDataKey && !isKeyDisabled && (isChecklistScreen || isMultiSelectScreen || isSingleSelectScreen) && (
         <ParentKeyOptionsHint dataKey={screenDataKey} owner="screen" className="mt-1" />
       )}
+      {!disabled && !!item?.keyId && <LockedOptionKeyHint className="mt-1" />}
       </>
     )
   }
