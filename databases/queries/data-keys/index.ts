@@ -6,3 +6,4 @@ export * from './_get-pending-deletion';
 export * from './_get-unused';
 export * from './_merges';
 export * from './_describe';
+export * from './_find-name-label-matches';

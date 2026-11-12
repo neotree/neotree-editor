@@ -11,6 +11,7 @@ import {
     screens,
     screensDrafts,
 } from '@/databases/pg/schema';
+import { escapeLikePattern } from '@/lib/sql-like';
 
 /**
  * JSON keys that hold data key references in screens/diagnoses/problems. The
@@ -27,9 +28,6 @@ const REFERENCE_JSON_KEYS = new Set([
     'refIdDataKey',
 ]);
 
-function escapeLikePattern(value: string) {
-    return value.replace(/[\\%_]/g, '\\$&');
-}
 
 function collectDataKeyReferences(node: unknown, uniqueKeys: Set<string>, found: Set<string>) {
     if (!node || typeof node !== 'object') return;

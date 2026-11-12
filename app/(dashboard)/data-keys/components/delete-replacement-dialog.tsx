@@ -350,10 +350,15 @@ export function DataKeyDeleteReplacementDialog({
     const showDeleteAnywaySecondary = !isUnlink && !!onDeleteAnyway && showReplaceButton && !!unreplacedReplaceableItems.length;
     const showDeleteAnywayPrimary = !isUnlink && !!onDeleteAnyway && !showReplaceButton && !!usedItems.length;
 
+    // Keys removed from scripts rather than replaced — unreplaced keys and every
+    // used parent (parents can't be replaced) — need the explicit "delete anyway".
+    const needsDeleteAnyway = !isUnlink
+        && (!!unreplacedReplaceableItems.length || usedItems.some((item) => isParentItem(item)));
+
     // The confirm step performs one of three actions; preview exactly that one.
     const receiptAction: DeleteAction = scriptsOnly
         ? 'scripts'
-        : (unreplacedReplaceableItems.length || (!replaceableItems.length && usedItems.length)) ? 'deleteAnyway' : 'confirm';
+        : needsDeleteAnyway ? 'deleteAnyway' : 'confirm';
 
     const [preview, setPreview] = useState<{ key: string; loading: boolean; data: OperationPreview | null; error: string }>({
         key: '', loading: false, data: null, error: '',
@@ -406,7 +411,7 @@ export function DataKeyDeleteReplacementDialog({
     // Receipt confirm: unreplaced keys need the explicit "delete anyway"
     // permission; a fully-replaced-with-exceptions batch does not.
     const handleReceiptConfirm = async () => {
-        if (unreplacedReplaceableItems.length || (!replaceableItems.length && usedItems.length)) {
+        if (needsDeleteAnyway) {
             await handleDeleteAnyway();
         } else {
             await executeConfirm();

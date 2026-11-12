@@ -264,6 +264,11 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
         defaultValue: "",
         clearOnDefault: true,
     });
+    // Set when coming back from "New data key" after choosing an existing key for the reference.
+    const [repairTargetParam, setRepairTargetParam] = useQueryState("dataKeyRepairTarget", {
+        defaultValue: "",
+        clearOnDefault: true,
+    });
     const [bulkStatusParam, setBulkStatusParam] = useQueryState("dataKeyBulkResolve", {
         defaultValue: "",
         clearOnDefault: true,
@@ -479,7 +484,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
         };
     };
 
-    const openRepairModal = useCallback(async (entry: DataKeyIntegrityReport["entries"][number]) => {
+    const openRepairModal = useCallback(async (entry: DataKeyIntegrityReport["entries"][number], targetUniqueKey?: string) => {
         if (!scriptId || viewOnly || isRepairing || loadingRepairPreview) return;
         await setBulkStatusParam("");
         await setRepairEntryParam(getEntryKey(entry));
@@ -487,7 +492,7 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
         setRepairPreview(null);
         setSelectedTargetUniqueKey("");
         setReviewAcknowledged(false);
-        const res = await loadRepairPreview({ entry });
+        const res = await loadRepairPreview({ entry, nextSelectedTargetUniqueKey: targetUniqueKey || undefined });
         if (!res.success) {
             setRepairModalEntry(null);
             setRepairPreview(null);
@@ -688,7 +693,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
     };
 
     const renderActions = (entry: DataKeyIntegrityReport["entries"][number]) => {
-        const createHref = `/data-keys/new?name=${encodeURIComponent(entry.currentKey || "")}&label=${encodeURIComponent(entry.currentLabel || entry.currentKey || "")}&dataType=${encodeURIComponent(entry.expectedDataType || "")}`;
+        // "Use this key" on the new data key page brings you back here with this reference's repair open.
+        const returnTo = `/script/${scriptId}/data-keys?dataKeyRepair=${encodeURIComponent(getEntryKey(entry))}`;
+        const createHref = `/data-keys/new?name=${encodeURIComponent(entry.currentKey || "")}&label=${encodeURIComponent(entry.currentLabel || entry.currentKey || "")}&dataType=${encodeURIComponent(entry.expectedDataType || "")}&returnTo=${encodeURIComponent(returnTo)}`;
         const editHref = entry.matchedUniqueKey ? `/data-keys/edit/${entry.matchedUniqueKey}` : undefined;
         const usageHref = buildUsageHref(entry);
         const canSafeResolve = !viewOnly && (
@@ -892,8 +899,9 @@ export function ScriptDataKeysTable({ data: { title, scriptId }, integrity, init
             void setRepairEntryParam("");
             return;
         }
-        void openRepairModal(matchedEntry);
-    }, [entries, isRepairing, loadingRepairPreview, openRepairModal, repairEntryParam, repairModalEntry, setRepairEntryParam, viewOnly]);
+        void openRepairModal(matchedEntry, repairTargetParam || undefined);
+        if (repairTargetParam) void setRepairTargetParam("");
+    }, [entries, isRepairing, loadingRepairPreview, openRepairModal, repairEntryParam, repairModalEntry, repairTargetParam, setRepairEntryParam, setRepairTargetParam, viewOnly]);
 
     useEffect(() => {
         if (viewOnly) return;

@@ -1,5 +1,5 @@
 {
-  "id": "2cc97848-8715-4ec9-8880-cc4f17196ea6",
+  "id": "53cdc0d3-cec8-424d-b2ce-d83ea486c468",
   "prevId": "07a30464-fb35-4e73-a58d-857339907afb",
   "version": "7",
   "dialect": "postgresql",
@@ -1231,6 +1231,310 @@
           "nullsNotDistinct": false,
           "columns": [
             "hotfix_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.nt_data_key_duplicate_dismissals": {
+      "name": "nt_data_key_duplicate_dismissals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "group_key": {
+          "name": "group_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unique_keys": {
+          "name": "unique_keys",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "nt_data_key_duplicate_dismissals_created_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_data_key_duplicate_dismissals_created_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_data_key_duplicate_dismissals",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "nt_data_key_duplicate_dismissals_group_key_unique": {
+          "name": "nt_data_key_duplicate_dismissals_group_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "group_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.nt_data_key_merges": {
+      "name": "nt_data_key_merges",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "merge_id": {
+          "name": "merge_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'merge'"
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "status": {
+          "name": "status",
+          "type": "data_key_merge_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'applied'"
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "survivor_unique_key": {
+          "name": "survivor_unique_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "survivor_name": {
+          "name": "survivor_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "merged_unique_keys": {
+          "name": "merged_unique_keys",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "script_ids": {
+          "name": "script_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "request": {
+          "name": "request",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "report": {
+          "name": "report",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reverted_by_user_id": {
+          "name": "reverted_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "published_by_user_id": {
+          "name": "published_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "reverted_at": {
+          "name": "reverted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "published_data_version": {
+          "name": "published_data_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discarded_at": {
+          "name": "discarded_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "data_key_merges_status_index": {
+          "name": "data_key_merges_status_index",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "data_key_merges_created_at_index": {
+          "name": "data_key_merges_created_at_index",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "nt_data_key_merges_created_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_data_key_merges_created_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_data_key_merges",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "nt_data_key_merges_reverted_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_data_key_merges_reverted_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_data_key_merges",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "reverted_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "nt_data_key_merges_published_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_data_key_merges_published_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_data_key_merges",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "published_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "nt_data_key_merges_merge_id_unique": {
+          "name": "nt_data_key_merges_merge_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "merge_id"
           ]
         }
       },
@@ -3257,6 +3561,193 @@
       },
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.nt_mobile_analytics_api_key": {
+      "name": "nt_mobile_analytics_api_key",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "singleton": {
+          "name": "singleton",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "key_hash": {
+          "name": "key_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key_hint": {
+          "name": "key_hint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generated_by_user_id": {
+          "name": "generated_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "nt_mobile_analytics_api_key_generated_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_mobile_analytics_api_key_generated_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_mobile_analytics_api_key",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "generated_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "nt_mobile_analytics_api_key_singleton_unique": {
+          "name": "nt_mobile_analytics_api_key_singleton_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "singleton"
+          ]
+        },
+        "nt_mobile_analytics_api_key_key_hash_unique": {
+          "name": "nt_mobile_analytics_api_key_key_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "key_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "nt_mobile_analytics_api_key_singleton_check": {
+          "name": "nt_mobile_analytics_api_key_singleton_check",
+          "value": "\"nt_mobile_analytics_api_key\".\"singleton\" = true"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.nt_mobile_analytics_config": {
+      "name": "nt_mobile_analytics_config",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "singleton": {
+          "name": "singleton",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "superset_url": {
+          "name": "superset_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inactivity_timeout_minutes": {
+          "name": "inactivity_timeout_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_number": {
+          "name": "version_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "updated_by_user_id": {
+          "name": "updated_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "nt_mobile_analytics_config_updated_by_user_id_nt_users_user_id_fk": {
+          "name": "nt_mobile_analytics_config_updated_by_user_id_nt_users_user_id_fk",
+          "tableFrom": "nt_mobile_analytics_config",
+          "tableTo": "nt_users",
+          "columnsFrom": [
+            "updated_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "nt_mobile_analytics_config_singleton_unique": {
+          "name": "nt_mobile_analytics_config_singleton_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "singleton"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "nt_mobile_analytics_config_singleton_check": {
+          "name": "nt_mobile_analytics_config_singleton_check",
+          "value": "\"nt_mobile_analytics_config\".\"singleton\" = true"
+        },
+        "nt_mobile_analytics_config_timeout_check": {
+          "name": "nt_mobile_analytics_config_timeout_check",
+          "value": "\"nt_mobile_analytics_config\".\"inactivity_timeout_minutes\" > 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.nt_pending_deletion": {
@@ -6479,6 +6970,16 @@
         "alias",
         "hospital",
         "release"
+      ]
+    },
+    "public.data_key_merge_status": {
+      "name": "data_key_merge_status",
+      "schema": "public",
+      "values": [
+        "applied",
+        "reverted",
+        "published",
+        "discarded"
       ]
     },
     "public.draft_origin": {

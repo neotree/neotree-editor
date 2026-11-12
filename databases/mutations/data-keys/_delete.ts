@@ -16,6 +16,7 @@ import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { uniqueValues } from '@/lib/unique-values';
 
 export type DeleteDataKeysParams = {
     dataKeysIds: string[];
@@ -60,9 +61,6 @@ function getDataKeyTitle(dataKey?: Pick<DataKey, 'name' | 'label' | 'uniqueKey'>
     return dataKey?.name || dataKey?.label || dataKey?.uniqueKey || 'Data key';
 }
 
-function uniqueValues(values: string[]) {
-    return Array.from(new Set(values.map((value) => `${value || ''}`.trim()).filter(Boolean)));
-}
 
 async function applyRequiredDeletionReplacements({
     targets,
@@ -109,13 +107,14 @@ async function applyRequiredDeletionReplacements({
 
         // Parent keys (keys with child options) are never replaced — a valid
         // replacement would need a superset option pool, which is practically
-        // unsatisfiable. Their references are removed instead; the UI warns
-        // with the affected scripts before allowing it.
+        // unsatisfiable. Their references are removed instead, which needs the
+        // same explicit "delete anyway" as any key left without a replacement.
         if ((target.options || []).length) {
             if (replacementId) {
                 throw new Error(`"${targetTitle}" is a parent data key and cannot be replaced. Delete it without a replacement instead.`);
             }
-            continue;
+            if (allowMissingReplacements) continue;
+            throw new Error(`"${targetTitle}" is a parent data key used in scripts. It can't be replaced, so deleting it removes it from those scripts: confirm "Delete anyway" to go ahead.`);
         }
 
         if (!replacementId) {
@@ -303,10 +302,15 @@ export async function _deleteDataKeys(
             if (blockedChildDeletions.length) {
                 const blocked = blockedChildDeletions[0];
                 const parentTitles = blocked.parents.map((parent) => `"${getDataKeyParentTitle(parent)}"`).join(', ');
-                throw new Error(
-                    `Cannot delete "${blocked.name || blocked.label || blocked.uniqueKey}" because it is a child option of ${parentTitles}. ` +
-                    `Unlink it from the parent data key${blocked.parents.length === 1 ? '' : 's'} first.`,
-                );
+                const childTitle = blocked.name || blocked.label || blocked.uniqueKey;
+                // Selected scripts deletes nothing from the library, but an option swapped inside scripts
+                // would no longer be one its parent offers: options change through their parent.
+                throw new Error(scriptsOnly
+                    ? `"${childTitle}" is an option of ${parentTitles}, so it can't be replaced or removed script by script: ` +
+                        `that would leave screens showing an option the parent doesn't offer. Open the parent data key and unlink it there ` +
+                        `(choose a replacement to swap it), which updates every script using that parent.`
+                    : `Cannot delete "${childTitle}" because it is a child option of ${parentTitles}. ` +
+                        `Unlink it from the parent data key${blocked.parents.length === 1 ? '' : 's'} first.`);
             }
 
             const impact = buildDataKeysDeleteImpact({

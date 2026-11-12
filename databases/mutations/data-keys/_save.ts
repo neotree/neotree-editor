@@ -14,6 +14,8 @@ import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { createProgressReporter } from '@/lib/in-progress';
+import { checkDataKeyDuplicates } from '@/lib/data-key-duplicate-check';
+import { _findDataKeyNameLabelMatches } from '@/databases/queries/data-keys/_find-name-label-matches';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
 import type { DataKeyDraftOrigin } from '@/databases/pg/_data-keys';
 import {
@@ -21,6 +23,7 @@ import {
     type UnlinkReplacementDataKey,
 } from './_delete-referenced-options';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { uniqueValues } from '@/lib/unique-values';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
     deletedUniqueKeys?: string[];
@@ -76,7 +79,6 @@ const describeOthersDrafts = (items: { title: string; scriptTitle?: string; }[])
     items.slice(0, 10).map(e => `${e.scriptTitle ? `${e.scriptTitle} > ` : ''}${e.title}`).join('; ') +
     (items.length > 10 ? '; ...' : '');
 
-const uniqueValues = (values: string[]) => Array.from(new Set(values.map((value) => `${value || ''}`.trim()).filter(Boolean)));
 
 async function createNewUniqueKey(executor: DbOrTransaction, uniqueKey?: string): Promise<string> {
     uniqueKey = `${uniqueKey || ''}`.trim();
@@ -393,6 +395,23 @@ export async function _saveDataKeys({
                             ),
                         });
 
+                        // An editor never creates a second key with the very same name (casing included):
+                        // checked for new keys and renames. Imports and syncs mirror another library as is.
+                        if (draftOrigin === 'editor' && typeof normalizedItem.name === 'string') {
+                            const nextName = normalizedItem.name.trim();
+                            const currentData = (typeof draft?.data === 'string' ? JSON.parse(draft.data) : draft?.data) as { name?: string; uuid?: string; } | undefined;
+                            const currentName = `${currentData?.name ?? published?.name ?? ''}`.trim();
+                            if (nextName && (!(draft || published) || nextName !== currentName)) {
+                                const matches = await _findDataKeyNameLabelMatches({ name: nextName });
+                                if (matches.errors?.length) throw new Error(matches.errors[0]);
+                                const ownUuid = currentData?.uuid || published?.uuid || dataKeyUuid;
+                                const clash = checkDataKeyDuplicates({ name: nextName, existing: matches.data, excludeUuid: ownUuid }).sameName[0];
+                                if (clash) {
+                                    throw new Error(`A data key named "${clash.name}" already exists${clash.dataType ? ` (${clash.dataType})` : ''}${clash.label ? ` — "${clash.label}"` : ''}. Use that key instead of creating another.`);
+                                }
+                            }
+                        }
+
                         // The editor's list was made from `baseOptions`: apply only its own additions and
                         // removals to what is stored now, so a concurrent change is not overwritten.
                         if (Array.isArray(baseOptions) && Array.isArray(normalizedItem.options) && (draft || published)) {
@@ -665,6 +684,7 @@ export async function _saveDataKeys({
                         renamesByScriptId: Object.fromEntries(affectedScriptIds.map((scriptId) => [scriptId, nameRenames])),
                         userId,
                         client: executor,
+                        refuseOthersDrafts,
                     });
                     if (conditionsRes.errors?.length) throw new Error(conditionsRes.errors.join(', '));
                     response.info = { ...response.info, conditionsRewritten: conditionsRes.rewritten };
@@ -678,9 +698,19 @@ export async function _saveDataKeys({
         const recorded = !client && (dryRun || unlinkItems.length > 0);
 
         // Run atomically: either every draft write, unlink sync, and refs update
-        // lands, or none do. When a client is provided we join its transaction.
+        // lands, or none do. With a client we run inside the caller's transaction
+        // as a savepoint (same connection, so no deadlock): a failure undoes only
+        // this save's writes, and a dry run rolls itself back.
         if (client) {
-            await executeSave(client);
+            const DRY_RUN = new Error('data key save dry run');
+            try {
+                await client.transaction(async (savepoint) => {
+                    await executeSave(savepoint);
+                    if (dryRun) throw DRY_RUN;
+                });
+            } catch (e) {
+                if (e !== DRY_RUN) throw e;
+            }
         } else if (recorded) {
             const parentKeys = uniqueValues(dataParam.map((item) => item.uniqueKey || ''));
             const childKeys = uniqueValues(unlinkItems.flatMap((item) => [

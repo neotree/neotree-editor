@@ -65,6 +65,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { DataKeySaveProgress } from '@/components/data-key-save-progress';
+import { DataKeyLabelNotice, DataKeyNameNotice, useDataKeyDuplicateCheck } from './duplicate-notice';
 
 type SaveRefsImpact = NonNullable<NonNullable<SaveDataKeysResponse['info']>['refs']>;
 
@@ -101,6 +102,12 @@ function Form({
         label: searchParams.get('label') || '',
         dataType: searchParams.get('dataType') || '',
     }), [searchParams]);
+    // Opened from a script's data key check to create a key for one of its references: an existing
+    // key can be used for that reference instead. Only a path back into a script is followed.
+    const returnTo = useMemo(() => {
+        const value = searchParams.get('returnTo') || '';
+        return /^\/script\/[^/]/.test(value) && !value.startsWith('//') ? value : '';
+    }, [searchParams]);
 
     const isLocked = useIsLocked({
         isDraft: !!dataKey?.isDraft,
@@ -339,6 +346,23 @@ function Form({
     };
 
     const isFormDisabled = isReadOnly || saving;
+
+    // Same key / same label as an existing data key: checked for a new key, and for an existing
+    // key's name or label once it changes (its own never conflicts with itself).
+    const typedName = watch('name');
+    const typedLabel = watch('label');
+    const duplicateCheck = useDataKeyDuplicateCheck({
+        name: typedName,
+        label: typedLabel,
+        uuid: dataKey?.uuid,
+        checkName: !dataKey || `${typedName || ''}`.trim() !== `${dataKey.name || ''}`.trim(),
+        checkLabel: !dataKey || `${typedLabel || ''}`.trim().toLowerCase() !== `${dataKey.label || ''}`.trim().toLowerCase(),
+        enabled: !isReadOnly,
+    });
+    // Back to the script's data key check, with the repair for that reference open on this key.
+    const chooseExistingKey = !returnTo || !!dataKey ? undefined : (key: { uniqueKey: string; }) => {
+        router.push(`${returnTo}${returnTo.includes('?') ? '&' : '?'}dataKeyRepairTarget=${encodeURIComponent(key.uniqueKey)}`);
+    };
 
     // One row per stored option, in order. Options whose data key no longer exists get a placeholder row
     // instead of being skipped, so row actions always act on the option they show.
@@ -737,11 +761,20 @@ function Form({
                                                     onChange(val);
 
                                                     const dataTypeInfo = dataKeyTypes.find(t => t.value === val);
+                                                    const savedOptions = dataKey?.options || [];
+                                                    const pendingUnlinks = getValues('deletedUniqueKeys') || [];
 
-                                                    setValue(
-                                                        'options',
-                                                        !dataTypeInfo?.hasChildren ? [] : (dataKey?.options || []),
-                                                    );
+                                                    if (!dataTypeInfo?.hasChildren) {
+                                                        // The options leave with the type change, so they must leave the screens that show
+                                                        // them too: queue them as unlinks, reviewed (exact changes) before saving.
+                                                        const leaving = (getValues('options') || []).filter(o => savedOptions.includes(o));
+                                                        setValue('deletedUniqueKeys', Array.from(new Set([...pendingUnlinks, ...leaving])));
+                                                        setValue('options', []);
+                                                    } else {
+                                                        // Back to a type with options: the saved options return, so they are no longer unlinked.
+                                                        setValue('options', savedOptions);
+                                                        setValue('deletedUniqueKeys', pendingUnlinks.filter(k => !savedOptions.includes(k)));
+                                                    }
                                                 }}
                                             >
                                                 <SelectTrigger>
@@ -777,6 +810,7 @@ function Form({
                                     Managed by NUID Search — the key, data type and options are locked, and it can&apos;t be deleted. You can still edit the label.
                                 </span>
                             )}
+                            <DataKeyNameNotice check={duplicateCheck} onUseKey={chooseExistingKey} />
                         </div>
 
                         <div className="px-4">
@@ -788,6 +822,7 @@ function Form({
                                     required: true,
                                 })}
                             />
+                            <DataKeyLabelNotice check={duplicateCheck} onUseKey={chooseExistingKey} />
                         </div>
 
                         <div className="px-4 hidden">
@@ -1240,7 +1275,8 @@ function Form({
                         {!isReadOnly && (
                             <Button
                                 onClick={() => onSave()}
-                                disabled={isFormDisabled || previewingImpact}
+                                disabled={isFormDisabled || previewingImpact || duplicateCheck.blocked}
+                                title={duplicateCheck.blocked ? 'This data key already exists' : undefined}
                             >
                                 Save
                             </Button>

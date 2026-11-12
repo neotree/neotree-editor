@@ -32,6 +32,7 @@ import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { queueDataKeysDeletion } from './_delete';
 import type { MergeSnapshotScope } from './_merge-snapshot';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationConflict } from './_recorded-operation';
+import { uniqueValues } from '@/lib/unique-values';
 
 export type MergeDataKeysParams = {
     /** The parent data key that is kept. */
@@ -66,8 +67,13 @@ export type MergeDataKeysParams = {
     broadcastAction?: boolean;
     /** Stops a preview nobody is waiting for any more (the request was aborted). */
     signal?: AbortSignal;
-    /** Library and scripts already loaded (a batch dry run reuses one load for every group). */
+    /**
+     * Library and scripts already loaded. A dry run may always plan against them; a real
+     * merge only when `sourcesAreCurrent` says nothing has changed since they were loaded.
+     */
     sources?: MergeSources;
+    /** The caller guarantees `sources` is still what is stored (a batch, after a group that changed nothing). */
+    sourcesAreCurrent?: boolean;
 };
 
 export type MergeSources = Awaited<ReturnType<typeof loadMergeSources>>;
@@ -120,7 +126,6 @@ export type MergeDataKeysResponse = {
     preview?: MergePreview;
 };
 
-const uniqueValues = (values: string[]) => Array.from(new Set(values.map((value) => `${value || ''}`.trim()).filter(Boolean)));
 
 export async function _mergeDataKeys({
     survivorId,
@@ -137,13 +142,14 @@ export async function _mergeDataKeys({
     broadcastAction,
     signal,
     sources,
+    sourcesAreCurrent,
 }: MergeDataKeysParams): Promise<MergeDataKeysResponse> {
     const response: MergeDataKeysResponse = { success: false };
     const scriptsOnly = Array.isArray(scriptIds);
 
     try {
         // Only a dry run may plan against data loaded earlier; a real merge always plans against fresh data.
-        const { dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes } = (dryRun && sources) || await loadMergeSources();
+        const { dataKeysRes, screensRes, diagnosesRes, problemsRes, scriptsRes } = ((dryRun || sourcesAreCurrent) && sources) || await loadMergeSources();
         throwIfAborted(signal);
 
         const allDataKeys = dataKeysRes.data;
@@ -313,6 +319,9 @@ export async function _mergeDataKeys({
                         data: [{
                             uuid: survivor.uuid,
                             options: plan.nextSurvivorOptions,
+                            // The plan was made from the library as loaded before this transaction: if the
+                            // pool changed since, only the merge's own additions and removals are applied.
+                            baseOptions: survivor.options || [],
                             ...(plan.survivorLabel ? { label: plan.survivorLabel } : {}),
                         }],
                         userId: userId || undefined,
@@ -344,7 +353,11 @@ export async function _mergeDataKeys({
                     if (swapRes.errors?.length) throw new Error(swapRes.errors[0]);
 
                     const poolsRes = await _saveDataKeys({
-                        data: plan.parentOptionRewrites.map((rewrite) => ({ uuid: rewrite.parentId, options: rewrite.nextOptions })),
+                        data: plan.parentOptionRewrites.map((rewrite) => ({
+                            uuid: rewrite.parentId,
+                            options: rewrite.nextOptions,
+                            baseOptions: byId.get(rewrite.parentId)?.options || [],
+                        })),
                         userId: userId || undefined,
                         // The swap above already updated their screens.
                         updateRefs: false,
@@ -597,10 +610,13 @@ export async function _mergeDataKeysBatch({
 }): Promise<{ success: boolean; results: MergeBatchResult[] }> {
     const results: MergeBatchResult[] = [];
     // A dry run rolls every group back, so one load serves them all. A real
-    // merge changes the data the next group plans against, so it reloads.
-    const sources = dryRun && groups.length ? await loadMergeSources() : undefined;
+    // merge changes the data the next group plans against, so the library is
+    // reloaded after each group that merged — and only then: a group that
+    // failed changed nothing.
+    let sources = groups.length ? await loadMergeSources() : undefined;
     for (const group of groups) {
         if (dryRun && signal?.aborted) break;
+        if (!sources) sources = await loadMergeSources();
         const res = await _mergeDataKeys({
             survivorId: group.survivorId,
             mergedIds: group.mergedIds,
@@ -608,9 +624,11 @@ export async function _mergeDataKeysBatch({
             userId,
             broadcastAction: false,
             sources,
+            sourcesAreCurrent: true,
             signal: dryRun ? signal : undefined,
         });
         results.push({ ...group, ...res });
+        if (!dryRun && res.success) sources = undefined;
     }
 
     if (!dryRun && broadcastAction && results.some((result) => result.success)) {
