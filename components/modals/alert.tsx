@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useState } from "react";
-import DOMPurify from "dompurify";
 import { FiAlertTriangle, FiCheckCircle } from "react-icons/fi";
 
 import {
@@ -15,6 +14,7 @@ import {
 import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SafeHtml } from "@/components/safe-html";
   
 export function AlertModal() {
     const { 
@@ -65,14 +65,7 @@ export function AlertModal() {
                                     (display names, entity titles), so they must be sanitized
                                     before being rendered as HTML. whitespace-pre-line keeps
                                     plain-text messages joined with \n readable. */}
-                                <div
-                                    className="whitespace-pre-line"
-                                    dangerouslySetInnerHTML={{
-                                        // DOMPurify needs a DOM; during SSR the modal is closed
-                                        // (message is empty), so rendering nothing is safe.
-                                        __html: typeof window === "undefined" ? "" : DOMPurify.sanitize(message),
-                                    }}
-                                />
+                                <SafeHtml className="whitespace-pre-line" html={message} />
                             </div>
                         </div>
                     )}

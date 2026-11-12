@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import bcrypt from 'bcrypt';
 import postgres from 'postgres';
 
@@ -5,7 +6,8 @@ export const E2E_USER_EMAIL = 'e2e-data-key-merge@neotree.test';
 
 /** Seeds (or resets) a super user the browser tests sign in as. */
 export default async function globalSetup() {
-    const password = `e2e-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+    // A super user, even if only in a throwaway database: a cryptographically random password.
+    const password = `e2e-${randomBytes(24).toString('base64url')}`;
     const sql = postgres(process.env.E2E_DATABASE_URL!, { max: 1 });
     try {
         const hash = await bcrypt.hash(password, 10);

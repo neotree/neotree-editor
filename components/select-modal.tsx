@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
+import { SafeHtml } from "@/components/safe-html";
 
 export type SelectModalOption = {
     value: string | number;
@@ -269,9 +270,9 @@ function Modal({
                                         <div className="flex items-center">
                                             {!o.isSelected ? null : <Check className="size-4 mr-2" />}
                                             <div>
-                                                {!o.caption ?  null : <div className="text-xs opacity-60" dangerouslySetInnerHTML={{ __html: o.caption || '', }} />}
+                                                {!o.caption ?  null : <SafeHtml className="text-xs opacity-60" html={o.caption} />}
                                                 <p>{o.label}</p>
-                                                {!o.description ?  null : <div className="text-xs opacity-60" dangerouslySetInnerHTML={{ __html: o.description || '', }} />}
+                                                {!o.description ?  null : <SafeHtml className="text-xs opacity-60" html={o.description} />}
                                             </div>
                                         </div>
                                         
