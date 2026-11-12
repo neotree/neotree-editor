@@ -89,7 +89,7 @@
         "uuid": "^14.0.3",
         "write-excel-file": "^4.1.1",
         "zod": "^4.6.6",
-        "zustand": "^4.5.4"
+        "zustand": "^5.1.0"
     },
     "devDependencies": {
         "@playwright/test": "1.64.0",
