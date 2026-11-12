@@ -113,7 +113,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "/home/farai/Workbench/Neotree/neotree-editor",
+    "outputFileTracingRoot": "/home/wilson/development/neotree/neotree-editor",
     "experimental": {
       "useSkewCookie": false,
       "cacheLife": {
@@ -172,7 +172,7 @@
       "middlewarePrefetch": "flexible",
       "optimisticClientCache": true,
       "manualClientBasePath": false,
-      "cpus": 11,
+      "cpus": 19,
       "memoryBasedWorkersCount": false,
       "imgOptConcurrency": null,
       "imgOptTimeoutInSeconds": 7,
@@ -301,8 +301,13 @@
     "htmlLimitedBots": "[\\w-]+-Google|Google-[\\w-]+|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight",
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.mjs",
+    "serverExternalPackages": [
+      "socket.io-client",
+      "engine.io-client",
+      "ws"
+    ],
     "turbopack": {
-      "root": "/home/farai/Workbench/Neotree/neotree-editor"
+      "root": "/home/wilson/development/neotree/neotree-editor"
     },
     "_originalRewrites": {
       "beforeFiles": [],
@@ -339,7 +344,7 @@
       "fallback": []
     }
   },
-  "appDir": "/home/farai/Workbench/Neotree/neotree-editor",
+  "appDir": "/home/wilson/development/neotree/neotree-editor",
   "relativeAppDir": "",
   "files": [
     "build/routes-manifest.json",
