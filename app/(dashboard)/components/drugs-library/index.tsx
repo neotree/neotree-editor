@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Loader } from "@/components/loader";
@@ -91,7 +91,7 @@ export function DrugsLibrary({}: Props) {
 
             const isMatch = part.toLowerCase() === lowerQuery;
             return isMatch ? (
-                <mark key={index} className="rounded bg-yellow-200 px-1">
+                <mark key={index} className="rounded bg-yellow-200 dark:bg-yellow-800/40 px-1">
                     {part}
                 </mark>
             ) : (
@@ -171,7 +171,7 @@ export function DrugsLibrary({}: Props) {
                     const result = item ? searchResultsById.get(item.itemId!) : undefined;
 
                     return (
-                        <>
+                        <Fragment key={item?.itemId || rowIndex}>
                             <TableRow {...props}>
                                 {cells}
                             </TableRow>
@@ -179,10 +179,10 @@ export function DrugsLibrary({}: Props) {
                             {!result || !result.matches.length ? null : (
                                 <TableRow
                                     {...props}
-                                    className={cn(props.className, 'bg-yellow-50 hover:bg-yellow-50')}
+                                    className={cn(props.className, 'bg-yellow-50 dark:bg-yellow-950/40 hover:bg-yellow-50 dark:hover:bg-yellow-950/60')}
                                 >
                                     <TableCell colSpan={cells.length} className="border-t p-0">
-                                        <Card className="m-4 border-none bg-white shadow-none">
+                                        <Card className="m-4 border-none bg-white dark:bg-background shadow-none">
                                             <div className="flex flex-col divide-y text-xs">
                                                 {result.matches.map((match, idx) => (
                                                     <div
@@ -203,7 +203,7 @@ export function DrugsLibrary({}: Props) {
                                     </TableCell>
                                 </TableRow>
                             )}
-                        </>
+                        </Fragment>
                     );
                 }}
                 getRowOptions={({ rowIndex }) => {

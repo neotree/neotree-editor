@@ -268,7 +268,7 @@ function sheetName(name: string, used: Set<string>) {
 /**
  * Lays out the worksheets for a metadata export of one or more scripts, in the
  * same order the single-script export uses: every script's screens sheet,
- * followed by every script's diagnoses sheet.
+ * followed by every script's diagnoses sheet, then every script's problems sheet.
  */
 export function buildScriptsMetadataWorkbookSheets(data: ScriptMetadata[]): MetadataWorkbookSheet[] {
     const used = new Set<string>();

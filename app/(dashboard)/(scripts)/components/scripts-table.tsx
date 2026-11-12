@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
@@ -236,13 +236,13 @@ export function ScriptsTable(props: Props) {
                         ];
 
                         return (
-                            <>
+                            <Fragment key={s?.scriptId || rowIndex}>
                                 <TableRow {...props}>
                                     {cells}
                                 </TableRow>
 
                                 {!!items.length && (
-                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 hover:bg-yellow-50 p-0')}>
+                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 dark:bg-yellow-950/40 hover:bg-yellow-50 dark:hover:bg-yellow-950/60 p-0')}>
                                         <TableCell colSpan={cells.length} className="p-0">
                                             <div className="flex flex-col gap-y-2">
                                                 {items.map((item, i) => {
@@ -309,7 +309,7 @@ export function ScriptsTable(props: Props) {
                                         </TableCell>
                                     </TableRow>
                                 )}
-                            </>
+                            </Fragment>
                         );
                     }}
                     noDataMessage={(

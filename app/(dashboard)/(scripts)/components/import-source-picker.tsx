@@ -115,7 +115,7 @@ export function ImportSourcePicker({
     const noteFor = (s: ImportSourceScript) => {
         if (lastImport?.sourceScriptId === s.scriptId) return <Badge variant="outline" className={CHANGELOG_ACTION_BADGE_CLASSES.create}>Last source</Badge>;
         if (!!targetScriptId && s.scriptId === targetScriptId) return <Badge variant="outline">Same script</Badge>;
-        if (multiple && s.importedInto.length) return <span className="text-xs text-amber-700">Already imported as {s.importedInto.map(t => `“${t.title || t.scriptId}”`).join(', ')}</span>;
+        if (multiple && s.importedInto.length) return <span className="text-xs text-amber-700 dark:text-amber-300">Already imported as {s.importedInto.map(t => `“${t.title || t.scriptId}”`).join(', ')}</span>;
         return null;
     };
 
@@ -243,7 +243,7 @@ export function ImportSourcePicker({
                     )}
 
                     {!!unknownSelected.length && !loading && !!scripts.length && (
-                        <p className="text-xs text-amber-700">
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
                             Selected by id, not in this editor&apos;s published scripts: {unknownSelected.join(', ')}
                         </p>
                     )}

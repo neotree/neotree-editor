@@ -1,6 +1,5 @@
 import { randomUUID } from "crypto";
 
-import { buildNormalizedDataKeyMatchKey } from "@/lib/data-key-types";
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { ScriptItem, ScriptField } from "@/types";
 
@@ -19,33 +18,18 @@ type SyncableObject = Record<string, unknown>;
 type SyncPatch<T> = Partial<T>;
 type SyncPatchBuilder<T extends SyncableObject> = (dataKey: DataKey, current: T) => SyncPatch<T>;
 
+// Existing items are matched to option data keys strictly by keyId — names and
+// labels are NOT unique across the library and must never identify a data key.
 function buildExistingOptionMaps<T extends { keyId?: string; label?: unknown }>(
     items: T[],
-    currentOptions: OptionDataKey[],
-    getKeys: (item: T) => string[],
 ) {
     const byUniqueKey = new Map<string, T>();
-    const byLegacyKey = new Map<string, T>();
 
     for (const item of items) {
         if (item.keyId) byUniqueKey.set(item.keyId, item);
-
-        for (const raw of getKeys(item)) {
-            const value = `${raw || ""}`.trim();
-            if (!value) continue;
-
-            for (const option of currentOptions) {
-                const nameKey = buildNormalizedDataKeyMatchKey(option.name, option.dataType);
-                const labelKey = buildNormalizedDataKeyMatchKey(option.label, option.dataType);
-                const candidateKey = buildNormalizedDataKeyMatchKey(value, option.dataType);
-                if (candidateKey === nameKey || candidateKey === labelKey) {
-                    if (!byLegacyKey.has(option.uniqueKey)) byLegacyKey.set(option.uniqueKey, item);
-                }
-            }
-        }
     }
 
-    return { byUniqueKey, byLegacyKey };
+    return { byUniqueKey };
 }
 
 function takeUnusedExisting<T>(used: Set<T>, ...candidates: Array<T | undefined>) {
@@ -148,6 +132,27 @@ export function resolveOwnedOptionDataKeys(
         .filter((item): item is DataKey => !!item);
 }
 
+/**
+ * Relinking can point two entries of one list at the same key (a symptom list or checklist that held both
+ * the merged key and the one it was merged into). The entry that already used the key stays and the relinked
+ * copy is dropped; duplicates that existed before the relink are left alone.
+ */
+export function dropRelinkCollisions<T extends { keyId?: string | null }>(entries: T[], relinkedIndexes: Set<number>) {
+    if (!relinkedIndexes.size) return entries;
+
+    const keyOf = (entry: T) => `${entry?.keyId || ""}`.trim();
+    const taken = new Set(entries.filter((_, index) => !relinkedIndexes.has(index)).map(keyOf).filter(Boolean));
+
+    return entries.filter((entry, index) => {
+        if (!relinkedIndexes.has(index)) return true;
+        const keyId = keyOf(entry);
+        if (!keyId) return true;
+        if (taken.has(keyId)) return false;
+        taken.add(keyId);
+        return true;
+    });
+}
+
 export function syncScreenReference(current: ExistingScreenItem, dataKey?: DataKey) {
     return applyDataKeySync(current, dataKey, (item, existing) => ({
         keyId: item.uniqueKey,
@@ -232,18 +237,13 @@ export function rebuildFieldItemsFromDataKeyOptions({
     currentItems?: ExistingFieldItem[];
     optionDataKeys?: OptionDataKey[];
 }): ExistingFieldItem[] {
-    const maps = buildExistingOptionMaps(
-        currentItems,
-        optionDataKeys,
-        (item) => [`${item.value || ""}`, `${item.label || ""}`],
-    );
+    const maps = buildExistingOptionMaps(currentItems);
     const usedExisting = new Set<ExistingFieldItem>();
 
     return optionDataKeys.map((item) => {
         const existing = takeUnusedExisting(
             usedExisting,
             maps.byUniqueKey.get(item.uniqueKey),
-            maps.byLegacyKey.get(item.uniqueKey),
         );
         return {
             ...existing,
@@ -264,18 +264,13 @@ export function rebuildScreenItemsFromDataKeyOptions({
     optionDataKeys?: OptionDataKey[];
     screenType?: string | null;
 }): ExistingScreenItem[] {
-    const maps = buildExistingOptionMaps(
-        currentItems,
-        optionDataKeys,
-        (item) => [`${item.id || ""}`, `${item.key || ""}`, `${item.label || ""}`],
-    );
+    const maps = buildExistingOptionMaps(currentItems);
     const usedExisting = new Set<ExistingScreenItem>();
 
     return optionDataKeys.map((item, index) => {
         const existing = takeUnusedExisting(
             usedExisting,
             maps.byUniqueKey.get(item.uniqueKey),
-            maps.byLegacyKey.get(item.uniqueKey),
         );
         return {
             ...existing,

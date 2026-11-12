@@ -1558,6 +1558,21 @@ export async function publishData({ scope, allowConfidentialDowngrade }: { scope
       })
       if (!publishProblems.success) throw new Error(publishProblems.errors?.join(", ") || "Failed to publish problems")
 
+      // Release fence: data keys were deleted before screens/diagnoses/problems
+      // published. If any surviving published entity (or remaining draft) still
+      // references them — e.g. the replacement sync drafts were discarded while
+      // the pending deletion survived — abort the whole release.
+      const deletedDataKeyUniqueKeys = publishDataKeys.deletedUniqueKeys || []
+      if (deletedDataKeyUniqueKeys.length) {
+        const refsCleared = await dataKeysMutations._assertDataKeyRefsCleared({
+          uniqueKeys: deletedDataKeyUniqueKeys,
+          client: tx,
+        })
+        if (!refsCleared.success) {
+          throw new Error(refsCleared.errors?.join(", ") || "Data keys queued for deletion are still referenced")
+        }
+      }
+
       const processPendingDeletion = await _processPendingDeletion({
         userId,
         publisherUserId: publisherUserId || undefined,
@@ -1570,6 +1585,15 @@ export async function publishData({ scope, allowConfidentialDowngrade }: { scope
       promotedImportScriptIds = settled.promotedScriptIds || []
 
       await tx.update(editorInfo).set({ dataVersion: nextDataVersion, lastPublishDate: new Date() }).where(eq(editorInfo.id, editor.id))
+
+      // Data key merges, deletes and unlinks whose drafts just went out become history.
+      await dataKeysMutations._settleDataKeyOperations({
+        outcome: "published",
+        userId,
+        actorUserId: publisherUserId,
+        dataVersion: nextDataVersion,
+        client: tx,
+      })
 
       const releaseLog = await _saveChangeLog({
         data: buildReleasePublishChangeLog({
@@ -1655,6 +1679,8 @@ export async function discardDrafts({ scope }: { scope: number }) {
         throw new Error(clearPendingDeletion.errors?.join(", ") || "Failed to clear queued deletions")
       }
 
+      // Their drafts are gone, so data key operations that made them never happened.
+      await dataKeysMutations._settleDataKeyOperations({ outcome: "discarded", userId, client: tx })
       // An import whose drafts were all discarded is forgotten; the previous import stays the base.
       await _settlePendingScriptImports({ outcome: "discarded", client: tx })
     })
