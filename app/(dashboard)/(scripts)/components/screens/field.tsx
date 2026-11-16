@@ -44,6 +44,7 @@ import { useFieldKeyCollisions } from "@/components/field-key-collisions"
 import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { collectNewOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
 import { ParentKeyOptionsHint } from "./parent-key-options-hint"
+import { fractionFieldPatch } from "@/lib/fraction-data-keys"
 
 type Props = {
   open: boolean
@@ -126,6 +127,8 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
   const valuesOptions = watch("valuesOptions")
   const editable = watch("editable")
   const printDisplayColumns = watch('printDisplayColumns');
+  const numeratorLabel = watch("numeratorLabel")
+  const denominatorLabel = watch("denominatorLabel")
   const reservedKeyCollisions = useMemo(
     () => collectNewOutcomeKeyCollisions(
       { screens: [{ type: "form", fields: [{ fieldId: field?.fieldId, key, label, items }] }] },
@@ -178,6 +181,8 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
   const isNumberField = useMemo(() => type === "number", [type])
   const isDropdownField = useMemo(() => type === "dropdown", [type])
   const isMultiSelectField = useMemo(() => type === "multi_select", [type])
+  const isFractionField = useMemo(() => type === "fraction", [type])
+
 
   const getAlias = useCallback(async (name: string) => {
     if (!name) return
@@ -305,6 +310,21 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
       setValue("confidentialLabelOnly", inheritedConfidentialLabelOnly, { shouldDirty: false, })
     }
   }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
+
+  // A fraction field shows its data key's numerator and denominator labels (same rule as above:
+  // following the key on load is not an edit).
+  const inheritedNumeratorLabel = useMemo(() => fractionFieldPatch(dataKey).numeratorLabel, [dataKey])
+  const inheritedDenominatorLabel = useMemo(() => fractionFieldPatch(dataKey).denominatorLabel, [dataKey])
+
+  useEffect(() => {
+    if (!isFractionField || !dataKey) return
+    if ((numeratorLabel || "") !== (inheritedNumeratorLabel || "")) {
+      setValue("numeratorLabel", inheritedNumeratorLabel || "", { shouldDirty: false, })
+    }
+    if ((denominatorLabel || "") !== (inheritedDenominatorLabel || "")) {
+      setValue("denominatorLabel", inheritedDenominatorLabel || "", { shouldDirty: false, })
+    }
+  }, [isFractionField, dataKey, numeratorLabel, denominatorLabel, inheritedNumeratorLabel, inheritedDenominatorLabel, setValue]);
 
   const isKeyDisabled = disabled || !!field;
 
@@ -500,7 +520,63 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                 <p className="text-xs text-destructive">{reservedKeyCollisions[0].message}</p>
               )}
 
-              {(isTextField || isNumberField) && (
+              {isFractionField && (
+                <>
+                  <span className="text-xs text-muted-foreground">
+                    A fraction is captured as two numbers shown together, e.g. blood pressure 120 / 80.
+                    The labels of the two numbers come from the data key and are edited in the data keys library.
+                  </span>
+
+                  <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                    <div className="sm:flex-1">
+                      <Label htmlFor="numeratorLabel">Numerator label</Label>
+                      <Input name="numeratorLabel" value={numeratorLabel || ""} disabled readOnly noRing={false} />
+                    </div>
+
+                    <div className="sm:flex-1">
+                      <Label htmlFor="denominatorLabel">Denominator label</Label>
+                      <Input name="denominatorLabel" value={denominatorLabel || ""} disabled readOnly noRing={false} />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-y-2">
+                    <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                      <div className="sm:flex-1">
+                        <Label htmlFor="minValue">{numeratorLabel || "Numerator"} min value</Label>
+                        <Input {...register("minValue", { disabled })} name="minValue" noRing={false} />
+                      </div>
+
+                      <div className="sm:flex-1">
+                        <Label htmlFor="maxValue">{numeratorLabel || "Numerator"} max value</Label>
+                        <Input {...register("maxValue", { disabled })} name="maxValue" noRing={false} />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                      <div className="sm:flex-1">
+                        <Label htmlFor="denominatorMinValue">{denominatorLabel || "Denominator"} min value</Label>
+                        <Input {...register("denominatorMinValue", { disabled })} name="denominatorMinValue" noRing={false} />
+                      </div>
+
+                      <div className="sm:flex-1">
+                        <Label htmlFor="denominatorMaxValue">{denominatorLabel || "Denominator"} max value</Label>
+                        <Input {...register("denominatorMaxValue", { disabled })} name="denominatorMaxValue" noRing={false} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="format">Format</Label>
+                      <Input {...register("format", { disabled })} name="format" noRing={false} />
+                    </div>
+
+                    <span className="text-xs text-muted-foreground">
+                      Format: Add as many # as the number of decimal digits or leave empty
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {(isTextField || isNumberField || isFractionField) && (
                 <div>
                   <Label htmlFor="unit">Unit (optional)</Label>
                   <Input {...register("unit", { disabled })} name="unit" noRing={false} />

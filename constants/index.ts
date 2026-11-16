@@ -1,5 +1,5 @@
 import { ScreenType, ScriptType } from "@/databases/queries/scripts";
-import { Preferences } from "@/types";
+import { Preferences, ScreenTableConfig, ScriptPrintOrientation } from "@/types";
 import { FieldTypes } from "./fields";
 import { SortAsc, SortDesc } from "lucide-react";
 
@@ -8,6 +8,27 @@ export const scriptPrintConfig = {
     headerFields: [] as string[],
     footerFields: [] as string[],
     sections: [] as any[],
+    // Page orientation is left unset here: a script without one prints in portrait.
+    orientation: undefined as ScriptPrintOrientation | undefined,
+};
+
+export const scriptPrintOrientations: { value: ScriptPrintOrientation; label: string; }[] = [
+    { value: 'portrait', label: 'Portrait' },
+    { value: 'landscape', label: 'Landscape' },
+];
+
+export const screenTableRowModes: { value: ScreenTableConfig['rowMode']; label: string; description: string; }[] = [
+    { value: 'dynamic', label: 'Rows are added during capture', description: 'The healthcare worker adds a row for each entry, e.g. one per previous pregnancy.' },
+    { value: 'fixed', label: 'Fixed rows', description: 'The table always has the rows listed below, each with its own heading.' },
+];
+
+export const defaultScreenTableConfig: ScreenTableConfig = {
+    title: '',
+    rowMode: 'dynamic',
+    rowsHeading: '',
+    rows: [],
+    minRows: null,
+    maxRows: null,
 };
 
 export const CONDITIONAL_EXP_EXAMPLE = "Example: ($key = true and $key2 = false) or $key3 = 'HD'";
@@ -190,6 +211,11 @@ export const dataKeyTypes: {
     {
         value: 'number',
         label: 'number',
+        hasChildren: false,
+    },
+    {
+        value: 'fraction',
+        label: 'fraction',
         hasChildren: false,
     },
     {

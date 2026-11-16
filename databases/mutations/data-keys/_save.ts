@@ -11,6 +11,7 @@ import { normalizeIncomingDataKeyPatch, rebaseDataKeyOptions } from '@/lib/data-
 import { validateDataKeyOptionsAddition } from '@/lib/data-key-children';
 import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
 import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
+import { validateFractionDataKey } from '@/lib/fraction-data-keys';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { createProgressReporter } from '@/lib/in-progress';
@@ -296,6 +297,10 @@ export async function _saveDataKeys({
             });
 
             const uniqueKeys: string[] = [];
+
+            if (draftOrigin === 'editor') {
+                data.forEach((item) => errors.push(...validateFractionDataKey(item)));
+            }
 
             if (draftOrigin === 'editor') try {
                 const incomingNames = Array.from(

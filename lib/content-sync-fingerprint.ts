@@ -63,6 +63,7 @@ const IGNORED = new Set([
     "fieldId",
     "symptomId",
     "sectionId",
+    "rowId",
 ]);
 const FILE_KEYS = new Set(["image1", "image2", "image3", "contentTextImage"]);
 

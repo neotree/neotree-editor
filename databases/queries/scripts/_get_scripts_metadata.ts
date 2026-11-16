@@ -512,6 +512,9 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     case 'number':
                                         dataType = 'number';
                                         break;
+                                    case 'fraction':
+                                        dataType = 'fraction';
+                                        break;
                                     case 'text':
                                         dataType = 'string';
                                         if (

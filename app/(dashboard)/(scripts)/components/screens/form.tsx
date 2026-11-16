@@ -49,6 +49,7 @@ import { useScreenForm } from "../../hooks/use-screen-form";
 import { getScreenDataType } from "../../utils";
 import { ImageField } from "../image-field";
 import { Fields } from "./fields";
+import { ScreenTableConfigForm } from "./table-config";
 import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
@@ -1449,6 +1450,13 @@ export function ScreenForm(props: Props) {
                                     </div>
                                     <Separator className="my-8" />
                             </div>
+
+                            <ScreenTableConfigForm
+                                form={form}
+                                disabled={disabled}
+                            />
+
+                            <Separator className="my-8" />
                         </>
                     )}
                 </>

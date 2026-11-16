@@ -66,6 +66,7 @@ import {
 } from '@/components/ui/dialog';
 import { DataKeySaveProgress } from '@/components/data-key-save-progress';
 import { DataKeyLabelNotice, DataKeyNameNotice, useDataKeyDuplicateCheck } from './duplicate-notice';
+import { getFractionLabels, isFractionDataType, validateFractionDataKey } from '@/lib/fraction-data-keys';
 
 type SaveRefsImpact = NonNullable<NonNullable<SaveDataKeysResponse['info']>['refs']>;
 
@@ -154,6 +155,18 @@ function Form({
     const labelValue = watch('label');
     const confidential = !!watch('confidential');
     const confidentialLabelOnly = !!watch('confidentialLabelOnly');
+    const metadataValue = watch('metadata');
+    const isFractionKey = isFractionDataType(dataType);
+    const fractionLabels = useMemo(() => getFractionLabels(metadataValue), [metadataValue]);
+    const savedFractionLabels = useMemo(() => getFractionLabels(dataKey?.metadata), [dataKey?.metadata]);
+    const fractionLabelsChanged = isFractionKey && (
+        fractionLabels.numeratorLabel !== savedFractionLabels.numeratorLabel ||
+        fractionLabels.denominatorLabel !== savedFractionLabels.denominatorLabel
+    );
+    const fractionErrors = useMemo(
+        () => validateFractionDataKey({ dataType, metadata: metadataValue }),
+        [dataType, metadataValue],
+    );
     const optionsSignature = useMemo(() => JSON.stringify(options || []), [options]);
     const savedOptionsSignature = useMemo(() => JSON.stringify(dataKey?.options || []), [dataKey?.options]);
 
@@ -257,6 +270,7 @@ function Form({
             `${dataType || ''}` !== `${dataKey.dataType || ''}` ||
             !!confidential !== !!dataKey.confidential ||
             !!confidentialLabelOnly !== !!dataKey.confidentialLabelOnly ||
+            fractionLabelsChanged ||
             optionsSignature !== savedOptionsSignature
         );
         if (!changed) {
@@ -278,6 +292,9 @@ function Form({
         dataType,
         confidential,
         confidentialLabelOnly,
+        fractionLabelsChanged,
+        fractionLabels.numeratorLabel,
+        fractionLabels.denominatorLabel,
         optionsSignature,
         savedOptionsSignature,
         loadImpactPreview,
@@ -825,6 +842,51 @@ function Form({
                             <DataKeyLabelNotice check={duplicateCheck} onUseKey={chooseExistingKey} />
                         </div>
 
+                        {isFractionKey && (
+                            <div className="px-4 flex flex-col gap-y-2">
+                                <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2">
+                                    <div className="sm:flex-1">
+                                        <Label htmlFor="numeratorLabel">Numerator label *</Label>
+                                        <Input
+                                            id="numeratorLabel"
+                                            name="numeratorLabel"
+                                            disabled={isFormDisabled}
+                                            value={`${metadataValue?.numeratorLabel ?? ''}`}
+                                            onChange={e => setValue(
+                                                'metadata',
+                                                { ...getValues('metadata'), numeratorLabel: e.target.value },
+                                                { shouldDirty: true },
+                                            )}
+                                        />
+                                    </div>
+
+                                    <div className="sm:flex-1">
+                                        <Label htmlFor="denominatorLabel">Denominator label *</Label>
+                                        <Input
+                                            id="denominatorLabel"
+                                            name="denominatorLabel"
+                                            disabled={isFormDisabled}
+                                            value={`${metadataValue?.denominatorLabel ?? ''}`}
+                                            onChange={e => setValue(
+                                                'metadata',
+                                                { ...getValues('metadata'), denominatorLabel: e.target.value },
+                                                { shouldDirty: true },
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                    A fraction is captured as two numbers shown together. Example: blood pressure, with
+                                    numerator label Systolic and denominator label Diastolic, is captured as 120 / 80.
+                                </span>
+                                {fractionErrors
+                                    .filter(error => /different/.test(error))
+                                    .map(error => (
+                                        <p key={error} className="text-xs text-destructive">{error}</p>
+                                    ))}
+                            </div>
+                        )}
+
                         <div className="px-4 hidden">
                             <Label htmlFor="refId">Ref ID</Label>
                             <Input 
@@ -1275,7 +1337,7 @@ function Form({
                         {!isReadOnly && (
                             <Button
                                 onClick={() => onSave()}
-                                disabled={isFormDisabled || previewingImpact || duplicateCheck.blocked}
+                                disabled={isFormDisabled || previewingImpact || duplicateCheck.blocked || !!fractionErrors.length}
                                 title={duplicateCheck.blocked ? 'This data key already exists' : undefined}
                             >
                                 Save

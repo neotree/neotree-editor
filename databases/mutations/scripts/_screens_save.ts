@@ -10,6 +10,7 @@ import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
 import { normalizeSelectionRuleItems, validateSelectionRules } from '@/lib/selection-rules';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { normalizeScreenTableConfig, validateScreenTable } from '@/lib/screen-table-config';
 
 
 export type SaveScreensData = Partial<ScreenType> & {
@@ -254,7 +255,13 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
             try {
                 index++;
                 const normalized = normalizeScreenSelectionRuleItemIds(item);
-                const normalizedItem = normalized.value;
+                const normalizedItem = {
+                    ...normalized.value,
+                    // Partial saves (e.g. only a title) must not clear the table settings.
+                    ...(item.tableConfig === undefined ? {} : {
+                        tableConfig: normalizeScreenTableConfig(item, () => uuid.v4()),
+                    }),
+                };
 
                 const screenId = itemScreenId || uuid.v4();
 
@@ -270,6 +277,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                             `Screen "${screenLabel}" field "${field.label || field.key || fieldIndex}" items`
                         )
                     ),
+                    ...validateScreenTable(normalizedItem, screenLabel),
                 ];
 
                 if (validationErrors.length) {
