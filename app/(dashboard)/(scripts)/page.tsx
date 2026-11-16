@@ -7,10 +7,19 @@ import { seedAliases } from '@/app/actions/aliases'
 
 export const dynamic = 'force-dynamic';
 
-export default async function ScriptsPage() { 
+export default async function ScriptsPage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string>>;
+}) { 
+    const { status } = await searchParams;
+
     // Once Off Initialisation On First Load
     await seedAliases()
-    const scripts = await serverActions.getScripts({ returnDraftsIfExist: true, });
+    const scripts = await serverActions.getScripts({ 
+        archivedOnly: status === 'archived',
+        returnDraftsIfExist: true, 
+    });
 
     return (
         <>
