@@ -14,6 +14,8 @@ export type GetScriptsParams = {
     hospitalIds?: string[];
     returnDraftsIfExist?: boolean;
     withDeleted?: boolean;
+    withArchived?: boolean;
+    archivedOnly?: boolean;
     /**
      * Return published rows even when a deletion is queued (pending) for them. Used when another
      * editor imports this editor's published state: an unpublished deletion is not published yet.
@@ -24,6 +26,7 @@ export type GetScriptsParams = {
 export type ScriptType = typeof scripts.$inferSelect & {
     isDraft: boolean;
     isDeleted: boolean;
+    isArchived?: boolean;
     nuidSearchFields: ScriptField[];
     eligibilityCriteria: EligibilityCriteria | null;
     reviewConfigurations: ScreenReviewField[];
@@ -79,6 +82,8 @@ export async function _getScripts(
             hospitalIds = [],
             returnDraftsIfExist = true, 
             includePendingDeletion,
+            withArchived,
+            archivedOnly,
         } = { ...params };
 
         const oldScriptsIds = scriptsIds.filter(s => !uuid.validate(s));
@@ -118,15 +123,22 @@ export async function _getScripts(
                     hospitalId: scriptsDrafts.hospitalId,
                     data: scriptsDrafts.data,
                     createdByUserId: scriptsDrafts.createdByUserId,
+                    archived: scriptsDrafts.archived,
                 },
                 hospitalName: hospitals.name,
             })
             .from(scriptsDrafts)
             .leftJoin(hospitals, eq(hospitals.hospitalId, scriptsDrafts.hospitalId))
-            .where(and(
-                !scriptsIds?.length ? undefined : inArray(scriptsDrafts.scriptDraftId, scriptsIds),
-                !hospitalIds.length ? undefined : inArray(scriptsDrafts.hospitalId, hospitalIds),
-            ));
+            .where(
+                and(
+                    archivedOnly ? eq(scriptsDrafts.archived, true) : undefined,
+                    and(
+                        !scriptsIds?.length ? undefined : inArray(scriptsDrafts.scriptDraftId, scriptsIds),
+                        !hospitalIds.length ? undefined : inArray(scriptsDrafts.hospitalId, hospitalIds),
+                        (withArchived || archivedOnly) ? undefined : eq(scriptsDrafts.archived, false),
+                    ),
+                )
+            );
 
         const drafts = draftsRes
             .map(s => ({ ...s.scriptDraft, hospitalName: s.hospitalName, }));
@@ -145,13 +157,19 @@ export async function _getScripts(
                 eq(hospitals.hospitalId, scripts.hospitalId),
                 isNull(hospitals.deletedAt)
             ))
-            .where(and(
-                isNull(scripts.deletedAt),
-                includePendingDeletion ? undefined : isNull(pendingDeletion),
-                !returnDraftsIfExist ? undefined : isNull(scriptsDrafts.scriptId),
-                !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds),
-                !hospitalIds.length ? undefined : inArray(scripts.hospitalId, hospitalIds),
-            ));
+            .where(
+                and(
+                    archivedOnly ? eq(scripts.archived, true) : undefined,
+                    and(
+                        isNull(scripts.deletedAt),
+                        includePendingDeletion ? undefined : isNull(pendingDeletion),
+                        !returnDraftsIfExist ? undefined : isNull(scriptsDrafts.scriptId),
+                        !scriptsIds.length ? undefined : inArray(scripts.scriptId, scriptsIds),
+                        !hospitalIds.length ? undefined : inArray(scripts.hospitalId, hospitalIds),
+                        (withArchived || archivedOnly) ? undefined : eq(scripts.archived, false),
+                    ),
+                ),
+            );
 
         const published = publishedRes.map(s => ({
             ...s.script,
@@ -168,6 +186,7 @@ export async function _getScripts(
                 ...s,
                 isDraft: false,
                 isDeleted: false,
+                isArchived: s.archived,
             } as GetScriptsResults['data'][0])),
 
             ...drafts.map((s => ({
@@ -175,6 +194,7 @@ export async function _getScripts(
                 hospitalName: s.hospitalName,
                 isDraft: true,
                 isDeleted: false,
+                isArchived: s.archived,
                 draftCreatedByUserId: s.createdByUserId,
             } as GetScriptsResults['data'][0])))
         ]

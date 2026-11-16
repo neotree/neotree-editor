@@ -655,6 +655,8 @@ export const scripts = pgTable(
         orientation?: ScriptPrintOrientation
       }>(),
     printSections: jsonb("print_sections").default("[]").notNull(),
+
+    archived: boolean('archived').notNull().default(false),
     publishDate: timestamp("publish_date").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -712,6 +714,7 @@ export const scriptsDrafts = pgTable("nt_scripts_drafts", {
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
+  archived: boolean('archived').notNull().default(false),
 })
 
 export const scriptsDraftsRelations = relations(scriptsDrafts, ({ one, many }) => ({

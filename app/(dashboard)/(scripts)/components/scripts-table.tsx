@@ -31,6 +31,7 @@ import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
 import { Separator } from "@/components/ui/separator";
 import { ScriptsTableSearch } from "./scripts-table-search";
+import { ScriptsTableFilters } from './scripts-table-filters';
 
 type Props = UseScriptsTableParams;
 
@@ -49,6 +50,7 @@ export function ScriptsTable(props: Props) {
         onDelete,
         onSort,
         onDuplicate,
+        onArchive,
     } = useScriptsTable(props);
 
     const { sys, viewOnly: viewMode, isSuperUser } = useAppContext();
@@ -136,6 +138,7 @@ export function ScriptsTable(props: Props) {
                 </div>
 
                 <DataTable 
+                    title={<ScriptsTableFilters />}
                     selectedIndexes={selected}
                     onSelect={setSelected}
                     selectable
@@ -422,6 +425,7 @@ export function ScriptsTable(props: Props) {
                                         setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
                                         onDelete={() => onDelete([s.scriptId])}
                                         onDuplicate={() => onDuplicate([s.scriptId])}
+                                        onArchive={() => onArchive([s.scriptId])}
                                     />
                                 );
                             },
