@@ -15,12 +15,14 @@ import {
     shouldSyncFieldOwnedOptions,
     shouldSyncScreenOwnedOptions,
     syncDiagnosisReference,
+    dropRelinkCollisions,
     syncFieldReference,
     syncNuidSearchFieldReference,
     syncKeyOnlyReference,
     syncScreenEntityReference,
     syncScreenReference,
 } from './_update_data_keys_refs.helpers';
+import { escapeLikePattern } from '@/lib/sql-like';
 
 export type UpdateDataKeysRefsParams = {
     broadcastAction?: boolean;
@@ -31,7 +33,21 @@ export type UpdateDataKeysRefsParams = {
     matchUniqueKeysByDataKey?: Record<string, string[]>;
     // Delete-replace uses alias-only matching so existing replacement usages are not rewritten unnecessarily.
     includePrimaryUniqueKeys?: boolean;
+    /**
+     * Per-script delete granularity: references to these alias uniqueKeys are
+     * NOT rewritten inside the listed scripts — the delete flow's strip step
+     * removes them there instead.
+     */
+    excludeScriptIdsByAlias?: Record<string, string[]>;
+    /**
+     * Include-list counterpart for "selected scripts only": references to these
+     * alias uniqueKeys are rewritten ONLY inside the listed scripts (an empty
+     * list rewrites nothing). A reference without a known script is skipped.
+     */
+    onlyScriptIdsByAlias?: Record<string, string[]>;
     forceFullScan?: boolean;
+    /** Progress for a long save: finding and loading the scripts, then "done of total" entities updated. */
+    onProgress?: (stage: 'finding' | 'loading' | 'updating', done?: number, total?: number) => void;
     client?: DbOrTransaction;
 };
 
@@ -124,6 +140,9 @@ const parsePositiveInt = (value: string | undefined, fallback: number) => {
 
 const SAVE_CHUNK_SIZE = parsePositiveInt(process.env.DATA_KEYS_REFS_SAVE_CHUNK_SIZE, 50);
 const SAVE_RETRY_CONCURRENCY = parsePositiveInt(process.env.DATA_KEYS_REFS_RETRY_CONCURRENCY, 5);
+// Bounds the OR-clause size of a single candidate query; queries are chunked, never truncated.
+const LIKE_PATTERN_CHUNK_SIZE = parsePositiveInt(process.env.DATA_KEYS_REFS_LIKE_CHUNK_SIZE, 240);
+
 // Chunks within one entity type used to be processed strictly one at a time.
 // A small concurrency here (on top of the 4 entity types already running
 // concurrently via Promise.all below) speeds this up without overwhelming
@@ -147,14 +166,10 @@ function buildLikeClauses(column: SQL, patterns: string[]): SQL | undefined {
     return or(...clauses) as SQL;
 }
 
-function escapeLikePattern(value: string) {
-    return value.replace(/[\\%_]/g, '\\$&');
-}
 
 function buildJsonKeyIdPatterns(uniqueKeys: string[], jsonKeys: string[]) {
     return uniqueKeys
         .filter(Boolean)
-        .slice(0, 120)
         .flatMap((uniqueKey) => {
             const escapedUniqueKey = escapeLikePattern(uniqueKey);
             return jsonKeys.flatMap((jsonKey) => ([
@@ -193,7 +208,10 @@ export async function _updateDataKeysRefs({
     draftOrigin = "data_key_sync",
     matchUniqueKeysByDataKey = {},
     includePrimaryUniqueKeys = true,
+    excludeScriptIdsByAlias = {},
+    onlyScriptIdsByAlias = {},
     forceFullScan = false,
+    onProgress,
     client,
 }: UpdateDataKeysRefsParams): Promise<UpdateDataKeysRefsResponse> {
     try {
@@ -235,12 +253,38 @@ export async function _updateDataKeysRefs({
             }),
         ));
 
+        const excludedScriptsByAlias = new Map(Object.entries(excludeScriptIdsByAlias)
+            .map(([alias, scriptIds]) => [
+                `${alias || ''}`.trim(),
+                new Set((scriptIds || []).map((scriptId) => `${scriptId || ''}`.trim()).filter(Boolean)),
+            ] as const)
+            .filter(([alias, scriptIds]) => !!alias && !!scriptIds.size));
+
+        const onlyScriptsByAlias = new Map(Object.entries(onlyScriptIdsByAlias)
+            .map(([alias, scriptIds]) => [
+                `${alias || ''}`.trim(),
+                new Set((scriptIds || []).map((scriptId) => `${scriptId || ''}`.trim()).filter(Boolean)),
+            ] as const)
+            .filter(([alias]) => !!alias));
+
         const getUpdatedDataKey = ({
             uniqueKey,
+            scriptId,
         }: {
             uniqueKey?: string | null;
+            scriptId?: string | null;
         }): { dataKey?: DataKey; source?: MatchSource } => {
             if (uniqueKey) {
+                // Per-script exception: this reference is removed by the strip
+                // step instead of being rewritten to the replacement.
+                const normalizedScriptId = `${scriptId || ''}`.trim();
+                if (normalizedScriptId && excludedScriptsByAlias.get(`${uniqueKey}`.trim())?.has(normalizedScriptId)) {
+                    return {};
+                }
+
+                const onlyScripts = onlyScriptsByAlias.get(`${uniqueKey}`.trim());
+                if (onlyScripts && !onlyScripts.has(normalizedScriptId)) return {};
+
                 if (includePrimaryUniqueKeys) {
                     const keyById = byUniqueKey.get(uniqueKey);
                     if (keyById) return { dataKey: keyById, source: 'uniqueKey' };
@@ -320,7 +364,7 @@ export async function _updateDataKeysRefs({
         }
         const nuidScriptLikePatterns = Array.from(new Set([
             ...buildJsonKeyIdPatterns(Array.from(nuidParentUniqueKeys), ['keyId']),
-        ])).slice(0, 240);
+        ]));
 
         const screenJsonReferenceKeys = [
             'keyId',
@@ -334,39 +378,31 @@ export async function _updateDataKeysRefs({
         const keyIdPatterns = buildJsonKeyIdPatterns(changedUniqueKeys, screenJsonReferenceKeys);
         const likePatterns = Array.from(new Set([
             ...keyIdPatterns,
-        ])).slice(0, 240);
+        ]));
+        // Chunked so every key is covered no matter how many are updated at once;
+        // truncating the pattern list would silently skip references.
+        const likePatternChunks = chunkArray(likePatterns, LIKE_PATTERN_CHUNK_SIZE);
+        onProgress?.('finding');
 
         const candidateScripts = new Set<string>();
+        const addCandidate = (row: { scriptId?: string | null; scriptDraftId?: string | null }) => {
+            if (row.scriptId) candidateScripts.add(row.scriptId);
+            if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
+        };
 
-        const scriptLikePatterns = Array.from(new Set([...likePatterns, ...nuidScriptLikePatterns])).slice(0, 240);
-
-        if (changedUniqueKeys.length || likePatterns.length || scriptLikePatterns.length) {
-            // These 8 queries are all independent (none depends on another's
-            // result — they're merged into the same Set afterward, and Set
-            // merge order doesn't matter), so run them concurrently instead of
-            // one at a time.
-            const noRows: { scriptId?: string | null; scriptDraftId?: string | null; }[] = [];
-
-            const [
-                screensPublishedCandidates,
-                diagnosesPublishedCandidates,
-                problemsPublishedCandidates,
-                scriptsPublishedCandidates,
-                scriptsDraftCandidates,
-                screensDraftCandidates,
-                diagnosesDraftCandidates,
-                problemsDraftCandidates,
-            ] = await Promise.all([
+        // These queries are all independent (they're merged into the same Set
+        // afterward, and Set merge order doesn't matter), so run them
+        // concurrently instead of one at a time.
+        if (changedUniqueKeys.length) {
+            const publishedCandidates = await Promise.all([
                 executor
                     .select({ scriptId: screens.scriptId })
                     .from(screens)
                     .where(and(
                         isNull(screens.deletedAt),
                         or(
-                            changedUniqueKeys.length ? inArray(screens.keyId, changedUniqueKeys) : undefined,
-                            changedUniqueKeys.length ? inArray(screens.refIdDataKey, changedUniqueKeys) : undefined,
-                            buildLikeClauses(sql`${screens.fields}`, likePatterns),
-                            buildLikeClauses(sql`${screens.items}`, likePatterns),
+                            inArray(screens.keyId, changedUniqueKeys),
+                            inArray(screens.refIdDataKey, changedUniqueKeys),
                         ),
                     )),
                 executor
@@ -374,85 +410,100 @@ export async function _updateDataKeysRefs({
                     .from(diagnoses)
                     .where(and(
                         isNull(diagnoses.deletedAt),
-                        or(
-                            changedUniqueKeys.length ? inArray(diagnoses.keyId, changedUniqueKeys) : undefined,
-                            buildLikeClauses(sql`${diagnoses.symptoms}`, likePatterns),
-                        ),
+                        inArray(diagnoses.keyId, changedUniqueKeys),
                     )),
                 executor
                     .select({ scriptId: problems.scriptId })
                     .from(problems)
                     .where(and(
                         isNull(problems.deletedAt),
+                        inArray(problems.keyId, changedUniqueKeys),
+                    )),
+            ]);
+
+            publishedCandidates.forEach(rows => rows.forEach(addCandidate));
+        }
+
+        for (const patternChunk of likePatternChunks) {
+            const chunkCandidates = await Promise.all([
+                executor
+                    .select({ scriptId: screens.scriptId })
+                    .from(screens)
+                    .where(and(
+                        isNull(screens.deletedAt),
                         or(
-                            changedUniqueKeys.length ? inArray(problems.keyId, changedUniqueKeys) : undefined,
+                            buildLikeClauses(sql`${screens.fields}`, patternChunk),
+                            buildLikeClauses(sql`${screens.items}`, patternChunk),
                         ),
                     )),
-                !scriptLikePatterns.length ? Promise.resolve(noRows) : executor
+                executor
+                    .select({ scriptId: diagnoses.scriptId })
+                    .from(diagnoses)
+                    .where(and(
+                        isNull(diagnoses.deletedAt),
+                        buildLikeClauses(sql`${diagnoses.symptoms}`, patternChunk),
+                    )),
+                executor
                     .select({ scriptId: scriptsTable.scriptId })
                     .from(scriptsTable)
                     .where(and(
                         isNull(scriptsTable.deletedAt),
-                        buildLikeClauses(sql`${scriptsTable.nuidSearchFields}`, scriptLikePatterns),
+                        buildLikeClauses(sql`${scriptsTable.nuidSearchFields}`, patternChunk),
                     )),
-                !scriptLikePatterns.length ? Promise.resolve(noRows) : executor
+                executor
                     .select({
                         scriptDraftId: scriptsDraftsTable.scriptDraftId,
                         scriptId: scriptsDraftsTable.scriptId,
                     })
                     .from(scriptsDraftsTable)
-                    .where(buildLikeClauses(sql`${scriptsDraftsTable.data}`, scriptLikePatterns)),
-                !likePatterns.length ? Promise.resolve(noRows) : executor
+                    .where(buildLikeClauses(sql`${scriptsDraftsTable.data}`, patternChunk)),
+                executor
                     .select({
                         scriptId: screensDrafts.scriptId,
                         scriptDraftId: screensDrafts.scriptDraftId,
                     })
                     .from(screensDrafts)
-                    .where(buildLikeClauses(sql`${screensDrafts.data}`, likePatterns)),
-                !likePatterns.length ? Promise.resolve(noRows) : executor
+                    .where(buildLikeClauses(sql`${screensDrafts.data}`, patternChunk)),
+                executor
                     .select({
                         scriptId: diagnosesDrafts.scriptId,
                         scriptDraftId: diagnosesDrafts.scriptDraftId,
                     })
                     .from(diagnosesDrafts)
-                    .where(buildLikeClauses(sql`${diagnosesDrafts.data}`, likePatterns)),
-                !likePatterns.length ? Promise.resolve(noRows) : executor
+                    .where(buildLikeClauses(sql`${diagnosesDrafts.data}`, patternChunk)),
+                executor
                     .select({
                         scriptId: problemsDrafts.scriptId,
                         scriptDraftId: problemsDrafts.scriptDraftId,
                     })
                     .from(problemsDrafts)
-                    .where(buildLikeClauses(sql`${problemsDrafts.data}`, likePatterns)),
+                    .where(buildLikeClauses(sql`${problemsDrafts.data}`, patternChunk)),
             ]);
 
-            screensPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
-            diagnosesPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
-            problemsPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
-            scriptsPublishedCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-            });
-            scriptsDraftCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-                if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-            });
-            screensDraftCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-                if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-            });
-            diagnosesDraftCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-                if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-            });
-            problemsDraftCandidates.forEach(row => {
-                if (row.scriptId) candidateScripts.add(row.scriptId);
-                if (row.scriptDraftId) candidateScripts.add(row.scriptDraftId);
-            });
+            chunkCandidates.forEach(rows => rows.forEach(addCandidate));
+        }
+
+        // Scripts whose NUID dropdowns sit on a parent of a changed key (their options are rebuilt below).
+        const nuidOnlyPatterns = nuidScriptLikePatterns.filter((pattern) => !likePatterns.includes(pattern));
+        for (const patternChunk of chunkArray(nuidOnlyPatterns, LIKE_PATTERN_CHUNK_SIZE)) {
+            const chunkCandidates = await Promise.all([
+                executor
+                    .select({ scriptId: scriptsTable.scriptId })
+                    .from(scriptsTable)
+                    .where(and(
+                        isNull(scriptsTable.deletedAt),
+                        buildLikeClauses(sql`${scriptsTable.nuidSearchFields}`, patternChunk),
+                    )),
+                executor
+                    .select({
+                        scriptDraftId: scriptsDraftsTable.scriptDraftId,
+                        scriptId: scriptsDraftsTable.scriptId,
+                    })
+                    .from(scriptsDraftsTable)
+                    .where(buildLikeClauses(sql`${scriptsDraftsTable.data}`, patternChunk)),
+            ]);
+
+            chunkCandidates.forEach(rows => rows.forEach(addCandidate));
         }
 
         stats.candidateScripts = candidateScripts.size;
@@ -474,6 +525,7 @@ export async function _updateDataKeysRefs({
         }
 
         const scriptsIds = useFullScan ? undefined : Array.from(candidateScripts);
+        onProgress?.('loading', 0, candidateScripts.size);
         const [
             { data: screensArr, errors: screensGetErrors },
             { data: diagnosesArr, errors: diagnosesGetErrors },
@@ -557,6 +609,7 @@ export async function _updateDataKeysRefs({
         }
         const getNuidLibraryKey = (id: string) => nuidLibraryIndex.get(id) as NuidLibraryKeyFull | undefined;
 
+        onProgress?.('loading', candidateScripts.size, candidateScripts.size);
         stats.fetchedScreens = screensArr.length;
         stats.fetchedDiagnoses = diagnosesArr.length;
         stats.fetchedProblems = problemsArr.length;
@@ -565,10 +618,12 @@ export async function _updateDataKeysRefs({
         let screensUpdatedData: typeof screensArr = screensArr.map(s => {
             const { dataKey: refIdDataKey, source: refMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.refIdDataKey || s.refId,
+                scriptId: s.scriptId,
             });
             trackMatchSource(refMatchSource);
             const { dataKey: screenDataKey, source: screenMatchSource } = getUpdatedDataKey({
                 uniqueKey: s.keyId,
+                scriptId: s.scriptId,
             });
             trackMatchSource(screenMatchSource);
 
@@ -594,15 +649,18 @@ export async function _updateDataKeysRefs({
                 currentItemsCount: (s.items || []).length,
             });
 
-            const items = `${s.type || ''}`.trim().toLowerCase() === 'progress'
+            const relinkedItems = new Set<number>();
+            const items = dropRelinkCollisions(`${s.type || ''}`.trim().toLowerCase() === 'progress'
                 ? (s.items || [])
                 : (s.items || []).map((item, itemIndex) => {
                     const { dataKey: itemDataKey, source: itemMatchSource } = getUpdatedDataKey({
                         uniqueKey: item.keyId,
+                        scriptId: s.scriptId,
                     });
                     trackMatchSource(itemMatchSource);
 
                     if (itemDataKey) {
+                        relinkedItems.add(itemIndex);
                         addUsage({
                             id: item.itemId || `${s.screenId}:item:${itemIndex}`,
                             kind: 'screen_item',
@@ -637,7 +695,9 @@ export async function _updateDataKeysRefs({
                         ...item,
                         ...syncedItem.value,
                     };
-                });
+                }), relinkedItems);
+            // relinked items that collided with a sibling were dropped
+            if (items.length !== (s.items || []).length) updated = true;
             if (shouldSyncScreenOptions && (items || []).some((item) => {
                 const keyId = `${item.keyId || ''}`.trim();
                 return !!keyId && !screenOptionUniqueKeys.has(keyId);
@@ -648,31 +708,37 @@ export async function _updateDataKeysRefs({
             const fields = (s.fields || []).map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.keyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(fieldMatchSource);
 
                 const { dataKey: refKeyDataKey, source: refKeyMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.refKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(refKeyMatchSource);
 
                 const { dataKey: minDateKeyDataKey, source: minDateMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.minDateKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(minDateMatchSource);
 
                 const { dataKey: maxDateKeyDataKey, source: maxDateMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.maxDateKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(maxDateMatchSource);
 
                 const { dataKey: minTimeKeyDataKey, source: minTimeMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.minTimeKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(minTimeMatchSource);
 
                 const { dataKey: maxTimeKeyDataKey, source: maxTimeMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.maxTimeKeyId,
+                    scriptId: s.scriptId,
                 });
                 trackMatchSource(maxTimeMatchSource);
 
@@ -690,13 +756,16 @@ export async function _updateDataKeysRefs({
                 }
 
                 const fieldOptionUniqueKeys = new Set((fieldDataKey?.options || []).filter(Boolean));
-                const fieldItems = (field.items || []).map((item, fieldItemIndex) => {
+                const relinkedFieldItems = new Set<number>();
+                const fieldItems = dropRelinkCollisions((field.items || []).map((item, fieldItemIndex) => {
                     const { dataKey: fieldItemDataKey, source: fieldItemMatchSource } = getUpdatedDataKey({
                         uniqueKey: item.keyId,
+                        scriptId: s.scriptId,
                     });
                     trackMatchSource(fieldItemMatchSource);
 
                     if (fieldItemDataKey) {
+                        relinkedFieldItems.add(fieldItemIndex);
                         addUsage({
                             id: item.itemId || `${s.screenId}:field:${field.fieldId || fieldIndex}:item:${fieldItemIndex}`,
                             kind: 'screen_field_item',
@@ -747,7 +816,8 @@ export async function _updateDataKeysRefs({
                         ...item,
                         ...fieldItemValue,
                     };
-                });
+                }), relinkedFieldItems);
+                if (fieldItems.length !== (field.items || []).length) updated = true;
                 const syncedField = syncFieldReference(field, fieldDataKey);
                 const syncedRefField = syncKeyOnlyReference(syncedField.value, refKeyDataKey, {
                     id: "refKeyId",
@@ -810,6 +880,7 @@ export async function _updateDataKeysRefs({
             const name = d.key || d.name || '';
             const { dataKey: diagnosisDataKey, source: diagnosisMatchSource } = getUpdatedDataKey({
                 uniqueKey: d.keyId,
+                scriptId: d.scriptId,
             });
             trackMatchSource(diagnosisMatchSource);
 
@@ -827,13 +898,16 @@ export async function _updateDataKeysRefs({
 
             let updated = false;
 
-            const symptoms = (d.symptoms || []).map((item, symptomIndex) => {
+            const relinkedSymptoms = new Set<number>();
+            const symptoms = dropRelinkCollisions((d.symptoms || []).map((item, symptomIndex) => {
                 const { dataKey: symptomDataKey, source: symptomMatchSource } = getUpdatedDataKey({
                     uniqueKey: item.keyId,
+                    scriptId: d.scriptId,
                 });
                 trackMatchSource(symptomMatchSource);
 
                 if (symptomDataKey) {
+                    relinkedSymptoms.add(symptomIndex);
                     addUsage({
                         id: item?.symptomId || `${d.diagnosisId}:symptom:${symptomIndex}`,
                         kind: 'diagnosis_symptom',
@@ -853,7 +927,8 @@ export async function _updateDataKeysRefs({
                     ...item,
                     ...syncedSymptom.value,
                 };
-            });
+            }), relinkedSymptoms);
+            if (symptoms.length !== (d.symptoms || []).length) updated = true;
             const syncedDiagnosis = syncDiagnosisReference({
                 ...d,
                 key: name,
@@ -873,6 +948,7 @@ export async function _updateDataKeysRefs({
             const name = d.key || d.name || '';
             const { dataKey: problemDataKey, source: problemMatchSource } = getUpdatedDataKey({
                 uniqueKey: d.keyId,
+                scriptId: d.scriptId,
             });
             trackMatchSource(problemMatchSource);
 
@@ -915,6 +991,7 @@ export async function _updateDataKeysRefs({
             const nuidSearchFields = script.nuidSearchFields.map((field, fieldIndex) => {
                 const { dataKey: fieldDataKey, source: fieldMatchSource } = getUpdatedDataKey({
                     uniqueKey: field.keyId,
+                    scriptId: script.scriptId,
                 });
                 trackMatchSource(fieldMatchSource);
 
@@ -1039,6 +1116,15 @@ export async function _updateDataKeysRefs({
 
         const saveErrors: string[] = [];
 
+        // Entities written so far, for "updated 12 of 40".
+        const totalToSave = diagnosesUpdatedData.length + problemsUpdatedData.length + screensUpdatedData.length + scriptRecordsUpdatedData.length;
+        let savedSoFar = 0;
+        const reportSaved = (count: number) => {
+            savedSoFar += count;
+            onProgress?.('updating', savedSoFar, totalToSave);
+        };
+        onProgress?.('updating', 0, totalToSave);
+
         const saveDiagnosesTask = async () => {
             await mapWithConcurrency(chunkArray(diagnosesUpdatedData, SAVE_CHUNK_SIZE), SAVE_CHUNK_CONCURRENCY, async (chunk) => {
                 const res = await _saveDiagnoses({ data: chunk, userId, draftOrigin, client: executor });
@@ -1055,6 +1141,7 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedDiagnoses += chunk.length;
                 }
+                reportSaved(chunk.length);
             });
         };
 
@@ -1074,6 +1161,7 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedProblems += chunk.length;
                 }
+                reportSaved(chunk.length);
             });
         };
 
@@ -1093,6 +1181,7 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedScreens += chunk.length;
                 }
+                reportSaved(chunk.length);
             });
         };
 
@@ -1116,6 +1205,7 @@ export async function _updateDataKeysRefs({
                 } else {
                     stats.savedScriptRecords += chunk.length;
                 }
+                reportSaved(chunk.length);
             });
         };
 

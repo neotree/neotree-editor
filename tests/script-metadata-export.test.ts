@@ -64,7 +64,7 @@ assert.equal(rows[2]["Value Label"], "Zero");
 const singleSheets = buildScriptsMetadataWorkbookSheets([script]);
 assert.deepEqual(
     singleSheets.map((sheet) => sheet.name),
-    ["Screens - Admission", "Diagnoses - Admission"],
+    ["Screens - Admission", "Diagnoses - Admission", "Problems - Admission"],
     "a single script keeps the per-script sheet layout",
 );
 
@@ -85,6 +85,9 @@ assert.deepEqual(
         "Diagnoses - Neonatal admission ",
         "Diagnoses - Neonatal admiss (2)",
         "Diagnoses - Discharge",
+        "Problems - Neonatal admission  ",
+        "Problems - Neonatal admissi (2)",
+        "Problems - Discharge",
     ],
     "batch exports keep the per-script sheet order and only adjust names the xlsx writer would reject",
 );

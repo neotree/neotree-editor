@@ -250,7 +250,7 @@ export function EdlizSummary({
                                                                 </PopoverTrigger>
 
                                                                 <PopoverContent
-                                                                    className="bg-red-100 text-destructive"
+                                                                    className="bg-red-100 dark:bg-red-900/40 text-destructive"
                                                                 >
                                                                     Please re-select item to link it to the datakey library.
                                                                 </PopoverContent>

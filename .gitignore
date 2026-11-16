@@ -50,5 +50,9 @@ deploy.command
 #zencoder
 .zencoder
 .zenflow
+# Playwright
+/test-results/
+/playwright-report/
+
 # per-developer record of applied manual migrations
 .migrations-tracker.json

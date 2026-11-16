@@ -86,8 +86,25 @@ export function PublishDrafts({ variant }: Props) {
   const [confidentialDowngradeErrors, setConfidentialDowngradeErrors] = useState<string[]>([])
   const [confidentialDowngradeModalOpen, setConfidentialDowngradeModalOpen] = useState(false)
 
-  const { publishData: _publishData, discardDrafts: _discardDrafts } = useAppContext()
+  const { publishData: _publishData, discardDrafts: _discardDrafts, authenticatedUser } = useAppContext()
   const isCreatingDataKey = pathname === "/data-keys/new"
+
+  // Discarding also restores data keys queued for deletion — surface that so
+  // the choice is informed rather than discovered later.
+  const [pendingDeletionKeys, setPendingDeletionKeys] = useState<{ createdByUserId: string | null }[]>([])
+
+  const fetchPendingDeletions = useCallback(async () => {
+    try {
+      const response = await axios.get<{ data: { createdByUserId: string | null }[] }>("/api/data-keys/pending-deletion")
+      setPendingDeletionKeys(response.data?.data || [])
+    } catch {
+      // non-critical — the info line just stays hidden
+    }
+  }, [])
+
+  const pendingDeletionCount = scope === "1"
+    ? pendingDeletionKeys.length
+    : pendingDeletionKeys.filter((key) => key.createdByUserId === authenticatedUser?.userId).length
 
   const closePublishBlockingModal = useCallback(() => {
     setPublishBlockingModalOpen(false)
@@ -242,7 +259,7 @@ export function PublishDrafts({ variant }: Props) {
                 {publishBlockingErrors.map((error, index) => (
                   <div
                     key={`${index}-${error}`}
-                    className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700"
+                    className="rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm leading-6 text-red-700 dark:text-red-300"
                   >
                     {error}
                   </div>
@@ -250,13 +267,13 @@ export function PublishDrafts({ variant }: Props) {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-1">
-                      <div className="font-medium text-red-950">
+                      <div className="font-medium text-red-950 dark:text-red-100">
                         Fix {pluralize(publishBlockingDetails.totalIssues, "blocking issue")} in {pluralize(publishBlockingDetails.totalScripts, "script")}
                       </div>
-                      <p className="text-sm leading-6 text-red-800">
+                      <p className="text-sm leading-6 text-red-800 dark:text-red-200">
                         {blocksOnlyNewIssues
                           ? "Only newly introduced blocking issues are stopping this publish."
                           : "These blocking issues must be resolved before this publish can continue."}
@@ -278,14 +295,14 @@ export function PublishDrafts({ variant }: Props) {
                       {ruleCounts.slice(0, 4).map((rule) => (
                         <span
                           key={rule.label}
-                          className="rounded-full border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-800"
+                          className="rounded-full border border-red-200 dark:border-red-800 bg-white dark:bg-background px-2.5 py-1 text-xs font-medium text-red-800 dark:text-red-200"
                           title={ruleFixHints[rule.label]}
                         >
                           {rule.count} {rule.label}{rule.count === 1 ? "" : "s"}
                         </span>
                       ))}
                       {ruleCounts.length > 4 && (
-                        <span className="rounded-full border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-800">
+                        <span className="rounded-full border border-red-200 dark:border-red-800 bg-white dark:bg-background px-2.5 py-1 text-xs font-medium text-red-800 dark:text-red-200">
                           +{ruleCounts.length - 4} more
                         </span>
                       )}
@@ -293,7 +310,7 @@ export function PublishDrafts({ variant }: Props) {
                   )}
 
                   {!!ruleCounts.length && (
-                    <div className="mt-3 space-y-1 text-xs leading-5 text-red-800">
+                    <div className="mt-3 space-y-1 text-xs leading-5 text-red-800 dark:text-red-200">
                       {ruleCounts.slice(0, 3).map((rule) => (
                         <div key={`hint-${rule.label}`}>
                           <span className="font-medium capitalize">{rule.label}:</span>{" "}
@@ -338,13 +355,13 @@ export function PublishDrafts({ variant }: Props) {
                         {showDetailedIssues ? (
                           <div className="space-y-3 px-4 py-3">
                             {script.issues.map((issue, index) => (
-                              <div key={`${script.scriptId}-${index}-${issue.displayName}`} className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                              <div key={`${script.scriptId}-${index}-${issue.displayName}`} className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3">
                                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                   <div className="space-y-1">
-                                    <div className="text-sm font-medium text-amber-950">{issue.displayName}</div>
-                                    <div className="text-xs uppercase tracking-wide text-amber-700">{issue.ruleLabel}</div>
-                                    <div className="text-sm leading-6 text-amber-900">{issue.reason}</div>
-                                    <div className="text-xs text-amber-800">Location: {issue.location}</div>
+                                    <div className="text-sm font-medium text-amber-950 dark:text-amber-100">{issue.displayName}</div>
+                                    <div className="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300">{issue.ruleLabel}</div>
+                                    <div className="text-sm leading-6 text-amber-900 dark:text-amber-100">{issue.reason}</div>
+                                    <div className="text-xs text-amber-800 dark:text-amber-200">Location: {issue.location}</div>
                                   </div>
 
                                   <Button asChild variant="ghost" size="sm" className="justify-start sm:justify-center">
@@ -403,9 +420,9 @@ export function PublishDrafts({ variant }: Props) {
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
             <div className="space-y-3">
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <div className="font-medium text-red-950">Affected data keys</div>
-                <ul className="mt-2 list-inside list-disc text-sm text-red-800">
+              <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
+                <div className="font-medium text-red-950 dark:text-red-100">Affected data keys</div>
+                <ul className="mt-2 list-inside list-disc text-sm text-red-800 dark:text-red-200">
                   {confidentialDowngradeKeys.map((key) => (
                     <li key={key.dataKeyId}>{key.name}</li>
                   ))}
@@ -416,7 +433,7 @@ export function PublishDrafts({ variant }: Props) {
                 {confidentialDowngradeErrors.map((error, index) => (
                   <div
                     key={`${index}-${error}`}
-                    className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700"
+                    className="rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm leading-6 text-red-700 dark:text-red-300"
                   >
                     {error}
                   </div>
@@ -450,7 +467,11 @@ export function PublishDrafts({ variant }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog>
+      <Dialog
+        onOpenChange={(open) => {
+          if (open && variant === "discard") fetchPendingDeletions()
+        }}
+      >
         <DialogTrigger asChild>{trigger}</DialogTrigger>
         <DialogContent>
           {loading && <Loader overlay />}
@@ -476,6 +497,12 @@ export function PublishDrafts({ variant }: Props) {
               ))}
             </RadioGroup>
           </div>
+
+          {variant === "discard" && pendingDeletionCount > 0 && (
+            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
+              {pendingDeletionCount} data key{pendingDeletionCount === 1 ? "" : "s"} queued for deletion will be restored.
+            </div>
+          )}
 
           <DialogFooter>
             <DialogClose asChild>

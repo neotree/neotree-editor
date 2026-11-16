@@ -21,7 +21,8 @@
         "prestart:production": "yarn",
         "start:stage": "NODE_ENV=production pm2 start pm2.stage.json",
         "start:production": "NODE_ENV=production pm2 start pm2.production.json",
-        "tsx": "tsx $1"
+        "tsx": "tsx $1",
+        "test:e2e": "playwright test"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.11.3",
@@ -91,6 +92,7 @@
         "zustand": "^4.5.4"
     },
     "devDependencies": {
+        "@playwright/test": "1.64.0",
         "@types/bcrypt": "^5.0.2",
         "@types/jsonwebtoken": "^9.0.7",
         "@types/node": "^20",

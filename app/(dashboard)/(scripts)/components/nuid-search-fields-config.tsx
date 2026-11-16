@@ -119,7 +119,7 @@ function IssueCounts({ issues }: { issues?: NuidFieldIssues }) {
             title={[...errors, ...issues.warnings].join('\n')}
         >
             {!!errors.length && <span className="text-danger">{errors.length} error{errors.length === 1 ? '' : 's'}</span>}
-            {!!issues.warnings.length && <span className="text-amber-600">{issues.warnings.length} warning{issues.warnings.length === 1 ? '' : 's'}</span>}
+            {!!issues.warnings.length && <span className="text-amber-600 dark:text-amber-400">{issues.warnings.length} warning{issues.warnings.length === 1 ? '' : 's'}</span>}
         </span>
     );
 }
@@ -391,7 +391,7 @@ export function NuidSearchFieldsConfig({
                         >
                             <Settings className="w-4 h-4 mr-1" />
                             {!!savedErrorCount && <span className="text-xs text-danger">{savedErrorCount} error{savedErrorCount === 1 ? '' : 's'}</span>}
-                            {!!savedWarningCount && <span className="text-xs text-amber-600">{savedWarningCount} warning{savedWarningCount === 1 ? '' : 's'}</span>}
+                            {!!savedWarningCount && <span className="text-xs text-amber-600 dark:text-amber-400">{savedWarningCount} warning{savedWarningCount === 1 ? '' : 's'}</span>}
                         </a>
                     </SheetTrigger>
                 )}
@@ -596,7 +596,7 @@ export function NuidSearchFieldsConfig({
                                         <ul className="mt-1 list-disc pl-5 text-xs">
                                             {issues!.errors.map(e => <li key={e} className="text-danger">{e}</li>)}
                                             {issues!.conditionErrors.map(e => <li key={e} className="text-danger">{e}</li>)}
-                                            {issues!.warnings.map(w => <li key={w} className="text-amber-700">{w}</li>)}
+                                            {issues!.warnings.map(w => <li key={w} className="text-amber-700 dark:text-amber-300">{w}</li>)}
                                         </ul>
                                     </div>
                                 ))}
@@ -966,7 +966,7 @@ export function Field({
                         <div>
                             <Label>What does this search do?</Label>
                             {roleInferred && !!compatibleRoles.length && (
-                                <p className="text-xs text-amber-700 mb-2">
+                                <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
                                     Not set yet. The app currently treats it as <b>{getNuidSearchRoleLabel(effectiveRole)}</b>,
                                     based on its key and label.
                                 </p>

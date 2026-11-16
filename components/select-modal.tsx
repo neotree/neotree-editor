@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
+import { SafeHtml } from "@/components/safe-html";
 
 export type SelectModalOption = {
     value: string | number;
@@ -38,6 +39,8 @@ type Props = {
     search?: {
         placeholder?: string;
     };
+    /** Short muted line under the search row — e.g. to explain why some options are filtered out. */
+    description?: string;
     header?: React.ReactNode;
     loading?: boolean;
     trigger?: React.ReactNode;
@@ -72,9 +75,10 @@ export function SelectModal({
     );
 }
 
-function Modal({ 
+function Modal({
     modal,
     header,
+    description,
     placeholder,
     search,
     multiple = false,
@@ -220,7 +224,7 @@ function Modal({
                         <div className="flex items-center gap-x-4">
                             {!search ? null : (
                                 <div className="flex-1">
-                                    <Input 
+                                    <Input
                                         type="search"
                                         placeholder={search.placeholder || ''}
                                         value={searchValue}
@@ -230,6 +234,9 @@ function Modal({
                             )}
                             {header}
                         </div>
+                        {!description ? null : (
+                            <div className="text-xs text-muted-foreground">{description}</div>
+                        )}
                     </DialogHeader>
 
                     <div className="flex-1 flex flex-col gap-y-1 overflow-y-auto px-4 py-2 overflow-x-hidden">
@@ -263,9 +270,9 @@ function Modal({
                                         <div className="flex items-center">
                                             {!o.isSelected ? null : <Check className="size-4 mr-2" />}
                                             <div>
-                                                {!o.caption ?  null : <div className="text-xs opacity-60" dangerouslySetInnerHTML={{ __html: o.caption || '', }} />}
+                                                {!o.caption ?  null : <SafeHtml className="text-xs opacity-60" html={o.caption} />}
                                                 <p>{o.label}</p>
-                                                {!o.description ?  null : <div className="text-xs opacity-60" dangerouslySetInnerHTML={{ __html: o.description || '', }} />}
+                                                {!o.description ?  null : <SafeHtml className="text-xs opacity-60" html={o.description} />}
                                             </div>
                                         </div>
                                         

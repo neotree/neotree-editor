@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button";
 import { useFiles } from "@/hooks/use-files";
+import { SafeHtml } from "@/components/safe-html";
   
 export function Errors() {
     const { unhandledErrors } = useFiles();
@@ -31,10 +32,10 @@ export function Errors() {
                     <AlertDialogDescription>{''}</AlertDialogDescription>
 
                     <div className="flex justify-center">
-                        <FiAlertTriangle className="text-red-600 min-w-12 min-h-12 w-12 h-12" />
+                        <FiAlertTriangle className="text-red-600 dark:text-red-400 min-w-12 min-h-12 w-12 h-12" />
                     </div>
 
-                    <div className="flex-1 text-lg" dangerouslySetInnerHTML={{ __html: unhandledErrors.join('\n'), }} />
+                    <SafeHtml className="flex-1 text-lg" html={unhandledErrors.join('\n')} />
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <div className="flex justify-end">

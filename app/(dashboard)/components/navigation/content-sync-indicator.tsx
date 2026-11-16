@@ -12,7 +12,7 @@ export function ContentSyncIndicator() {
   const count = (sync.status?.pairs || []).filter(p => isOutOfSync(p.status)).length
   if (!count) return null
   return (
-    <Link href="/settings/sync" className="text-amber-600 hover:underline">
+    <Link href="/settings/sync" className="text-amber-600 dark:text-amber-400 hover:underline">
       {count} script{count === 1 ? "" : "s"} out of sync with {sync.settings.role === "target" ? sync.sourceName : sync.targetName}
     </Link>
   )

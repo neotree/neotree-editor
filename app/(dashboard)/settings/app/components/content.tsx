@@ -394,7 +394,7 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
 
                     <CardContent className="space-y-6">
                         {!canManagePolicy && (
-                            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
                                 You can view the current integrity policy, but only super admins can change policy settings and baseline snapshots.
                             </div>
                         )}
@@ -413,13 +413,13 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                         </div>
 
                         {!enforcementDisabled && !hasActiveTriggers && (
-                            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
                                 All trigger sources are off. This policy will not run any integrity scans until at least one trigger source is enabled.
                             </div>
                         )}
 
                         {enablingEnforcementFromOff && (
-                            <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                            <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-4 py-3 text-sm text-blue-900 dark:text-blue-100">
                                 <div className="font-medium">Fresh baseline will be captured automatically</div>
                                 <div className="mt-1">
                                     Saving this policy will automatically capture a new published baseline first, then re-enable integrity scanning with that baseline in place.
@@ -654,13 +654,13 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                         </div>
 
                         {policy.enforcementMode === "block_new_issues_only" && !hasCapturedBaseline && (
-                            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
                                 No baseline has been captured yet. In this state, &quot;block new issues only&quot; will behave as warn-only until a baseline is captured.
                             </div>
                         )}
 
                         {policy.enforcementMode === "block_new_issues_only" && hasCapturedBaseline && !hasCompatibleBaseline && (
-                            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
                                 The captured baseline is outdated for the current integrity rule set. &quot;Block new issues only&quot; will behave as warn-only until a new baseline is captured.
                             </div>
                         )}
@@ -1007,7 +1007,7 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
                             {!!reviewDetails?.summary?.length && (
                                 <div className="space-y-2">
                                     {reviewDetails.summary.map((summary, index) => (
-                                        <div key={`${summary}-${index}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                                        <div key={`${summary}-${index}`} className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
                                             {summary}
                                         </div>
                                     ))}
@@ -1040,13 +1040,13 @@ export function Content({ canManagePolicy, canManageImports, initialPolicy, init
 
                                                 <div className="mt-3 space-y-3">
                                                     {script.issues.map((issue, index) => (
-                                                        <div key={`${script.scriptId}-${issue.location}-${index}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
-                                                            <div className="text-xs font-medium uppercase tracking-wide text-amber-800">
+                                                        <div key={`${script.scriptId}-${issue.location}-${index}`} className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
+                                                            <div className="text-xs font-medium uppercase tracking-wide text-amber-800 dark:text-amber-200">
                                                                 {issue.ruleLabel}
                                                             </div>
-                                                            <div className="mt-1 font-medium text-amber-950">{issue.displayName}</div>
-                                                            <div className="mt-1 text-sm text-amber-900">{issue.reason}</div>
-                                                            <div className="mt-1 text-xs text-amber-800">Location: {issue.location}</div>
+                                                            <div className="mt-1 font-medium text-amber-950 dark:text-amber-100">{issue.displayName}</div>
+                                                            <div className="mt-1 text-sm text-amber-900 dark:text-amber-100">{issue.reason}</div>
+                                                            <div className="mt-1 text-xs text-amber-800 dark:text-amber-200">Location: {issue.location}</div>
                                                             <div className="mt-2 flex flex-wrap gap-2">
                                                                 <Button size="sm" variant="outline" asChild>
                                                                     <a href={issue.usageHref}>Open usage</a>

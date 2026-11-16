@@ -10,7 +10,7 @@ export function ContentLockNotice({ area, className }: { area: ContentArea; clas
     const lock = useContentLock(area, null);
     if (!lock.locked || viewOnly) return null;
     return (
-        <div className={`rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 ${className || ''}`}>
+        <div className={`rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-4 py-3 text-sm text-blue-900 dark:text-blue-100 ${className || ''}`}>
             {lock.reason}
         </div>
     );

@@ -93,7 +93,7 @@ export function ScriptIssueBadge({ issues, className, maxListed = 8 }: ScriptIss
       <Tooltip>
         <TooltipTrigger asChild>
           <span
-            className={cn("inline-flex shrink-0 items-center", blocking ? "text-destructive" : "text-amber-600", className)}
+            className={cn("inline-flex shrink-0 items-center", blocking ? "text-destructive" : "text-amber-600 dark:text-amber-400", className)}
             aria-label={label}
           >
             <Icon className="h-4 w-4" />

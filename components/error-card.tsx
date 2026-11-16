@@ -13,7 +13,7 @@ export function ErrorCard({ color, children, errors = [], }: Props) {
             <Card
                 className={cn(
                     'bg-destructive/20 border-destructive text-destructive',
-                    color === 'warning' && 'bg-yellow-200/20 border-yellow-400 text-yellow-600',
+                    color === 'warning' && 'bg-yellow-200/20 dark:bg-yellow-500/20 border-yellow-400 text-yellow-600 dark:text-yellow-400',
                 )}
             >
                 <CardContent className="flex flex-col gap-y-4 px-4 py-2">

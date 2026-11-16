@@ -30,7 +30,7 @@ export function OwnerlessDrafts() {
     <Button
       size="sm"
       variant="link"
-      className="h-auto p-0 text-xs text-amber-700"
+      className="h-auto p-0 text-xs text-amber-700 dark:text-amber-300"
       disabled={loading}
       onClick={() => confirm(async () => {
         try {

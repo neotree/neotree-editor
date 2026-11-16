@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Edit, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
@@ -31,6 +31,7 @@ import { ScriptsFab } from "./scripts-fab";
 import { UseScriptsTableParams, useScriptsTable } from "../hooks/use-scripts-table";
 import { Separator } from "@/components/ui/separator";
 import { ScriptsTableSearch } from "./scripts-table-search";
+import { ScriptsTableFilters } from './scripts-table-filters';
 
 type Props = UseScriptsTableParams;
 
@@ -49,6 +50,7 @@ export function ScriptsTable(props: Props) {
         onDelete,
         onSort,
         onDuplicate,
+        onArchive,
     } = useScriptsTable(props);
 
     const { sys, viewOnly: viewMode, isSuperUser } = useAppContext();
@@ -136,6 +138,7 @@ export function ScriptsTable(props: Props) {
                 </div>
 
                 <DataTable 
+                    title={<ScriptsTableFilters />}
                     selectedIndexes={selected}
                     onSelect={setSelected}
                     selectable
@@ -236,13 +239,13 @@ export function ScriptsTable(props: Props) {
                         ];
 
                         return (
-                            <>
+                            <Fragment key={s?.scriptId || rowIndex}>
                                 <TableRow {...props}>
                                     {cells}
                                 </TableRow>
 
                                 {!!items.length && (
-                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 hover:bg-yellow-50 p-0')}>
+                                    <TableRow {...props} className={cn(props.className, 'bg-yellow-50 dark:bg-yellow-950/40 hover:bg-yellow-50 dark:hover:bg-yellow-950/60 p-0')}>
                                         <TableCell colSpan={cells.length} className="p-0">
                                             <div className="flex flex-col gap-y-2">
                                                 {items.map((item, i) => {
@@ -309,7 +312,7 @@ export function ScriptsTable(props: Props) {
                                         </TableCell>
                                     </TableRow>
                                 )}
-                            </>
+                            </Fragment>
                         );
                     }}
                     noDataMessage={(
@@ -422,6 +425,7 @@ export function ScriptsTable(props: Props) {
                                         setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
                                         onDelete={() => onDelete([s.scriptId])}
                                         onDuplicate={() => onDuplicate([s.scriptId])}
+                                        onArchive={() => onArchive([s.scriptId])}
                                     />
                                 );
                             },

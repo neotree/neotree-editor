@@ -70,6 +70,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                                 data,
                                 position: data.position,
                                 hospitalId: data.hospitalId,
+                                archived: data.archived,
                                 draftOrigin,
                                 // an ownerless draft is taken over by whoever edits it next (see _screens_save)
                                 ...(!draft.createdByUserId && userId ? { createdByUserId: userId } : {}),
@@ -106,6 +107,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                             data,
                             scriptDraftId: scriptId,
                             position: data.position,
+                            archived: data.archived,
                             hospitalId: data.hospitalId,
                             scriptId: published?.scriptId,
                             draftOrigin,

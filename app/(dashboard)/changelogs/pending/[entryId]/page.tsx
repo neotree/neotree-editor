@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { buildHumanDiffRows, formatTechnicalDiffValue, parseDraftPreviewValue } from "@/lib/changelog-human-diff"
+import { buildHumanDiffRows, collectDataKeyReferences, formatTechnicalDiffValue, parseDraftPreviewValue, type DescribeDataKey } from "@/lib/changelog-human-diff"
+import { _describeDataKeys } from "@/databases/queries/data-keys"
 
 export const dynamic = "force-dynamic"
 
@@ -48,14 +49,16 @@ const entityBadgeClasses: Record<PendingDraftQueueEntry["entityType"], string> =
   alias: "border-zinc-500/20 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
 }
 
-function humanizeDraftDiff(entry: PendingDraftQueueEntry) {
-  return entry.diffPreview.flatMap((preview) => {
-    return buildHumanDiffRows({
-      field: preview.field,
-      before: parseDraftPreviewValue(preview.before),
-      after: parseDraftPreviewValue(preview.after),
-    })
-  })
+async function humanizeDraftDiff(entry: PendingDraftQueueEntry) {
+  const previews = entry.diffPreview.map((preview) => ({
+    field: preview.field,
+    before: parseDraftPreviewValue(preview.before),
+    after: parseDraftPreviewValue(preview.after),
+  }))
+  // Names for the data keys the diff refers to (relinked items, option lists).
+  const names = await _describeDataKeys(previews.flatMap((preview) => collectDataKeyReferences([preview.before, preview.after], preview.field)))
+  const describeDataKey: DescribeDataKey = (uniqueKey) => names.get(uniqueKey)
+  return previews.flatMap((preview) => buildHumanDiffRows({ ...preview, describeDataKey }))
 }
 
 export default async function PendingDraftDiffPage(props: { params: Promise<Params> }) {
@@ -76,7 +79,7 @@ export default async function PendingDraftDiffPage(props: { params: Promise<Para
     notFound()
   }
 
-  const readableDiffs = humanizeDraftDiff(entry)
+  const readableDiffs = await humanizeDraftDiff(entry)
   const changedSummary =
     entry.action === "delete"
       ? "This item is queued for deletion."

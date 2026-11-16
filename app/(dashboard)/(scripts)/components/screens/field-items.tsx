@@ -26,7 +26,8 @@ import { ConditionalExpressionModal } from "@/components/conditional-expression-
 import type { ConditionKey } from "@/lib/conditional-expression"
 import { useFieldKeyCollisions } from "@/components/field-key-collisions"
 import { ScriptIssueBadge, collisionIssues } from "@/components/script-issues"
-import { ParentKeyOptionsHint } from "./parent-key-options-hint"
+import { applyItemEdit } from "@/lib/apply-item-edit"
+import { LockedOptionKeyHint, ParentKeyOptionsHint } from "./parent-key-options-hint"
 
 type Item = NonNullable<ScriptField["items"]>[0]
 
@@ -114,15 +115,10 @@ export function FieldItems({
             if (currentItem === "new") {
               onChange([...items, data])
             } else if (resolvedCurrentItemIndex !== null && resolvedCurrentItemIndex >= 0) {
-              onChange(
-                items.map((item, i) => {
-                  if (i !== resolvedCurrentItemIndex) return item
-                  return {
-                    ...item,
-                    ...data,
-                  }
-                }),
-              )
+              // Saving an option unchanged must not mark the field as edited.
+              const { next, changed } = applyItemEdit(items[resolvedCurrentItemIndex], data)
+              if (!changed) return
+              onChange(items.map((item, i) => (i === resolvedCurrentItemIndex ? next : item)))
             }
           }}
         />
@@ -382,6 +378,7 @@ function Form({
                       {!!fieldDataKey && !isKeyDisabled && (
                         <ParentKeyOptionsHint dataKey={fieldDataKey} owner="field" />
                       )}
+                      {!!item?.keyId && <LockedOptionKeyHint />}
                       {allowCustomKey && (
                         <Input
                           id="value"

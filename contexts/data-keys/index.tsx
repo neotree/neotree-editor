@@ -17,13 +17,18 @@ import { useAlertModal } from "@/hooks/use-alert-modal";
 import { Alert } from "@/components/alert";
 import { dataKeysSortOpts } from "@/constants";
 import * as actions from '@/app/actions/data-keys';
-import { DeleteDataKeysParams, DeleteDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
+import { DeleteDataKeysParams, DeleteDataKeysResponse, MergeDataKeysParams, MergeDataKeysResponse, SaveDataKeysParams } from '@/databases/mutations/data-keys';
 import { _getDataKeys, } from "@/databases/queries/data-keys";
 import { Pagination } from "@/types";
 import { recordPendingDeletionChange } from "@/lib/change-tracker";
+import { pendingChangesAPI } from "@/lib/indexed-db";
 import { useAppContext } from "@/contexts/app";
+import { buildDataKeyParentIndex } from "@/lib/data-key-children";
 import { matchesDataKeySearch } from "@/lib/data-keys-search";
 import { SocketEventsListener } from "@/components/socket-events-listener";
+import { DataKeySaveProgress } from "@/components/data-key-save-progress";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { v4 as uuidv4 } from "uuid";
 import { boolean } from "drizzle-orm/gel-core";
 
 function paginateData<T>(
@@ -136,7 +141,19 @@ export type tDataKeysCtx = {
         data: DataKeyFormData[],
         cb?: ((error?: string) => void)
     ) => Promise<Awaited<ReturnType<typeof actions.saveDataKeys>>>;
-    deleteDataKeys: (data: string[], replacements?: Record<string, string>) => Promise<boolean>;
+    deleteDataKeys: (
+        data: string[],
+        replacements?: Record<string, string>,
+        opts?: {
+            allowMissingReplacements?: boolean;
+            scriptRemovals?: Record<string, string[]>;
+            /** Selected scripts only — the keys stay in the library. */
+            scriptsOnly?: Record<string, string[]>;
+        },
+    ) => Promise<boolean>;
+    /** Applies a merge; resolves to the recorded merge id, or null when it failed (the error is shown). */
+    mergeDataKeys: (params: Omit<MergeDataKeysParams, 'userId' | 'broadcastAction' | 'dryRun'>) => Promise<string | null>;
+    merging: boolean;
     exportDataKeys: (data: ExportDataKeysFormData) => Promise<void>;
     setSort: (value: string) => void;
     onSort: (value: string) => void;
@@ -257,6 +274,12 @@ export function DataKeysCtxProvider({
             });
             setCurrentPage(1);
             setAllDataKeysLastFetchedDate(new Date().toISOString());
+
+            // The full library excludes keys queued for deletion, so any local "delete" entry for a key that is
+            // listed again is stale (its deletion was reverted, maybe by someone else).
+            if (!queryParams.toString()) {
+                pendingChangesAPI.clearStaleDeletions("dataKey", sortedData.map(d => d.uuid)).catch(() => {});
+            }
         } catch (e: any) {
             if (!opts?.silent) {
                 setErrors([e.message]);
@@ -300,8 +323,15 @@ export function DataKeysCtxProvider({
         if (filter) {
             if (filter === 'published') {
                 filtered = filtered.filter(dataKey => !dataKey?.isDraft);
-            } else if (filter === 'drafts') {
+            } else if (filter === 'draft' || filter === 'drafts') {
                 filtered = filtered.filter(dataKey => !!dataKey?.isDraft);
+            } else if (filter === 'parentKeys') {
+                filtered = filtered.filter(dataKey => !!(dataKey?.options || []).length);
+            } else if (filter === 'childKeys') {
+                const parentIndex = buildDataKeyParentIndex(allDataKeys);
+                filtered = filtered.filter(dataKey => (
+                    !!dataKey?.uniqueKey && !!(parentIndex.get(dataKey.uniqueKey) || []).length
+                ));
             } else {
                 filtered = filtered.filter(dataKey => dataKey?.dataType === filter);
             }
@@ -355,10 +385,14 @@ export function DataKeysCtxProvider({
      ************ SAVE
     ******************************************************/
     const [saving, setSaving] = useState(false);
+    // A save also updates every script using the key, which can take a while: show how far it got.
+    const [saveProgressKey, setSaveProgressKey] = useState<string | null>(null);
 
     const saveDataKeys: tDataKeysCtx['saveDataKeys'] = useCallback(async (data, cb) => {
+        const progressKey = uuidv4();
         try {
             setSaving(true);
+            setSaveProgressKey(progressKey);
 
             const dataWithNumberVersion = data.map(d => ({
                 ...d,
@@ -368,8 +402,11 @@ export function DataKeysCtxProvider({
             const response = await axios.post('/api/data-keys/save', {
                 data: dataWithNumberVersion,
                 broadcastAction: true,
+                progressKey,
             } satisfies SaveDataKeysParams);
             const res = response.data as Awaited<ReturnType<typeof actions.saveDataKeys>>;
+            // Close the progress before the result alert opens, so two dialogs never close at once.
+            setSaveProgressKey(null);
 
             if (res.errors?.length) {
                 alert({
@@ -381,15 +418,23 @@ export function DataKeysCtxProvider({
             } else {
                 await loadDataKeys();
                 router.refresh();
+                const conditionsRewritten = ("info" in res ? res.info?.conditionsRewritten : 0) || 0;
                 const warnings = (res as { warnings?: string[] }).warnings || [];
+                const messages = [
+                    conditionsRewritten
+                        ? `${conditionsRewritten} condition${conditionsRewritten === 1 ? ' was' : 's were'} updated to the new name in the scripts using it.`
+                        : '',
+                    ...warnings,
+                ].filter(Boolean);
                 alert({
-                    message: warnings.length ? `Data key saved. ${warnings.join(' ')}` : "Data key saved!",
+                    message: messages.length ? `Data key saved. ${messages.join(' ')}` : "Data key saved!",
                     variant: 'success',
                     onClose: () => cb?.(),
                 });
                 return res;
             }
         } catch(e: any) {
+            setSaveProgressKey(null);
             alert({
                 title: 'Error',
                 message: 'Failed to save data key: ' + e.message,
@@ -398,6 +443,7 @@ export function DataKeysCtxProvider({
             return { success: false, errors: [e.message], };
         } finally {
             setSaving(false);
+            setSaveProgressKey(null);
         }
     }, [alert, router.refresh, loadDataKeys]);
 
@@ -432,7 +478,7 @@ export function DataKeysCtxProvider({
         }
     }, [authenticatedUser?.userId, authenticatedUser?.displayName]);
 
-    const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data, replacements) => {
+    const deleteDataKeys: tDataKeysCtx['deleteDataKeys'] = useCallback(async (data, replacements, opts) => {
         const keysToDelete = allDataKeys.filter(key => key?.uuid && data.includes(key.uuid));
 
         try {
@@ -443,6 +489,9 @@ export function DataKeysCtxProvider({
                     dataKeysIds: data,
                     broadcastAction: true,
                     replacements,
+                    allowMissingReplacements: opts?.allowMissingReplacements,
+                    scriptRemovals: opts?.scriptRemovals,
+                    scriptsOnly: opts?.scriptsOnly,
                 } satisfies DeleteDataKeysParams,
             });
 
@@ -450,7 +499,8 @@ export function DataKeysCtxProvider({
 
             if (res.errors?.length) throw new Error(res.errors[0]);
 
-            await recordDeletionPendingChanges(keysToDelete);
+            // Scripts-only changes keep the keys, so nothing is queued for deletion.
+            if (!opts?.scriptsOnly) await recordDeletionPendingChanges(keysToDelete);
 
             setSelected([]);
 
@@ -458,11 +508,19 @@ export function DataKeysCtxProvider({
 
             router.refresh();
 
+            // A change that touched scripts opens its report, where it can also be reverted.
+            if (res.operationId && res.preview?.scriptsChanged) {
+                router.push(`/data-keys/merge/history/${res.operationId}?merged=1`);
+                return true;
+            }
+
             alert({
                 title: 'Success',
-                message: replacements && Object.keys(replacements).length
-                    ? 'Data key replacements saved and deletion queued successfully!'
-                    : 'Data keys deleted successfully!',
+                message: opts?.scriptsOnly
+                    ? 'Selected scripts updated. The data keys remain in the library.'
+                    : (replacements && Object.keys(replacements).length
+                        ? 'Data key replacements saved and deletion queued successfully!'
+                        : 'Data keys deleted successfully!'),
                 variant: 'success',
             });
             return true;
@@ -472,9 +530,48 @@ export function DataKeysCtxProvider({
                 message: e.message,
                 variant: 'error',
             });
+            // A rejected delete usually means the local list is stale (e.g. the
+            // key became a child option elsewhere) — resync so the UI reflects
+            // the state the server enforced.
+            await loadDataKeys();
             return false;
         } finally {
             setDeleting(false);
+        }
+    }, [router.refresh, alert, loadDataKeys, allDataKeys, recordDeletionPendingChanges]);
+
+    /*****************************************************
+     ************ MERGE
+    ******************************************************/
+    const [merging, setMerging] = useState(false);
+
+    const mergeDataKeys: tDataKeysCtx['mergeDataKeys'] = useCallback(async (params) => {
+        try {
+            setMerging(true);
+
+            const response = await axios.post<MergeDataKeysResponse>('/api/data-keys/merge', params);
+            const res = response.data;
+            if (res.errors?.length || !res.mergeId) throw new Error(res.errors?.[0] || 'The merge could not be recorded.');
+
+            const deletedIds = new Set(res.preview?.deletedDataKeyIds || []);
+            if (deletedIds.size) {
+                await recordDeletionPendingChanges(allDataKeys.filter(key => key?.uuid && deletedIds.has(key.uuid)));
+            }
+
+            setSelected([]);
+            await loadDataKeys();
+            router.refresh();
+            return res.mergeId;
+        } catch (e: any) {
+            alert({
+                title: 'Error',
+                message: e.message,
+                variant: 'error',
+            });
+            await loadDataKeys();
+            return null;
+        } finally {
+            setMerging(false);
         }
     }, [router.refresh, alert, loadDataKeys, allDataKeys, recordDeletionPendingChanges]);
 
@@ -606,6 +703,8 @@ export function DataKeysCtxProvider({
                     setSearchValue,
                     extractDataKeys,
                     deleteDataKeys,
+                    mergeDataKeys,
+                    merging,
                     saveDataKeys,
                     exportDataKeys,
                     setCurrentDataKeyUuid,
@@ -619,6 +718,14 @@ export function DataKeysCtxProvider({
             >
                 {children}
             </DataKeysCtx.Provider>
+
+            <AlertDialog open={!!saveProgressKey}>
+                <AlertDialogContent className="sm:max-w-md">
+                    <AlertDialogTitle className="sr-only">Saving the data key</AlertDialogTitle>
+                    <AlertDialogDescription className="sr-only">Progress of the save</AlertDialogDescription>
+                    {!!saveProgressKey && <DataKeySaveProgress requestKey={saveProgressKey} />}
+                </AlertDialogContent>
+            </AlertDialog>
 
             <SocketEventsListener
                 events={[

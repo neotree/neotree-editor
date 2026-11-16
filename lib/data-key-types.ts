@@ -43,6 +43,18 @@ export function normalizeDataKeyType(dataType?: string | null) {
     return normalized;
 }
 
+/**
+ * Which keys count as the same kind of key for duplicates, merging and the key
+ * picker: the normalized type (dropdown = single select, yes_no = yesno,
+ * timer = number, …), except that EDLIZ summary tables stay per country —
+ * a Zimbabwe and a Malawi table are different tables, not duplicates.
+ */
+export function dataKeyTypeFamily(dataType?: string | null) {
+    const normalized = normalizeDataKeyType(dataType);
+    if (normalized === 'edliz_table') return `${dataType || ''}`.trim().toLowerCase();
+    return normalized;
+}
+
 export function normalizeDataKeyCompatibilityType(dataType?: string | null) {
     const normalized = normalizeDataKeyType(dataType);
 

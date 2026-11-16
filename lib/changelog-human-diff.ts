@@ -10,6 +10,52 @@ export type HumanDiffRow = {
   rawAfter: unknown
 }
 
+/** Turns a data key's uniqueKey into a readable name (e.g. "Feeding — Feeding method [ab12cd34]"). */
+export type DescribeDataKey = (uniqueKey: string) => string | undefined
+
+type DiffOptions = { describeDataKey?: DescribeDataKey }
+
+// Fields that hold a data key's uniqueKey. keyId is otherwise a technical field,
+// but when it changes the item now points at another data key (a merge or a
+// replacement relinked it), which is worth seeing.
+const DATA_KEY_REFERENCE_FIELDS = new Set([
+  "keyId",
+  "refKeyId",
+  "refIdDataKey",
+  "minDateKeyId",
+  "maxDateKeyId",
+  "minTimeKeyId",
+  "maxTimeKeyId",
+])
+
+const shortKey = (uniqueKey: string) => uniqueKey.slice(0, 8)
+
+function formatDataKeyReference(value: unknown, options: DiffOptions) {
+  const uniqueKey = typeof value === "string" ? value.trim() : ""
+  if (!uniqueKey) return "Empty"
+  const name = options.describeDataKey?.(uniqueKey)
+  return name || `[${shortKey(uniqueKey)}]`
+}
+
+/** Every data key uniqueKey a snapshot value refers to, for looking up their names. */
+export function collectDataKeyReferences(values: unknown[], field?: string) {
+  const found = new Set<string>()
+  const walk = (value: unknown, key?: string) => {
+    if (Array.isArray(value)) {
+      if (key === "options" && value.every((item) => typeof item === "string")) value.forEach((item) => found.add(item))
+      else value.forEach((item) => walk(item))
+      return
+    }
+    if (value && typeof value === "object") {
+      Object.entries(value as Record<string, unknown>).forEach(([childKey, child]) => walk(child, childKey))
+      return
+    }
+    if (key && DATA_KEY_REFERENCE_FIELDS.has(key) && typeof value === "string" && value.trim()) found.add(value.trim())
+  }
+  values.forEach((value) => walk(value, field))
+  return Array.from(found)
+}
+
 const friendlyFieldLabels: Record<string, string> = {
   items: "Answer options",
   fields: "Fields",
@@ -17,7 +63,7 @@ const friendlyFieldLabels: Record<string, string> = {
   fluids: "Fluids",
   feeds: "Feeds",
   key: "Key",
-  keyId: "Key ID",
+  keyId: "Data key",
   label: "Display label",
   name: "Name",
   title: "Title",
@@ -180,6 +226,7 @@ function buildObjectRows({
   rawBefore,
   rawAfter,
   path = [],
+  options = {},
 }: {
   field: string
   fieldLabel: string
@@ -189,10 +236,11 @@ function buildObjectRows({
   rawBefore: unknown
   rawAfter: unknown
   path?: string[]
+  options?: DiffOptions
 }) {
   const rows: HumanDiffRow[] = []
   const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]))
-    .filter((key) => !technicalKeys.has(key))
+    .filter((key) => !technicalKeys.has(key) || DATA_KEY_REFERENCE_FIELDS.has(key))
     .sort((a, b) => {
       const aIndex = preferredDisplayKeys.indexOf(a)
       const bIndex = preferredDisplayKeys.indexOf(b)
@@ -206,6 +254,21 @@ function buildObjectRows({
     if (valuesEqual(previousValue, nextValue)) continue
 
     const nextPath = [...path, key]
+    if (DATA_KEY_REFERENCE_FIELDS.has(key)) {
+      rows.push({
+        id: `${field}:${itemLabel || "item"}:${nextPath.join(".")}`,
+        fieldLabel,
+        itemLabel,
+        detailLabel: buildPathLabel(nextPath),
+        before: formatDataKeyReference(previousValue, options),
+        after: formatDataKeyReference(nextValue, options),
+        rawField: field,
+        rawBefore,
+        rawAfter,
+      })
+      continue
+    }
+
     if (Array.isArray(previousValue) || Array.isArray(nextValue)) {
       rows.push(
         ...buildArrayRows({
@@ -215,6 +278,7 @@ function buildObjectRows({
           rawBefore,
           rawAfter,
           path: nextPath,
+          options,
         }),
       )
       continue
@@ -231,6 +295,7 @@ function buildObjectRows({
           rawBefore,
           rawAfter,
           path: nextPath,
+          options,
         }),
       )
       continue
@@ -259,6 +324,7 @@ function buildArrayRows({
   rawBefore,
   rawAfter,
   path = [],
+  options = {},
 }: {
   field: string
   before: unknown[]
@@ -266,8 +332,15 @@ function buildArrayRows({
   rawBefore: unknown
   rawAfter: unknown
   path?: string[]
+  options?: DiffOptions
 }) {
   const fieldLabel = buildPathLabel(path.length ? path : [field])
+
+  // A data key's option list: which options it gained or lost, by name.
+  if ((path.at(-1) || field) === "options" && [...before, ...after].every((item) => typeof item === "string")) {
+    return buildOptionListRows({ field, fieldLabel, before: before as string[], after: after as string[], rawBefore, rawAfter, options })
+  }
+
   const beforeMap = new Map(before.map((item, index) => [getObjectIdentity(item, index), item]))
   const afterMap = new Map(after.map((item, index) => [getObjectIdentity(item, index), item]))
   const ids = Array.from(new Set([...Array.from(beforeMap.keys()), ...Array.from(afterMap.keys())]))
@@ -290,6 +363,7 @@ function buildArrayRows({
           after: afterItem as Record<string, unknown>,
           rawBefore,
           rawAfter,
+          options,
         }),
       )
       return
@@ -310,8 +384,66 @@ function buildArrayRows({
   return rows
 }
 
-export function buildHumanDiffRows({ field, before, after }: { field: string; before: unknown; after: unknown }) {
+function buildOptionListRows({
+  field,
+  fieldLabel,
+  before,
+  after,
+  rawBefore,
+  rawAfter,
+  options,
+}: {
+  field: string
+  fieldLabel: string
+  before: string[]
+  after: string[]
+  rawBefore: unknown
+  rawAfter: unknown
+  options: DiffOptions
+}) {
+  const rows: HumanDiffRow[] = []
+  const beforeSet = new Set(before)
+  const afterSet = new Set(after)
+  const row = (id: string, itemLabel: string, beforeText: string, afterText: string): HumanDiffRow => ({
+    id: `${field}:options:${id}`,
+    fieldLabel,
+    itemLabel,
+    before: beforeText,
+    after: afterText,
+    rawField: field,
+    rawBefore,
+    rawAfter,
+  })
+
+  before.filter((uniqueKey) => !afterSet.has(uniqueKey)).forEach((uniqueKey) => {
+    rows.push(row(`removed:${uniqueKey}`, formatDataKeyReference(uniqueKey, options), "Offered", "Removed"))
+  })
+  after.filter((uniqueKey) => !beforeSet.has(uniqueKey)).forEach((uniqueKey) => {
+    rows.push(row(`added:${uniqueKey}`, formatDataKeyReference(uniqueKey, options), "Not offered", "Added"))
+  })
+
+  const kept = (list: string[], other: Set<string>) => list.filter((uniqueKey) => other.has(uniqueKey)).join("|")
+  if (!rows.length && kept(before, afterSet) !== kept(after, beforeSet)) {
+    rows.push(row("order", "Order", "Previous order", "Reordered"))
+  }
+
+  return rows
+}
+
+export function buildHumanDiffRows({
+  field,
+  before,
+  after,
+  describeDataKey,
+}: {
+  field: string
+  before: unknown
+  after: unknown
+  /** Names data keys in key references and option lists; without it they show as short ids. */
+  describeDataKey?: DescribeDataKey
+}) {
   const fieldLabel = getFriendlyDiffLabel(field)
+  const options: DiffOptions = { describeDataKey }
 
   if (Array.isArray(before) || Array.isArray(after)) {
     return buildArrayRows({
@@ -321,6 +453,7 @@ export function buildHumanDiffRows({ field, before, after }: { field: string; be
       rawBefore: before,
       rawAfter: after,
       path: [field],
+      options,
     })
   }
 
@@ -332,7 +465,20 @@ export function buildHumanDiffRows({ field, before, after }: { field: string; be
       after: after as Record<string, unknown>,
       rawBefore: before,
       rawAfter: after,
+      options,
     })
+  }
+
+  if (DATA_KEY_REFERENCE_FIELDS.has(field) && !valuesEqual(before, after)) {
+    return [{
+      id: `${field}:value`,
+      fieldLabel,
+      before: formatDataKeyReference(before, options),
+      after: formatDataKeyReference(after, options),
+      rawField: field,
+      rawBefore: before,
+      rawAfter: after,
+    }]
   }
 
   if (valuesEqual(before, after)) return []

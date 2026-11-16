@@ -475,7 +475,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                       key={`${collision.kind}-${i}`}
                       className={cn(
                         "mt-1 max-w-[280px] text-xs",
-                        collision.severity === "blocking" ? "text-destructive" : "text-amber-600",
+                        collision.severity === "blocking" ? "text-destructive" : "text-amber-600 dark:text-amber-400",
                       )}
                     >
                       {collision.message}

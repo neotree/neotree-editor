@@ -12,6 +12,8 @@ import {
     Upload, 
     ExternalLink,
     RefreshCw,
+    ArchiveIcon,
+    ArchiveRestoreIcon,
 } from "lucide-react"
 
 import {
@@ -28,13 +30,23 @@ import { LockStatus, type LockStatusProps } from "@/components/lock-status";
 import { useIsLocked } from "@/hooks/use-is-locked";
 import { cn } from "@/lib/utils";
 
-export function ScriptsTableActions({ item, disabled, deleteDisabled, setScriptsIdsToExport, onDelete, onDuplicate, onRecheckIssues }: {
+export function ScriptsTableActions({ 
+    item, 
+    disabled, 
+    deleteDisabled, 
+    setScriptsIdsToExport, 
+    onDelete, 
+    onDuplicate, 
+    onRecheckIssues,
+    onArchive, 
+}: {
     disabled: boolean;
     /** Content sync: on a target editor super users may still delete a script (e.g. one deleted on the source). */
     deleteDisabled?: boolean;
     item: Awaited<ReturnType<IScriptsContext['getScripts']>>['data'][0];
     onDelete: () => void;
     onDuplicate: () => void;
+    onArchive: () => void;
     setScriptsIdsToExport: () => void;
     onRecheckIssues?: () => Promise<void> | void;
 }) {
@@ -150,13 +162,22 @@ export function ScriptsTableActions({ item, disabled, deleteDisabled, setScripts
                         </DropdownMenuItem>
 
                         {canDelete && (
-                            <DropdownMenuItem
-                                onClick={() => setTimeout(() => onDelete(), 0)}
-                                className="text-danger focus:bg-danger focus:text-danger-foreground"
-                            >
-                                <Trash className="mr-2 h-4 w-4" />
-                                <span>Delete</span>
-                            </DropdownMenuItem>
+                            <>
+                                <DropdownMenuItem
+                                    onClick={() => setTimeout(() => onArchive(), 0)}
+                                >
+                                    {item.isArchived ? <ArchiveRestoreIcon className="mr-2 h-4 w-4"/> : <ArchiveIcon className="mr-2 h-4 w-4"/>}
+                                    <span>{item.archived ? 'Unarchive' : 'Archive'} script</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                    onClick={() => setTimeout(() => onDelete(), 0)}
+                                    className="text-danger focus:bg-danger focus:text-danger-foreground"
+                                >
+                                    <Trash className="mr-2 h-4 w-4" />
+                                    <span>Delete</span>
+                                </DropdownMenuItem>
+                            </>
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
