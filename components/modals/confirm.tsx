@@ -15,6 +15,7 @@ import { FiAlertCircle } from "react-icons/fi";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SafeHtml } from "@/components/safe-html";
   
 export function ConfirmModal() {
     const { 
@@ -64,15 +65,13 @@ export function ConfirmModal() {
                     )}
                 >
                     {danger && <FiAlertCircle className="text-red-600 dark:text-red-400 min-w-10 min-h-10 w-10 h-10" />}
-                    <div dangerouslySetInnerHTML={{ __html: message, }} />
+                    {/* Messages often include data key names and labels: sanitised before rendering. */}
+                    <SafeHtml html={message} />
                 </div>
 
                 <div className="border-t border-border px-4 py-3">
                     {!!footerMessage && (
-                        <div
-                            className="mb-3 text-sm text-muted-foreground"
-                            dangerouslySetInnerHTML={{ __html: footerMessage }}
-                        />
+                        <SafeHtml className="mb-3 text-sm text-muted-foreground" html={footerMessage} />
                     )}
 
                     <AlertDialogFooter>

@@ -130,6 +130,60 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
     [saveScripts, scripts, router],
   )
 
+  const onArchive = useCallback(
+    async (scriptsIds: string[]) => {
+      confirm(
+        async () => {
+          const _scripts = { ...scripts }
+          const scriptsToArchive = scripts.data
+            .filter((s) => s.scriptId && scriptsIds.includes(s.scriptId))
+            .map(s => ({
+              ...s,
+              archived: !s.archived,
+            }));
+
+          setScripts((prev) => ({ ...prev, data: prev.data.filter((s) => !scriptsIds.includes(s.scriptId)) }))
+          setSelected([])
+
+          setLoading(true)
+
+          // const res = await deleteScripts({ scriptsIds, broadcastAction: true, });
+
+          // TODO: Replace this with server action
+          const response = await axios.post("/api/scripts/save", { data: scriptsToArchive, broadcastAction: true })
+
+          const res = response.data as Awaited<ReturnType<typeof saveScripts>>
+
+          if (res.errors?.length) {
+            alert({
+              title: "Error",
+              message: res.errors.join(", "),
+              variant: "error",
+              onClose: () => setScripts(_scripts),
+            })
+          } else {
+            setSelected([])
+            router.refresh()
+            alert({
+              title: "Success",
+              message: "Scripts archived successfully!",
+              variant: "success",
+            })
+          }
+
+          setLoading(false)
+        },
+        {
+          danger: true,
+          title: "Archive scripts",
+          message: "Are you sure you want to archive scripts?",
+          positiveLabel: "Yes, archive",
+        },
+      )
+    },
+    [saveScripts, confirm, alert, router, scripts],
+  )
+
   const [duplicateRequestKey, setDuplicateRequestKey] = useState(Math.random().toString(12).substring(2));
 
   const onDuplicate = useCallback(
@@ -262,5 +316,6 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
     onDelete,
     onSort,
     onDuplicate,
+    onArchive,
   }
 }
