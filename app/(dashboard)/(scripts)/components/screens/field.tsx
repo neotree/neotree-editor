@@ -53,6 +53,8 @@ type Props = {
     index: number
     data: FieldType
   }
+  /** The field is a column of a table screen: worded as a column and given a column heading. */
+  isColumn?: boolean
   /** Persisted field used to grandfather only pre-existing key collisions. */
   baselineField?: FieldType
   form: ReturnType<typeof useScreenForm>
@@ -61,7 +63,7 @@ type Props = {
   unavailableOutcomeKeys?: Record<string, string>
 }
 
-export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
+export function Field<P = {}>({ open, field: fieldProp, baselineField, isColumn, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
   const { confirm: confirmDiscard } = useConfirmModal()
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
@@ -252,6 +254,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
 
     const normalizedData = {
       ...data,
+      tableHeading: `${data.tableHeading || ""}`.trim(),
       minLength: normalizedMinLength.value,
       maxLength: normalizedMaxLength.value,
     }
@@ -342,7 +345,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
           if (!open && fieldFormIsDirty) {
             confirmDiscard(applyOpenChange, {
               title: "Discard changes?",
-              message: "Discard your changes to this field?",
+              message: `Discard your changes to this ${isColumn ? "column" : "field"}?`,
               positiveLabel: "Discard",
               negativeLabel: "Keep editing",
               danger: true,
@@ -351,7 +354,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
           }
           applyOpenChange()
         }}
-        title={field ? "Edit field" : "New field"}
+        title={isColumn ? (field ? "Edit column" : "New column") : (field ? "Edit field" : "New field")}
         actions={
           <>
             <span className={cn("text-danger text-xs", disabled && "hidden")}>* Required</span>
@@ -518,6 +521,21 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
               </div>
               {!!reservedKeyCollisions.length && (
                 <p className="text-xs text-destructive">{reservedKeyCollisions[0].message}</p>
+              )}
+
+              {isColumn && (
+                <div>
+                  <Label htmlFor="tableHeading">Column heading (optional)</Label>
+                  <Input
+                    {...register("tableHeading", { disabled })}
+                    name="tableHeading"
+                    noRing={false}
+                    placeholder={label || ""}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Shown at the top of this column. Leave empty to use the label.
+                  </span>
+                </div>
               )}
 
               {isFractionField && (

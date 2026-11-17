@@ -37,6 +37,7 @@ export function useField(field?: ScriptField) {
             maxDateKeyId: field?.maxDateKeyId || '',
             minTimeKeyId: field?.minTimeKeyId || '',
             maxTimeKeyId: field?.maxTimeKeyId || '',
+            tableHeading: field?.tableHeading || '',
             numeratorLabel: field?.numeratorLabel || '',
             denominatorLabel: field?.denominatorLabel || '',
             denominatorMinValue: field?.denominatorMinValue || '',

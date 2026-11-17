@@ -10,7 +10,7 @@ import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
 import { normalizeSelectionRuleItems, validateSelectionRules } from '@/lib/selection-rules';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
-import { normalizeScreenTableConfig, validateScreenTable } from '@/lib/screen-table-config';
+import { normalizeScreenTableConfig, tableCollectionName, validateScreenTable } from '@/lib/screen-table-config';
 
 
 export type SaveScreensData = Partial<ScreenType> & {
@@ -255,11 +255,17 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
             try {
                 index++;
                 const normalized = normalizeScreenSelectionRuleItemIds(item);
+                // Partial saves (e.g. only a title) must not clear the table settings.
+                const tableConfig = item.tableConfig === undefined
+                    ? undefined
+                    : normalizeScreenTableConfig(item, () => uuid.v4());
                 const normalizedItem = {
                     ...normalized.value,
-                    // Partial saves (e.g. only a title) must not clear the table settings.
-                    ...(item.tableConfig === undefined ? {} : {
-                        tableConfig: normalizeScreenTableConfig(item, () => uuid.v4()),
+                    ...(tableConfig === undefined ? {} : { tableConfig }),
+                    // A table's rows are stored under a collection named after the table, unless
+                    // the screen already has one (renaming a table must not move its data).
+                    ...(!tableConfig || `${item.collectionName || ''}`.trim() ? {} : {
+                        collectionName: tableCollectionName(tableConfig.title),
                     }),
                 };
 

@@ -76,6 +76,15 @@ export const screenTypes: { label: string; value: ScreenType['type'] }[] = [
     { value: 'problems', label: 'Problems' }
 ];
 
+/**
+ * Screen types offered when a screen is created. "Table" is a form underneath (repeatable,
+ * with table settings), so it is listed here and not in screenTypes, which mirrors the
+ * types that are stored.
+ */
+export const screenTypePickerOptions: { label: string; value: string }[] = screenTypes.flatMap(t => (
+    t.value === 'form' ? [t, { value: 'table', label: 'Table' }] : [t]
+));
+
 export const SymptomTypes = [
     { value: 'risk', label: 'Risk factor', },
     { value: 'sign', label: 'Sign/Symptom', },

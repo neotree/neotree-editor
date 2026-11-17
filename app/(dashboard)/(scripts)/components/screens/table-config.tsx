@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { arrayMoveImmutable } from "array-move";
 import { v4 } from "uuid";
 import { Edit, Eye, MoreVertical, Plus, Trash } from "lucide-react";
@@ -11,7 +11,6 @@ import { DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
     DropdownMenu,
@@ -30,7 +29,7 @@ import {
 import { defaultScreenTableConfig, screenTableRowModes } from "@/constants";
 import { useConfirmModal } from "@/hooks/use-confirm-modal";
 import { cn } from "@/lib/utils";
-import { validateScreenTableConfig } from "@/lib/screen-table-config";
+import { getTableColumnHeading, tableCollectionName } from "@/lib/screen-table-config";
 import type { ScreenTableConfig, ScriptField } from "@/types";
 import { Title } from "../title";
 import type { useScreenForm } from "../../hooks/use-screen-form";
@@ -40,24 +39,30 @@ type Props = {
     form: ReturnType<typeof useScreenForm>;
 };
 
+type SettingsProps = Props & {
+    /** Problems that stop the table from being saved (see validateScreenTableConfig). */
+    errors: string[];
+    /** The collection name the screen was loaded with. Once set it is kept when the table is renamed. */
+    persistedCollectionName?: string;
+};
+
 type TableRowHeading = ScreenTableConfig['rows'][number];
 
 const PREVIEW_DYNAMIC_ROWS = 2;
 
 /**
- * Table settings of a repeatable form screen. The screen's fields are the table's columns,
- * so the columns, their input types and their dropdown options are edited in the Fields
- * list above; this section only decides how the rows work and what the table is called.
+ * Settings of a table screen: its name and how its rows work. The columns are the screen's
+ * fields, edited in the Columns list (input type, dropdown options, column heading).
+ * Rendered as direct children of the screen form's padded column.
  */
-export function ScreenTableConfigForm({ disabled, form }: Props) {
+export function ScreenTableSettings({ disabled, form, errors, persistedCollectionName }: SettingsProps) {
     const { confirm } = useConfirmModal();
 
     const tableConfig = form.watch('tableConfig') as ScreenTableConfig | null;
-    const fields = form.watch('fields');
+    const collectionName = form.watch('collectionName');
 
     const [editedRow, setEditedRow] = useState<{ index: number; } | null>(null);
 
-    const enabled = !!tableConfig;
     const config = tableConfig || defaultScreenTableConfig;
     const isFixed = config.rowMode === 'fixed';
 
@@ -69,14 +74,21 @@ export function ScreenTableConfigForm({ disabled, form }: Props) {
         );
     }, [form]);
 
-    const errors = useMemo(
-        () => (!enabled ? [] : validateScreenTableConfig({
-            ...config,
-            minRows: toRowLimit(config.minRows),
-            maxRows: toRowLimit(config.maxRows),
-        })),
-        [enabled, config],
-    );
+    const onNameChange = useCallback((name: string) => {
+        const previousName = `${form.getValues('tableConfig')?.title || ''}`;
+        update({ title: name });
+
+        // The screen title starts as the table name and follows it until it is given its own text.
+        const screenTitle = `${form.getValues('title') || ''}`;
+        if (!screenTitle.trim() || screenTitle === previousName) {
+            form.setValue('title', name, { shouldDirty: true, });
+        }
+
+        // A new table stores its rows under its own name; a saved one keeps its collection.
+        if (!persistedCollectionName) {
+            form.setValue('collectionName', tableCollectionName(name), { shouldDirty: true, });
+        }
+    }, [form, update, persistedCollectionName]);
 
     const onDeleteRow = useCallback((index: number) => {
         const row = config.rows[index];
@@ -88,135 +100,103 @@ export function ScreenTableConfigForm({ disabled, form }: Props) {
         });
     }, [config.rows, confirm, update]);
 
-    const previewRows = isFixed
-        ? config.rows.map(row => row.label)
-        : Array.from({ length: PREVIEW_DYNAMIC_ROWS }).map((_, i) => `${i + 1}`);
-
     return (
         <>
-            <div className="flex flex-col gap-y-5 [&>*]:px-4">
-                <Title>Table</Title>
+            <Title>Table</Title>
 
-                <div>
-                    <div className="flex items-center gap-x-2">
-                        <Switch
-                            id="displayAsTable"
-                            checked={enabled}
-                            disabled={disabled}
-                            onCheckedChange={checked => form.setValue(
-                                'tableConfig',
-                                checked ? { ...defaultScreenTableConfig } : null,
-                                { shouldDirty: true, },
-                            )}
-                        />
-                        <Label secondary htmlFor="displayAsTable">Display as table</Label>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                        Each field above becomes a column and the field label is the column heading.
-                        The table is captured on the app and printed as a table.
-                    </span>
-                </div>
-
-                {enabled && (
-                    <>
-                        <div>
-                            <Label secondary htmlFor="tableTitle">Table name</Label>
-                            <Input
-                                id="tableTitle"
-                                name="tableTitle"
-                                noRing={false}
-                                disabled={disabled}
-                                value={config.title || ''}
-                                onChange={e => update({ title: e.target.value })}
-                            />
-                            <span className="text-xs text-muted-foreground">
-                                Shown above the table. Leave empty to use the screen title.
-                            </span>
-                        </div>
-
-                        <div>
-                            <Label secondary>Rows</Label>
-                            <RadioGroup
-                                disabled={disabled}
-                                value={config.rowMode}
-                                onValueChange={value => update({ rowMode: value as ScreenTableConfig['rowMode'] })}
-                                className="flex flex-col gap-y-4 mt-2"
-                            >
-                                {screenTableRowModes.map(mode => (
-                                    <div key={mode.value} className="flex items-start space-x-2">
-                                        <RadioGroupItem value={mode.value} id={`tableRowMode_${mode.value}`} className="mt-0.5" />
-                                        <div className="flex flex-col">
-                                            <Label secondary htmlFor={`tableRowMode_${mode.value}`}>{mode.label}</Label>
-                                            <span className="text-xs text-muted-foreground">{mode.description}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </RadioGroup>
-                        </div>
-
-                        {!isFixed && (
-                            <div className="flex flex-col gap-y-2">
-                                <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
-                                    <div className="sm:flex-1">
-                                        <Label secondary htmlFor="tableMinRows">Min rows (optional)</Label>
-                                        <Input
-                                            id="tableMinRows"
-                                            name="tableMinRows"
-                                            type="number"
-                                            min={0}
-                                            step={1}
-                                            noRing={false}
-                                            disabled={disabled}
-                                            value={config.minRows ?? ''}
-                                            onChange={e => update({ minRows: inputToRowLimit(e.target.value) })}
-                                        />
-                                    </div>
-
-                                    <div className="sm:flex-1">
-                                        <Label secondary htmlFor="tableMaxRows">Max rows (optional)</Label>
-                                        <Input
-                                            id="tableMaxRows"
-                                            name="tableMaxRows"
-                                            type="number"
-                                            min={1}
-                                            step={1}
-                                            noRing={false}
-                                            disabled={disabled}
-                                            value={config.maxRows ?? ''}
-                                            onChange={e => update({ maxRows: inputToRowLimit(e.target.value) })}
-                                        />
-                                    </div>
-                                </div>
-                                <span className="text-xs text-muted-foreground">Leave empty for no limit.</span>
-                            </div>
-                        )}
-
-                        {isFixed && (
-                            <div>
-                                <Label secondary htmlFor="tableRowsHeading">Row headings title (optional)</Label>
-                                <Input
-                                    id="tableRowsHeading"
-                                    name="tableRowsHeading"
-                                    noRing={false}
-                                    disabled={disabled}
-                                    value={config.rowsHeading || ''}
-                                    onChange={e => update({ rowsHeading: e.target.value })}
-                                />
-                                <span className="text-xs text-muted-foreground">
-                                    Heading of the first column, above the row headings. Example: Pregnancy
-                                </span>
-                            </div>
-                        )}
-
-                        {errors.map(error => (
-                            <p key={error} className="text-xs text-destructive">{error}</p>
-                        ))}
-                    </>
-                )}
+            <div>
+                <Label secondary error={!disabled && !config.title?.trim()} htmlFor="tableTitle">Table name *</Label>
+                <Input
+                    id="tableTitle"
+                    name="tableTitle"
+                    noRing={false}
+                    disabled={disabled}
+                    error={!disabled && !config.title?.trim()}
+                    value={config.title || ''}
+                    onChange={e => onNameChange(e.target.value)}
+                />
+                <span className="text-xs text-muted-foreground">
+                    Shown above the table on the app and on the printout.
+                    {!!collectionName && <> Captured rows are stored as &quot;{collectionName}&quot;.</>}
+                </span>
             </div>
 
-            {enabled && isFixed && (
-                <>
+            <div>
+                <Label secondary>Rows</Label>
+                <RadioGroup
+                    disabled={disabled}
+                    value={config.rowMode}
+                    onValueChange={value => update({ rowMode: value as ScreenTableConfig['rowMode'] })}
+                    className="flex flex-col gap-y-4 mt-2"
+                >
+                    {screenTableRowModes.map(mode => (
+                        <div key={mode.value} className="flex items-start space-x-2">
+                            <RadioGroupItem value={mode.value} id={`tableRowMode_${mode.value}`} className="mt-0.5" />
+                            <div className="flex flex-col">
+                                <Label secondary htmlFor={`tableRowMode_${mode.value}`}>{mode.label}</Label>
+                                <span className="text-xs text-muted-foreground">{mode.description}</span>
+                            </div>
+                        </div>
+                    ))}
+                </RadioGroup>
+            </div>
+
+            {!isFixed && (
+                <div className="flex flex-col gap-y-2">
+                    <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                        <div className="sm:flex-1">
+                            <Label secondary htmlFor="tableMinRows">Min rows (optional)</Label>
+                            <Input
+                                id="tableMinRows"
+                                name="tableMinRows"
+                                type="number"
+                                min={0}
+                                step={1}
+                                noRing={false}
+                                disabled={disabled}
+                                value={config.minRows ?? ''}
+                                onChange={e => update({ minRows: inputToRowLimit(e.target.value) })}
+                            />
+                        </div>
+
+                        <div className="sm:flex-1">
+                            <Label secondary htmlFor="tableMaxRows">Max rows (optional)</Label>
+                            <Input
+                                id="tableMaxRows"
+                                name="tableMaxRows"
+                                type="number"
+                                min={1}
+                                step={1}
+                                noRing={false}
+                                disabled={disabled}
+                                value={config.maxRows ?? ''}
+                                onChange={e => update({ maxRows: inputToRowLimit(e.target.value) })}
+                            />
+                        </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Leave empty for no limit.</span>
+                </div>
+            )}
+
+            {isFixed && (
+                <div>
+                    <Label secondary htmlFor="tableRowsHeading">Row headings title (optional)</Label>
+                    <Input
+                        id="tableRowsHeading"
+                        name="tableRowsHeading"
+                        noRing={false}
+                        disabled={disabled}
+                        value={config.rowsHeading || ''}
+                        onChange={e => update({ rowsHeading: e.target.value })}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                        Heading of the first column, above the row headings. Example: Pregnancy
+                    </span>
+                </div>
+            )}
+
+            {isFixed && (
+                <div className="!px-0">
                     <TableRowHeadingModal
                         open={!!editedRow}
                         disabled={disabled}
@@ -304,80 +284,97 @@ export function ScreenTableConfigForm({ disabled, form }: Props) {
                             '',
                         ])}
                     />
-                </>
+                </div>
             )}
 
-            {enabled && (
-                <div className="flex flex-col gap-y-2 px-4 mt-5">
-                    <Label secondary>Preview</Label>
-
-                    {!fields.length ? (
-                        <span className="text-xs text-muted-foreground">
-                            Add fields to this screen to create the table&apos;s columns.
-                        </span>
-                    ) : (
-                        <div className="border border-border rounded-md">
-                            <div className="px-4 py-2 border-b border-b-border text-sm">
-                                {config.title || form.watch('title') || 'Untitled table'}
-                            </div>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className={cn(!isFixed && 'w-10')}>
-                                            {isFixed ? config.rowsHeading : '#'}
-                                        </TableHead>
-                                        {fields.map(field => (
-                                            <TableHead key={field.fieldId}>
-                                                {field.label || field.key}
-                                                {!field.optional && <span className="text-danger"> *</span>}
-                                            </TableHead>
-                                        ))}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {previewRows.map((rowLabel, rowIndex) => (
-                                        <TableRow key={`${rowLabel}-${rowIndex}`}>
-                                            <TableCell>{rowLabel}</TableCell>
-                                            {fields.map(field => (
-                                                <TableCell
-                                                    key={field.fieldId}
-                                                    className="text-muted-foreground"
-                                                >
-                                                    {getColumnPlaceholder(field)}
-                                                </TableCell>
-                                            ))}
-                                        </TableRow>
-                                    ))}
-
-                                    {!previewRows.length && (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={fields.length + 1}
-                                                className="text-center text-muted-foreground"
-                                            >
-                                                No rows yet
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-
-                    {!isFixed && !!fields.length && (
-                        <span className="text-xs text-muted-foreground">
-                            Rows are added on the app during capture; two are shown here as an example.
-                        </span>
-                    )}
+            {!disabled && !!errors.length && (
+                <div className="flex flex-col gap-y-1">
+                    {errors.map(error => (
+                        <p key={error} className="text-xs text-destructive">{error}</p>
+                    ))}
                 </div>
             )}
         </>
     );
 }
 
-function toRowLimit(value: unknown) {
-    if (value === null || value === undefined || `${value}`.trim() === '') return null;
-    return Number(value);
+/** The table as it will look: its columns (the screen's fields) and rows. */
+export function ScreenTablePreview({ form }: Pick<Props, 'form'>) {
+    const tableConfig = form.watch('tableConfig') as ScreenTableConfig | null;
+    const fields = form.watch('fields');
+    const screenTitle = form.watch('title');
+
+    const config = tableConfig || defaultScreenTableConfig;
+    const isFixed = config.rowMode === 'fixed';
+
+    const previewRows = isFixed
+        ? config.rows.map(row => row.label)
+        : Array.from({ length: PREVIEW_DYNAMIC_ROWS }).map((_, i) => `${i + 1}`);
+
+    return (
+        <div className="flex flex-col gap-y-2 px-4">
+            <Title>Preview</Title>
+
+            {!fields.length ? (
+                <span className="text-xs text-muted-foreground">
+                    Add columns to see the table.
+                </span>
+            ) : (
+                <div className="border border-border rounded-md">
+                    <div className="px-4 py-2 border-b border-b-border text-sm">
+                        {config.title || screenTitle || 'Untitled table'}
+                    </div>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className={cn(!isFixed && 'w-10')}>
+                                    {isFixed ? config.rowsHeading : '#'}
+                                </TableHead>
+                                {fields.map(field => (
+                                    <TableHead key={field.fieldId}>
+                                        {getTableColumnHeading(field)}
+                                        {!field.optional && <span className="text-danger"> *</span>}
+                                    </TableHead>
+                                ))}
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {previewRows.map((rowLabel, rowIndex) => (
+                                <TableRow key={`${rowLabel}-${rowIndex}`}>
+                                    <TableCell>{rowLabel}</TableCell>
+                                    {fields.map(field => (
+                                        <TableCell
+                                            key={field.fieldId}
+                                            className="text-muted-foreground"
+                                        >
+                                            {getColumnPlaceholder(field)}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))}
+
+                            {!previewRows.length && (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={fields.length + 1}
+                                        className="text-center text-muted-foreground"
+                                    >
+                                        No rows yet
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+
+            {!isFixed && !!fields.length && (
+                <span className="text-xs text-muted-foreground">
+                    Rows are added on the app during capture; two are shown here as an example.
+                </span>
+            )}
+        </div>
+    );
 }
 
 function inputToRowLimit(value: string) {

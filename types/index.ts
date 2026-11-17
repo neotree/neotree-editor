@@ -30,7 +30,7 @@ export type Preferences = {
  * null / undefined = the screen is shown as an ordinary repeatable form.
  */
 export type ScreenTableConfig = {
-    /** Name shown above the table on the app and on the printout. */
+    /** Name of the table, shown above it on the app and on the printout. Required. */
     title: string;
     /** dynamic: rows are added while capturing. fixed: one row per configured heading. */
     rowMode: 'dynamic' | 'fixed';
@@ -122,6 +122,8 @@ export type ScriptField = {
      */
     numeratorLabel?: string;
     denominatorLabel?: string;
+    /** Table screens only: the column heading, when it should differ from the label. */
+    tableHeading?: string;
     denominatorMinValue?: string;
     denominatorMaxValue?: string;
     values: string;

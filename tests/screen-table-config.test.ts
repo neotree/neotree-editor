@@ -1,14 +1,20 @@
 import assert from "assert";
 
 import {
+    TABLE_SCREEN_TYPE,
     canScreenBeTable,
+    getDisplayedScreenType,
+    getTableColumnHeading,
+    isTableScreen,
     normalizeScreenTableConfig,
+    tableCollectionName,
+    validateTableCollectionName,
     validateScreenTable,
     validateScreenTableConfig,
 } from "../lib/screen-table-config";
 import { getFractionLabels, isFractionDataType, validateFractionDataKey } from "../lib/fraction-data-keys";
 import { syncFieldReference } from "../databases/mutations/data-keys/_update_data_keys_refs.helpers";
-import { dataKeyTypes } from "../constants";
+import { dataKeyTypes, screenTypePickerOptions, screenTypes } from "../constants";
 import { FieldTypes } from "../constants/fields";
 import { computeScriptFingerprint } from "../lib/content-sync-fingerprint";
 import { dataKeyTypeFamily, normalizeDataKeyCompatibilityType } from "../lib/data-key-types";
@@ -77,7 +83,8 @@ import { mapNewScreenToOld } from "../lib/map-old-and-new";
     );
     assert.match(validateScreenTableConfig({ ...fixed!, rows: [{ rowId: "a", label: "" }] })[0], /needs a heading/);
 
-    const dynamic = { title: "", rowMode: "dynamic" as const, rowsHeading: "", rows: [], minRows: null, maxRows: null };
+    const dynamic = { title: "Previous pregnancies", rowMode: "dynamic" as const, rowsHeading: "", rows: [], minRows: null, maxRows: null };
+    assert.match(validateScreenTableConfig({ ...dynamic, title: " " })[0], /give the table a name/, "a table must be named");
     assert.deepEqual(validateScreenTableConfig(dynamic), [], "limits are optional");
     assert.match(validateScreenTableConfig({ ...dynamic, minRows: 5, maxRows: 2 })[0], /cannot be greater/);
     assert.match(validateScreenTableConfig({ ...dynamic, maxRows: 0 })[0], /at least 1/);
@@ -88,6 +95,42 @@ import { mapNewScreenToOld } from "../lib/map-old-and-new";
         /^Screen "History" table:/,
         "save errors name the screen",
     );
+
+    // ── "Table" is a way of creating and showing a form, never a stored type ──────────────────
+
+    const tableScreen = { type: "form", repeatable: true, tableConfig: dynamic };
+    assert.equal(isTableScreen(tableScreen), true);
+    assert.equal(isTableScreen({ ...tableScreen, tableConfig: null }), false, "a repeatable form without table settings is a form");
+    assert.equal(isTableScreen({ ...tableScreen, repeatable: false }), false);
+    assert.equal(isTableScreen(null), false);
+    assert.equal(getDisplayedScreenType(tableScreen), TABLE_SCREEN_TYPE);
+    assert.equal(getDisplayedScreenType({ ...tableScreen, tableConfig: null }), "form");
+    assert.equal(getDisplayedScreenType({ type: "checklist" }), "checklist");
+    assert.equal(screenTypes.some(t => `${t.value}` === TABLE_SCREEN_TYPE), false, "table is not a stored screen type");
+    assert.deepEqual(
+        screenTypePickerOptions.map(t => t.value).slice(screenTypePickerOptions.findIndex(t => t.value === "form")).slice(0, 2),
+        ["form", TABLE_SCREEN_TYPE],
+        "the picker offers Table next to Form",
+    );
+
+    // ── The collection is named after the table, and unique within the script ────────────────
+
+    assert.equal(tableCollectionName("  Previous   pregnancies "), "Previous pregnancies");
+    assert.equal(tableCollectionName(null), "");
+    assert.deepEqual(validateTableCollectionName("Previous pregnancies", ["Medication", "", null]), []);
+    assert.match(validateTableCollectionName("", [])[0], /give the table a name/);
+    assert.match(
+        validateTableCollectionName("previous  pregnancies", ["Previous pregnancies"])[0],
+        /already stores its rows as/,
+        "compared without case or extra spaces",
+    );
+
+    // ── Column headings: the field's own heading, else its label ─────────────────────────────
+
+    assert.equal(getTableColumnHeading({ tableHeading: " Year ", label: "Year of previous delivery", key: "PrevYear" }), "Year");
+    assert.equal(getTableColumnHeading({ tableHeading: "", label: "Year of previous delivery", key: "PrevYear" }), "Year of previous delivery");
+    assert.equal(getTableColumnHeading({ label: "", key: "PrevYear" }), "PrevYear");
+    assert.equal(getTableColumnHeading(null), "");
 
     // ── Fraction: a data key type that carries the labels of its two numbers ─────────────────
 
