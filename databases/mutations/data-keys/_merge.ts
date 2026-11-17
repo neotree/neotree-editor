@@ -22,7 +22,6 @@ import {
     type SameScriptUse,
 } from '@/lib/data-key-merge-analysis';
 import type { MergeReport } from '@/lib/data-key-merge-report';
-import { isNuidManagedDataKey } from '@/lib/nuid-search';
 import { _saveScreens } from '../scripts';
 import { _saveDataKeys } from './_save';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
@@ -170,10 +169,8 @@ export async function _mergeDataKeys({
         const byUniqueKey = new Map(allDataKeys.map((dataKey) => [dataKey.uniqueKey, dataKey]));
         const byId = new Map(allDataKeys.map((dataKey) => [dataKey.uuid, dataKey]));
 
-        const managed = [survivor, ...merged].filter((dataKey) => isNuidManagedDataKey(dataKey as any));
-        if (managed.length) {
-            throw new Error(`NUID Search data keys cannot be merged: ${managed.map(getMergeKeyTitle).join(', ')}.`);
-        }
+        // NUID Search fields on a merged key are re-pointed at the kept key with every
+        // other reference (step 3), dropdown options included.
 
         // Merged keys that other parents offer as options are replaced by the
         // kept key in those parents — library-wide by nature, since a parent's
@@ -510,7 +507,7 @@ export async function _mergeDataKeys({
                         const parentIndex = buildDataKeyParentIndex(allDataKeys.filter((dataKey) => !mergedIds.includes(dataKey.uuid)));
                         const candidates = swappedChildren.filter((childKey) => {
                             const child = byUniqueKey.get(childKey);
-                            return !!child && !child.isDeleted && !isNuidManagedDataKey(child as any) && !(parentIndex.get(childKey) || []).length;
+                            return !!child && !child.isDeleted && !(parentIndex.get(childKey) || []).length;
                         });
 
                         if (candidates.length) {

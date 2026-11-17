@@ -1,7 +1,8 @@
 import { defaultNuidSearchFields } from "@/constants/fields";
 import type { NuidFieldSpec, NuidOptionSpec } from "./constants";
 
-const DROPDOWN_TYPES = ["dropdown", "multi_select"];
+// The mobile app shows only single-choice dropdowns on its NUID Search page.
+const DROPDOWN_TYPES = ["dropdown"];
 
 /** Parse a template `values` string (`"Y,Yes\nN,No"`) into option specs. */
 export function parseTemplateOptionValues(values?: string): NuidOptionSpec[] {

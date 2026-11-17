@@ -205,7 +205,9 @@ function getObjectIdentity(value: unknown, index: number) {
   if (!value || typeof value !== "object") return `index:${index}`
   const record = value as Record<string, unknown>
 
-  for (const key of ["itemId", "id", "uuid", "key", "label", "name", "title"]) {
+  // Stable ids first: a NUID Search field relinked to another key keeps its fieldId, so it
+  // shows as one edited field rather than one removed and one added.
+  for (const key of ["itemId", "fieldId", "id", "uuid", "key", "label", "name", "title"]) {
     const candidate = record[key]
     if (candidate !== null && candidate !== undefined && String(candidate).trim()) return `${key}:${String(candidate)}`
   }

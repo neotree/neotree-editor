@@ -10,10 +10,13 @@ export {
   type NuidConflict,
 } from "./resolve";
 export { buildNuidProvisionPayload, type NuidProvisionKey } from "./provision";
-export { isNuidManagedDataKey, lockManagedDataKeyPatch } from "./managed";
+export { isNuidManagedDataKey } from "./managed";
 export {
   NUID_SEARCH_ROLES,
   NUID_FIELD_TYPE_LABELS,
+  NUID_SUPPORTED_KEYS_DESCRIPTION,
+  getNuidFieldTypeForDataKey,
+  isNuidSupportedDataKey,
   isNuidSearchRole,
   inferNuidSearchRole,
   getLegacyNuidSearchBehaviour,
@@ -24,9 +27,12 @@ export {
   parseNuidOptions,
   formatNuidOptions,
   validateNuidSearchFields,
+  describeNuidField,
+  getActiveNuidSearchFields,
   collectNuidSearchPublishErrors,
   applyLibraryKeyToNuidField,
   type NuidSearchRole,
+  type NuidFieldType,
   type NuidSearchBehaviour,
   type NuidSearchFieldLike,
   type NuidLibraryKeyLike,

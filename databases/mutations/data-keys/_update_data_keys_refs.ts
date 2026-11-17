@@ -8,8 +8,7 @@ import { dataKeys as dataKeysTable, dataKeysDrafts as dataKeysDraftsTable, diagn
 import { _getScreens, _getDiagnoses, _getProblems } from '@/databases/queries/scripts';
 import { _saveScreens, _saveDiagnoses, _saveProblems, _saveScripts } from '@/databases/mutations/scripts';
 import { DataKey, _getDataKeys } from "@/databases/queries/data-keys";
-import { applyLibraryKeyToNuidField, type NuidLibraryKeyFull } from "@/lib/nuid-search/fields";
-import { normalizeDataKeyCompatibilityType } from "@/lib/data-key-types";
+import { applyLibraryKeyToNuidField, getNuidFieldTypeForDataKey, type NuidLibraryKeyFull } from "@/lib/nuid-search/fields";
 import type { ScriptField } from "@/types";
 import {
     shouldSyncFieldOwnedOptions,
@@ -581,12 +580,18 @@ export async function _updateDataKeysRefs({
         // The current library (drafts included) for the NUID dropdowns being rebuilt,
         // indexed by both ids an option list may use.
         const nuidLibraryIndex = new Map<string, DataKey>();
-        const nuidParentKeyIds = Array.from(new Set(
-            scriptRecords
-                .flatMap((record) => record.nuidSearchFields)
-                .filter((f) => (f?.type === 'dropdown') && f.keyId && nuidParentUniqueKeys.has(`${f.keyId}`))
-                .map((f) => `${f.keyId}`),
-        ));
+        // Every NUID field on a changed key follows it: type, options and the rest.
+        const nuidDropdownsToRebuild = scriptRecords
+            .flatMap((record) => record.nuidSearchFields)
+            .filter((f) => f?.keyId && nuidParentUniqueKeys.has(`${f.keyId}`));
+        const nuidParentKeyIds = Array.from(new Set([
+            ...nuidDropdownsToRebuild.map((f) => `${f.keyId}`),
+            // A dropdown re-pointed at one of these keys (a merge: matched by alias)
+            // takes that key's options, so these keys are loaded too.
+            ...(nuidDropdownsToRebuild.length
+                ? dataKeys.map((key) => `${key.uniqueKey || ''}`.trim()).filter(Boolean)
+                : []),
+        ]));
         if (nuidParentKeyIds.length) {
             const parentsRes = await _getDataKeys({ uniqueKeys: nuidParentKeyIds, client: executor });
             const optionIds = Array.from(new Set((parentsRes.data || []).flatMap((k) => k.options || []).map((id) => `${id}`)));
@@ -1000,10 +1005,13 @@ export async function _updateDataKeysRefs({
 
                 // A dropdown on a changed key, or on a key whose options changed:
                 // everything the key owns, options included, comes from the library.
-                const libraryKey = (value.type === 'dropdown') && value.keyId && nuidParentUniqueKeys.has(`${value.keyId}`)
+                // A field on a changed key, or re-pointed at another key (fieldDataKey), takes
+                // everything that key owns: its type (choice or search), options, label…
+                const libraryKey = value.keyId
+                    && (nuidParentUniqueKeys.has(`${value.keyId}`) || !!fieldDataKey)
                     ? getNuidLibraryKey(`${value.keyId}`)
                     : undefined;
-                if (libraryKey && (normalizeDataKeyCompatibilityType(libraryKey.dataType) === normalizeDataKeyCompatibilityType(value.type))) {
+                if (libraryKey && getNuidFieldTypeForDataKey(libraryKey)) {
                     value = applyLibraryKeyToNuidField(value, libraryKey, getNuidLibraryKey);
                 }
 
@@ -1012,7 +1020,10 @@ export async function _updateDataKeysRefs({
                     addUsage({
                         id: field.fieldId || `${script.scriptId}:nuidSearchField:${fieldIndex}`,
                         kind: 'script_nuid_search_field',
-                        title: value.label || value.key || `${fieldIndex + 1}`,
+                        // label and key, e.g. Does the baby have a twin? (BabyTwin)
+                        title: value.label && value.key && value.label !== value.key
+                            ? `${value.label} (${value.key})`
+                            : (value.label || value.key || `${fieldIndex + 1}`),
                         location: 'NUID search',
                         scriptId: script.scriptId,
                         scriptTitle: script.scriptTitle,

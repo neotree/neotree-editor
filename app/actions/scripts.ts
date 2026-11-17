@@ -61,7 +61,7 @@ import {
     type FieldKeyCollisionSeverity,
 } from "@/lib/field-key-collisions";
 import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
-import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
+import { getActiveNuidSearchFields, indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastActionInProgress } from "@/lib/in-progress";
 import {
     assertContentEditable,
@@ -665,6 +665,8 @@ export async function getScriptsWithItems(
 
 export type ScriptConditionErrorInput = {
     scriptId: string;
+    /** Only live NUID fields (NUID Search on) count as script keys. */
+    nuidSearchEnabled?: boolean | null;
     nuidSearchFields?: any;
     eligibilityCriteria?: any;
 };
@@ -731,6 +733,7 @@ async function getScriptConditionInputStamps(scriptIds: string[]): Promise<Map<s
         const rows = await db
             .select({
                 scriptId: scriptsTable.scriptId,
+                nuidSearchEnabled: scriptsTable.nuidSearchEnabled,
                 nuidSearchFields: scriptsTable.nuidSearchFields,
                 eligibilityCriteria: scriptsTable.eligibilityCriteria,
                 draftData: scriptsDrafts.data,
@@ -1143,8 +1146,8 @@ async function computeConditionReportsLean(
             .map((k) => drugItemsByKey.get(k))
             .filter(Boolean);
 
-        const nuidSearchFields = (s?.nuidSearchFields || []) as any[];
-        // NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
+        // Live NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
+        const nuidSearchFields = getActiveNuidSearchFields(s as any) as any[];
         const dataKeys = await scrapDataKeys({
             scripts: [{ nuidSearchFields }] as any,
             dataKeys: globalDataKeys,
@@ -1201,6 +1204,7 @@ async function computeConditionReportsDraftInclusive(
     ] = await Promise.all([
         db.select({
             scriptId: scriptsTable.scriptId,
+            nuidSearchEnabled: scriptsTable.nuidSearchEnabled,
             nuidSearchFields: scriptsTable.nuidSearchFields,
             eligibilityCriteria: scriptsTable.eligibilityCriteria,
         }).from(scriptsTable).where(and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scriptIds))),
@@ -1400,8 +1404,11 @@ async function computeConditionReportsDraftInclusive(
     await runWithConcurrency(Array.from(effectiveById.entries()), 6, async ([scriptId, effective]) => {
         const drugKeys = collectDrugKeysFromScreens(effective.screens);
         const drugsLibrary = Array.from(drugKeys).map((key) => drugItemsByKey.get(key)).filter(Boolean);
-        const nuidSearchFields = (effective.script?.nuidSearchFields || effective.input?.nuidSearchFields || []) as any[];
-        // NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
+        // Live NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
+        const nuidSearchFields = getActiveNuidSearchFields({
+            nuidSearchEnabled: effective.script?.nuidSearchEnabled ?? effective.input?.nuidSearchEnabled,
+            nuidSearchFields: effective.script?.nuidSearchFields || effective.input?.nuidSearchFields || [],
+        }) as any[];
         const dataKeys = await scrapDataKeys({
             scripts: [{ nuidSearchFields }] as any,
             dataKeys: globalDataKeys as any,
@@ -1541,7 +1548,8 @@ export async function getScriptsConditionKeys(
             : [];
 
         const dataKeys = await scrapDataKeys({
-            scripts: scripts.data || [],
+            // Fields kept while NUID Search is off aren't live: their keys aren't script keys.
+            scripts: (scripts.data || []).map((s: any) => ({ ...s, nuidSearchFields: getActiveNuidSearchFields(s) })),
             dataKeys: dataKeysRes.data || [],
             screens: mergedScreens as any,
             diagnoses: mergedDiagnoses as any,
@@ -2181,6 +2189,7 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
                     scriptId: scriptsTable.scriptId,
                     title: scriptsTable.title,
                     report: scriptsTable.conditionErrorReport,
+                    nuidSearchEnabled: scriptsTable.nuidSearchEnabled,
                     nuidSearchFields: scriptsTable.nuidSearchFields,
                     eligibilityCriteria: scriptsTable.eligibilityCriteria,
                 })
@@ -2217,6 +2226,7 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
                 title: `${row.title || 'Untitled script'}`,
                 report: (row.report as ScriptConditionReport | null) || null,
                 hasDraft: false,
+                nuidSearchEnabled: row.nuidSearchEnabled,
                 nuidSearchFields: row.nuidSearchFields,
                 eligibilityCriteria: row.eligibilityCriteria,
             });
@@ -2238,6 +2248,9 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
                     : current?.title || 'Untitled script',
                 report: current?.report || null,
                 hasDraft: true,
+                nuidSearchEnabled: data?.nuidSearchEnabled !== undefined
+                    ? data.nuidSearchEnabled
+                    : current?.nuidSearchEnabled,
                 nuidSearchFields: data?.nuidSearchFields !== undefined
                     ? data.nuidSearchFields
                     : current?.nuidSearchFields,

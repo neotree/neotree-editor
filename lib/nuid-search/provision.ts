@@ -126,14 +126,17 @@ export function buildNuidProvisionPayload(
   };
 
   for (const spec of missing) {
-    if (spec.options?.length) {
-      const childUniqueKeys = spec.options.map((opt) => ensureOption(opt));
+    // A choice is always a dropdown key (one without options is reported as "has no options"),
+    // so the field can link to it; only a search becomes a text key.
+    if (spec.type === "dropdown" || spec.options?.length) {
+      const childUniqueKeys = (spec.options || []).map((opt) => ensureOption(opt));
       ensureKey(spec.key, spec.label || spec.key, "dropdown", {
         options: childUniqueKeys,
         confidential: false,
       });
     } else {
-      ensureKey(spec.key, spec.label || spec.key, spec.type || "text", { confidential: true });
+      // A search: the only other kind of key the mobile app shows on its NUID Search page.
+      ensureKey(spec.key, spec.label || spec.key, "text", { confidential: true });
     }
   }
 

@@ -3,7 +3,9 @@ import assert from "assert"
 import { defaultNuidSearchFields } from "../constants/fields"
 import {
   applyLibraryKeyToNuidField,
+  describeNuidField,
   getCompatibleNuidSearchRoles,
+  getNuidFieldTypeForDataKey,
   collectNuidSearchPublishErrors,
   getNuidSearchRole,
   validateNuidSearchFields,
@@ -23,6 +25,9 @@ const library: Record<string, any> = {
   "dk-n": { uniqueKey: "dk-n", name: "N", label: "No", dataType: "option" },
   "dk-twin-nuid": { uniqueKey: "dk-twin-nuid", name: "BabyTwinNUID", label: "Search twin's NUID", dataType: "text", confidential: true },
   "dk-empty": { uniqueKey: "dk-empty", name: "Empty", label: "Empty", dataType: "dropdown", options: [] },
+  "dk-single": { uniqueKey: "dk-single", name: "Single", label: "One of", dataType: "single_select", options: ["dk-y", "dk-n"] },
+  "dk-multi": { uniqueKey: "dk-multi", name: "Multi", label: "Many of", dataType: "multi_select", options: ["dk-y", "dk-n"] },
+  "dk-yesno": { uniqueKey: "dk-yesno", name: "YN", label: "Yes or no", dataType: "yesno" },
 }
 const getLibraryKey = (id: string) => library[id] || null
 
@@ -38,8 +43,13 @@ assert.ok(validateNuidSearchFields([{ ...twin, keyId: undefined }])[0].errors.so
 assert.ok(validateNuidSearchFields([{ type: "text", searchRole: "patient" }])[0].errors.includes("Choose a Data Key library key."))
 
 // The library must still have the key, of the right type, with options for a choice.
-assert.ok(issues({ ...twin, keyId: "dk-gone" }).errors.some((e) => /no longer exists/.test(e)))
-assert.ok(issues({ ...twin, keyId: "dk-twin-nuid" }).errors.some((e) => /is a text key/.test(e)))
+assert.ok(issues({ ...twin, keyId: "dk-gone" }).errors.some((e) => /isn.t in this library/.test(e)))
+// The field type comes from the key: a choice linked to a text key is out of date (type), and
+// "Update from library" makes it a search. Keys the app can't show here are errors.
+assert.ok(issues({ ...twin, keyId: "dk-twin-nuid" }).errors.some((e) => /out of date.*type/.test(e)))
+assert.ok(issues({ ...twin, keyId: "dk-multi", key: "Multi", label: "Many of" }).errors.some((e) => /multi_select key, which the mobile app can't show/.test(e)))
+assert.ok(issues({ ...twin, keyId: "dk-yesno", key: "YN", label: "Yes or no" }).errors.some((e) => /yesno key, which the mobile app can't show/.test(e)))
+assert.deepEqual(issues({ ...twin, keyId: "dk-single", key: "Single", label: "One of" }).errors, [], "a single select key is a choice")
 assert.ok(issues({ ...twin, keyId: "dk-empty", key: "Empty" }).errors.some((e) => /has no options/.test(e)))
 assert.ok(issues({ ...twin, values: "" }).errors.some((e) => /has no options/.test(e)))
 assert.ok(issues({ ...twin, label: "" }).errors.some((e) => /has no label/.test(e)))
@@ -100,7 +110,7 @@ assert.deepEqual(collectNuidSearchPublishErrors([{ title: "Off", nuidSearchEnabl
 assert.deepEqual(collectNuidSearchPublishErrors([{ title: "Fine", nuidSearchEnabled: true, nuidSearchFields: [twin, twinSearch] }], { getLibraryKey }), [])
 assert.deepEqual(
   collectNuidSearchPublishErrors([{ title: "Admission", nuidSearchEnabled: true, nuidSearchFields: [{ ...twin, keyId: "dk-gone" }] }], { getLibraryKey }),
-  ['Admission: Does the baby have a twin?: The data key for "BabyTwin" no longer exists in the library. Link another key.'],
+  ['Admission: Does the baby have a twin? (BabyTwin): "Does the baby have a twin?" (BabyTwin) is linked to a data key that isn\'t in this library (for example, one from another editor that came in with an import). Link the field to a key from this library.'],
 )
 
 // Nothing stale reaches the app: anything the library owns that differs from it is an error.
@@ -122,6 +132,32 @@ assert.deepEqual(issues({ ...twinSearch, confidential: true }).errors, [], "a fi
   assert.equal(synced.value.optional, true, "the page's required flag is kept")
   assert.deepEqual(syncNuidSearchFieldReference(field, undefined), { value: field, changed: false })
 }
+
+// Which keys NUID Search can use, and the field type each gives (the app renders "dropdown" as a
+// choice and anything else as a Neotree ID search).
+assert.equal(getNuidFieldTypeForDataKey({ dataType: "dropdown" }), "dropdown")
+assert.equal(getNuidFieldTypeForDataKey({ dataType: "single_select" }), "dropdown")
+assert.equal(getNuidFieldTypeForDataKey({ dataType: "text" }), "text")
+for (const dataType of ["multi_select", "yesno", "number", "date", "checklist", "option", "", undefined]) {
+  assert.equal(getNuidFieldTypeForDataKey({ dataType }), null, `${dataType} is not offered`)
+}
+
+// The type follows the key: relinking a choice to a text key makes it a search (no options),
+// and a search relinked to a dropdown key becomes a choice (no role, the key's options).
+{
+  const asSearch = applyLibraryKeyToNuidField({ ...twin }, library["dk-twin-nuid"], getLibraryKey) as any
+  assert.equal(asSearch.type, "text")
+  assert.equal(asSearch.values, undefined, "a search has no options")
+  const asChoice = applyLibraryKeyToNuidField({ ...twinSearch }, library["dk-single"], getLibraryKey) as any
+  assert.equal(asChoice.type, "dropdown")
+  assert.equal(asChoice.searchRole, undefined, "a choice has no search role")
+  assert.equal(asChoice.values, "Y,Yes\nN,No")
+}
+
+// Fields are named by label and key.
+assert.equal(describeNuidField(twin), '"Does the baby have a twin?" (BabyTwin)')
+assert.equal(describeNuidField({ key: "Plain" }), '"Plain"')
+assert.equal(describeNuidField({ key: "Old", label: "Old label" }, { name: "New", label: "New label" }), '"New label" (New)', "the library wins")
 
 // Integrity: an unlinked NUID field is still a blocker.
 assert.equal(isDataKeyIntegrityRuleBlocking({ kind: "nuid_search_field", status: "unmanaged" }), true)

@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath as _revalidatePath } from "next/cache"
+import { SCRIPT_COMPUTED_KEYS } from "@/lib/script-computed-props";
 
 import socket from "@/lib/socket"
 import logger from "@/lib/logger"
@@ -183,6 +184,8 @@ const ignoredDiffKeys = new Set([
   "itemId",
   "dataKeyId",
   "uuid",
+  // computed by the editor, never an edit (see lib/script-computed-props)
+  ...SCRIPT_COMPUTED_KEYS,
 ])
 
 function getCreatedByLabel(createdBy?: { displayName?: string | null; email?: string | null } | null) {
