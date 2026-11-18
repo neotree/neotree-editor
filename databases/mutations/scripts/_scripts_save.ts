@@ -11,6 +11,8 @@ import { _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
 import { removeHexCharacters } from '../../utils'
 import { _getScreens } from '@/databases/queries/scripts';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveScriptsData = Partial<ScriptType> & {
     /** The revision the editor loaded (see lib/entity-revision.ts); checked by the save action. */
@@ -25,7 +27,7 @@ export type SaveScriptsResponse = {
 
 export type ScriptDraftOrigin = "editor" | "data_key_sync" | "import" | "other";
 
-export async function _saveScripts({ data, broadcastAction, syncSilently, userId, draftOrigin = "editor", client, }: {
+async function _saveScriptsNow({ data, broadcastAction, syncSilently, userId, draftOrigin = "editor", client, }: {
     data: SaveScriptsData[],
     broadcastAction?: boolean;
     userId?: string;
@@ -127,7 +129,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                     }
                 }
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
             }
         }
 
@@ -150,3 +152,8 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
 }
 
  
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _saveScripts(...args: Parameters<typeof _saveScriptsNow>): ReturnType<typeof _saveScriptsNow> {
+    return queueContentWrite('a script save', args[0] as any, () => _saveScriptsNow(...args));
+}

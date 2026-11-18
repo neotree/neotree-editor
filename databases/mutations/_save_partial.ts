@@ -8,6 +8,7 @@ import { _saveScreens } from '@/databases/mutations/scripts/_screens_save';
 import { _saveDiagnoses } from '@/databases/mutations/scripts/_diagnoses_save';
 import { _saveProblems } from '@/databases/mutations/scripts/_problems_save';
 import { applyFieldItemPatches, applyIndexedPatches, type FieldItemPatch, type IndexedPatch } from '@/lib/search-replace-payload';
+import { describeError } from '@/lib/server/db-errors';
 
 export type SavePartialParams = {
     broadcastAction?: boolean;
@@ -182,7 +183,7 @@ export async function savePartial({
     } catch(e: any) {
         return {
             success: false,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }

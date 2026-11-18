@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { copyScripts } from "@/app/actions/scripts";
-import { startOrJoinImportJob, buildImportContentKey } from "@/lib/import-jobs";
+import { startOrJoinImportJob, buildImportContentKey, buildImportLogicalKey } from "@/lib/import-jobs";
 import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
@@ -27,22 +27,27 @@ export async function POST(req: NextRequest) {
         // same logical import (same user+site+scripts+overwrite target)
         // idempotent: a duplicate while one is already running joins the
         // in-flight job instead of starting a second import.
+        const keyParams = {
+            requestKey,
+            userId: isAuthorised.user?.userId,
+            fromRemoteSiteId: body.fromRemoteSiteId,
+            toRemoteSiteId: body.toRemoteSiteId,
+            scriptsIds: body.scriptsIds,
+            overWriteScriptWithId: body.overWriteScriptWithId,
+            overwriteDataKeys: !!body.overwriteDataKeys,
+            overwriteDrugsLibraryItems: !!body.overwriteDrugsLibraryItems,
+            dryRun: !!body.dryRun,
+            confirmSourceMismatch: !!body.confirmSourceMismatch,
+            keepTargetOnly: body.keepTargetOnly !== false,
+        };
+        const { resume, ...copyParams } = body;
         const job = startOrJoinImportJob({
             requestKey,
-            contentKey: buildImportContentKey({
-                requestKey,
-                userId: isAuthorised.user?.userId,
-                fromRemoteSiteId: body.fromRemoteSiteId,
-                toRemoteSiteId: body.toRemoteSiteId,
-                scriptsIds: body.scriptsIds,
-                overWriteScriptWithId: body.overWriteScriptWithId,
-                overwriteDataKeys: !!body.overwriteDataKeys,
-                overwriteDrugsLibraryItems: !!body.overwriteDrugsLibraryItems,
-                dryRun: !!body.dryRun,
-                confirmSourceMismatch: !!body.confirmSourceMismatch,
-                keepTargetOnly: body.keepTargetOnly !== false,
-            }),
-            run: () => copyScripts({ ...body, requestKey, }),
+            logicalKey: buildImportLogicalKey(keyParams),
+            // polls ask for a job already started; they never start one
+            resume: !!resume,
+            contentKey: buildImportContentKey(keyParams),
+            run: () => copyScripts({ ...copyParams, requestKey, }),
         });
 
         if (job.status === 'pending') {

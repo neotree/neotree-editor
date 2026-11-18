@@ -10,6 +10,7 @@ import { isAllowed } from './is-allowed';
 import { validateApiKey, validateHeadersItem } from './authenticate';
 import { DataKeysUsageExportRow } from '@/types/data-keys-usage-export';
 import db from '@/databases/pg/drizzle';
+import { describeWriter, runContentTransaction } from '@/lib/server/content-write-lock'
 import { dataKeys, dataKeysDrafts, pendingDeletion, screens, screensDrafts, scripts as scriptsTable, scriptsDrafts as scriptsDraftsTable } from '@/databases/pg/schema';
 import { count, eq, isNull, max } from 'drizzle-orm';
 import { buildDataKeyIntegrityContext, getDataKeyIntegrityEntryFingerprint, isBlockingEntry, repairSingleDataKeyIntegrityReference, scanDataKeyIntegrity, type DataKeyIntegrityEntry } from '@/lib/data-key-integrity';
@@ -23,6 +24,7 @@ import { _getUser } from '@/databases/queries/users';
 import { actingUserHeaders } from '@/lib/acting-user';
 import { assertContentEditable } from '@/lib/server/content-sync';
 import { trustedDraftOrigin } from '@/lib/server/internal-call';
+import { describeError } from '@/lib/server/db-errors';
 
 type BulkIntegrityRepairItemInput = {
     entry: DataKeyIntegrityEntry;
@@ -265,7 +267,7 @@ export const saveDataKeys: typeof _saveDataKeys = async params => {
         return res;
     } catch (e: any) {
         logger.error('saveDataKeys ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [describeError(e)], data: undefined, success: false, };
     }
 }
 
@@ -288,7 +290,7 @@ export const saveDataKeysIfNotExist = async (
         });
     } catch (e: any) {
         logger.error('saveDataKeysIfNotExist ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 };
 
@@ -311,7 +313,7 @@ export const saveDataKeysUpdateIfExist  = async (
         });
     } catch (e: any) {
         logger.error('saveDataKeysUpdateIfExist ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 };
 
@@ -321,7 +323,7 @@ export const previewDataKeysRefsImpact: typeof _previewDataKeysRefsImpact = asyn
         return await _previewDataKeysRefsImpact(params);
     } catch (e: any) {
         logger.error('previewDataKeysRefsImpact ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 }
 
@@ -416,7 +418,7 @@ export const getDataKeysIntegrity = async (params?: {
         return {
             success: false,
             data: null,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }
@@ -427,7 +429,7 @@ export const getPendingDeletionDataKeys = async () => {
         return await _getPendingDeletionDataKeys();
     } catch (e: any) {
         logger.error('getPendingDeletionDataKeys ERROR', e.message);
-        return { data: [], errors: [e.message] };
+        return { data: [], errors: [describeError(e)] };
     }
 };
 
@@ -517,7 +519,7 @@ export const getDataKeysDeleteImpact = async (params?: {
         return {
             success: false,
             data: [],
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }
@@ -570,7 +572,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
 
         const warnings: string[] = [];
         try {
-            await db.transaction(async (tx) => {
+            await runContentTransaction({ label: await describeWriter('a data key integrity fix', session.user?.userId) }, async (tx) => {
                 if (repairs.screens.length) {
                     const repairedScreens = await _saveScreens({
                         data: repairs.screens,
@@ -639,7 +641,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
                 changed: false,
                 reportAfter: null,
                 impactSummary: null,
-                errors: [e.message],
+                errors: [describeError(e)],
                 warnings,
             };
         }
@@ -703,7 +705,7 @@ export const resolveDataKeyIntegrityEntry = async (params: {
             changed: false,
             reportAfter: null,
             impactSummary: null,
-            errors: [e.message],
+            errors: [describeError(e)],
             warnings: [],
         };
     }
@@ -875,7 +877,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
         }
 
         try {
-            await db.transaction(async (tx) => {
+            await runContentTransaction({ label: await describeWriter('a data key integrity fix', session.user?.userId) }, async (tx) => {
                 if (changedScreens.length) {
                     const repairedScreens = await _saveScreens({
                         data: changedScreens,
@@ -945,7 +947,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
                 changed: false,
                 resolvedCount: 0,
                 impactSummary: null,
-                errors: [e.message],
+                errors: [describeError(e)],
                 warnings,
             };
         }
@@ -1010,7 +1012,7 @@ export const resolveDataKeyIntegrityEntriesBulk = async (params: {
             changed: false,
             resolvedCount: 0,
             impactSummary: null,
-            errors: [e.message],
+            errors: [describeError(e)],
             warnings: [],
         };
     }
@@ -1142,7 +1144,7 @@ export const previewDataKeyIntegrityEntriesBulk = async (params: {
         return {
             success: false,
             previews: [],
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }
@@ -1234,7 +1236,7 @@ export const previewDataKeyIntegrityEntryRepair = async (params: {
             success: false,
             changed: false,
             preview: null,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }
@@ -1532,7 +1534,7 @@ export const getDataKeysUsageExportRows = async (params?: {
         return {
             success: false,
             data: [],
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 };
@@ -1606,7 +1608,7 @@ export const exportDataKeys = async ({
         logger.error('exportDataKeys ERROR', JSON.stringify({ siteId, overwriteExisting: !!overwriteExisting, message: e.message }));
         return {
             success: false,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }

@@ -6,6 +6,7 @@ import { devices } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getUniqueDeviceHash } from '@/databases/queries/devices';
 import { DeviceDetails } from '@/types';
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveDevicesData = Omit<typeof devices.$inferInsert, 'deviceHash'> & {
     deviceHash?: string;
@@ -54,7 +55,7 @@ export async function _saveDevices({ data, returnSaved, }: {
                     await q.execute();
                 }
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
             }
         }
 

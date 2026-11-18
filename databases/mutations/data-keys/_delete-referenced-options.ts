@@ -3,6 +3,7 @@ import { _getDataKeysRefs } from '@/databases/queries/data-keys';
 import { _saveScreens, _saveDiagnoses, _saveProblems, _saveScripts, } from '../scripts';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
+import { describeError } from '@/lib/server/db-errors';
 
 type RefRow = Awaited<ReturnType<typeof _getDataKeysRefs>>['data'][0];
 
@@ -386,7 +387,7 @@ export async function _deleteReferencedDataKeyOptions({
         logger.error('_deleteReferencedDataKeyOptions ERROR', e.message);
         return {
             success: false,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }
