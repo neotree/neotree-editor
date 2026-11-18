@@ -2,6 +2,7 @@ import { buildNormalizedDataKeyMatchKey, normalizeDataKeyCompatibilityType, norm
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { DiagnosisType, ProblemType, ScreenType } from "@/databases/queries/scripts";
 import type { ScriptField } from "@/types";
+import { applyLibraryKeyToNuidField, getNuidFieldTypeForDataKey, type NuidLibraryKeyFull } from "@/lib/nuid-search/fields";
 import { DEFAULT_INTEGRITY_POLICY, getIntegrityEntryFingerprint, type IntegrityPolicy } from "@/lib/integrity-policy";
 import {
     getDataKeyIntegrityPublishRuleLabel,
@@ -18,6 +19,29 @@ import {
     syncScreenReference,
 } from "@/databases/mutations/data-keys/_update_data_keys_refs.helpers";
 import { getOutcomeCollectionForScreenType } from "@/lib/conditional-expression/script-outcomes";
+
+
+
+/** Resolves a key (or an option child) by uniqueKey or uuid, for rebuilding NUID options. */
+function getIntegrityLibraryKey(byUniqueKey: Map<string, DataKey>) {
+    let byUuid: Map<string, DataKey> | null = null;
+    return (id: string) => {
+        const hit = byUniqueKey.get(id);
+        if (hit) return hit as NuidLibraryKeyFull;
+        if (!byUuid) byUuid = new Map(Array.from(byUniqueKey.values()).filter(k => k.uuid).map(k => [k.uuid, k]));
+        return (byUuid.get(id) || null) as NuidLibraryKeyFull | null;
+    };
+}
+
+/**
+ * The data type a NUID Search field's key is checked against. The field takes its type from
+ * its key, so a linked key NUID Search can use (dropdown / single select or text) is never a
+ * type conflict, whichever kind the field had; otherwise the field's own type.
+ */
+function nuidExpectedDataType(field: ScriptField, byUniqueKey: Map<string, DataKey>) {
+    const linked = field.keyId ? byUniqueKey.get(field.keyId) : undefined;
+    return linked && getNuidFieldTypeForDataKey(linked) ? `${linked.dataType || ""}` : `${field.type || ""}`;
+}
 
 export type DataKeyIntegrityStatus =
     | "resolved"
@@ -898,16 +922,17 @@ export function scanDataKeyIntegrity({
 
         (script.nuidSearchFields || []).forEach((field, fieldIndex) => {
             if (!hasReferenceIdentity([field.keyId, field.key])) return;
+            const expectedDataType = nuidExpectedDataType(field, resolvedContext.byUniqueKey);
 
-            pushEntry(evaluateReference({
+            const entry = evaluateReference({
                 currentUniqueKey: field.keyId || undefined,
                 currentKey: field.key || undefined,
                 currentLabel: field.label || undefined,
-                expectedDataType: field.type || "",
+                expectedDataType,
                 base: {
                     ...scriptBase,
                     kind: "nuid_search_field",
-                    expectedDataType: field.type || "",
+                    expectedDataType,
                     currentUniqueKey: field.keyId || undefined,
                     currentKey: field.key || undefined,
                     currentLabel: field.label || undefined,
@@ -916,7 +941,21 @@ export function scanDataKeyIntegrity({
                     location: buildNuidSearchFieldLocation(field, fieldIndex),
                 },
                 context: resolvedContext,
-            }));
+            });
+
+            // The field takes its type from its key: a choice on a text key (or the reverse) is
+            // out of sync until it is updated from the library (the repair does that).
+            const linked = field.keyId ? resolvedContext.byUniqueKey.get(field.keyId) : undefined;
+            const keyType = linked ? getNuidFieldTypeForDataKey(linked) : null;
+            if (entry.status === "resolved" && keyType && keyType !== field.type) {
+                pushEntry({
+                    ...entry,
+                    status: "out_of_sync",
+                    reason: `The field is a ${field.type || "untyped"} field, but its data key makes it a ${keyType} field`,
+                });
+                return;
+            }
+            pushEntry(entry);
         });
     }
 
@@ -1251,13 +1290,17 @@ export function repairDataKeyIntegrityReferences<TScript extends NuidSearchSourc
                 currentUniqueKey: field.keyId || undefined,
                 currentKey: field.key || undefined,
                 currentLabel: field.label || undefined,
-                expectedDataType: field.type || "",
+                expectedDataType: nuidExpectedDataType(field, byUniqueKey),
                 byUniqueKey,
                 legacyMaps,
             });
             const synced = syncNuidSearchFieldReference(field, fieldDataKey);
-            if (synced.changed) changed = true;
-            return synced.value;
+            // Everything the key owns, type and options included, as the editor and publish check expect.
+            const value = fieldDataKey && getNuidFieldTypeForDataKey(fieldDataKey)
+                ? applyLibraryKeyToNuidField(synced.value, fieldDataKey as NuidLibraryKeyFull, getIntegrityLibraryKey(byUniqueKey))
+                : synced.value;
+            if (synced.changed || JSON.stringify(value) !== JSON.stringify(synced.value)) changed = true;
+            return value;
         });
 
         return {
@@ -1539,13 +1582,17 @@ export function repairSingleDataKeyIntegrityReference<TScript extends NuidSearch
                 currentUniqueKey: field.keyId || undefined,
                 currentKey: field.key || undefined,
                 currentLabel: field.label || undefined,
-                expectedDataType: field.type || "",
+                expectedDataType: nuidExpectedDataType(field, byUniqueKey),
                 byUniqueKey,
                 legacyMaps,
             });
             const synced = syncNuidSearchFieldReference(field, fieldDataKey);
-            if (synced.changed) changed = true;
-            return synced.value;
+            // Everything the key owns, type and options included, as the editor and publish check expect.
+            const value = fieldDataKey && getNuidFieldTypeForDataKey(fieldDataKey)
+                ? applyLibraryKeyToNuidField(synced.value, fieldDataKey as NuidLibraryKeyFull, getIntegrityLibraryKey(byUniqueKey))
+                : synced.value;
+            if (synced.changed || JSON.stringify(value) !== JSON.stringify(synced.value)) changed = true;
+            return value;
         });
 
         return {

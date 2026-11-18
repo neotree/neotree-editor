@@ -12,6 +12,7 @@ import {
     screensDrafts,
 } from '@/databases/pg/schema';
 import { escapeLikePattern } from '@/lib/sql-like';
+import { describeError } from '@/lib/server/db-errors';
 
 /**
  * JSON keys that hold data key references in screens/diagnoses/problems. The
@@ -239,6 +240,6 @@ export async function _assertDataKeyRefsCleared({
         return { success: true };
     } catch (e: any) {
         logger.error('_assertDataKeyRefsCleared ERROR', e.message);
-        return { success: false, errors: [e.message] };
+        return { success: false, errors: [describeError(e)] };
     }
 }

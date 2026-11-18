@@ -1,5 +1,6 @@
 import { normalizeDataKeyCompatibilityType } from "@/lib/data-key-types";
 import type { NuidFieldSpec } from "./constants";
+import { getNuidFieldTypeForDataKey } from "./fields";
 
 /** Minimal shape of a library data key needed to resolve/match. */
 export type NuidLibraryKey = {
@@ -15,8 +16,12 @@ export type ResolvedNuidField = NuidFieldSpec & { keyId: string };
 
 export type NuidConflict = {
   key: string;
+  /** The template field's label. */
+  label?: string;
   expectedType: string;
   foundType: string;
+  /** The label of the existing key that can't be used. */
+  foundLabel?: string;
 };
 
 export type NuidResolution = {
@@ -68,8 +73,8 @@ export function resolveNuidLibraryKeys(
 
 /**
  * Resolve a NUID template against the data-key library, matching by exact key
- * name and library type-compatibility (the same normalisation the field picker
- * uses). Never mutates anything — it only classifies each field so the caller
+ * name and kind (a choice needs a dropdown / single select key, a search a text
+ * key: the only keys the mobile app shows on its NUID Search page). Never mutates anything — it only classifies each field so the caller
  * can auto-link the resolved ones and prompt for the rest.
  */
 export function resolveNuidTemplate(
@@ -89,17 +94,22 @@ export function resolveNuidTemplate(
       continue;
     }
 
+    // A template field keeps its kind: other fields' conditions rely on a choice being a
+    // choice (e.g. $BabyTransfered = 'Y'), so only a same-name key of the same kind that the
+    // mobile app can show here is linked. Anything else is reported, never silently used.
     const compatible = sameName.find(
-      (k) => normalizeDataKeyCompatibilityType(k.dataType) === expected,
+      (k) => !!getNuidFieldTypeForDataKey(k) && normalizeDataKeyCompatibilityType(k.dataType) === expected,
     );
 
     if (compatible) {
-      linked.push({ ...spec, keyId: keyIdOf(compatible) });
+      linked.push({ ...spec, type: getNuidFieldTypeForDataKey(compatible) || spec.type, keyId: keyIdOf(compatible) });
     } else {
       conflicts.push({
         key: spec.key,
-        expectedType: expected,
-        foundType: normalizeDataKeyCompatibilityType(sameName[0].dataType),
+        label: spec.label,
+        expectedType: spec.type === "dropdown" ? "dropdown" : "text",
+        foundType: `${sameName[0].dataType || "untyped"}`,
+        foundLabel: `${sameName[0].label || ""}`,
       });
     }
   }

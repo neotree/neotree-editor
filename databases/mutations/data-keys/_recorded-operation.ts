@@ -1,6 +1,6 @@
 import { inArray } from 'drizzle-orm';
 
-import db from '@/databases/pg/drizzle';
+import { describeWriter, runContentTransaction } from '@/lib/server/content-write-lock';
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { dataKeyMerges, users } from '@/databases/pg/schema';
 import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/scripts';
@@ -147,7 +147,10 @@ export async function runRecordedDataKeyOperation<T>({
     let outcome: { preview: OperationPreview; result: T; operationId?: string } | undefined;
 
     try {
-        await db.transaction(async (tx) => {
+        // One writer at a time on this editor (lib/server/content-write-lock.ts); previews too, since they
+        // write the drafts before rolling them back.
+        const label = await describeWriter(dryRun ? 'a data key change preview' : 'a data key change (merge, delete or unlink)', userId);
+        await runContentTransaction({ label }, async (tx) => {
             const loadScripts = async (): Promise<ScriptEntities> => {
                 if (!scriptIds.length) return { screens: [], diagnoses: [], problems: [] };
                 const screens = await _getScreens({ scriptsIds: scriptIds, returnDraftsIfExist: true, client: tx });

@@ -30,6 +30,12 @@ type CopyResult = Awaited<ReturnType<ReturnType<typeof useScriptsContext>['copyS
 
 const newRequestKey = () => Math.random().toString(12).substring(2);
 
+// How the dialog follows an import running on the server (see waitForCompletion).
+const CHECK_INTERVAL_MS = 20 * 1000;
+const MAX_FAILED_CHECKS = 6;
+// a little longer than the server's own limit (lib/import-jobs.ts), which answers with an error first
+const MAX_CLIENT_WAIT_MS = 25 * 60 * 1000;
+
 const STEP_TEXT: Record<'source' | 'review' | 'import' | 'done', string> = {
     source: 'Step 1 of 3 \u00b7 Choose what to import',
     review: 'Step 2 of 3 \u00b7 Review the changes',
@@ -187,21 +193,40 @@ export function ScriptsImportModal({
     // only acks that it started, and the same request is asked again (idempotent on requestKey) when the
     // job signals completion over the socket, or every 45 s in case that signal is missed. The socket
     // event is only a "check now" signal: the result itself only travels over this authenticated request.
+    //
+    // The checks are polls (`resume`): they never start the import again. If the editor lost the job (it was
+    // restarted), the answer says so. If the editor can't be reached for several checks in a row, or the
+    // import runs past the server's own limit, the dialog stops waiting and says what is known.
     const waitForCompletion = (requestBody: Record<string, any>) => {
         let settled = false;
+        let failedChecks = 0;
+        const startedAt = Date.now();
         const stop = () => { settled = true; socket.off(requestBody.requestKey, onSignal); clearInterval(pollTimer); };
+        const giveUp = (message: string) => {
+            if (settled) return;
+            stop();
+            setRequestKey(newRequestKey());
+            setError(message);
+            setStep('error');
+        };
         const check = async () => {
             if (settled) return;
             try {
-                const res = (await axios.post('/api/scripts/copy', requestBody)).data as { started?: boolean; } & CopyResult;
-                if (!res.started && !settled) { stop(); handleRunResult(res, !!requestBody.dryRun); }
-            } catch {
-                // the next signal or poll resolves it
+                const res = (await axios.post('/api/scripts/copy', { ...requestBody, resume: true }, { timeout: 60 * 1000 })).data as { started?: boolean; } & CopyResult;
+                failedChecks = 0;
+                if (!res.started && !settled) { stop(); handleRunResult(res, !!requestBody.dryRun); return; }
+                if (Date.now() - startedAt > MAX_CLIENT_WAIT_MS) {
+                    giveUp('This is taking much longer than expected, so the dialog stopped waiting. The import may still finish on the server: check the script for new drafts before trying again.');
+                }
+            } catch (e: any) {
+                if (++failedChecks >= MAX_FAILED_CHECKS) {
+                    giveUp(`Lost contact with this editor while the import was running (${e?.message || 'network error'}). It may still finish on the server: reload the page and check the script for new drafts before trying again.`);
+                }
             }
         };
         const onSignal = (key: string) => { if (key === IMPORT_JOB_COMPLETE_EVENT && !settled) check(); };
         socket.on(requestBody.requestKey, onSignal);
-        const pollTimer = setInterval(check, 45 * 1000);
+        const pollTimer = setInterval(check, CHECK_INTERVAL_MS);
     };
 
     const run = async (dryRun: boolean) => {
@@ -524,7 +549,8 @@ export function ScriptsImportModal({
                                 <div>
                                     <div className="font-medium">{runningKind === 'preview' ? 'The preview could not be prepared' : 'The import did not go through'}</div>
                                     <div className="mt-1">{error}</div>
-                                    {runningKind === 'import' && <div className="mt-1 opacity-80">Nothing was saved: an import is saved completely or not at all.</div>}
+                                    {/* the message says itself when something may still be saving */}
+                                    {runningKind === 'import' && !/saved|finish/i.test(error || '') && <div className="mt-1 opacity-80">Nothing was saved: an import is saved completely or not at all.</div>}
                                 </div>
                             </div>
                         </ErrorCard>
@@ -711,6 +737,8 @@ function ImportProgress({
             { key: BROADCAST_ACTIONS_IN_PROGRESS.loading_remote_dff, label: `Loading drugs library from ${site.name}` },
             { key: BROADCAST_ACTIONS_IN_PROGRESS.uploading_remote_files, label: `Copying files from ${site.name}` },
         ]),
+        // only shown while it happens: another import, a publish or a save is running on this editor
+        { key: BROADCAST_ACTIONS_IN_PROGRESS.waiting_for_other_changes, label: 'Waiting for another change on this editor to finish', optional: true },
         { key: BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, label: 'Saving scripts' },
         { key: BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, label: 'Saving drugs & fluids' },
         { key: BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, label: 'Saving data keys' },
@@ -758,7 +786,7 @@ function ImportProgress({
             </div>
             <ScrollArea className="max-h-[320px]">
                 <div className="flex flex-col gap-y-1.5">
-                    {steps.map(s => {
+                    {steps.filter(s => !s.optional || s.key in events).map(s => {
                         const active = latestEvent === s.key && events[s.key] !== false;
                         const done = events[s.key] === false;
                         const Icon = active ? EllipsisIcon : done ? CheckIcon : XIcon;

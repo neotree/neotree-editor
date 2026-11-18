@@ -24,7 +24,7 @@ type ProblemData = Awaited<ReturnType<typeof _getProblems>>["data"][number];
 type NuidSearchScriptData = {
     scriptId: string;
     title?: string | null;
-    nuidSearchFields?: Array<{ keyId?: string | null; key?: string | null; label?: string | null }> | null;
+    nuidSearchFields?: Array<{ keyId?: string | null; key?: string | null; label?: string | null; fieldId?: string | null }> | null;
 };
 
 /**
@@ -348,8 +348,11 @@ export function buildDataKeysDeleteImpact({
                 scriptId: script.scriptId,
                 scriptTitle: script.title,
                 keyId: field.keyId,
-                label: `NUID search > ${field.label || field.key || `field ${fieldIndex + 1}`}`,
-                href: `/script/${script.scriptId}`,
+                label: `NUID search > ${field.label && field.key && field.label !== field.key
+                    ? `${field.label} (${field.key})`
+                    : (field.label || field.key || `field ${fieldIndex + 1}`)}`,
+                // straight to the field on the script's NUID Search page
+                href: `/script/${script.scriptId}?nuidSearchField=${encodeURIComponent(field.fieldId || `${fieldIndex}`)}`,
             });
         });
     });

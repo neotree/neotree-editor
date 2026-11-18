@@ -6,6 +6,7 @@ import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { screens, screensDrafts, pendingDeletion, scriptsDrafts, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
 
 export type DeleteScreensData = {
     screensIds?: string[];
@@ -33,7 +34,7 @@ export async function _deleteAllScreensDrafts(opts?: {
     }
 }
 
-export async function _deleteScreens(
+async function _deleteScreensNow(
     { 
         screensIds = [], 
         scriptsIds = [], 
@@ -97,4 +98,9 @@ export async function _deleteScreens(
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'delete_screens');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _deleteScreens(...args: Parameters<typeof _deleteScreensNow>): ReturnType<typeof _deleteScreensNow> {
+    return queueContentWrite('a screen deletion', args[0] as any, () => _deleteScreensNow(...args));
 }

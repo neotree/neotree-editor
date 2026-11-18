@@ -1,4 +1,5 @@
 import { desc, eq, Query } from 'drizzle-orm';
+import { scriptContentChanged, stripScriptComputedProps } from '@/lib/script-computed-props';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
@@ -10,6 +11,8 @@ import { _getScript, ScriptType } from '../../queries/scripts/_scripts_get';
 import { removeHexCharacters } from '../../utils'
 import { _getScreens } from '@/databases/queries/scripts';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveScriptsData = Partial<ScriptType> & {
     /** The revision the editor loaded (see lib/entity-revision.ts); checked by the save action. */
@@ -24,7 +27,7 @@ export type SaveScriptsResponse = {
 
 export type ScriptDraftOrigin = "editor" | "data_key_sync" | "import" | "other";
 
-export async function _saveScripts({ data, broadcastAction, syncSilently, userId, draftOrigin = "editor", client, }: {
+async function _saveScriptsNow({ data, broadcastAction, syncSilently, userId, draftOrigin = "editor", client, }: {
     data: SaveScriptsData[],
     broadcastAction?: boolean;
     userId?: string;
@@ -59,10 +62,11 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                     });
 
                     if (draft) {
-                        const data = {
+                        // Computed properties never live in a draft (a copy from an older save is dropped).
+                        const data = stripScriptComputedProps({
                             ...draft.data,
                             ...item,
-                        } as typeof draft.data;
+                        }) as typeof draft.data;
                         
                         const q = executor
                             .update(scriptsDrafts)
@@ -95,13 +99,18 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                             position = Math.max(0, script?.position || 0, scriptDraft?.position || 0) + 1;
                         }
 
-                        const data = {
+                        const data = stripScriptComputedProps({
                             ...published,
                             ...item,
                             scriptId,
                             version: published?.version ? (published.version + 1) : 1,
                             position,
-                        } as typeof scriptsDrafts.$inferInsert['data'];
+                        }) as typeof scriptsDrafts.$inferInsert['data'];
+
+                        // A save that changes nothing (e.g. Save with no edits) leaves no draft behind.
+                        if (published && !scriptContentChanged(published as Record<string, any>, data as Record<string, any>)) {
+                            continue;
+                        }
 
                         const q = executor.insert(scriptsDrafts).values({
                             data,
@@ -120,7 +129,7 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                     }
                 }
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
             }
         }
 
@@ -143,3 +152,8 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
 }
 
  
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _saveScripts(...args: Parameters<typeof _saveScriptsNow>): ReturnType<typeof _saveScriptsNow> {
+    return queueContentWrite('a script save', args[0] as any, () => _saveScriptsNow(...args));
+}

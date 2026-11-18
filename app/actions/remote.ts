@@ -3,6 +3,7 @@ import queryString from 'query-string';
 import { broadcastActionInProgress as _broadcastActionInProgress, BROADCAST_ACTIONS_IN_PROGRESS }from '@/lib/in-progress';
 import { getSiteAxiosClient }from '@/lib/server/axios';
 import logger from '@/lib/logger';
+import { describeError } from '@/lib/server/db-errors';
 import {
     type GetDataKeysParams,
     type GetDataKeysResults,
@@ -108,7 +109,7 @@ export const loadRemoteScripts = async ({
         return { ...data, time, };
     } catch(e: any) {
         if (throwError) throw e;
-        return { data: [], errors: [e.message], time, };
+        return { data: [], errors: [describeError(e, 'the source editor')], time, };
     }
 };
 
@@ -159,7 +160,7 @@ export const loadRemoteScreens = async ({
         return { ...res, time, };
     } catch(e: any) {
         if (throwError) throw e;
-        return { data: [], errors: [e.message], time, };
+        return { data: [], errors: [describeError(e, 'the source editor')], time, };
     }
 };
 
@@ -211,7 +212,7 @@ export const loadRemoteDiagnoses = async ({
         return { ...res, time, };
     } catch(e: any) {
         if (throwError) throw e;
-        return { data: [], errors: [e.message], time, };
+        return { data: [], errors: [describeError(e, 'the source editor')], time, };
     }
 };
 
@@ -263,7 +264,7 @@ export const loadRemoteProblems = async ({
         return { ...res, time, };
     } catch(e: any) {
         if (throwError) throw e;
-        return { data: [], errors: [e.message], time, };
+        return { data: [], errors: [describeError(e, 'the source editor')], time, };
     }
 };
 
@@ -308,7 +309,7 @@ export const loadRemoteDrugsLibraryItems = async ({
         return { ...data, time, };
     } catch(e: any) {
         if (throwError) throw e;
-        return { data: [], errors: [e.message], time, };
+        return { data: [], errors: [describeError(e, 'the source editor')], time, };
     }
 };
 
@@ -356,7 +357,7 @@ export const loadRemoteDataKeys = async ({
         return { ...data, time, };
     } catch(e: any) {
         if (throwError) throw e;
-        return { data: [], errors: [e.message], time, };
+        return { data: [], errors: [describeError(e, 'the source editor')], time, };
     }
 };
 
@@ -516,7 +517,7 @@ export const loadRemoteScriptsWithItems = async ({
         };
     } catch(e: any) {
         if (throwError) throw e;
-        return { data: [], files: [], errors: [e.message], time, };
+        return { data: [], files: [], errors: [describeError(e, 'the source editor')], time, };
     }
 };
 
@@ -602,6 +603,6 @@ export const uploadRemoteFiles = async ({
         return { data, time, };
     } catch(e: any) {
         if (throwError) throw e;
-        return { data: {}, errors: [e.message], time, };
+        return { data: {}, errors: [describeError(e, 'the source editor')], time, };
     }
 };

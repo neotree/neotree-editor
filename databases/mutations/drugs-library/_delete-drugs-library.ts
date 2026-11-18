@@ -9,6 +9,7 @@ import { _getDrugsLibraryItems } from '@/databases/queries/drugs-library';
 import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
 import { and } from 'drizzle-orm';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
 
 export type DeleteDrugsLibraryItemsData = {
     itemsIds: string[];
@@ -32,7 +33,7 @@ export async function _deleteAllDrugsLibraryItemsDrafts(opts?: {
     }
 }
 
-export async function _deleteDrugsLibraryItems(
+async function _deleteDrugsLibraryItemsNow(
     { itemsIds: itemsIdsParam, broadcastAction, userId, }: DeleteDrugsLibraryItemsData,
 ) {
     const response: DeleteDrugsLibraryItemsResponse = { success: false, };
@@ -70,4 +71,9 @@ export async function _deleteDrugsLibraryItems(
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'delete_drugs_library_items');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _deleteDrugsLibraryItems(...args: Parameters<typeof _deleteDrugsLibraryItemsNow>): ReturnType<typeof _deleteDrugsLibraryItemsNow> {
+    return queueContentWrite('a drugs library deletion', args[0] as any, () => _deleteDrugsLibraryItemsNow(...args));
 }

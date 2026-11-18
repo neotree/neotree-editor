@@ -11,6 +11,8 @@ import { _saveScreens } from '@/databases/mutations/scripts';
 import { _getScreens } from '@/databases/queries/scripts';
 import { _removeDrugLibraryItemsReferences } from './_remove-items-references';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveDrugsLibraryItemsData = Partial<typeof drugsLibrary.$inferSelect>;
 
@@ -95,7 +97,7 @@ export async function _copyDrugsLibraryItems({ data, ...params }: {
         return await _saveDrugsLibraryItems({ data: itemsToCopy, ...params, });
     } catch(e: any) {
         logger.error('_copyDrugsLibraryItems ERROR', e.message);
-        return { success: false, errors: [e.message], };
+        return { success: false, errors: [describeError(e)], };
     }
 }
 
@@ -131,7 +133,7 @@ export async function _saveDrugsLibraryItemsIfKeysNotExist({ data, ...params }: 
         return { success: true, };
     } catch(e: any) {
         logger.error('_saveDrugsLibraryItemsIfKeysNotExist ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     } 
 }
 
@@ -171,11 +173,11 @@ export async function _saveDrugsLibraryItemsUpdateIfExists({ data, ...params }: 
         return { success: true, };
     } catch(e: any) {
         logger.error('_saveDrugsLibraryItemsAndUpdateIfExists ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     } 
 }
 
-export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, client, }: {
+async function _saveDrugsLibraryItemsNow({ data, broadcastAction, userId, client, }: {
     data: SaveDrugsLibraryItemsData[],
     broadcastAction?: boolean,
     userId?: string;
@@ -274,7 +276,7 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, cl
                     }
                 }
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
             }
         }
 
@@ -352,4 +354,9 @@ export async function _saveDrugsLibraryItems({ data, broadcastAction, userId, cl
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_drugs_library_items');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _saveDrugsLibraryItems(...args: Parameters<typeof _saveDrugsLibraryItemsNow>): ReturnType<typeof _saveDrugsLibraryItemsNow> {
+    return queueContentWrite('a drugs library save', args[0] as any, () => _saveDrugsLibraryItemsNow(...args));
 }

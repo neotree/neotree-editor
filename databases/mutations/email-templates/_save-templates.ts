@@ -2,6 +2,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { emailTemplates } from '@/databases/pg/schema';
 import { eq } from 'drizzle-orm';
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveEmailTemplatesData = typeof emailTemplates.$inferInsert;
 
@@ -25,7 +26,7 @@ export async function _saveEmailTemplates(
             try {
                 await db.update(emailTemplates).set(item).where(eq(emailTemplates.id, item.id!));
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
             }
         }
 

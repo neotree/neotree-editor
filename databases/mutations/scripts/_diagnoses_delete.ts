@@ -6,6 +6,7 @@ import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { diagnoses, diagnosesDrafts, pendingDeletion, scriptsDrafts, } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
 
 export type DeleteDiagnosesData = {
     diagnosesIds?: string[];
@@ -33,7 +34,7 @@ export async function _deleteAllDiagnosesDrafts(opts?: {
     }
 }
 
-export async function _deleteDiagnoses(
+async function _deleteDiagnosesNow(
     { 
         diagnosesIds = [], 
         scriptsIds = [], 
@@ -97,4 +98,9 @@ export async function _deleteDiagnoses(
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'delete_diagnoses');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _deleteDiagnoses(...args: Parameters<typeof _deleteDiagnosesNow>): ReturnType<typeof _deleteDiagnosesNow> {
+    return queueContentWrite('a diagnosis deletion', args[0] as any, () => _deleteDiagnosesNow(...args));
 }

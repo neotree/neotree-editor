@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
 import { sites } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveSitesData = typeof sites.$inferInsert;
 
@@ -27,7 +28,7 @@ export async function _saveSites(
             try {
                 await db.update(sites).set(item).where(eq(sites.id, item.id!));
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
             }
         }
 

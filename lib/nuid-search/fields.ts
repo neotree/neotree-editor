@@ -8,7 +8,7 @@
  * only decides how it uses the key — its condition, whether it is required, and
  * for a search, its role.
  */
-import { normalizeDataKeyCompatibilityType } from "@/lib/data-key-types";
+import { normalizeDataKeyType } from "@/lib/data-key-types";
 
 /**
  * What a "Neotree ID search" field does on the app. Set explicitly so the app
@@ -43,6 +43,32 @@ export const NUID_FIELD_TYPE_LABELS: Record<string, string> = {
   dropdown: "Choice",
   text: "Neotree ID search",
 };
+
+/** The two field types the mobile app renders on its NUID Search page. */
+export type NuidFieldType = "dropdown" | "text";
+
+/**
+ * The NUID Search field type a library key gives, or null when the mobile app can't show
+ * that kind of key there. The app renders `type === "dropdown"` as a single choice from the
+ * key's options and anything else as a Neotree ID search, so only these are offered:
+ * dropdown / single select keys (they always have options) become a Choice, text keys a
+ * Neotree ID search. Everything else (multi select, yes/no, number, date…) would surprise.
+ */
+export function getNuidFieldTypeForDataKey(dataKey?: { dataType?: string | null } | null): NuidFieldType | null {
+  const type = normalizeDataKeyType(dataKey?.dataType);
+  if (type === "single_select") return "dropdown";
+  if (type === "text") return "text";
+  return null;
+}
+
+/** Whether a library key can be used on the NUID Search page. */
+export function isNuidSupportedDataKey(dataKey?: { dataType?: string | null } | null) {
+  return !!getNuidFieldTypeForDataKey(dataKey);
+}
+
+/** Said wherever an unsupported key needs explaining. */
+export const NUID_SUPPORTED_KEYS_DESCRIPTION =
+  "NUID Search uses dropdown or single select keys (shown as a choice) and text keys (shown as a Neotree ID search).";
 
 export type NuidSearchFieldLike = {
   key?: string | null;
@@ -175,6 +201,28 @@ export function formatNuidOptions(options: { value: string; label: string }[]) {
 }
 
 /**
+ * The NUID Search fields that are live: none while NUID Search is switched off (the fields are
+ * kept for when it is switched back on, but devices don't get them, so their keys must not
+ * count as script keys for conditions either).
+ */
+export function getActiveNuidSearchFields<T = NuidSearchFieldLike>(
+  script?: { nuidSearchEnabled?: boolean | null; nuidSearchFields?: T[] | null } | null,
+): T[] {
+  return script?.nuidSearchEnabled ? (script.nuidSearchFields || []) : [];
+}
+
+/** "Does the baby have a twin?" (BabyTwin): the label the app shows, then the key conditions use. */
+export function describeNuidField(
+  f?: { key?: string | null; label?: string | null } | null,
+  libraryKey?: { name?: string | null; label?: string | null } | null,
+) {
+  const key = `${libraryKey?.name || f?.key || ""}`.trim();
+  const label = `${libraryKey?.label || f?.label || ""}`.trim();
+  if (label && key && label !== key) return `"${label}" (${key})`;
+  return `"${label || key || "This field"}"`;
+}
+
+/**
  * Checks each field. Without `getLibraryKey` only what the field itself shows is
  * checked; with it, the linked key is checked against the library too.
  */
@@ -196,35 +244,37 @@ export function validateNuidSearchFields(
     const warnings: string[] = [];
     const key = `${f?.key || ""}`.trim();
     const type = `${f?.type || ""}`.trim();
+    const libraryKey = f?.keyId && opts?.getLibraryKey ? opts.getLibraryKey(`${f.keyId}`) : undefined;
+    // Named by label and key everywhere ("Does the baby have a twin?" (BabyTwin)).
+    const who = describeNuidField(f, libraryKey);
 
     if (!f?.keyId) {
       errors.push(key
-        ? `"${key}" is not linked to a Data Key library key. Link it, or create it in the library.`
+        ? `${who} is not linked to a Data Key library key. Link it, or create it in the library.`
         : "Choose a Data Key library key.");
     } else if (opts?.getLibraryKey) {
-      const libraryKey = opts.getLibraryKey(`${f.keyId}`);
       if (!libraryKey) {
-        errors.push(`The data key for "${key || "this field"}" no longer exists in the library. Link another key.`);
-      } else if (normalizeDataKeyCompatibilityType(libraryKey.dataType) !== normalizeDataKeyCompatibilityType(type)) {
-        errors.push(`"${libraryKey.name}" is a ${libraryKey.dataType || "untyped"} key, but this field needs a ${type || "typed"} key.`);
-      } else if ((type === "dropdown") && !libraryKey.options?.length) {
-        errors.push(`"${libraryKey.name}" has no options. Add them in the Data Key library.`);
+        errors.push(`${who} is linked to a data key that isn't in this library (for example, one from another editor that came in with an import). Link the field to a key from this library.`);
+      } else if (!getNuidFieldTypeForDataKey(libraryKey)) {
+        errors.push(`${who} is linked to a ${libraryKey.dataType || "untyped"} key, which the mobile app can't show on the NUID Search page. ${NUID_SUPPORTED_KEYS_DESCRIPTION} Link another key.`);
+      } else if ((getNuidFieldTypeForDataKey(libraryKey) === "dropdown") && !libraryKey.options?.length) {
+        errors.push(`${who} has no options. Add them in the Data Key library.`);
       } else {
         // Nothing the library owns may differ from it by the time it reaches the app.
         const expected = applyLibraryKeyToNuidField(f, libraryKey, opts.getLibraryKey);
-        const stale: string[] = (["key", "label", "values"] as const).filter((p) => `${expected[p] ?? ""}` !== `${f[p] ?? ""}`);
+        const stale: string[] = (["key", "label", "type", "values"] as const).filter((p) => `${expected[p] ?? ""}` !== `${f[p] ?? ""}`);
         if (!!expected.confidential !== !!f.confidential || !!expected.confidentialLabelOnly !== !!f.confidentialLabelOnly) stale.push("confidentiality");
         if (stale.length) {
-          errors.push(`"${key}" is out of date with the Data Key library (${stale.join(", ")}). Open the script's NUID Search page and save it to refresh.`);
+          errors.push(`${who} is out of date with the Data Key library (${stale.join(", ")}). Use "Update from library" on the script's NUID Search page.`);
         }
       }
     }
 
-    if (key && (keyCounts.get(key.toLowerCase()) || 0) > 1) errors.push(`"${key}" is used by more than one field.`);
-    if (f?.keyId && !`${f?.label || ""}`.trim()) errors.push(`"${key}" has no label. Add one in the Data Key library.`);
+    if (key && (keyCounts.get(key.toLowerCase()) || 0) > 1) errors.push(`${who} is used by more than one field.`);
+    if (f?.keyId && !`${f?.label || ""}`.trim()) errors.push(`${who} has no label, so the app shows the question without one. Add a label in the Data Key library.`);
 
     if (type === "dropdown") {
-      if (f?.keyId && !parseNuidOptions(f.values).length) errors.push(`"${key}" has no options. Add them in the Data Key library.`);
+      if (f?.keyId && !parseNuidOptions(f.values).length) errors.push(`${who} has no options. Add them in the Data Key library.`);
     } else if (type === "text") {
       if (f?.searchRole && !isNuidSearchRole(f.searchRole)) {
         errors.push(`Unknown search role "${f.searchRole}".`);
@@ -233,7 +283,7 @@ export function validateNuidSearchFields(
         const compatible = getCompatibleNuidSearchRoles(f);
         if (!compatible.includes(f.searchRole as NuidSearchRole)) {
           errors.push(
-            `Search role "${getNuidSearchRoleLabel(f.searchRole as NuidSearchRole)}" doesn't match what released app versions do with "${key}": `
+            `Search role "${getNuidSearchRoleLabel(f.searchRole as NuidSearchRole)}" doesn't match what released app versions do with ${who}: `
             + `they treat it as ${describeLegacyNuidSearchBehaviour(f)}. `
             + (compatible.length
               ? `Choose ${compatible.map((r) => `"${getNuidSearchRoleLabel(r)}"`).join(" or ")}, or link a key that matches the role.`
@@ -265,7 +315,8 @@ export function collectNuidSearchPublishErrors(
     if (!script?.nuidSearchEnabled) continue;
     const fields = script.nuidSearchFields || [];
     validateNuidSearchFields(fields, opts).forEach((report, i) => {
-      const name = `${fields[i]?.label || fields[i]?.key || `field ${i + 1}`}`.trim();
+      const name = `${fields[i]?.label || fields[i]?.key || `field ${i + 1}`}`.trim()
+        + (fields[i]?.label && fields[i]?.key && fields[i]?.label !== fields[i]?.key ? ` (${fields[i]?.key})` : "");
       report.errors.forEach((error) => lines.push(`${script.title || "Untitled script"}: ${name}: ${error}`));
     });
   }
@@ -280,8 +331,8 @@ export type NuidLibraryKeyFull = NuidLibraryKeyLike & {
 };
 
 /**
- * The field as its library key says it is: everything the key owns (name,
- * label, options, confidentiality) comes from the library; what the page owns
+ * The field as its library key says it is: everything the key owns (name, label,
+ * field type, options, confidentiality) comes from the library; what the page owns
  * (condition, required, role) is left alone. `getKey` resolves the key's option
  * children by id.
  */
@@ -290,8 +341,11 @@ export function applyLibraryKeyToNuidField<T extends NuidSearchFieldLike>(
   libraryKey: NuidLibraryKeyFull,
   getKey: (id: string) => NuidLibraryKeyFull | null | undefined,
 ): T {
+  // The type is the key's too: a choice for dropdown keys, a search for text keys.
+  const type = getNuidFieldTypeForDataKey(libraryKey) || field.type;
   const next: T = {
     ...field,
+    type,
     keyId: libraryKey.uniqueKey || field.keyId,
     key: `${libraryKey.name || ""}`,
     label: `${libraryKey.label || libraryKey.name || ""}`,
@@ -299,7 +353,13 @@ export function applyLibraryKeyToNuidField<T extends NuidSearchFieldLike>(
     confidentialLabelOnly: !!libraryKey.confidentialLabelOnly,
   };
 
-  if (field.type === "dropdown") {
+  if (type !== field.type) {
+    // A choice has no search role; a search has no options.
+    if (type !== "text") delete (next as NuidSearchFieldLike).searchRole;
+    if (type !== "dropdown") delete (next as NuidSearchFieldLike).values;
+  }
+
+  if (type === "dropdown") {
     const options = (libraryKey.options || [])
       .map((id) => getKey(`${id}`))
       .filter((c): c is NuidLibraryKeyFull => !!c?.name)

@@ -20,6 +20,7 @@ import {
     dataKeys as dataKeysTable,
     dataKeysDrafts as dataKeysDraftsTable,
     scriptImportSources as scriptImportSourcesTable,
+    sites as sitesTable,
     type ScriptImportSnapshot,
 } from "@/databases/pg/schema";
 import * as mutations from "@/databases/mutations/scripts";
@@ -28,6 +29,15 @@ import { _saveDrugsLibraryItemsUpdateIfExists, _saveDrugsLibraryItemsIfKeysNotEx
 import { _saveDataKeys } from "@/databases/mutations/data-keys";
 import { _getSiteApiKey, } from '@/databases/queries/sites';
 import logger from "@/lib/logger";
+import {
+    ContentWriteBusyError,
+    describeWriter,
+    IMPORT_WRITE_WAIT_MS,
+    lockContentWritesInTransaction,
+    runContentTransaction,
+    withContentWriteLock,
+} from "@/lib/server/content-write-lock";
+import { describeError } from "@/lib/server/db-errors";
 import socket from "@/lib/socket";
 import { getSiteAxiosClient } from "@/lib/server/axios";
 import { isAllowed } from "./is-allowed";
@@ -61,7 +71,7 @@ import {
     type FieldKeyCollisionSeverity,
 } from "@/lib/field-key-collisions";
 import { getConditionKeyRegistry } from "@/lib/server/condition-key-registry";
-import { indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
+import { getActiveNuidSearchFields, indexDataKeysById, resolveNuidLibraryKeys } from "@/lib/nuid-search";
 import { BROADCAST_ACTIONS_IN_PROGRESS, broadcastActionInProgress as _broadcastActionInProgress } from "@/lib/in-progress";
 import {
     assertContentEditable,
@@ -107,7 +117,7 @@ export const countScreens: typeof queries._countScreens = async (...args) => {
         return await queries._countScreens(...args);
     } catch (e: any) {
         logger.error('countScreens ERROR', e.message);
-        return { errors: [e.message], data: queries._defaultScreensCount, };
+        return { errors: [describeError(e)], data: queries._defaultScreensCount, };
     }
 };
 
@@ -117,7 +127,7 @@ export const getScreens: typeof queries._getScreens = async (...args) => {
         return await queries._getScreens(...args);
     } catch(e: any) {
         logger.error('getScreens ERROR', e.message);
-        return { errors: [e.message], data: [], };
+        return { errors: [describeError(e)], data: [], };
     }
 };
 
@@ -127,7 +137,7 @@ export const listScreens: typeof queries._listScreens = async (...args) => {
         return await queries._listScreens(...args);
     } catch (e: any) {
         logger.error('listScreens ERROR', e.message);
-        return { errors: [e.message], data: [], };
+        return { errors: [describeError(e)], data: [], };
     }
 };
 
@@ -203,7 +213,7 @@ export const deleteScreens: typeof mutations._deleteScreens = async params => {
         return res;
     } catch (e: any) {
         logger.error('deleteScreens ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 };
 
@@ -329,7 +339,7 @@ async function saveScreensInternal(
         return res;
     } catch (e: any) {
         logger.error('getSys ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 }
 
@@ -342,7 +352,7 @@ export const countDiagnoses: typeof queries._countDiagnoses = async (...args) =>
         return await queries._countDiagnoses(...args);
     } catch (e: any) {
         logger.error('countDiagnoses ERROR', e.message);
-        return { errors: [e.message], data: queries._defaultDiagnosesCount, };
+        return { errors: [describeError(e)], data: queries._defaultDiagnosesCount, };
     }
 };
 
@@ -352,7 +362,7 @@ export const getDiagnoses: typeof queries._getDiagnoses = async (...args) => {
         return await queries._getDiagnoses(...args);
     } catch (e: any) {
         logger.error('getDiagnoses ERROR', e.message);
-        return { errors: [e.message], data: [], };
+        return { errors: [describeError(e)], data: [], };
     }
 };
 
@@ -383,7 +393,7 @@ export const deleteDiagnoses: typeof mutations._deleteDiagnoses = async params =
         return res;
     } catch (e: any) {
         logger.error('deleteDiagnoses ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 };
 
@@ -394,7 +404,7 @@ export const countProblems: typeof queries._countProblems = async (...args) => {
         return await queries._countProblems(...args);
     } catch (e: any) {
         logger.error('countProblems ERROR', e.message);
-        return { errors: [e.message], data: queries._defaultProblemsCount, };
+        return { errors: [describeError(e)], data: queries._defaultProblemsCount, };
     }
 };
 
@@ -404,7 +414,7 @@ export const getProblems: typeof queries._getProblems = async (...args) => {
         return await queries._getProblems(...args);
     } catch (e: any) {
         logger.error('getProblems ERROR', e.message);
-        return { errors: [e.message], data: [], };
+        return { errors: [describeError(e)], data: [], };
     }
 };
 
@@ -435,7 +445,7 @@ export const deleteProblems: typeof mutations._deleteProblems = async params => 
         return res;
     } catch (e: any) {
         logger.error('deleteProblems ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 };
 
@@ -475,7 +485,7 @@ async function saveDiagnosesInternal(
         return res;
     } catch (e: any) {
         logger.error('saveDiagnoses ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 }
 
@@ -517,7 +527,7 @@ async function saveProblemsInternal(
         return res;
     } catch (e: any) {
         logger.error('saveProblems ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 }
 
@@ -530,7 +540,7 @@ export const countScripts: typeof queries._countScripts = async (...args) => {
         return await queries._countScripts(...args);
     } catch (e: any) {
         logger.error('countScripts ERROR', e.message);
-        return { errors: [e.message], data: queries._defaultScriptsCount, };
+        return { errors: [describeError(e)], data: queries._defaultScriptsCount, };
     }
 };
 
@@ -540,7 +550,7 @@ export const getScripts: typeof queries._getScripts = async (...args) => {
         return await queries._getScripts(...args);
     } catch (e: any) {
         logger.error('getScripts ERROR', e.message);
-        return { errors: [e.message], data: [], };
+        return { errors: [describeError(e)], data: [], };
     }
 };
 
@@ -563,7 +573,7 @@ export const deleteScripts: typeof mutations._deleteScripts = async params => {
         });
     } catch (e: any) {
         logger.error('deleteScripts ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 };
 
@@ -584,7 +594,7 @@ export const saveScripts: typeof mutations._saveScripts = async params => {
         return res;
     } catch (e: any) {
         logger.error('saveScripts ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [describeError(e)], data: undefined, success: false, };
     }
 };
 
@@ -659,12 +669,14 @@ export async function getScriptsWithItems(
         return { data, };
     } catch (e: any) {
         logger.error('getScriptsWithItems ERROR', e.message);
-        return { data: [], errors: [e.message], };
+        return { data: [], errors: [describeError(e)], };
     }
 }
 
 export type ScriptConditionErrorInput = {
     scriptId: string;
+    /** Only live NUID fields (NUID Search on) count as script keys. */
+    nuidSearchEnabled?: boolean | null;
     nuidSearchFields?: any;
     eligibilityCriteria?: any;
 };
@@ -731,6 +743,7 @@ async function getScriptConditionInputStamps(scriptIds: string[]): Promise<Map<s
         const rows = await db
             .select({
                 scriptId: scriptsTable.scriptId,
+                nuidSearchEnabled: scriptsTable.nuidSearchEnabled,
                 nuidSearchFields: scriptsTable.nuidSearchFields,
                 eligibilityCriteria: scriptsTable.eligibilityCriteria,
                 draftData: scriptsDrafts.data,
@@ -1007,7 +1020,7 @@ async function saveOutcomeEntityWithReferenceRewrite(
         ? { screens: [], diagnoses: [], problems: [], script: undefined, findings: [], occurrences: 0 }
         : buildScriptOutcomeReferencePatches(scriptWithIncoming, collection, oldKey, newKey);
 
-    await db.transaction(async (tx) => {
+    await runContentTransaction({ label: await describeWriter('a save that renames an outcome key', userId) }, async (tx) => {
         const diagnosisData = mergePatches(kind === "diagnosis" ? items : [], patches.diagnoses, "diagnosisId");
         const problemData = mergePatches(kind === "problem" ? items : [], patches.problems, "problemId");
         const results: any[] = [];
@@ -1143,8 +1156,8 @@ async function computeConditionReportsLean(
             .map((k) => drugItemsByKey.get(k))
             .filter(Boolean);
 
-        const nuidSearchFields = (s?.nuidSearchFields || []) as any[];
-        // NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
+        // Live NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
+        const nuidSearchFields = getActiveNuidSearchFields(s as any) as any[];
         const dataKeys = await scrapDataKeys({
             scripts: [{ nuidSearchFields }] as any,
             dataKeys: globalDataKeys,
@@ -1201,6 +1214,7 @@ async function computeConditionReportsDraftInclusive(
     ] = await Promise.all([
         db.select({
             scriptId: scriptsTable.scriptId,
+            nuidSearchEnabled: scriptsTable.nuidSearchEnabled,
             nuidSearchFields: scriptsTable.nuidSearchFields,
             eligibilityCriteria: scriptsTable.eligibilityCriteria,
         }).from(scriptsTable).where(and(isNull(scriptsTable.deletedAt), inArray(scriptsTable.scriptId, scriptIds))),
@@ -1400,8 +1414,11 @@ async function computeConditionReportsDraftInclusive(
     await runWithConcurrency(Array.from(effectiveById.entries()), 6, async ([scriptId, effective]) => {
         const drugKeys = collectDrugKeysFromScreens(effective.screens);
         const drugsLibrary = Array.from(drugKeys).map((key) => drugItemsByKey.get(key)).filter(Boolean);
-        const nuidSearchFields = (effective.script?.nuidSearchFields || effective.input?.nuidSearchFields || []) as any[];
-        // NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
+        // Live NUID search keys count as script keys, as in the script editor (getScriptsConditionKeys).
+        const nuidSearchFields = getActiveNuidSearchFields({
+            nuidSearchEnabled: effective.script?.nuidSearchEnabled ?? effective.input?.nuidSearchEnabled,
+            nuidSearchFields: effective.script?.nuidSearchFields || effective.input?.nuidSearchFields || [],
+        }) as any[];
         const dataKeys = await scrapDataKeys({
             scripts: [{ nuidSearchFields }] as any,
             dataKeys: globalDataKeys as any,
@@ -1541,7 +1558,8 @@ export async function getScriptsConditionKeys(
             : [];
 
         const dataKeys = await scrapDataKeys({
-            scripts: scripts.data || [],
+            // Fields kept while NUID Search is off aren't live: their keys aren't script keys.
+            scripts: (scripts.data || []).map((s: any) => ({ ...s, nuidSearchFields: getActiveNuidSearchFields(s) })),
             dataKeys: dataKeysRes.data || [],
             screens: mergedScreens as any,
             diagnoses: mergedDiagnoses as any,
@@ -1567,7 +1585,7 @@ export async function getScriptsConditionKeys(
         return { data: [{ scriptId: ids[0], dataKeys, conditionKeys, conditionScreens }] };
     } catch (e: any) {
         logger.error('getScriptsConditionKeys ERROR', e?.message);
-        return { data: [], errors: [e.message] };
+        return { data: [], errors: [describeError(e)] };
     }
 }
 
@@ -1661,7 +1679,7 @@ export async function recheckScriptConditionErrors(scriptId: string): Promise<{
         return { count: (row?.report as ScriptConditionReport | null)?.count || 0 };
     } catch (e: any) {
         logger.error('recheckScriptConditionErrors ERROR', e.message);
-        return { count: 0, errors: [e.message] };
+        return { count: 0, errors: [describeError(e)] };
     }
 }
 
@@ -1754,7 +1772,7 @@ export async function getScriptsConditionErrors(
         return { data: pruned, errors: [] };
     } catch (e: any) {
         logger.error('getScriptsConditionErrors ERROR', e.message);
-        return { data: {}, errors: [e.message] };
+        return { data: {}, errors: [describeError(e)] };
     }
 }
 
@@ -2181,6 +2199,7 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
                     scriptId: scriptsTable.scriptId,
                     title: scriptsTable.title,
                     report: scriptsTable.conditionErrorReport,
+                    nuidSearchEnabled: scriptsTable.nuidSearchEnabled,
                     nuidSearchFields: scriptsTable.nuidSearchFields,
                     eligibilityCriteria: scriptsTable.eligibilityCriteria,
                 })
@@ -2217,6 +2236,7 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
                 title: `${row.title || 'Untitled script'}`,
                 report: (row.report as ScriptConditionReport | null) || null,
                 hasDraft: false,
+                nuidSearchEnabled: row.nuidSearchEnabled,
                 nuidSearchFields: row.nuidSearchFields,
                 eligibilityCriteria: row.eligibilityCriteria,
             });
@@ -2238,6 +2258,9 @@ export async function getScriptsWithConditionErrors(opts?: { scriptIds?: string[
                     : current?.title || 'Untitled script',
                 report: current?.report || null,
                 hasDraft: true,
+                nuidSearchEnabled: data?.nuidSearchEnabled !== undefined
+                    ? data.nuidSearchEnabled
+                    : current?.nuidSearchEnabled,
                 nuidSearchFields: data?.nuidSearchFields !== undefined
                     ? data.nuidSearchFields
                     : current?.nuidSearchFields,
@@ -2456,7 +2479,7 @@ async function saveScriptScreens({
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptScreens ERROR', e.message);
-        return { saved: 0, success: false, errors: [e.message], };
+        return { saved: 0, success: false, errors: [describeError(e)], };
     }
 }
 
@@ -2579,7 +2602,7 @@ async function saveScriptDiagnoses({
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptDiagnoses ERROR', e.message);
-        return { saved: 0, success: false, errors: [e.message], };
+        return { saved: 0, success: false, errors: [describeError(e)], };
     }
 }
 
@@ -2701,7 +2724,7 @@ async function saveScriptProblems({
         return { saved, success: true, };
     } catch (e: any) {
         logger.error('saveScriptProblems ERROR', e.message);
-        return { saved: 0, success: false, errors: [e.message], };
+        return { saved: 0, success: false, errors: [describeError(e)], };
     }
 }
 
@@ -2730,7 +2753,7 @@ export async function deleteScriptsItems({ scriptsIds, draftOrigin, client, }: {
         return { success: true, };
     } catch (e: any) {
         logger.error('deleteScriptsItems ERROR', e.message);
-        return { success: false, errors: [e.message], };
+        return { success: false, errors: [describeError(e)], };
     }
 }
 
@@ -2871,7 +2894,12 @@ export async function saveScriptsWithItems({ data, uploadedFiles, client, }: {
                 // resolves successfully (see below) — mutating them from inside
                 // the callback would overcount if a later step in the same
                 // transaction fails and rolls everything back.
-                const txInfo = await (client || db).transaction(async (tx) => {
+                // Standalone, the save queues behind this editor's other writers (lib/server/content-write-lock.ts);
+                // inside an import it is a savepoint of the import's transaction, which already holds the lock.
+                const transact = client
+                    ? <T,>(fn: (tx: DbOrTransaction) => Promise<T>) => client.transaction(fn as any) as Promise<T>
+                    : <T,>(fn: (tx: DbOrTransaction) => Promise<T>) => runContentTransaction({ label: `a save of “${script.title || 'a script'}”` }, fn as any) as Promise<T>;
+                const txInfo = await transact(async (tx) => {
                     if (overWriteScript?.data) {
                         const delRes = await deleteScriptsItems({
                             scriptsIds: [overWriteScript.data.scriptId],
@@ -2955,7 +2983,8 @@ export async function saveScriptsWithItems({ data, uploadedFiles, client, }: {
                     };
                 }
             } catch (e: any) {
-                errors.push(e.message);
+                logger.error('saveScriptsWithItems script ERROR', script.title, e.message, e?.cause?.message || '');
+                errors.push(`“${script.title || 'Script'}” could not be saved: ${describeError(e)}`);
                 continue;
             }
         }
@@ -2965,8 +2994,8 @@ export async function saveScriptsWithItems({ data, uploadedFiles, client, }: {
         void recomputeScriptsConditionErrors(savedScriptIds);
         return { success: true, info, savedScriptIds, importIdMaps, };
     } catch (e: any) {
-        logger.error('saveScriptsWithItems ERROR', e.message);
-        return { success: false, errors: [e.message], info, savedScriptIds, };
+        logger.error('saveScriptsWithItems ERROR', e.message, e?.cause?.message || '');
+        return { success: false, errors: [describeError(e)], info, savedScriptIds, };
     }
 }
 
@@ -3438,6 +3467,7 @@ async function applyMergeImport({
     const draftOrigin = 'import' as const;
     const oldScriptId = plan.target.script.oldScriptId ?? null;
     return await db.transaction(async (tx) => {
+        await lockContentWritesInTransaction(tx);
         if (plan.script) {
             const res = await saveScripts({ data: [plan.script as any], draftOrigin, client: tx });
             if (res.errors?.length) throw new Error(res.errors.join(', '));
@@ -3654,21 +3684,44 @@ async function exportScriptsViaRemoteImport({
     };
 
     // The target runs the import in the background; ask again (same body = same job) until it settles.
+    // Only the first request may start it: later ones are polls (`resume`), so a target that restarted
+    // says it lost the job instead of running the import a second time. A few failed polls in a row
+    // (network) are tolerated; then the export says what went wrong instead of waiting on.
+    const targetName = await getSiteDisplayName(toRemoteSiteId);
     const startedAt = Date.now();
     const MAX_WAIT_MS = 25 * 60 * 1000;
+    const MAX_FAILED_POLLS = 6;
+    let failedPolls = 0;
+    let first = true;
     while (true) {
-        const res = await axiosClient.post('/api/scripts/copy', body, { headers });
-        const data = res.data as { started?: boolean } & Awaited<ReturnType<typeof saveScriptsWithItems>> & { preview?: ScriptImportPreview[] };
+        let data: { started?: boolean } & Awaited<ReturnType<typeof saveScriptsWithItems>> & { preview?: ScriptImportPreview[] };
+        try {
+            const res = await axiosClient.post('/api/scripts/copy', first ? body : { ...body, resume: true }, { headers });
+            data = res.data;
+            failedPolls = 0;
+        } catch (e: any) {
+            if (first || ++failedPolls >= MAX_FAILED_POLLS) {
+                logger.error('exportScriptsViaRemoteImport ERROR', e.message);
+                return {
+                    success: false,
+                    errors: [`The export to ${targetName} ${first ? 'could not start' : 'lost contact with it'}: ${describeError(e, targetName)}${first ? '' : ' It may still finish there: check its drafts before trying again.'}`],
+                    info,
+                };
+            }
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            continue;
+        }
+        first = false;
         if (!data?.started) {
             return {
                 ...data,
                 info: { ...info, ...(data?.info || {}) },
-                errors: data?.errors?.map(e => `Target editor: ${e}`),
+                errors: data?.errors?.map(e => `${targetName}: ${e}`),
                 success: !!data?.success,
             };
         }
         if (Date.now() - startedAt > MAX_WAIT_MS) {
-            return { success: false, errors: ['The target editor is still importing. Check its drafts before trying again.'], info, };
+            return { success: false, errors: [`${targetName} is still importing after ${Math.round(MAX_WAIT_MS / 60000)} minutes. Check its drafts before trying again.`], info, };
         }
         await new Promise(resolve => setTimeout(resolve, 5000));
     }
@@ -3683,6 +3736,16 @@ export async function copyScripts(params?: Parameters<typeof copyScriptsInternal
     // an import changes what the sync status shows (pending imports, new sync points)
     if (res?.success && !params?.dryRun) clearContentSyncStatusCache();
     return res;
+}
+
+/** The other editor's name as people know it (Settings > Sites), for messages. */
+async function getSiteDisplayName(siteId: string) {
+    try {
+        const site = await db.query.sites.findFirst({ where: eq(sitesTable.siteId, siteId), columns: { name: true, displayName: true, link: true } });
+        return site?.displayName || site?.name || site?.link || 'the source editor';
+    } catch {
+        return 'the source editor';
+    }
 }
 
 async function copyScriptsInternal(params?: {
@@ -3741,6 +3804,13 @@ async function copyScriptsInternal(params?: {
         return _broadcastActionInProgress(requestKey!, action, loading);
     };
 
+    // Where the import is, for the message when it fails: people need to know what did not happen.
+    let step = 'checking the import';
+    let siteName = 'the source editor';
+    const importFailure = (e: any) => e instanceof ContentWriteBusyError
+        ? `The import did not save anything: ${e.message}`
+        : `The import stopped while ${step}: ${describeError(e, siteName)}. Nothing was saved.`;
+
     try {
         const session = await isAllowed('import_scripts');
         const userId = session.user?.userId;
@@ -3787,24 +3857,16 @@ async function copyScriptsInternal(params?: {
             if (blocked) return { success: false, errors: [blocked], info, };
         }
 
-        const { data: localDataKeys, } = await _getDataKeys({ includePendingDeletion: true, });
-
         let importedDataKeys: Awaited<ReturnType<typeof _getDataKeys>>['data'] = [];
         let scrappedDataKeys: Awaited<ReturnType<typeof scrapDataKeys>> = [];
         let importedDataKeyAffectedScriptIds: string[] = [];
         let importedFiles: Awaited<ReturnType<typeof uploadRemoteFiles>>['data'] = {};
         const warnings: string[] = [];
 
-        let scripts: GetScriptsWithItemsResponse = fromRemoteSiteId ? { data: [], } : await getScriptsWithItems({ scriptsIds });
+        let scripts: GetScriptsWithItemsResponse = { data: [], };
         let dataKeysToSave: Awaited<ReturnType<typeof parseImportedDataKeys>>['dataKeys'] = [];
         let dffItemsToSave: Awaited<ReturnType<typeof getScriptsWithItems>>['data'][0]['drugsLibrary'] = [];
         const dataKeySnapshots: Record<string, ScriptImportSnapshot['dataKeys']> = {};
-
-        if (scripts.errors) return { success: false, errors: scripts.errors, info, };
-
-        if (!fromRemoteSiteId && scriptsIds.length && !scripts.data.length) {
-            return { success: false, errors: [`Script(s) not found: ${scriptsIds.join(', ')}`], info, };
-        }
 
         let siteUrl: undefined | string = undefined;
         let mergeBase: Awaited<ReturnType<typeof resolveMergeBase>> | null = null;
@@ -3814,7 +3876,10 @@ async function copyScriptsInternal(params?: {
         let sourceFingerprints = new Map<string, string>();
 
         if (fromRemoteSiteId) {
+            step = 'connecting to the source editor';
+            siteName = await getSiteDisplayName(fromRemoteSiteId);
             const axiosClient = await getSiteAxiosClient(fromRemoteSiteId);
+            step = `loading the scripts and data keys from ${siteName}`;
             sourceFingerprints = await fetchRemoteScriptFingerprints(fromRemoteSiteId, scriptsIds);
 
             siteUrl = axiosClient.defaults.baseURL;
@@ -3824,7 +3889,7 @@ async function copyScriptsInternal(params?: {
                 remoteSiteId: fromRemoteSiteId,
                 axiosClient,
             });
-            if (importedDataKeysRes.errors?.length) return { success: false, errors: importedDataKeysRes.errors, info, };
+            if (importedDataKeysRes.errors?.length) return { success: false, errors: importedDataKeysRes.errors.map(e => `The import stopped while ${step}: ${e.replace(/the source editor/g, siteName)}`), info, };
             importedDataKeys = importedDataKeysRes.data;
 
             const res = await loadRemoteScriptsWithItems({
@@ -3835,7 +3900,7 @@ async function copyScriptsInternal(params?: {
                 scriptsIds,
             });
 
-            if (res.errors?.length) return { success: false, errors: res.errors, info, };
+            if (res.errors?.length) return { success: false, errors: res.errors.map(e => `The import stopped while ${step}: ${e.replace(/the source editor/g, siteName)}`), info, };
 
             scripts = res;
 
@@ -3844,6 +3909,7 @@ async function copyScriptsInternal(params?: {
             }
 
             if (!dryRun) {
+                step = `copying files from ${siteName}`;
                 const uploadRes = await uploadRemoteFiles({
                     files: res.files,
                     requestKey,
@@ -3853,140 +3919,12 @@ async function copyScriptsInternal(params?: {
             }
 
             timings['remote_fetch'] = importedDataKeysRes.time + res.time;
-
-            scripts.data.forEach(({ dataKeys, drugsLibrary }) => {
-                scrappedDataKeys = [...scrappedDataKeys, ...dataKeys];
-                dffItemsToSave = [...dffItemsToSave, ...drugsLibrary];
-            });
-
-            if (isMergeImport) {
-                mergeBase = await resolveMergeBase(overWriteScriptWithId!, scripts.data[0].scriptId, fromRemoteSiteId, { persist: !dryRun });
-            }
-
-            const liveUniqueKeys = new Set(localDataKeys.map(k => k.uniqueKey));
-            const takenUniqueKeys = await getTakenDataKeyUniqueKeys(importedDataKeys.map(k => k.uniqueKey), liveUniqueKeys);
-            const mode = overwriteDataKeys ? 'three_way' as const : 'additive' as const;
-
-            let index = -1;
-            const parseImportedStartedAt = Date.now();
-            for (const s of scripts.data) {
-                index++;
-                // Only the source's published state is imported; say so when it has more.
-                if ((s as any).hasChangedItems || (s as any).hasDeletedItems || (s as any).isDraft) {
-                    warnings.push(`"${s.title}" has unpublished changes on the source editor. They are not part of this import until they are published there.`);
-                }
-                const parseArgs = {
-                    localDataKeys,
-                    importedDataKeys,
-                    importedScrappedKeys: scrappedDataKeys,
-                    importedScreens: s.screens,
-                    importedDiagnoses: s.diagnoses,
-                    importedProblems: s.problems,
-                    importedDrugsLibraryItems: s.drugsLibrary,
-                    importedNuidSearchFields: (s.nuidSearchFields || []) as any[],
-                    mode,
-                    baseDataKeys: mergeBase?.base?.dataKeys || null,
-                    takenUniqueKeys,
-                };
-                let parsed = await parseImportedDataKeys(parseArgs);
-
-                // Options the source removed are only removed from a key when no other script uses them.
-                const removalCandidates = parsed.dataKeys
-                    .filter(k => k.canSave)
-                    .flatMap(k => k.removedOptions.map(option => ({ parent: k.uniqueKey, option })));
-                if (removalCandidates.length) {
-                    const usedElsewhere = await getOptionsUsedOutsideScripts(
-                        removalCandidates,
-                        overWriteScriptWithId ? [overWriteScriptWithId] : [],
-                    );
-                    if (usedElsewhere.size) {
-                        parsed = await parseImportedDataKeys({
-                            ...parseArgs,
-                            isOptionUsedOutsideImport: (parent, option) => usedElsewhere.has(`${parent}|${option}`),
-                        });
-                    }
-                }
-
-                const { dataKeys, screens, diagnoses, problems, drugsLibrary, nuidSearchFields } = parsed;
-                parsed.warnings.forEach(w => warnings.push(w));
-
-                scripts.data[index].screens = screens as unknown as typeof s.screens;
-                scripts.data[index].diagnoses = diagnoses as unknown as typeof s.diagnoses;
-                scripts.data[index].problems = problems as unknown as typeof s.problems;
-                scripts.data[index].drugsLibrary = drugsLibrary as unknown as typeof s.drugsLibrary;
-                scripts.data[index].nuidSearchFields = nuidSearchFields as unknown as typeof s.nuidSearchFields;
-
-                // What the source has for every key this script uses (in this editor's ids): the base
-                // for the next import's three-way merge.
-                dataKeySnapshots[s.scriptId] = Object.fromEntries(
-                    dataKeys.filter(k => k.isReferenced).map(k => [k.uniqueKey, k.sourceSnapshot]),
-                );
-
-                dataKeys.filter(k => k.canSave).forEach(k => {
-                    if (!dataKeysToSave.some(saved => saved.uniqueKey === k.uniqueKey)) dataKeysToSave.push(k);
-                });
-            }
-
-            markTiming('parse_imported_data_keys', parseImportedStartedAt);
         }
 
-        // The same drug can come with several scripts.
-        dffItemsToSave = dffItemsToSave
-            .filter(item => !!item?.key)
-            .filter((item, i, all) => all.findIndex(other => `${other.key}`.toLowerCase() === `${item.key}`.toLowerCase()) === i);
-
-        const dataKeysPreview: ScriptImportPreview['dataKeys'] = {
-            created: dataKeysToSave.filter(k => k.isNew).length,
-            updated: dataKeysToSave.filter(k => !k.isNew).length,
-            optionsAdded: dataKeysToSave.filter(k => !k.isNew).reduce((sum, k) => sum + k.addedOptions.length, 0),
-            optionsRemoved: dataKeysToSave.reduce((sum, k) => sum + k.removedOptions.length, 0),
-            details: dataKeysToSave.slice(0, 200).map(k => ({
-                label: k.label || k.name,
-                isNew: k.isNew,
-                added: k.isNew ? 0 : k.addedOptions.length,
-                removed: k.removedOptions.length,
-                changed: k.changedProps,
-            })),
-        };
-
-        // Drugs and data keys are saved in the same transaction as the scripts: if any part fails,
-        // nothing is saved (screens referencing options their data key doesn't have, or the reverse).
-        const libraryInfo = { dffItems: 0, dataKeys: 0, };
-        const saveLibraries = async (tx: DbOrTransaction) => {
-            if (dffItemsToSave.length) {
-                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, true);
-                const saveDrugsStartedAt = Date.now();
-                const res = overwriteDrugsLibraryItems ?
-                    await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId, client: tx, })
-                    :
-                    await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId, client: tx, });
-                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
-                markTiming('save_drugs_library_items', saveDrugsStartedAt);
-                if (!res.success) throw new Error((res.errors || ['Failed to save drugs library items']).join(', '));
-                libraryInfo.dffItems = dffItemsToSave.length;
-            }
-
-            if (dataKeysToSave.length) {
-                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, true);
-                const saveDataKeysStartedAt = Date.now();
-                const res = await _saveDataKeys({
-                    data: dataKeysToSave.map(toDataKeySavePayload),
-                    userId,
-                    draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
-                    propagatedDraftOrigin: fromRemoteSiteId ? 'import' : 'data_key_sync',
-                    client: tx,
-                });
-                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
-                markTiming('save_data_keys', saveDataKeysStartedAt);
-                if (!res.success) throw new Error((res.errors || ['Failed to save data keys']).join(', '));
-                libraryInfo.dataKeys = dataKeysToSave.length;
-                res.warnings?.forEach(w => warnings.push(w));
-                importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])
-                    .map((script: { scriptId?: string | null }) => script.scriptId)
-                    .filter((value): value is string => !!value);
-            }
-        };
-
+        // Everything below reads and changes this editor's content. A real import runs it as this editor's only
+        // writer (lib/server/content-write-lock.ts): another import, a data key save or a publish can no longer
+        // save the same rows at the same time, which used to leave one of them waiting on the other, then
+        // failing. It is also re-read here, after the wait, so the import works from the current state.
         let response: Awaited<ReturnType<typeof saveScriptsWithItems>> & {
             warnings?: string[];
             preview?: ScriptImportPreview[];
@@ -3999,171 +3937,356 @@ async function copyScriptsInternal(params?: {
             } | null;
         } = { success: true, info, };
 
-        if (isMergeImport && scripts.data.length) {
-            const source = scripts.data[0] as unknown as RemoteScriptWithItems;
-            const targetScriptId = overWriteScriptWithId!;
-
-            const plan = await planMergeImport({
-                source,
-                targetScriptId,
-                base: mergeBase?.base || null,
-                keepTargetOnly,
-                keepSameIds: syncSettings.role !== 'off' && syncSettings.keepSameIds,
-            });
-
-            // Guard against importing the wrong script: the source must be the one this script was
-            // imported from before, or (first import) carry the same title.
-            let sourceMismatch: string | undefined;
-            const normalizeTitle = (t?: string | null) => `${t || ''}`.trim().toLowerCase();
-            if (mergeBase?.origin === 'remote') {
-                // the other editor's records link these two scripts
-            } else if (mergeBase?.row && !mergeBase.sameSource) {
-                sourceMismatch = `This script was last imported from a different source script (${mergeBase.row.sourceScriptId}). Importing "${source.title}" (${source.scriptId}) will treat it as a first import.`;
-            } else if (!mergeBase?.row && normalizeTitle(source.title) !== normalizeTitle(plan.target.script.title)) {
-                sourceMismatch = `The source script "${source.title}" does not have the same title as this script ("${plan.target.script.title}"). Check the script ID before importing.`;
+        const runLocally = async (): Promise<typeof response | null> => {
+            step = 'checking this editor';
+            if (overWriteScriptWithId) {
+                const blocked = await getOtherDraftOwners(overWriteScriptWithId, userId);
+                if (blocked) return { success: false, errors: [blocked], info, };
             }
 
-            const preview: ScriptImportPreview = {
-                ...plan.preview,
-                upToDate: plan.preview.upToDate && !dataKeysToSave.length,
-                dataKeys: dataKeysPreview,
-                warnings: Array.from(new Set(warnings)),
-                requiresConfirmation: sourceMismatch && !confirmSourceMismatch ? { sourceMismatch } : null,
-            };
+            const { data: localDataKeys, } = await _getDataKeys({ includePendingDeletion: true, });
 
-            if (dryRun) return { success: true, info, preview: [preview], warnings: preview.warnings, };
-
-            if (sourceMismatch && !confirmSourceMismatch) {
-                return { success: false, errors: [sourceMismatch], info, preview: [preview], };
+            if (!fromRemoteSiteId) {
+                step = 'loading the scripts to copy';
+                scripts = await getScriptsWithItems({ scriptsIds });
+                if (scripts.errors) return { success: false, errors: scripts.errors, info, };
+                if (scriptsIds.length && !scripts.data.length) {
+                    return { success: false, errors: [`Script(s) not found: ${scriptsIds.join(', ')}`], info, };
+                }
             }
 
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, true);
-            const saveScriptsStartedAt = Date.now();
-            try {
-                const snapshot: ScriptImportSnapshot = {
-                    sourceScriptId: source.scriptId,
-                    importedAt: new Date().toISOString(),
-                    script: scriptImportProps(source),
-                    screens: source.screens as any[],
-                    diagnoses: source.diagnoses as any[],
-                    problems: source.problems as any[],
-                    dataKeys: dataKeySnapshots[source.scriptId] || {},
-                    idMap: plan.idMap,
-                };
-                const saved = await applyMergeImport({
-                    plan,
-                    targetScriptId,
-                    uploadedFiles: importedFiles,
-                    snapshot,
-                    sourceSiteId: fromRemoteSiteId,
-                    sourceSiteLink: siteUrl,
-                    sourceFingerprint: sourceFingerprints.get(source.scriptId) || null,
-                    userId,
-                    saveLibraries,
+            if (fromRemoteSiteId) {
+                step = 'working out what changed';
+                scripts.data.forEach(({ dataKeys, drugsLibrary }) => {
+                    scrappedDataKeys = [...scrappedDataKeys, ...dataKeys];
+                    dffItemsToSave = [...dffItemsToSave, ...drugsLibrary];
                 });
-                // Nothing to publish: the published state here already matches, so this is a sync point now.
-                if (!saved.hasDrafts) await recordTargetFingerprints([targetScriptId]);
-                info.scripts = 1;
-                info.screens = saved.screens;
-                info.diagnoses = saved.diagnoses;
-                info.problems = saved.problems;
-                response = { success: true, info, savedScriptIds: [targetScriptId], preview: [preview], };
-                void recomputeScriptsConditionErrors([targetScriptId]);
-            } catch (e: any) {
-                response = { success: false, errors: [e.message], info, };
-            }
-            markTiming('merge_import', saveScriptsStartedAt);
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
-        } else if (scripts.data.length) {
-            if (dryRun) {
-                const preview: ScriptImportPreview[] = scripts.data.map(s => ({
-                    mode: 'new_copy',
-                    sourceScript: { scriptId: s.scriptId, title: s.title || '' },
-                    targetScript: null,
-                    firstImport: true,
-                    upToDate: false,
-                    screens: { ...EMPTY_ENTITY_COUNTS, added: s.screens.length },
-                    diagnoses: { ...EMPTY_ENTITY_COUNTS, added: s.diagnoses.length },
-                    problems: { ...EMPTY_ENTITY_COUNTS, added: s.problems.length },
-                    options: { added: 0, removedBySource: 0, keptTargetOnly: 0, conflicts: 0 },
-                    removedEntities: [],
-                    keptEntities: [],
-                    changes: [],
-                    changesTruncated: 0,
-                    dataKeys: dataKeysPreview,
-                    warnings: Array.from(new Set(warnings)),
-                    requiresConfirmation: null,
-                }));
-                return { success: true, info, preview, warnings, };
-            }
 
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, true);
+                if (isMergeImport) {
+                    mergeBase = await resolveMergeBase(overWriteScriptWithId!, scripts.data[0].scriptId, fromRemoteSiteId, { persist: !dryRun });
+                }
 
-            const saveScriptsStartedAt = Date.now();
-            try {
-                response = await db.transaction(async (tx) => {
-                    const res = await saveScriptsWithItems({
-                        client: tx,
-                        uploadedFiles: importedFiles,
-                        data: scripts.data.map(s => ({
-                            ...(withoutKeys(s, IMPORT_ROW_KEYS) as typeof s),
-                            overWriteScriptWithId,
-                            keepSourceIds: !!fromRemoteSiteId && syncSettings.role !== 'off' && syncSettings.keepSameIds,
-                            draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
-                            hospitalId: undefined!,
-                            hospitalName: undefined!,
-                        })),
-                    });
-                    if (!res.success || res.errors?.length) throw new ImportRolledBack(res);
+                const liveUniqueKeys = new Set(localDataKeys.map(k => k.uniqueKey));
+                const takenUniqueKeys = await getTakenDataKeyUniqueKeys(importedDataKeys.map(k => k.uniqueKey), liveUniqueKeys);
+                const mode = overwriteDataKeys ? 'three_way' as const : 'additive' as const;
 
-                    // Remember where each new copy came from, so a later import into it can merge.
-                    if (fromRemoteSiteId) {
-                        for (const [newScriptId, maps] of Object.entries(res.importIdMaps || {})) {
-                            const source = scripts.data.find(s => s.scriptId === maps.sourceScriptId);
-                            if (!source) continue;
-                            await _recordScriptImport({
-                                targetScriptId: newScriptId,
-                                sourceSiteId: fromRemoteSiteId,
-                                sourceSiteLink: siteUrl,
-                                sourceFingerprint: sourceFingerprints.get(source.scriptId) || null,
-                                userId,
-                                hasDrafts: true,
-                                snapshot: {
-                                    sourceScriptId: source.scriptId,
-                                    importedAt: new Date().toISOString(),
-                                    script: scriptImportProps(source),
-                                    screens: source.screens as any[],
-                                    diagnoses: source.diagnoses as any[],
-                                    problems: source.problems as any[],
-                                    dataKeys: dataKeySnapshots[source.scriptId] || {},
-                                    idMap: { screens: maps.screens, diagnoses: maps.diagnoses, problems: maps.problems },
-                                },
-                                client: tx,
+                let index = -1;
+                const parseImportedStartedAt = Date.now();
+                for (const s of scripts.data) {
+                    index++;
+                    // Only the source's published state is imported; say so when it has more.
+                    if ((s as any).hasChangedItems || (s as any).hasDeletedItems || (s as any).isDraft) {
+                        warnings.push(`"${s.title}" has unpublished changes on the source editor. They are not part of this import until they are published there.`);
+                    }
+                    const parseArgs = {
+                        localDataKeys,
+                        importedDataKeys,
+                        importedScrappedKeys: scrappedDataKeys,
+                        importedScreens: s.screens,
+                        importedDiagnoses: s.diagnoses,
+                        importedProblems: s.problems,
+                        importedDrugsLibraryItems: s.drugsLibrary,
+                        importedNuidSearchFields: (s.nuidSearchFields || []) as any[],
+                        mode,
+                        baseDataKeys: mergeBase?.base?.dataKeys || null,
+                        takenUniqueKeys,
+                    };
+                    let parsed = await parseImportedDataKeys(parseArgs);
+
+                    // Options the source removed are only removed from a key when no other script uses them.
+                    const removalCandidates = parsed.dataKeys
+                        .filter(k => k.canSave)
+                        .flatMap(k => k.removedOptions.map(option => ({ parent: k.uniqueKey, option })));
+                    if (removalCandidates.length) {
+                        const usedElsewhere = await getOptionsUsedOutsideScripts(
+                            removalCandidates,
+                            overWriteScriptWithId ? [overWriteScriptWithId] : [],
+                        );
+                        if (usedElsewhere.size) {
+                            parsed = await parseImportedDataKeys({
+                                ...parseArgs,
+                                isOptionUsedOutsideImport: (parent, option) => usedElsewhere.has(`${parent}|${option}`),
                             });
                         }
                     }
 
-                    await saveLibraries(tx);
-                    return res;
-                });
-                void recomputeScriptsConditionErrors(response.savedScriptIds || []);
-            } catch (e: any) {
-                response = e instanceof ImportRolledBack
-                    ? e.response
-                    : { success: false, errors: [e.message], info, };
+                    const { dataKeys, screens, diagnoses, problems, drugsLibrary, nuidSearchFields } = parsed;
+                    parsed.warnings.forEach(w => warnings.push(w));
+
+                    scripts.data[index].screens = screens as unknown as typeof s.screens;
+                    scripts.data[index].diagnoses = diagnoses as unknown as typeof s.diagnoses;
+                    scripts.data[index].problems = problems as unknown as typeof s.problems;
+                    scripts.data[index].drugsLibrary = drugsLibrary as unknown as typeof s.drugsLibrary;
+                    scripts.data[index].nuidSearchFields = nuidSearchFields as unknown as typeof s.nuidSearchFields;
+
+                    // What the source has for every key this script uses (in this editor's ids): the base
+                    // for the next import's three-way merge.
+                    dataKeySnapshots[s.scriptId] = Object.fromEntries(
+                        dataKeys.filter(k => k.isReferenced).map(k => [k.uniqueKey, k.sourceSnapshot]),
+                    );
+
+                    dataKeys.filter(k => k.canSave).forEach(k => {
+                        if (!dataKeysToSave.some(saved => saved.uniqueKey === k.uniqueKey)) dataKeysToSave.push(k);
+                    });
+                }
+
+                markTiming('parse_imported_data_keys', parseImportedStartedAt);
             }
-            markTiming('save_scripts_with_items', saveScriptsStartedAt);
 
-            await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
-        }
 
-        if (!response.success || response.errors?.length) {
-            return response;
-        }
+            // The same drug can come with several scripts.
+            dffItemsToSave = dffItemsToSave
+                .filter(item => !!item?.key)
+                .filter((item, i, all) => all.findIndex(other => `${other.key}`.toLowerCase() === `${item.key}`.toLowerCase()) === i);
 
-        response.info = { ...response.info, ...libraryInfo, };
+            const dataKeysPreview: ScriptImportPreview['dataKeys'] = {
+                created: dataKeysToSave.filter(k => k.isNew).length,
+                updated: dataKeysToSave.filter(k => !k.isNew).length,
+                optionsAdded: dataKeysToSave.filter(k => !k.isNew).reduce((sum, k) => sum + k.addedOptions.length, 0),
+                optionsRemoved: dataKeysToSave.reduce((sum, k) => sum + k.removedOptions.length, 0),
+                details: dataKeysToSave.slice(0, 200).map(k => ({
+                    label: k.label || k.name,
+                    isNew: k.isNew,
+                    added: k.isNew ? 0 : k.addedOptions.length,
+                    removed: k.removedOptions.length,
+                    changed: k.changedProps,
+                })),
+            };
 
-        if (warnings.length) response.warnings = Array.from(new Set([...(response.warnings || []), ...warnings]));
+            // Drugs and data keys are saved in the same transaction as the scripts: if any part fails,
+            // nothing is saved (screens referencing options their data key doesn't have, or the reverse).
+            const libraryInfo = { dffItems: 0, dataKeys: 0, };
+            const saveLibraries = async (tx: DbOrTransaction) => {
+                if (dffItemsToSave.length) {
+                    step = 'saving the drugs library';
+                    await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, true);
+                    const saveDrugsStartedAt = Date.now();
+                    const res = overwriteDrugsLibraryItems ?
+                        await _saveDrugsLibraryItemsUpdateIfExists({ data: dffItemsToSave, userId, client: tx, })
+                        :
+                        await _saveDrugsLibraryItemsIfKeysNotExist({ data: dffItemsToSave, userId, client: tx, });
+                    await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_dff, false);
+                    markTiming('save_drugs_library_items', saveDrugsStartedAt);
+                    if (!res.success) throw new Error((res.errors || ['Failed to save drugs library items']).join(', '));
+                    libraryInfo.dffItems = dffItemsToSave.length;
+                }
+
+                if (dataKeysToSave.length) {
+                    step = 'saving data keys';
+                    await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, true);
+                    const saveDataKeysStartedAt = Date.now();
+                    const res = await _saveDataKeys({
+                        data: dataKeysToSave.map(toDataKeySavePayload),
+                        userId,
+                        draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
+                        propagatedDraftOrigin: fromRemoteSiteId ? 'import' : 'data_key_sync',
+                        client: tx,
+                    });
+                    await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_data_keys, false);
+                    markTiming('save_data_keys', saveDataKeysStartedAt);
+                    if (!res.success) throw new Error((res.errors || ['Failed to save data keys']).join(', '));
+                    libraryInfo.dataKeys = dataKeysToSave.length;
+                    res.warnings?.forEach(w => warnings.push(w));
+                    importedDataKeyAffectedScriptIds = ((("info" in res) ? res.info?.refs?.affected?.scripts : []) || [])
+                        .map((script: { scriptId?: string | null }) => script.scriptId)
+                        .filter((value): value is string => !!value);
+                }
+            };
+
+            response = { success: true, info, };
+
+            if (isMergeImport && scripts.data.length) {
+                const source = scripts.data[0] as unknown as RemoteScriptWithItems;
+                const targetScriptId = overWriteScriptWithId!;
+
+                const plan = await planMergeImport({
+                    source,
+                    targetScriptId,
+                    base: mergeBase?.base || null,
+                    keepTargetOnly,
+                    keepSameIds: syncSettings.role !== 'off' && syncSettings.keepSameIds,
+                });
+
+                // Guard against importing the wrong script: the source must be the one this script was
+                // imported from before, or (first import) carry the same title.
+                let sourceMismatch: string | undefined;
+                const normalizeTitle = (t?: string | null) => `${t || ''}`.trim().toLowerCase();
+                if (mergeBase?.origin === 'remote') {
+                    // the other editor's records link these two scripts
+                } else if (mergeBase?.row && !mergeBase.sameSource) {
+                    sourceMismatch = `This script was last imported from a different source script (${mergeBase.row.sourceScriptId}). Importing "${source.title}" (${source.scriptId}) will treat it as a first import.`;
+                } else if (!mergeBase?.row && normalizeTitle(source.title) !== normalizeTitle(plan.target.script.title)) {
+                    sourceMismatch = `The source script "${source.title}" does not have the same title as this script ("${plan.target.script.title}"). Check the script ID before importing.`;
+                }
+
+                const preview: ScriptImportPreview = {
+                    ...plan.preview,
+                    upToDate: plan.preview.upToDate && !dataKeysToSave.length,
+                    dataKeys: dataKeysPreview,
+                    warnings: Array.from(new Set(warnings)),
+                    requiresConfirmation: sourceMismatch && !confirmSourceMismatch ? { sourceMismatch } : null,
+                };
+
+                if (dryRun) return { success: true, info, preview: [preview], warnings: preview.warnings, };
+
+                if (sourceMismatch && !confirmSourceMismatch) {
+                    return { success: false, errors: [sourceMismatch], info, preview: [preview], };
+                }
+
+                step = 'saving the scripts';
+                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, true);
+                const saveScriptsStartedAt = Date.now();
+                try {
+                    const snapshot: ScriptImportSnapshot = {
+                        sourceScriptId: source.scriptId,
+                        importedAt: new Date().toISOString(),
+                        script: scriptImportProps(source),
+                        screens: source.screens as any[],
+                        diagnoses: source.diagnoses as any[],
+                        problems: source.problems as any[],
+                        dataKeys: dataKeySnapshots[source.scriptId] || {},
+                        idMap: plan.idMap,
+                    };
+                    const saved = await applyMergeImport({
+                        plan,
+                        targetScriptId,
+                        uploadedFiles: importedFiles,
+                        snapshot,
+                        sourceSiteId: fromRemoteSiteId,
+                        sourceSiteLink: siteUrl,
+                        sourceFingerprint: sourceFingerprints.get(source.scriptId) || null,
+                        userId,
+                        saveLibraries,
+                    });
+                    // Nothing to publish: the published state here already matches, so this is a sync point now.
+                    if (!saved.hasDrafts) await recordTargetFingerprints([targetScriptId]);
+                    info.scripts = 1;
+                    info.screens = saved.screens;
+                    info.diagnoses = saved.diagnoses;
+                    info.problems = saved.problems;
+                    response = { success: true, info, savedScriptIds: [targetScriptId], preview: [preview], };
+                    void recomputeScriptsConditionErrors([targetScriptId]);
+                } catch (e: any) {
+                    logger.error('copyScripts merge ERROR', step, e.message, e?.cause?.message || '');
+                    response = { success: false, errors: [importFailure(e)], info, };
+                }
+                markTiming('merge_import', saveScriptsStartedAt);
+                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
+            } else if (scripts.data.length) {
+                if (dryRun) {
+                    const preview: ScriptImportPreview[] = scripts.data.map(s => ({
+                        mode: 'new_copy',
+                        sourceScript: { scriptId: s.scriptId, title: s.title || '' },
+                        targetScript: null,
+                        firstImport: true,
+                        upToDate: false,
+                        screens: { ...EMPTY_ENTITY_COUNTS, added: s.screens.length },
+                        diagnoses: { ...EMPTY_ENTITY_COUNTS, added: s.diagnoses.length },
+                        problems: { ...EMPTY_ENTITY_COUNTS, added: s.problems.length },
+                        options: { added: 0, removedBySource: 0, keptTargetOnly: 0, conflicts: 0 },
+                        removedEntities: [],
+                        keptEntities: [],
+                        changes: [],
+                        changesTruncated: 0,
+                        dataKeys: dataKeysPreview,
+                        warnings: Array.from(new Set(warnings)),
+                        requiresConfirmation: null,
+                    }));
+                    return { success: true, info, preview, warnings, };
+                }
+
+                step = 'saving the scripts';
+                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, true);
+
+                const saveScriptsStartedAt = Date.now();
+                try {
+                    response = await db.transaction(async (tx) => {
+                        await lockContentWritesInTransaction(tx);
+                        const res = await saveScriptsWithItems({
+                            client: tx,
+                            uploadedFiles: importedFiles,
+                            data: scripts.data.map(s => ({
+                                ...(withoutKeys(s, IMPORT_ROW_KEYS) as typeof s),
+                                overWriteScriptWithId,
+                                keepSourceIds: !!fromRemoteSiteId && syncSettings.role !== 'off' && syncSettings.keepSameIds,
+                                draftOrigin: fromRemoteSiteId ? 'import' : 'editor',
+                                hospitalId: undefined!,
+                                hospitalName: undefined!,
+                            })),
+                        });
+                        if (!res.success || res.errors?.length) throw new ImportRolledBack(res);
+
+                        // Remember where each new copy came from, so a later import into it can merge.
+                        if (fromRemoteSiteId) {
+                            for (const [newScriptId, maps] of Object.entries(res.importIdMaps || {})) {
+                                const source = scripts.data.find(s => s.scriptId === maps.sourceScriptId);
+                                if (!source) continue;
+                                await _recordScriptImport({
+                                    targetScriptId: newScriptId,
+                                    sourceSiteId: fromRemoteSiteId,
+                                    sourceSiteLink: siteUrl,
+                                    sourceFingerprint: sourceFingerprints.get(source.scriptId) || null,
+                                    userId,
+                                    hasDrafts: true,
+                                    snapshot: {
+                                        sourceScriptId: source.scriptId,
+                                        importedAt: new Date().toISOString(),
+                                        script: scriptImportProps(source),
+                                        screens: source.screens as any[],
+                                        diagnoses: source.diagnoses as any[],
+                                        problems: source.problems as any[],
+                                        dataKeys: dataKeySnapshots[source.scriptId] || {},
+                                        idMap: { screens: maps.screens, diagnoses: maps.diagnoses, problems: maps.problems },
+                                    },
+                                    client: tx,
+                                });
+                            }
+                        }
+
+                        await saveLibraries(tx);
+                        return res;
+                    });
+                    void recomputeScriptsConditionErrors(response.savedScriptIds || []);
+                } catch (e: any) {
+                    logger.error('copyScripts save ERROR', step, e.message, e?.cause?.message || '');
+                    response = e instanceof ImportRolledBack
+                        ? { ...e.response, errors: (e.response.errors || ['The scripts could not be saved.']).map((err: string) => `The import stopped while ${step}: ${err}`) }
+                        : { success: false, errors: [importFailure(e)], info, };
+                }
+                markTiming('save_scripts_with_items', saveScriptsStartedAt);
+
+                await broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.saving_scripts, false);
+            }
+
+            if (!response.success || response.errors?.length) {
+                return response;
+            }
+
+            response.info = { ...response.info, ...libraryInfo, };
+
+            if (warnings.length) response.warnings = Array.from(new Set([...(response.warnings || []), ...warnings]));
+            return null;
+        };
+
+        const describeImport = () => {
+            const titles = scripts.data.map(item => item.title).filter(Boolean);
+            const what = titles.length === 1 ? `“${titles[0]}”` : titles.length ? `${titles.length} scripts` : 'scripts';
+            const who = session.user?.displayName || session.user?.email || 'someone';
+            return `${fromRemoteSiteId ? `an import of ${what} from ${siteName}` : `a copy of ${what}`} by ${who}`;
+        };
+
+        const early = dryRun ? await runLocally() : await withContentWriteLock({
+            label: describeImport(),
+            maxWaitMs: IMPORT_WRITE_WAIT_MS,
+            onWait: () => {
+                step = 'waiting for another change on this editor to finish';
+                void broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.waiting_for_other_changes, true);
+            },
+        }, async () => {
+            void broadcastActionInProgress(BROADCAST_ACTIONS_IN_PROGRESS.waiting_for_other_changes, false);
+            return runLocally();
+        });
+        if (early) return early;
 
         if (
             fromRemoteSiteId &&
@@ -4270,8 +4393,8 @@ async function copyScriptsInternal(params?: {
 
         return response;
     } catch (e: any) {
-        logger.error('copyScripts ERROR', e.response?.data?.errors?.join(', ') || e.message);
-        return { errors: e.response?.data?.errors || [e.message], success: false, info, };
+        logger.error('copyScripts ERROR', step, e.response?.data?.errors?.join(', ') || e.message, e?.cause?.message || '');
+        return { errors: [importFailure(e)], success: false, info, };
     }
 }
 
@@ -4331,7 +4454,7 @@ export async function copyScreens(params?: {
         };
     } catch (e: any) {
         logger.error('copyScreens ERROR', e.message);
-        return { errors: [e.message], success: false, copied, };
+        return { errors: [describeError(e)], success: false, copied, };
     }
 }
 
@@ -4391,7 +4514,7 @@ export async function copyDiagnoses(params?: {
         };
     } catch (e: any) {
         logger.error('copyDiagnoses ERROR', e.message);
-        return { errors: [e.message], success: false, copied, };
+        return { errors: [describeError(e)], success: false, copied, };
     }
 }
 
@@ -4451,7 +4574,7 @@ export async function copyProblems(params?: {
         };
     } catch (e: any) {
         logger.error('copyProblems ERROR', e.message);
-        return { errors: [e.message], success: false, copied, };
+        return { errors: [describeError(e)], success: false, copied, };
     }
 }
 
@@ -4546,6 +4669,6 @@ export async function getImportSources({ siteId, targetScriptId }: { siteId: str
         };
     } catch (e: any) {
         logger.error('getImportSources ERROR', e.message);
-        return { scripts: [], lastImport: null, errors: [e.message], };
+        return { scripts: [], lastImport: null, errors: [describeError(e)], };
     }
 }

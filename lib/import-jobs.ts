@@ -76,6 +76,20 @@ const jobsByContentKey: Map<string, ImportJob> = globalThis.importJobsByContentK
 
 if (process.env.NODE_ENV !== 'production') globalThis.importJobsByContentKey = jobsByContentKey;
 
+// Running jobs by what they do, regardless of the request key: the same person starting the same import
+// again while it runs (closed the dialog and retried, a second tab) joins it instead of running a second
+// import alongside it.
+declare global {
+    var importJobsByLogicalKey: Map<string, ImportJob> | undefined;
+}
+const pendingByLogicalKey: Map<string, ImportJob> = globalThis.importJobsByLogicalKey || new Map();
+if (process.env.NODE_ENV !== 'production') globalThis.importJobsByLogicalKey = pendingByLogicalKey;
+
+/** What a poll gets when this server has no record of its job (restarted, or long finished). */
+export const IMPORT_JOB_LOST_MESSAGE =
+    'This editor has no record of this import any more: it was restarted while the import ran, or the import finished a while ago. ' +
+    'An interrupted import does not save anything (it is saved completely or not at all). Check the script for new drafts, then start the import again if needed.';
+
 export function buildImportContentKey(params: {
     requestKey?: string;
     userId?: string | null;
@@ -107,6 +121,11 @@ export function buildImportContentKey(params: {
         flag(params.keepTargetOnly),
         params.requestKey || '',
     ].join("::");
+}
+
+/** The content key without the request key: the same import by the same person. */
+export function buildImportLogicalKey(params: Parameters<typeof buildImportContentKey>[0]): string {
+    return buildImportContentKey({ ...params, requestKey: '' });
 }
 
 function scheduleCleanup(contentKey: string, job: ImportJob) {
@@ -141,10 +160,16 @@ function logDraftCounts(label: string, contentKey: string, requestKey: string) {
 export function startOrJoinImportJob<T>({
     requestKey,
     contentKey,
+    logicalKey,
+    resume,
     run,
 }: {
     requestKey: string;
     contentKey: string;
+    /** Same import by the same person (buildImportLogicalKey): joins it while it runs. */
+    logicalKey?: string;
+    /** A poll for a job already started: never starts one (it would run the import a second time). */
+    resume?: boolean;
     run: () => Promise<T>;
 }): { status: ImportJobStatus; result?: T } {
     const existing = jobsByContentKey.get(contentKey);
@@ -153,6 +178,19 @@ export function startOrJoinImportJob<T>({
         existing.requestKeys.add(requestKey);
         logger.log('importJob joined existing job (not a restart)', { contentKey, requestKey, status: existing.status });
         return { status: existing.status, result: existing.result };
+    }
+
+    const running = logicalKey ? pendingByLogicalKey.get(logicalKey) : undefined;
+    if (running && running.status === "pending") {
+        running.requestKeys.add(requestKey);
+        jobsByContentKey.set(contentKey, running);
+        logger.log('importJob joined the same import already running', { logicalKey, requestKey });
+        return { status: "pending" };
+    }
+
+    if (resume) {
+        logger.log('importJob poll for an unknown job', { contentKey, requestKey });
+        return { status: "error", result: { success: false, errors: [IMPORT_JOB_LOST_MESSAGE] } as T };
     }
 
     // This is a genuinely new run — no matching in-flight or recently-settled
@@ -165,6 +203,7 @@ export function startOrJoinImportJob<T>({
         requestKeys: new Set([requestKey]),
     };
     jobsByContentKey.set(contentKey, job);
+    if (logicalKey) pendingByLogicalKey.set(logicalKey, job);
 
     let settled = false;
     const finalize = (status: "done" | "error", result: T) => {
@@ -174,6 +213,7 @@ export function startOrJoinImportJob<T>({
         job.status = status;
         job.result = result;
         job.settledAt = Date.now();
+        if (logicalKey && pendingByLogicalKey.get(logicalKey) === job) pendingByLogicalKey.delete(logicalKey);
         // Signal only — no result payload goes over the socket (see
         // broadcastImportJobComplete's comment in lib/in-progress.ts). The
         // frontend fetches the actual result over the authenticated HTTP

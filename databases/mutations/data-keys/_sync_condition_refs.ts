@@ -4,6 +4,7 @@ import { _getDiagnoses, _getProblems, _getScreens } from '@/databases/queries/sc
 import { syncScriptConditionReferences } from '@/lib/data-key-condition-sync';
 import type { ConditionNameRename } from '@/lib/conditional-expression/rename-references';
 import { _saveDiagnoses, _saveProblems, _saveScreens } from '../scripts';
+import { describeError } from '@/lib/server/db-errors';
 
 export type SyncConditionRefsResponse = {
     success: boolean;
@@ -135,6 +136,6 @@ export async function _syncConditionRefsAfterReplacement({
         return { success: true, rewritten };
     } catch (e: any) {
         logger.error('_syncConditionRefsAfterReplacement ERROR', e.message);
-        return { success: false, errors: [e.message], rewritten: 0 };
+        return { success: false, errors: [describeError(e)], rewritten: 0 };
     }
 }
