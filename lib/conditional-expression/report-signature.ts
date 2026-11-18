@@ -104,10 +104,14 @@ export function buildConditionReportSignature(parts: ConditionReportSignaturePar
  * presentation (labels, ordering) so cosmetic edits do not expire every report.
  */
 export function getScriptConditionInputsStamp(input: {
+  nuidSearchEnabled?: boolean | null;
   nuidSearchFields?: any;
   eligibilityCriteria?: any;
 }): string {
-  const fields = Array.isArray(input?.nuidSearchFields) ? input.nuidSearchFields : [];
+  // Only live fields feed validation: switching NUID Search off (or on) changes the inputs.
+  // Callers that don't pass the flag keep the old behaviour (all fields).
+  const live = input?.nuidSearchEnabled === false ? [] : input?.nuidSearchFields;
+  const fields = Array.isArray(live) ? live : [];
   const parts = fields
     .map((field: any) =>
       [

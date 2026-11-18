@@ -4,6 +4,7 @@ import { _saveHospitals, _deleteHospitals } from "@/databases/mutations/hospital
 import { _getHospital, _getHospitals, _countHospitals, _defaultHospitalsCount } from "@/databases/queries/hospitals";
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
+import { describeError } from "@/lib/server/db-errors";
 
 export const deleteHospitals: typeof _deleteHospitals = async params => {
     try {
@@ -14,7 +15,7 @@ export const deleteHospitals: typeof _deleteHospitals = async params => {
         });
     } catch(e: any) {
         logger.error('deleteHospitals ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 };
 
@@ -24,7 +25,7 @@ export const countHospitals: typeof _countHospitals = async (...args) => {
         return await _countHospitals(...args);
     } catch(e: any) {
         logger.error('countHospitals ERROR', e.message);
-        return { errors: [e.message], data: _defaultHospitalsCount, };
+        return { errors: [describeError(e)], data: _defaultHospitalsCount, };
     }
 };
 
@@ -34,7 +35,7 @@ export const getHospitals: typeof _getHospitals = async (...args) => {
         return await _getHospitals(...args);
     } catch(e: any) {
         logger.error('getHospitals ERROR', e.message);
-        return { errors: [e.message], data: [], };
+        return { errors: [describeError(e)], data: [], };
     }
 };
 
@@ -52,6 +53,6 @@ export const saveHospitals: typeof _saveHospitals = async (params) => {
         });
     } catch(e: any) {
         logger.error('getSys ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [describeError(e)], data: undefined, success: false, };
     }
 };

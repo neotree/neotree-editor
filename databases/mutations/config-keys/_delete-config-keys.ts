@@ -6,6 +6,7 @@ import { configKeys, configKeysDrafts, pendingDeletion, } from '@/databases/pg/s
 import socket from '@/lib/socket';
 import { and } from 'drizzle-orm';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
 
 export type DeleteConfigKeysData = {
     configKeysIds: string[];
@@ -29,7 +30,7 @@ export async function _deleteAllConfigKeysDrafts(opts?: {
     }
 }
 
-export async function _deleteConfigKeys(
+async function _deleteConfigKeysNow(
     { configKeysIds: configKeysIdsParam, broadcastAction, userId, }: DeleteConfigKeysData,
 ) {
     const response: DeleteConfigKeysResponse = { success: false, };
@@ -73,4 +74,9 @@ export async function _deleteConfigKeys(
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'delete_config_keys');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _deleteConfigKeys(...args: Parameters<typeof _deleteConfigKeysNow>): ReturnType<typeof _deleteConfigKeysNow> {
+    return queueContentWrite('a config key deletion', args[0] as any, () => _deleteConfigKeysNow(...args));
 }

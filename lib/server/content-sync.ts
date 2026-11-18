@@ -18,6 +18,10 @@ import {
 } from "@/lib/content-sync";
 import { computeEntityFingerprints, computeScriptFingerprint, type ScriptEntityFingerprints } from "@/lib/content-sync-fingerprint";
 import type { ScriptImportSnapshot } from "@/databases/pg/schema";
+import { REMOTE_EDITOR_TIMEOUT_MS } from "@/lib/remote-timeout";
+
+// Status and sync calls to the other editor: at most 2 minutes, or less when remote calls are limited more.
+const CONTENT_SYNC_REMOTE_TIMEOUT_MS = Math.min(REMOTE_EDITOR_TIMEOUT_MS, 120000);
 
 /**
  * Server side of content sync (see lib/content-sync.ts): settings, hotfixes, fingerprints of published
@@ -237,7 +241,7 @@ export async function getLocalScriptEntities(scriptId: string): Promise<LocalScr
 
 export async function fetchRemoteContentSyncState(siteId: string, scriptIds?: string[], sourceScriptIds?: string[]): Promise<ContentSyncState> {
     const client = await getSiteAxiosClient(siteId);
-    const res = await client.get('/api/content-sync/state?data=' + encodeURIComponent(JSON.stringify({ scriptIds: scriptIds || [], sourceScriptIds: sourceScriptIds || [] })), { timeout: 120000 });
+    const res = await client.get('/api/content-sync/state?data=' + encodeURIComponent(JSON.stringify({ scriptIds: scriptIds || [], sourceScriptIds: sourceScriptIds || [] })), { timeout: CONTENT_SYNC_REMOTE_TIMEOUT_MS });
     if (res.data?.errors?.length) throw new Error(res.data.errors.join(", "));
     return res.data.data as ContentSyncState;
 }
@@ -260,7 +264,7 @@ export async function fetchRemoteScriptFingerprints(siteId: string, scriptIds: s
 export async function fetchRemoteScriptEntities(siteId: string, remoteScriptId: string): Promise<LocalScriptEntities | null> {
     try {
         const client = await getSiteAxiosClient(siteId);
-        const res = await client.get('/api/content-sync/entities?data=' + encodeURIComponent(JSON.stringify({ scriptId: remoteScriptId })), { timeout: 120000 });
+        const res = await client.get('/api/content-sync/entities?data=' + encodeURIComponent(JSON.stringify({ scriptId: remoteScriptId })), { timeout: CONTENT_SYNC_REMOTE_TIMEOUT_MS });
         return (res.data?.data as LocalScriptEntities) || null;
     } catch (e: any) {
         logger.error("fetchRemoteScriptEntities ERROR", e.message);
@@ -281,7 +285,7 @@ export async function fetchRemoteImportBase(siteId: string, remoteScriptId: stri
         const res = await client.get('/api/content-sync/import-base?data=' + encodeURIComponent(JSON.stringify({
             targetScriptId: remoteScriptId,
             sourceScriptId: localScriptId,
-        })), { timeout: 120000 });
+        })), { timeout: CONTENT_SYNC_REMOTE_TIMEOUT_MS });
         if (!res.data?.data?.baseSnapshot) return null;
         return res.data.data;
     } catch (e: any) {

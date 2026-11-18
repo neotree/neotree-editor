@@ -6,6 +6,8 @@ import db from '@/databases/pg/drizzle';
 import { hospitals, hospitalsDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveHospitalsData = Partial<typeof hospitals.$inferSelect>;
 
@@ -14,7 +16,7 @@ export type SaveHospitalsResponse = {
     errors?: string[]; 
 };
 
-export async function _saveHospitals({ data, broadcastAction = true, userId, }: {
+async function _saveHospitalsNow({ data, broadcastAction = true, userId, }: {
     data: SaveHospitalsData[],
     broadcastAction?: boolean,
     userId?: string;
@@ -70,7 +72,7 @@ export async function _saveHospitals({ data, broadcastAction = true, userId, }: 
                     }
                 }
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
             }
         }
 
@@ -87,4 +89,9 @@ export async function _saveHospitals({ data, broadcastAction = true, userId, }: 
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_hospitals');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _saveHospitals(...args: Parameters<typeof _saveHospitalsNow>): ReturnType<typeof _saveHospitalsNow> {
+    return queueContentWrite('a hospital save', args[0] as any, () => _saveHospitalsNow(...args));
 }

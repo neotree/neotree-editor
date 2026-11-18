@@ -10,6 +10,8 @@ import { DiagnosisType } from '../../queries/scripts/_diagnoses_get';
 import { removeHexCharacters } from '../../utils'
 import type { DraftOrigin } from './_screens_save';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveDiagnosesData = Partial<DiagnosisType> & {
     /** The revision the editor loaded (see lib/entity-revision.ts); checked by the save action. */
@@ -46,7 +48,7 @@ async function resolveScriptReference(
     };
 }
 
-export async function _saveDiagnoses({ data, broadcastAction, syncSilently, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
+async function _saveDiagnosesNow({ data, broadcastAction, syncSilently, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveDiagnosesData[],
     broadcastAction?: boolean;
     userId?: string;
@@ -150,7 +152,7 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
                     }
                 }
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
                 logger.error('saveDiagnosis SQL (FAILED)', JSON.stringify(sqlInfo));
             }
         }
@@ -168,4 +170,9 @@ export async function _saveDiagnoses({ data, broadcastAction, syncSilently, user
         if (!response?.errors?.length && broadcastAction && !syncSilently) socket.emit('data_changed', 'save_diagnoses');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _saveDiagnoses(...args: Parameters<typeof _saveDiagnosesNow>): ReturnType<typeof _saveDiagnosesNow> {
+    return queueContentWrite('a diagnosis save', args[0] as any, () => _saveDiagnosesNow(...args));
 }

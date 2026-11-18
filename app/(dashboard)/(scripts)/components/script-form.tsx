@@ -277,8 +277,9 @@ export function ScriptForm() {
                             checked={nuidSearchEnabled}
                             onCheckedChange={() => {
                                 const enabled = !nuidSearchEnabled;
+                                // Switching off keeps the fields, so switching back on restores them.
+                                if (enabled) setValue('nuidSearchFields', getDefaultNuidSearchFields(), { shouldDirty: true, });
                                 setValue('nuidSearchEnabled', enabled, { shouldDirty: true, });
-                                setValue('nuidSearchFields', getDefaultNuidSearchFields(), { shouldDirty: true, });
                             }}
                         />
                         <Label secondary htmlFor="nuidSearchEnabled">Enable NUID Search</Label>
@@ -288,6 +289,12 @@ export function ScriptForm() {
                             form={form}
                         />
                     </div>
+                    {!nuidSearchEnabled && !!nuidSearchFields?.length && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            NUID Search is off. Its {nuidSearchFields.length} field{nuidSearchFields.length === 1 ? ' is' : 's are'} kept
+                            and come back when you switch it on; the app ignores them meanwhile.
+                        </p>
+                    )}
 
                     {!!scriptFormCtx?.formData?.scriptId && ( 
                         <>

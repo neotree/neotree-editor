@@ -6,6 +6,8 @@ import db from '@/databases/pg/drizzle';
 import { configKeys, configKeysDrafts } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveConfigKeysData = Partial<typeof configKeys.$inferSelect>;
 
@@ -14,7 +16,7 @@ export type SaveConfigKeysResponse = {
     errors?: string[]; 
 };
 
-export async function _saveConfigKeys({ data, broadcastAction, userId, }: {
+async function _saveConfigKeysNow({ data, broadcastAction, userId, }: {
     data: SaveConfigKeysData[],
     broadcastAction?: boolean,
     userId?: string;
@@ -88,7 +90,7 @@ export async function _saveConfigKeys({ data, broadcastAction, userId, }: {
                     }
                 }
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
             }
         }
 
@@ -105,4 +107,9 @@ export async function _saveConfigKeys({ data, broadcastAction, userId, }: {
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_config_keys');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _saveConfigKeys(...args: Parameters<typeof _saveConfigKeysNow>): ReturnType<typeof _saveConfigKeysNow> {
+    return queueContentWrite('a config key save', args[0] as any, () => _saveConfigKeysNow(...args));
 }

@@ -16,6 +16,7 @@ import {
 } from "@/lib/changelog-rollback"
 import { isUuidLike } from "@/lib/uuid"
 import db from "@/databases/pg/drizzle"
+import { describeWriter, runContentTransaction } from "@/lib/server/content-write-lock"
 import { changeLogs, editorInfo } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
 import {
@@ -129,7 +130,7 @@ export async function _rollbackDataVersion({
   try {
     if (!isUuidLike(userId)) throw new Error("Invalid userId")
 
-    await db.transaction(async (tx) => {
+    await runContentTransaction({ label: await describeWriter('a release rollback', userId) }, async (tx) => {
       const lockedEditorInfo = await tx.execute<{ id: number; dataVersion: number }>(
         sql`select id, data_version as "dataVersion" from nt_editor_info limit 1 for update`,
       )

@@ -1,7 +1,9 @@
 {
     "name": "neotree-webeditor",
     "version": "0.1.0",
-    "engines": { "node": ">=22.23.4" },
+    "engines": {
+        "node": ">=22.23.4"
+    },
     "private": true,
     "packageManager": "yarn@1.22.22",
     "scripts": {
@@ -29,13 +31,13 @@
         "@auth/drizzle-adapter": "^1.4.1",
         "@devicefarmer/adbkit-apkreader": "^3.2.4",
         "@prisma/client": "^5.18.0",
-        "@radix-ui/react-alert-dialog": "^1.1.1",
+        "@radix-ui/react-alert-dialog": "^1.2.1",
         "@radix-ui/react-checkbox": "^1.1.1",
         "@radix-ui/react-collapsible": "^1.1.12",
         "@radix-ui/react-dialog": "^1.1.7",
-        "@radix-ui/react-dropdown-menu": "^2.1.1",
+        "@radix-ui/react-dropdown-menu": "^2.2.1",
         "@radix-ui/react-label": "^2.1.0",
-        "@radix-ui/react-popover": "^1.1.1",
+        "@radix-ui/react-popover": "^1.3.1",
         "@radix-ui/react-radio-group": "^1.2.0",
         "@radix-ui/react-scroll-area": "^1.2.1",
         "@radix-ui/react-select": "^2.1.1",
@@ -43,7 +45,7 @@
         "@radix-ui/react-slot": "^1.1.0",
         "@radix-ui/react-switch": "^1.1.0",
         "@radix-ui/react-tabs": "^1.1.0",
-        "@radix-ui/react-toast": "^1.2.1",
+        "@radix-ui/react-toast": "^1.3.1",
         "@radix-ui/react-tooltip": "^1.1.2",
         "@uiw/react-textarea-code-editor": "^3.0.2",
         "array-move": "^4.0.0",

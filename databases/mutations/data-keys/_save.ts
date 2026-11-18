@@ -10,11 +10,18 @@ import { _getDataKeys, _getDataKeysRefs } from '@/databases/queries/data-keys';
 import { normalizeIncomingDataKeyPatch, rebaseDataKeyOptions } from '@/lib/data-key-save';
 import { validateDataKeyOptionsAddition } from '@/lib/data-key-children';
 import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
-import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
 import { assertDraftOwner } from '@/lib/server/draft-owner';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { createProgressReporter } from '@/lib/in-progress';
+import {
+    ContentWriteBusyError,
+    describeWriter,
+    holdsContentWriteLock,
+    lockContentWritesInTransaction,
+    withContentWriteLock,
+} from '@/lib/server/content-write-lock';
+import { describeDatabaseError } from '@/lib/server/db-errors';
 import { checkDataKeyDuplicates } from '@/lib/data-key-duplicate-check';
 import { _findDataKeyNameLabelMatches } from '@/databases/queries/data-keys/_find-name-label-matches';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
@@ -24,6 +31,7 @@ import {
     type UnlinkReplacementDataKey,
 } from './_delete-referenced-options';
 import { uniqueValues } from '@/lib/unique-values';
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
     deletedUniqueKeys?: string[];
@@ -224,7 +232,23 @@ async function buildOptionUnlinkPlan({
     };
 }
 
-export async function _saveDataKeys({
+export async function _saveDataKeys(params: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
+    // A standalone save waits its turn behind this editor's other writers (an import, a publish, another
+    // save) instead of colliding with them; inside a caller's transaction the caller already holds it.
+    if (params.client || holdsContentWriteLock()) return saveDataKeysNow(params);
+    try {
+        return await withContentWriteLock(
+            { label: await describeWriter(params.draftOrigin === 'import' ? 'an import of data keys' : 'a data key save', params.userId) },
+            () => saveDataKeysNow(params),
+        );
+    } catch (e: any) {
+        if (!(e instanceof ContentWriteBusyError)) throw e;
+        logger.error('_saveDataKeys BUSY', e.message);
+        return { success: false, errors: [describeError(e)], };
+    }
+}
+
+async function saveDataKeysNow({
     data: dataParam,
     broadcastAction,
     updateRefs = true,
@@ -300,33 +324,6 @@ export async function _saveDataKeys({
 
             const uniqueKeys: string[] = [];
 
-            if (draftOrigin === 'editor') try {
-                const incomingNames = Array.from(
-                    new Set(data.map((d) => `${d.name || ''}`.trim().toLowerCase()).filter(Boolean)),
-                );
-                if (incomingNames.length) {
-                    const existing = await _getDataKeys({ names: incomingNames, client: executor, });
-                    const managedExisting = (existing.data || []).filter((k) => isNuidManagedDataKey(k as any));
-                    for (const item of data) {
-                        const name = `${item.name || ''}`.trim();
-                        if (!name) continue;
-                        const compat = normalizeDataKeyCompatibilityType(item.dataType);
-                        const dup = managedExisting.find((k) =>
-                            `${k.name || ''}`.trim().toLowerCase() === name.toLowerCase() &&
-                            normalizeDataKeyCompatibilityType(k.dataType) === compat &&
-                            `${k.uniqueKey || ''}` !== `${item.uniqueKey || ''}` &&
-                            `${k.uuid || ''}` !== `${item.uuid || ''}`,
-                        );
-                        if (dup) {
-                            errors.push(
-                                `A NUID Search data key "${dup.name}" (${dup.dataType}) already exists — duplicate managed keys aren't allowed.`,
-                            );
-                        }
-                    }
-                }
-            } catch (e: any) {
-                logger.error('_saveDataKeys managed-duplicate check ERROR', e?.message);
-            }
             if (errors.length) {
                 throw new Error(errors.join(', '));
             }
@@ -504,11 +501,9 @@ export async function _saveDataKeys({
                             data.confidential = resolvedConfidential;
                             data.confidentialLabelOnly = resolvedConfidentialLabelOnly;
 
-                            // A NUID-managed key's `name` and `dataType` are immutable — force
-                            // them back to the stored draft values and keep the managed flag.
+                            // Keys created for NUID Search edit like any other; only the
+                            // provenance marker is kept when an edit doesn't send it.
                             if (isNuidManagedDataKey(draft.data as any)) {
-                                (data as any).name = (draft.data as any)?.name ?? (data as any).name;
-                                (data as any).dataType = (draft.data as any)?.dataType ?? (data as any).dataType;
                                 (data as any).metadata = { ...((data as any).metadata || {}), managed: NUID_MANAGED };
                             }
 
@@ -557,8 +552,6 @@ export async function _saveDataKeys({
                             data.confidentialLabelOnly = resolvedConfidentialLabelOnly;
 
                             if (isNuidManagedDataKey(published as any)) {
-                                data.name = published?.name ?? data.name;
-                                data.dataType = published?.dataType ?? data.dataType;
                                 data.metadata = { ...((data as any).metadata || {}), managed: NUID_MANAGED } as any;
                             }
 
@@ -612,7 +605,7 @@ export async function _saveDataKeys({
                         }
                     }
                 } catch(e: any) {
-                    errors.push(e.message);
+                    errors.push(describeError(e));
                 }
             }
 
@@ -788,7 +781,10 @@ export async function _saveDataKeys({
                 if (broadcastAction && refsSaved) socket.emit('data_changed', 'save_scripts');
             }
         } else {
-            await db.transaction(executeSave);
+            await db.transaction(async (tx) => {
+                await lockContentWritesInTransaction(tx);
+                await executeSave(tx);
+            });
 
             // Emit only when we own the transaction — a joined transaction may
             // still roll back after we return.
@@ -800,10 +796,16 @@ export async function _saveDataKeys({
         response.success = true;
         return response;
     } catch(e: any) {
+        // Drizzle wraps database errors ("Failed query: …"); the reason (constraint, detail) is on e.cause.
+        const cause = e?.cause;
+        const reason = cause?.message
+            ? [cause.message, cause.detail, cause.constraint_name || cause.constraint ? `constraint ${cause.constraint_name || cause.constraint}` : ''].filter(Boolean).join(' | ')
+            : '';
         response.success = false;
-        response.errors = [e.message];
-        logger.error('_saveDataKeys ERROR', e.message);
-        return { success: false, errors: [e.message], };
+        // what happened, in words (lib/server/db-errors.ts); the raw query stays in the log
+        response.errors = [describeDatabaseError(e) ? `The data keys could not be saved: ${describeDatabaseError(e)}.` : e.message];
+        logger.error('_saveDataKeys ERROR', e.message, reason ? `CAUSE: ${reason}` : '');
+        return { success: false, errors: response.errors, };
     } finally {
         progress.finish();
     }
@@ -845,7 +847,7 @@ export async function _saveDataKeysIfNotExist({
     } catch(e: any) {
         return {
             success: false,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }
@@ -882,7 +884,7 @@ export async function _saveDataKeysUpdateIfExist({
     } catch(e: any) {
         return {
             success: false,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }

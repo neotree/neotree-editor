@@ -1,6 +1,7 @@
 import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { _getScreens } from "@/databases/queries/scripts";
 import { _saveScreens } from "@/databases/mutations/scripts";
+import { describeError } from "@/lib/server/db-errors";
 
 export type RemoveDrugLibraryItemsReferencesParams = {
     keys: string[];
@@ -43,6 +44,6 @@ export async function _removeDrugLibraryItemsReferences({
 
         return { data: { success: true, } };
     } catch(e: any) {
-        return { errors: [e.message], data: { success: false, }, };
+        return { errors: [describeError(e)], data: { success: false, }, };
     }
 }

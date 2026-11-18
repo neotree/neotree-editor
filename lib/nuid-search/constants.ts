@@ -1,8 +1,7 @@
 /**
  * Value stored at `dataKey.metadata.managed` to mark a data key (and its option
- * children) as provisioned for / owned by NUID Search. Managed keys get special
- * treatment: their `name` (key) and `dataType` are immutable — only the label
- * may change — and they cannot be deleted while managed. See [[managed]].
+ * children) as created for NUID Search. A provenance marker only: these keys
+ * are edited, merged and deleted like any other key. See managed.ts.
  */
 export const NUID_MANAGED = "nuid";
 

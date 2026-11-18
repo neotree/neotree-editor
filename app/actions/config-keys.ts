@@ -4,6 +4,7 @@ import { _saveConfigKeys, _deleteConfigKeys } from "@/databases/mutations/config
 import { _getConfigKey, _getConfigKeys, _countConfigKeys, _defaultConfigKeysCount } from "@/databases/queries/config-keys";
 import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
+import { describeError } from "@/lib/server/db-errors";
 
 export const deleteConfigKeys: typeof _deleteConfigKeys = async params => {
     try {
@@ -14,7 +15,7 @@ export const deleteConfigKeys: typeof _deleteConfigKeys = async params => {
         });
     } catch(e: any) {
         logger.error('deleteConfigKeys ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 };
 
@@ -24,7 +25,7 @@ export const countConfigKeys: typeof _countConfigKeys = async (...args) => {
         return await _countConfigKeys(...args);
     } catch(e: any) {
         logger.error('countConfigKeys ERROR', e.message);
-        return { errors: [e.message], data: _defaultConfigKeysCount, };
+        return { errors: [describeError(e)], data: _defaultConfigKeysCount, };
     }
 };
 
@@ -34,7 +35,7 @@ export const getConfigKeys: typeof _getConfigKeys = async (...args) => {
         return await _getConfigKeys(...args);
     } catch(e: any) {
         logger.error('getConfigKeys ERROR', e.message);
-        return { errors: [e.message], data: [], };
+        return { errors: [describeError(e)], data: [], };
     }
 };
 
@@ -52,6 +53,6 @@ export const saveConfigKeys: typeof _saveConfigKeys = async (params) => {
         });
     } catch(e: any) {
         logger.error('getSys ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [describeError(e)], data: undefined, success: false, };
     }
 };

@@ -12,6 +12,8 @@ export const BROADCAST_ACTIONS_IN_PROGRESS = {
     saving_scripts: '9',
     saving_dff: '10',
     saving_data_keys: '11',
+    /** Queued behind another change on this editor (lib/server/content-write-lock.ts). */
+    waiting_for_other_changes: '12',
 } as const;
 
 export async function broadcastActionInProgress(

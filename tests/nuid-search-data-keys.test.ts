@@ -195,10 +195,12 @@ const wrongTypeReport = scanDataKeyIntegrity({
   ] as any)],
 })
 
+// A NUID field takes its type from its key, so a supported key of the other kind is not a
+// conflict (these fixtures also have stale labels; the type path alone is tested below).
 assert.equal(
   wrongTypeReport.entries[0].status,
-  "conflict",
-  "a NUID search (text) field linked to a dropdown key is a conflict",
+  "out_of_sync",
+  "a NUID search (text) field linked to a dropdown key follows the key",
 )
 
 const dropdownWrongTypeReport = scanDataKeyIntegrity({
@@ -215,9 +217,49 @@ const dropdownWrongTypeReport = scanDataKeyIntegrity({
 
 assert.equal(
   dropdownWrongTypeReport.entries[0].status,
-  "conflict",
-  "a Yes/No (dropdown) field linked to a text key is a conflict",
+  "out_of_sync",
+  "a choice (dropdown) field linked to a text key follows the key",
 )
+
+// The type path on its own (label and key match the library): a search on a dropdown key is
+// out of sync, and repairing it makes it a choice and drops the search role.
+{
+  const searchOnChoiceKey = {
+    type: "text",
+    key: "BabyTransfered",
+    keyId: "dk-baby-transferred",
+    label: "Has the baby been transferred?",
+    searchRole: "patient",
+  }
+  const report = scanDataKeyIntegrity({ dataKeys, scripts: [buildScript([searchOnChoiceKey] as any)] })
+  assert.equal(report.entries[0].status, "out_of_sync", "only the type differs, and that is out of sync")
+  assert.match(report.entries[0].reason, /data key makes it a dropdown field/)
+
+  const fixed = repairSingleDataKeyIntegrityReference({
+    entry: report.entries[0],
+    dataKeys,
+    scripts: [buildScript([searchOnChoiceKey] as any)],
+  })
+  const field = (fixed.scripts[0].nuidSearchFields as any[])[0]
+  assert.equal(field.type, "dropdown", "the repair makes it a choice")
+  assert.equal(field.searchRole, undefined, "a choice has no search role")
+  assert.equal(field.keyId, "dk-baby-transferred")
+
+  // A field whose type already matches its key stays resolved.
+  const fine = scanDataKeyIntegrity({ dataKeys, scripts: [buildScript([{ ...searchOnChoiceKey, type: "dropdown", searchRole: undefined }] as any)] })
+  assert.equal(fine.entries[0].status, "resolved")
+}
+
+// A key the mobile app can't show on the NUID Search page is still a conflict.
+const multiSelectKey = {
+  uuid: "uuid-multi", uniqueKey: "dk-multi", name: "Multi", label: "Many of", dataType: "multi_select",
+  confidential: false, options: [], metadata: {},
+} as unknown as DataKey
+const unsupportedReport = scanDataKeyIntegrity({
+  dataKeys: [...dataKeys, multiSelectKey],
+  scripts: [buildScript([{ type: "dropdown", key: "Multi", keyId: "dk-multi", label: "Many of" }] as any)],
+})
+assert.equal(unsupportedReport.entries[0].status, "conflict", "a NUID field on a multi select key is a conflict")
 
 const singleSelectReport = scanDataKeyIntegrity({
   dataKeys: [...dataKeys, singleSelectKey],

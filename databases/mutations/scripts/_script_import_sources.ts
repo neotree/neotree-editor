@@ -12,6 +12,7 @@ import {
     type ScriptImportSnapshot,
 } from '@/databases/pg/schema';
 import logger from '@/lib/logger';
+import { describeError } from '@/lib/server/db-errors';
 
 export type ScriptImportSource = typeof scriptImportSources.$inferSelect;
 
@@ -151,6 +152,6 @@ export async function _settlePendingScriptImports({
         return { success: true, promotedScriptIds };
     } catch (e: any) {
         logger.error('_settlePendingScriptImports ERROR', e.message);
-        return { success: false, errors: [e.message] };
+        return { success: false, errors: [describeError(e)] };
     }
 }
