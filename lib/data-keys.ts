@@ -5,6 +5,7 @@ import { _getDrugsLibraryItems } from "@/databases/queries/drugs-library";
 import { _getDataKeys, DataKey } from "@/databases/queries/data-keys";
 import { diagnoses, drugsLibrary } from "@/databases/pg/schema";
 import { normalizeDataKeyType } from "@/lib/data-key-types";
+import { getNuidFieldTypeForDataKey } from "@/lib/nuid-search/fields";
 import { getOutcomeCollectionForScreenType } from "@/lib/conditional-expression/script-outcomes";
 
 type KeyWithoutOptions = {
@@ -553,6 +554,27 @@ export async function parseImportedDataKeys({
         if (keyId) warnings.push(`Reference "${k?.label || k?.name || keyId}" points to a data key the source editor does not have; it was imported without a link.`);
         return undefined;
     };
+    // NUID Search fields: the source key through the key map, a key this editor already has, then
+    // the one key here (or being imported) with the field's name and a type the field can use.
+    const resolveNuidFieldKeyId = (f: { keyId?: string | null; key?: string | null; type?: string | null }) => {
+        const mapped = mapUniqueKey(f.keyId);
+        if (mapped) return mapped;
+        if (f.keyId && (localByUniqueKey.has(f.keyId) || parsedByLocalUniqueKey.has(f.keyId))) return f.keyId;
+        const name = `${f.key || ''}`.trim();
+        if (!name) return undefined;
+        const fits = (k: { name?: string | null; dataType?: string | null; uniqueKey?: string | null }) => (
+            `${k.name || ''}`.trim() === name
+            // a key the NUID Search page can use, of the kind this field is (choice or search)
+            && getNuidFieldTypeForDataKey(k) === f.type
+        );
+        const candidates = Array.from(new Set([
+            ...localDataKeys.filter(fits).map(k => k.uniqueKey),
+            // An imported key only counts when this import saves it (or it is already here).
+            ...parsed.filter(k => fits(k) && (!k.isNew || k.canSave)).map(k => k.uniqueKey),
+        ].filter(Boolean)));
+        return candidates.length === 1 ? candidates[0] : undefined;
+    };
+
     const remapRefs = <T extends Record<string, any>>(obj: T): T => {
         const out: Record<string, any> = { ...obj };
         KEY_REFERENCE_PROPS.forEach(p => {
@@ -565,14 +587,20 @@ export async function parseImportedDataKeys({
     return {
         dataKeys: parsed,
 
-        warnings: Array.from(new Set(warnings)),
-
         drugsLibrary: importedDrugsLibraryItems,
 
-        nuidSearchFields: importedNuidSearchFields.map(f => remapRefs({
-            ...f,
-            keyId: resolveKeyId(f.keyId, { label: f.label || '', name: f.key || '', dataType: 'field' }) ?? f.keyId,
-        })),
+        // A NUID Search field is its library key, matched by id, then by name and type. It never
+        // keeps the source's id when that id means nothing here: that left fields pointing at
+        // keys this library doesn't have. Unresolved, it comes in unlinked and the NUID Search
+        // page links it (or offers to create the key).
+        nuidSearchFields: importedNuidSearchFields.map(f => {
+            const keyId = resolveNuidFieldKeyId(f);
+            if (!keyId && f.keyId) {
+                const name = f.label && f.key && f.label !== f.key ? `"${f.label}" (${f.key})` : `"${f.label || f.key || f.keyId}"`;
+                warnings.push(`NUID Search field ${name}: its data key could not be matched in this library, so it was imported without a link. Link it on the script's NUID Search page.`);
+            }
+            return remapRefs({ ...f, keyId });
+        }),
 
         diagnoses: importedDiagnoses.map(s => {
             const name = s.key || s.name;
@@ -635,6 +663,9 @@ export async function parseImportedDataKeys({
                 }),
             });
         }),
+
+        // Last: the mappings above add warnings while they run (properties are evaluated in order).
+        warnings: Array.from(new Set(warnings)),
     };
 }
 

@@ -65,17 +65,19 @@ export function useScriptForm(params: UseScriptFormParams) {
     defaultValues: getDefaultFormValues(),
   })
 
+  /**
+   * The fields to show when NUID Search is switched on: what the page has now (the
+   * fields are kept while it is off, and the app ignores them then), else what was
+   * saved, else the standard fields for the script type.
+   */
   const getDefaultNuidSearchFields = useCallback(() => {
     const fields = form.getValues("nuidSearchFields")
+    if (fields?.length) return fields
+    if (formData?.nuidSearchFields?.length) return formData.nuidSearchFields
     const type = form.getValues("type")
-    const enabled = form.getValues("nuidSearchEnabled")
-    let _fields = formData?.nuidSearchFields?.length
-      ? formData.nuidSearchFields
-      : ((type === "admission"
-          ? defaultNuidSearchFields.admission
-          : defaultNuidSearchFields.other) as unknown as typeof fields)
-    if (!enabled) _fields = []
-    return _fields
+    return (type === "admission"
+      ? defaultNuidSearchFields.admission
+      : defaultNuidSearchFields.other) as unknown as typeof fields
   }, [form, formData?.nuidSearchFields])
 
   const getDefaultScreenReviewConfigurations = useCallback(() => {

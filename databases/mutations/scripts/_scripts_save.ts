@@ -1,4 +1,5 @@
 import { desc, eq, Query } from 'drizzle-orm';
+import { scriptContentChanged, stripScriptComputedProps } from '@/lib/script-computed-props';
 import * as uuid from 'uuid';
 
 import logger from '@/lib/logger';
@@ -59,10 +60,11 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                     });
 
                     if (draft) {
-                        const data = {
+                        // Computed properties never live in a draft (a copy from an older save is dropped).
+                        const data = stripScriptComputedProps({
                             ...draft.data,
                             ...item,
-                        } as typeof draft.data;
+                        }) as typeof draft.data;
                         
                         const q = executor
                             .update(scriptsDrafts)
@@ -95,13 +97,18 @@ export async function _saveScripts({ data, broadcastAction, syncSilently, userId
                             position = Math.max(0, script?.position || 0, scriptDraft?.position || 0) + 1;
                         }
 
-                        const data = {
+                        const data = stripScriptComputedProps({
                             ...published,
                             ...item,
                             scriptId,
                             version: published?.version ? (published.version + 1) : 1,
                             position,
-                        } as typeof scriptsDrafts.$inferInsert['data'];
+                        }) as typeof scriptsDrafts.$inferInsert['data'];
+
+                        // A save that changes nothing (e.g. Save with no edits) leaves no draft behind.
+                        if (published && !scriptContentChanged(published as Record<string, any>, data as Record<string, any>)) {
+                            continue;
+                        }
 
                         const q = executor.insert(scriptsDrafts).values({
                             data,

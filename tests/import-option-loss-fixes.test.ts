@@ -199,6 +199,42 @@ async function main() {
         assert.equal(repaired.fields[1].items[0].label, "Old", "the other field with the same label is not touched");
     }
 
+    // ── NUID Search fields never keep a source id this library doesn't have ──────────────────────
+    {
+        // This editor's library: BabyTwin (dropdown) and BabyTwinNUID (text) under its own ids.
+        const live = [dk("LIVE-TWIN", "BabyTwin", "Does the baby have a twin?", "dropdown"), dk("LIVE-TWIN-NUID", "BabyTwinNUID", "Search twin's NUID", "text")];
+        const nuid = (key: string, type: string, keyId?: string) => ({ key, type, keyId, label: key });
+        const run = (importedDataKeys: any[], fields: any[]) => parseImportedDataKeys({
+            localDataKeys: live, importedDataKeys, importedScrappedKeys: [], importedNuidSearchFields: fields,
+        });
+
+        // 1. The source sends a key whose id this editor doesn't have, and it matches a local key: mapped.
+        const mapped = await run([dk("SRC-TWIN", "BabyTwin", "Does the baby have a twin?", "dropdown")], [nuid("BabyTwin", "dropdown", "SRC-TWIN")]);
+        assert.equal(mapped.nuidSearchFields[0].keyId, "LIVE-TWIN", "source key mapped to this editor's key");
+
+        // 2. The source doesn't have the linked key (the field was already dangling there): the old
+        //    code kept "GONE", a key nobody has. Now: the local key of the same name and type.
+        const byName = await run([], [nuid("BabyTwin", "dropdown", "GONE"), nuid("BabyTwinNUID", "text", "GONE-2")]);
+        assert.deepEqual(byName.nuidSearchFields.map((f: any) => f.keyId), ["LIVE-TWIN", "LIVE-TWIN-NUID"], "linked by name and type");
+        assert.ok(!byName.warnings.some(w => /NUID Search field/.test(w)), "no warning when it resolves");
+
+        // 3. No key of that name and type here: imported unlinked, with a warning — never the source id.
+        const none = await run([], [nuid("BabyTwin", "text", "GONE"), nuid("Unknown", "text", "GONE-3")]);
+        assert.deepEqual(none.nuidSearchFields.map((f: any) => f.keyId), [undefined, undefined], "a wrong type or unknown name is not linked");
+        assert.equal(none.warnings.filter(w => /NUID Search field/.test(w)).length, 2);
+
+        // 4. An id this editor already has is kept as it is.
+        const known = await run([], [nuid("BabyTwin", "dropdown", "LIVE-TWIN")]);
+        assert.equal(known.nuidSearchFields[0].keyId, "LIVE-TWIN");
+
+        // 5. Two keys here with the same name and type: ambiguous, so it is left for the author.
+        const twice = await parseImportedDataKeys({
+            localDataKeys: [...live, dk("LIVE-TWIN-2", "BabyTwin", "Twin?", "dropdown")],
+            importedDataKeys: [], importedScrappedKeys: [], importedNuidSearchFields: [nuid("BabyTwin", "dropdown", "GONE")],
+        });
+        assert.equal(twice.nuidSearchFields[0].keyId, undefined, "ambiguous name is not guessed");
+    }
+
     console.log("import option loss fix tests passed");
     process.exit(0);
 }
