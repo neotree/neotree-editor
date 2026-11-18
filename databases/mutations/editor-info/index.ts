@@ -5,6 +5,7 @@ import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { editorInfo } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
+import { describeError } from "@/lib/server/db-errors";
 
 export type SaveEditorInfoParams = {
     data: Partial<typeof editorInfo.$inferSelect>;
@@ -39,6 +40,6 @@ export async function _saveEditorInfo({ data, increaseVersion, broadcastAction ,
         return  { data: info || null, success: !!info, };
     } catch(e: any) {
         logger.error('_saveEditorInfo ERROR', e.message);
-        return { data: null, success: false, errors: [e.message], };
+        return { data: null, success: false, errors: [describeError(e)], };
     }
 }

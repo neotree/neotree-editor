@@ -1,4 +1,5 @@
 import axios from "axios";
+import { REMOTE_EDITOR_TIMEOUT_MS } from "@/lib/remote-timeout";
 
 export async function getSiteAxiosClient(params: {
     baseURL: string;
@@ -12,6 +13,7 @@ export async function getSiteAxiosClient(params: {
 
     const axiosClient = axios.create({
         baseURL: siteLink,
+        timeout: REMOTE_EDITOR_TIMEOUT_MS,
     });
     
     axiosClient.interceptors.request.use(async config => {

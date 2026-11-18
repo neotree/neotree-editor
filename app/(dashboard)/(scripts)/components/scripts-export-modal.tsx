@@ -34,23 +34,34 @@ type CopyResult = { started?: boolean; } & Awaited<ReturnType<ReturnType<typeof 
  * waits for it. POST once, then ask again (same body = same job) until the job has a result.
  */
 async function runCopyJob(body: Record<string, any>): Promise<CopyResult> {
-    const post = async () => (await axios.post('/api/scripts/copy', body)).data as CopyResult;
+    // Only the first request starts the job; the checks are polls (`resume`) that never start it again.
+    const post = async (resume = false) => (await axios.post('/api/scripts/copy', resume ? { ...body, resume: true } : body, resume ? { timeout: 60 * 1000 } : undefined)).data as CopyResult;
     let res = await post();
     if (!res.started) return res;
+    const startedAt = Date.now();
     return await new Promise<CopyResult>((resolve) => {
         let settled = false;
+        let failedChecks = 0;
+        const finish = (result: CopyResult) => {
+            if (settled) return;
+            settled = true;
+            socket.off(body.requestKey, onSignal);
+            clearInterval(timer);
+            resolve(result);
+        };
         const check = async () => {
             if (settled) return;
             try {
-                const next = await post();
-                if (!next.started && !settled) {
-                    settled = true;
-                    socket.off(body.requestKey, onSignal);
-                    clearInterval(timer);
-                    resolve(next);
+                const next = await post(true);
+                failedChecks = 0;
+                if (!next.started) return finish(next);
+                if (Date.now() - startedAt > 30 * 60 * 1000) {
+                    finish({ success: false, errors: ['This is taking much longer than expected, so the dialog stopped waiting. The export may still finish: check the other editor for new drafts before trying again.'] } as CopyResult);
                 }
-            } catch {
-                // the next signal or poll resolves it
+            } catch (e: any) {
+                if (++failedChecks >= 6) {
+                    finish({ success: false, errors: [`Lost contact with this editor while exporting (${e?.message || 'network error'}). The export may still finish: check the other editor for new drafts before trying again.`] } as CopyResult);
+                }
             }
         };
         const onSignal = (key: string) => { if (key === IMPORT_JOB_COMPLETE_EVENT) check(); };

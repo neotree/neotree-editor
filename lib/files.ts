@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 
 import { getSiteAxiosClient } from '@/lib/axios';
+import { REMOTE_EDITOR_TIMEOUT_MS } from '@/lib/remote-timeout';
 import { UploadFileFromSiteResponse } from "@/app/actions/files";
 import { FileReference } from "@/types";
 import { isValidUrl, getUploadUrl } from "@/lib/urls";
@@ -139,6 +140,7 @@ export function parseFileReferences({
 export async function uploadReferencedFileIfMissing(file: FileReference, siteUrl?: string) {
     let axiosClient = axios.create({
         baseURL: process.env.NEXT_PUBLIC_APP_URL,
+        timeout: REMOTE_EDITOR_TIMEOUT_MS,
     });
 
     if (siteUrl) {

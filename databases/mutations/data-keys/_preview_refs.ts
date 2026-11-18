@@ -1,6 +1,7 @@
 import { _getDataKeys } from "@/databases/queries/data-keys";
 import { _updateDataKeysRefs, type UpdateDataKeysRefsResponse } from "./_update_data_keys_refs";
 import type { SaveDataKeysData } from "./_save";
+import { describeError } from "@/lib/server/db-errors";
 
 export async function _previewDataKeysRefsImpact({
     data,
@@ -87,7 +88,7 @@ export async function _previewDataKeysRefsImpact({
     } catch (e: any) {
         return {
             success: false,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }

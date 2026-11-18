@@ -13,6 +13,14 @@ import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { createProgressReporter } from '@/lib/in-progress';
+import {
+    ContentWriteBusyError,
+    describeWriter,
+    holdsContentWriteLock,
+    lockContentWritesInTransaction,
+    withContentWriteLock,
+} from '@/lib/server/content-write-lock';
+import { describeDatabaseError } from '@/lib/server/db-errors';
 import { checkDataKeyDuplicates } from '@/lib/data-key-duplicate-check';
 import { _findDataKeyNameLabelMatches } from '@/databases/queries/data-keys/_find-name-label-matches';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
@@ -23,6 +31,7 @@ import {
 } from './_delete-referenced-options';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
 import { uniqueValues } from '@/lib/unique-values';
+import { describeError } from '@/lib/server/db-errors';
 
 export type SaveDataKeysData = Partial<typeof dataKeys.$inferSelect> & {
     deletedUniqueKeys?: string[];
@@ -219,7 +228,23 @@ async function buildOptionUnlinkPlan({
     };
 }
 
-export async function _saveDataKeys({
+export async function _saveDataKeys(params: SaveDataKeysParams): Promise<SaveDataKeysResponse> {
+    // A standalone save waits its turn behind this editor's other writers (an import, a publish, another
+    // save) instead of colliding with them; inside a caller's transaction the caller already holds it.
+    if (params.client || holdsContentWriteLock()) return saveDataKeysNow(params);
+    try {
+        return await withContentWriteLock(
+            { label: await describeWriter(params.draftOrigin === 'import' ? 'an import of data keys' : 'a data key save', params.userId) },
+            () => saveDataKeysNow(params),
+        );
+    } catch (e: any) {
+        if (!(e instanceof ContentWriteBusyError)) throw e;
+        logger.error('_saveDataKeys BUSY', e.message);
+        return { success: false, errors: [describeError(e)], };
+    }
+}
+
+async function saveDataKeysNow({
     data: dataParam,
     broadcastAction,
     updateRefs = true,
@@ -579,7 +604,7 @@ export async function _saveDataKeys({
                         }
                     }
                 } catch(e: any) {
-                    errors.push(e.message);
+                    errors.push(describeError(e));
                 }
             }
 
@@ -750,7 +775,10 @@ export async function _saveDataKeys({
                 if (broadcastAction && refsSaved) socket.emit('data_changed', 'save_scripts');
             }
         } else {
-            await db.transaction(executeSave);
+            await db.transaction(async (tx) => {
+                await lockContentWritesInTransaction(tx);
+                await executeSave(tx);
+            });
 
             // Emit only when we own the transaction — a joined transaction may
             // still roll back after we return.
@@ -765,10 +793,11 @@ export async function _saveDataKeys({
         // Drizzle wraps database errors ("Failed query: …"); the reason (constraint, detail) is on e.cause.
         const cause = e?.cause;
         const reason = cause?.message
-            ? [cause.message, cause.detail, cause.constraint ? `constraint ${cause.constraint}` : ''].filter(Boolean).join(' | ')
+            ? [cause.message, cause.detail, cause.constraint_name || cause.constraint ? `constraint ${cause.constraint_name || cause.constraint}` : ''].filter(Boolean).join(' | ')
             : '';
         response.success = false;
-        response.errors = [reason ? `Saving data keys failed: ${reason}` : e.message];
+        // what happened, in words (lib/server/db-errors.ts); the raw query stays in the log
+        response.errors = [describeDatabaseError(e) ? `The data keys could not be saved: ${describeDatabaseError(e)}.` : e.message];
         logger.error('_saveDataKeys ERROR', e.message, reason ? `CAUSE: ${reason}` : '');
         return { success: false, errors: response.errors, };
     } finally {
@@ -812,7 +841,7 @@ export async function _saveDataKeysIfNotExist({
     } catch(e: any) {
         return {
             success: false,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }
@@ -849,7 +878,7 @@ export async function _saveDataKeysUpdateIfExist({
     } catch(e: any) {
         return {
             success: false,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }

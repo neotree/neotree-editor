@@ -3,6 +3,7 @@ import { eq, or } from 'drizzle-orm';
 import socket  from '@/lib/socket';
 import db from '@/databases/pg/drizzle';
 import * as schema from '@/databases/pg/schema';
+import { describeError } from '@/lib/server/db-errors';
 
 export type DeleteAndReplaceFiles = {
     broadcastAction?: boolean;
@@ -59,7 +60,7 @@ export async function _deleteAndReplaceFiles({
         };
     } catch(e: any) {
         return {
-            errors: [e.message],
+            errors: [describeError(e)],
             success: false,
         };
     }

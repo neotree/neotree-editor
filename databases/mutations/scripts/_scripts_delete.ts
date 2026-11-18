@@ -8,6 +8,7 @@ import { _deleteScreens } from './_screens_delete';
 import { _deleteDiagnoses } from './_diagnoses_delete';
 import { _deleteProblems } from './_problems_delete';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
 
 export type DeleteScriptsData = {
     scriptsIds?: string[];
@@ -33,7 +34,7 @@ export async function _deleteAllScriptsDrafts(opts?: {
     }
 }
 
-export async function _deleteScripts(
+async function _deleteScriptsNow(
     { scriptsIds = [], broadcastAction, confirmDeleteAll, userId, draftOrigin = "editor", }: DeleteScriptsData,
 ) {
     const response: DeleteScriptsResponse = { success: false, };
@@ -86,4 +87,9 @@ export async function _deleteScripts(
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'delete_scripts');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _deleteScripts(...args: Parameters<typeof _deleteScriptsNow>): ReturnType<typeof _deleteScriptsNow> {
+    return queueContentWrite('a script deletion', args[0] as any, () => _deleteScriptsNow(...args));
 }
