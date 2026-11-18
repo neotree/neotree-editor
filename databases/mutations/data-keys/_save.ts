@@ -762,10 +762,15 @@ export async function _saveDataKeys({
         response.success = true;
         return response;
     } catch(e: any) {
+        // Drizzle wraps database errors ("Failed query: …"); the reason (constraint, detail) is on e.cause.
+        const cause = e?.cause;
+        const reason = cause?.message
+            ? [cause.message, cause.detail, cause.constraint ? `constraint ${cause.constraint}` : ''].filter(Boolean).join(' | ')
+            : '';
         response.success = false;
-        response.errors = [e.message];
-        logger.error('_saveDataKeys ERROR', e.message);
-        return { success: false, errors: [e.message], };
+        response.errors = [reason ? `Saving data keys failed: ${reason}` : e.message];
+        logger.error('_saveDataKeys ERROR', e.message, reason ? `CAUSE: ${reason}` : '');
+        return { success: false, errors: response.errors, };
     } finally {
         progress.finish();
     }
