@@ -341,7 +341,7 @@ const COLLECTION_MEMBERSHIP_OP: Record<string, "includes" | "excludes"> = {
 
     // A fraction is stored as two numbers under keys of their own; the fraction key itself
     // holds no value to compare.
-    if (isFractionDataType(dataType)) {
+    if (isFractionDataType(dataType) && node.left.name.toLowerCase() !== "self") {
       const { numeratorKey, denominatorKey } = getFractionStorageKeys(node.left.name);
       diagnostics.push({
         severity: "error",
