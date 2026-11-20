@@ -54,3 +54,62 @@ export function fractionFieldPatch(
     if (!isFractionDataType(dataKey?.dataType)) return {};
     return getFractionLabels(dataKey?.metadata);
 }
+
+/**
+ * How a captured fraction is stored: as two plain numbers, each under a key of its own, so
+ * conditions, exports and analytics read them like any other number key. For a fraction key
+ * "BP" with labels Systolic / Diastolic, 120 / 80 is stored as BP_numerator = 120 and
+ * BP_denominator = 80. The suffixes never follow the labels, so relabelling a key does not
+ * move its stored data.
+ */
+export const FRACTION_NUMERATOR_SUFFIX = "_numerator";
+export const FRACTION_DENOMINATOR_SUFFIX = "_denominator";
+
+export type FractionStorageKeys = {
+    numeratorKey: string;
+    denominatorKey: string;
+};
+
+export function getFractionStorageKeys(key?: string | null): FractionStorageKeys {
+    const name = `${key || ""}`.trim();
+    return {
+        numeratorKey: `${name}${FRACTION_NUMERATOR_SUFFIX}`,
+        denominatorKey: `${name}${FRACTION_DENOMINATOR_SUFFIX}`,
+    };
+}
+
+type NamedDataKey = { name?: string | null; dataType?: string | null; metadata?: Record<string, any> | null };
+
+/**
+ * Name clashes between fraction storage keys and other data keys. A fraction key "BP" stores
+ * its numbers under BP_numerator and BP_denominator, so no other data key may use those names
+ * (the two values would overwrite each other in a session). Checks `dataKey` against
+ * `otherKeys` both ways: its own storage keys, and its name against theirs.
+ */
+export function validateFractionStorageKeyClashes(dataKey: NamedDataKey, otherKeys: NamedDataKey[]): string[] {
+    const name = `${dataKey?.name || ""}`.trim();
+    if (!name) return [];
+    const lower = name.toLowerCase();
+    const others = (otherKeys || []).filter(k => `${k?.name || ""}`.trim() && `${k?.name || ""}`.trim().toLowerCase() !== lower);
+    const errors: string[] = [];
+
+    if (isFractionDataType(dataKey?.dataType)) {
+        const { numeratorKey, denominatorKey } = getFractionStorageKeys(name);
+        for (const storageKey of [numeratorKey, denominatorKey]) {
+            const clash = others.find(k => `${k.name}`.trim().toLowerCase() === storageKey.toLowerCase());
+            if (clash) {
+                errors.push(`Fraction data key "${name}" stores a number under "${storageKey}", but a data key with that name already exists.`);
+            }
+        }
+    }
+
+    for (const other of others) {
+        if (!isFractionDataType(other?.dataType)) continue;
+        const { numeratorKey, denominatorKey } = getFractionStorageKeys(other.name);
+        if ([numeratorKey, denominatorKey].some(k => k.toLowerCase() === lower)) {
+            errors.push(`"${name}" is where fraction data key "${`${other.name}`.trim()}" stores one of its numbers; choose another name.`);
+        }
+    }
+
+    return errors;
+}

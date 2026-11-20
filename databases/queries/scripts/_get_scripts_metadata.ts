@@ -4,6 +4,7 @@ import db from "@/databases/pg/drizzle";
 import { scripts, screens, hospitals, scriptsDrafts, problems, diagnoses } from "@/databases/pg/schema";
 import { DiagnosisSymptom, ScriptField, FileReference, ScriptItem } from "@/types";
 import * as uuid from "uuid";
+import { getFractionStorageKeys } from "@/lib/fraction-data-keys";
 
 export type GetScriptsMetadataParams = {
     scriptsIds?: string[];
@@ -65,6 +66,8 @@ export type GetScriptsMetadataResponse = {
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
                 condition?: string | null;
+                /** Set on the two number fields a fraction field exports as: the fraction's own key. */
+                fractionKey?: string;
                 options?: {
                     value: string;
                     valueLabel: string;
@@ -512,9 +515,6 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     case 'number':
                                         dataType = 'number';
                                         break;
-                                    case 'fraction':
-                                        dataType = 'fraction';
-                                        break;
                                     case 'text':
                                         dataType = 'string';
                                         if (
@@ -524,6 +524,33 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         break;
                                     default:
                                         dataType = f.dataType;
+                                }
+
+                                // A fraction is stored as two numbers under keys of their own
+                                // (lib/fraction-data-keys.ts), so it exports as two number fields.
+                                if (f.type === 'fraction') {
+                                    const { numeratorKey, denominatorKey } = getFractionStorageKeys(f.key);
+                                    const numeratorLabel = `${f.numeratorLabel || ''}`.trim() || 'numerator';
+                                    const denominatorLabel = `${f.denominatorLabel || ''}`.trim() || 'denominator';
+                                    const part = (key: string, partLabel: string, minValue: any, maxValue: any) => ({
+                                        label: `${f.label || f.key} (${partLabel})`,
+                                        key,
+                                        type: 'number',
+                                        dataType: 'number',
+                                        value: null,
+                                        valueLabel: null,
+                                        optional: f.optional,
+                                        confidential: f.confidential,
+                                        confidentialLabelOnly: f.confidentialLabelOnly,
+                                        minValue,
+                                        maxValue,
+                                        condition: f.condition || '',
+                                        fractionKey: f.key,
+                                    });
+                                    return [
+                                        part(numeratorKey, numeratorLabel, f.minValue, f.maxValue),
+                                        part(denominatorKey, denominatorLabel, f.denominatorMinValue, f.denominatorMaxValue),
+                                    ];
                                 }
 
                                 if (['multi_select', 'dropdown'].includes(f.type)) {

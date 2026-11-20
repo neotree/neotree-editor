@@ -1,4 +1,5 @@
 import type { ConditionKey } from "./ast";
+import { getFractionLabels, getFractionStorageKeys, isFractionDataType } from "../fraction-data-keys";
 
 /**
  * Adapts registry/scrapped data keys into the ConditionKey shape, resolving each
@@ -19,7 +20,7 @@ export function toConditionKeys(rawKeys: any[]): ConditionKey[] {
     if (key?.uuid) idToMeta.set(`${key.uuid}`, meta);
   }
 
-  return list
+  const dataKeys: ConditionKey[] = list
     .map((key: any) => {
       const name = `${key?.name || ""}`.trim();
 
@@ -51,4 +52,33 @@ export function toConditionKeys(rawKeys: any[]): ConditionKey[] {
       };
     })
     .filter((key) => !!key.name);
+
+  return [...dataKeys, ...fractionStorageConditionKeys(list)];
+}
+
+/**
+ * A fraction key (e.g. BP) is captured as two numbers stored under keys of their own
+ * (BP_numerator, BP_denominator). Conditions compare those, so they are offered as number keys.
+ * A real data key with the same name wins (the data-key save refuses such clashes).
+ */
+function fractionStorageConditionKeys(rawKeys: any[]): ConditionKey[] {
+  const taken = new Set(rawKeys.map((key) => `${key?.name || ""}`.trim().toLowerCase()).filter(Boolean));
+  const keys: ConditionKey[] = [];
+  for (const key of rawKeys) {
+    const name = `${key?.name || ""}`.trim();
+    if (!name || !isFractionDataType(key?.dataType)) continue;
+    const label = `${key?.label || ""}`.trim() || name;
+    const { numeratorLabel, denominatorLabel } = getFractionLabels(key?.metadata);
+    const { numeratorKey, denominatorKey } = getFractionStorageKeys(name);
+    const parts: [string, string][] = [
+      [numeratorKey, numeratorLabel || "numerator"],
+      [denominatorKey, denominatorLabel || "denominator"],
+    ];
+    for (const [storageKey, part] of parts) {
+      if (taken.has(storageKey.toLowerCase())) continue;
+      taken.add(storageKey.toLowerCase());
+      keys.push({ name: storageKey, label: `${storageKey} - ${label} (${part})`, dataType: "number" });
+    }
+  }
+  return keys;
 }

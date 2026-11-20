@@ -11,7 +11,13 @@ import { normalizeIncomingDataKeyPatch, rebaseDataKeyOptions } from '@/lib/data-
 import { validateDataKeyOptionsAddition } from '@/lib/data-key-children';
 import { isNuidManagedDataKey, NUID_MANAGED } from '@/lib/nuid-search';
 import { normalizeDataKeyCompatibilityType } from '@/lib/data-key-types';
-import { validateFractionDataKey } from '@/lib/fraction-data-keys';
+import {
+    FRACTION_DENOMINATOR_SUFFIX,
+    FRACTION_NUMERATOR_SUFFIX,
+    getFractionStorageKeys,
+    validateFractionDataKey,
+    validateFractionStorageKeyClashes,
+} from '@/lib/fraction-data-keys';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { createProgressReporter } from '@/lib/in-progress';
@@ -300,6 +306,52 @@ export async function _saveDataKeys({
 
             if (draftOrigin === 'editor') {
                 data.forEach((item) => errors.push(...validateFractionDataKey(item)));
+
+                // A fraction key stores its numbers under <name>_numerator and <name>_denominator:
+                // no other key may take those names, in this save or already stored.
+                try {
+                    const lookupNames = new Set<string>();
+                    for (const item of data) {
+                        const name = `${item.name || ''}`.trim();
+                        if (!name) continue;
+                        lookupNames.add(name.toLowerCase());
+                        const storage = getFractionStorageKeys(name);
+                        lookupNames.add(storage.numeratorKey.toLowerCase());
+                        lookupNames.add(storage.denominatorKey.toLowerCase());
+                        for (const suffix of [FRACTION_NUMERATOR_SUFFIX, FRACTION_DENOMINATOR_SUFFIX]) {
+                            if (name.toLowerCase().endsWith(suffix) && name.length > suffix.length) {
+                                lookupNames.add(name.slice(0, -suffix.length).toLowerCase());
+                            }
+                        }
+                    }
+                    if (lookupNames.size) {
+                        const stored = await _getDataKeys({ names: Array.from(lookupNames), client: executor, });
+                        if (stored.errors?.length) throw new Error(stored.errors.join(', '));
+                        for (const item of data) {
+                            const isSelf = (k: { uuid?: string | null; uniqueKey?: string | null; }) =>
+                                (!!item.uniqueKey && `${k.uniqueKey || ''}` === `${item.uniqueKey}`) ||
+                                (!!item.uuid && `${k.uuid || ''}` === `${item.uuid}`);
+                            const incoming = data.filter(other => other !== item);
+                            const incomingNames = new Set(incoming.map(k => `${k.name || ''}`.trim().toLowerCase()));
+                            const others = [
+                                ...incoming,
+                                // a stored key renamed or retyped in this same save counts as it will be
+                                ...(stored.data || []).filter(k =>
+                                    !isSelf(k) &&
+                                    !incoming.some(other => (
+                                        (!!other.uniqueKey && `${k.uniqueKey || ''}` === `${other.uniqueKey}`) ||
+                                        (!!other.uuid && `${k.uuid || ''}` === `${other.uuid}`)
+                                    )) &&
+                                    !incomingNames.has(`${k.name || ''}`.trim().toLowerCase())
+                                ),
+                            ];
+                            errors.push(...validateFractionStorageKeyClashes(item, others));
+                        }
+                    }
+                } catch (e: any) {
+                    logger.error('_saveDataKeys fraction storage key check ERROR', e?.message);
+                    errors.push('Could not check fraction storage key names; please try again.');
+                }
             }
 
             if (draftOrigin === 'editor') try {

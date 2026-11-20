@@ -44,7 +44,7 @@ import { useFieldKeyCollisions } from "@/components/field-key-collisions"
 import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { collectNewOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
 import { ParentKeyOptionsHint } from "./parent-key-options-hint"
-import { fractionFieldPatch } from "@/lib/fraction-data-keys"
+import { fractionFieldPatch, getFractionStorageKeys } from "@/lib/fraction-data-keys"
 
 type Props = {
   open: boolean
@@ -543,6 +543,13 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, isColumn,
                   <span className="text-xs text-muted-foreground">
                     A fraction is captured as two numbers shown together, e.g. blood pressure 120 / 80.
                     The labels of the two numbers come from the data key and are edited in the data keys library.
+                    {!!`${key || ""}`.trim() && (
+                      <>
+                        {" "}The numbers are saved separately
+                        as <span className="font-mono">{getFractionStorageKeys(key).numeratorKey}</span> and{" "}
+                        <span className="font-mono">{getFractionStorageKeys(key).denominatorKey}</span>; use these keys in conditions.
+                      </>
+                    )}
                   </span>
 
                   <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">

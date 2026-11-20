@@ -11,6 +11,7 @@ import type {
 import { quoteValue } from "./quote";
 import { OUTCOME_COLLECTIONS } from "./script-outcomes";
 import { suggestClosest } from "./suggest";
+import { getFractionStorageKeys, isFractionDataType } from "../fraction-data-keys";
 
 // Data-type families (compared case-insensitively).
 const MULTI_VALUE_TYPES = new Set([
@@ -337,6 +338,21 @@ const COLLECTION_MEMBERSHIP_OP: Record<string, "includes" | "excludes"> = {
     const desc = describeVar(node.left);
     if (!desc) return; // unknown key already reported
     const dataType = (desc.dataType || "").toLowerCase();
+
+    // A fraction is stored as two numbers under keys of their own; the fraction key itself
+    // holds no value to compare.
+    if (isFractionDataType(dataType)) {
+      const { numeratorKey, denominatorKey } = getFractionStorageKeys(node.left.name);
+      diagnostics.push({
+        severity: "error",
+        code: "FRACTION_COMPARISON",
+        message: `"$${node.left.name}" is a fraction, stored as two numbers. Compare one of them: "$${numeratorKey}" or "$${denominatorKey}".`,
+        start: node.left.start,
+        end: node.left.end,
+        suggestion: `$${numeratorKey}`,
+      });
+      return;
+    }
 
     if (ORDERING_OPS.has(node.op) && dataType && NON_ORDERED_TYPES.has(dataType)) {
       diagnostics.push({

@@ -12,7 +12,14 @@ import {
     validateScreenTable,
     validateScreenTableConfig,
 } from "../lib/screen-table-config";
-import { getFractionLabels, isFractionDataType, validateFractionDataKey } from "../lib/fraction-data-keys";
+import {
+    getFractionLabels,
+    getFractionStorageKeys,
+    isFractionDataType,
+    validateFractionDataKey,
+    validateFractionStorageKeyClashes,
+} from "../lib/fraction-data-keys";
+import { toConditionKeys, validateCondition } from "../lib/conditional-expression";
 import { syncFieldReference } from "../databases/mutations/data-keys/_update_data_keys_refs.helpers";
 import { dataKeyTypes, screenTypePickerOptions, screenTypes } from "../constants";
 import { FieldTypes } from "../constants/fields";
@@ -208,6 +215,49 @@ import { mapNewScreenToOld } from "../lib/map-old-and-new";
         true,
         "a fraction field on a number key is reported",
     );
+
+    // ── A captured fraction is stored as two numbers, each under a key of its own ─────────────
+
+    assert.deepEqual(getFractionStorageKeys("BP"), { numeratorKey: "BP_numerator", denominatorKey: "BP_denominator" });
+    assert.deepEqual(getFractionStorageKeys(" BP "), getFractionStorageKeys("BP"), "names are trimmed");
+
+    assert.deepEqual(validateFractionStorageKeyClashes(bpKey, [weightKey]), [], "no clash");
+    assert.match(
+        validateFractionStorageKeyClashes(bpKey, [{ name: "bp_numerator", dataType: "number" }])[0],
+        /stores a number under "BP_numerator"/,
+        "a fraction key cannot store into a key that already exists (any casing)",
+    );
+    assert.match(
+        validateFractionStorageKeyClashes({ name: "BP_denominator", dataType: "number" }, [bpKey])[0],
+        /fraction data key "BP" stores one of its numbers/,
+        "a new key cannot take a fraction's storage name",
+    );
+    assert.deepEqual(
+        validateFractionStorageKeyClashes({ name: "BP_numerator", dataType: "number" }, [{ ...bpKey, dataType: "number" }]),
+        [],
+        "only fraction keys reserve storage names",
+    );
+    assert.deepEqual(validateFractionStorageKeyClashes(bpKey, [bpKey]), [], "a key never clashes with itself");
+
+    // Conditions compare the stored numbers, never the fraction key itself.
+    const conditionKeys = toConditionKeys([bpKey, weightKey]);
+    const numerator = conditionKeys.find(k => k.name === "BP_numerator");
+    assert.equal(numerator?.dataType, "number", "the numerator is offered to conditions as a number key");
+    assert.match(`${numerator?.label}`, /Systolic/, "labelled with the key's numerator label");
+    assert.equal(conditionKeys.find(k => k.name === "BP_denominator")?.dataType, "number");
+    assert.equal(conditionKeys.filter(k => /_numerator$/.test(k.name)).length, 1, "only fraction keys add storage keys");
+    assert.equal(
+        toConditionKeys([bpKey, { name: "BP_numerator", dataType: "text" }]).filter(k => k.name === "BP_numerator").length,
+        1,
+        "a real data key with the same name wins",
+    );
+
+    const conditionErrors = (input: string) =>
+        validateCondition(input, { keys: conditionKeys }).diagnostics.filter(d => d.severity === "error");
+    assert.deepEqual(conditionErrors("$BP_numerator > 140 or $BP_denominator > 90"), [], "the stored numbers can be compared");
+    const onFraction = conditionErrors("$BP > 140");
+    assert.equal(onFraction[0]?.code, "FRACTION_COMPARISON", "comparing the fraction key itself is an error");
+    assert.equal(onFraction[0]?.suggestion, "$BP_numerator");
 
     // ── Content sync: unset table settings and row ids are not differences ───────────────────
 

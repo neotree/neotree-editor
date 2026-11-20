@@ -66,7 +66,7 @@ import {
 } from '@/components/ui/dialog';
 import { DataKeySaveProgress } from '@/components/data-key-save-progress';
 import { DataKeyLabelNotice, DataKeyNameNotice, useDataKeyDuplicateCheck } from './duplicate-notice';
-import { getFractionLabels, isFractionDataType, validateFractionDataKey } from '@/lib/fraction-data-keys';
+import { getFractionLabels, getFractionStorageKeys, isFractionDataType, validateFractionDataKey } from '@/lib/fraction-data-keys';
 
 type SaveRefsImpact = NonNullable<NonNullable<SaveDataKeysResponse['info']>['refs']>;
 
@@ -878,6 +878,12 @@ function Form({
                                 <span className="text-xs text-muted-foreground">
                                     A fraction is captured as two numbers shown together. Example: blood pressure, with
                                     numerator label Systolic and denominator label Diastolic, is captured as 120 / 80.
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    The two numbers are saved separately
+                                    as <span className="font-mono">{getFractionStorageKeys(nameValue || 'KEY').numeratorKey}</span> and{' '}
+                                    <span className="font-mono">{getFractionStorageKeys(nameValue || 'KEY').denominatorKey}</span>.
+                                    Use these keys in conditions.
                                 </span>
                                 {fractionErrors
                                     .filter(error => /different/.test(error))
