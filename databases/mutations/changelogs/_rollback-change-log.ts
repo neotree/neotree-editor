@@ -3,6 +3,7 @@ import * as uuid from "uuid"
 
 import logger from "@/lib/logger"
 import db from "@/databases/pg/drizzle"
+import { describeWriter, runContentTransaction } from "@/lib/server/content-write-lock"
 import { changeLogs, editorInfo } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
 import {
@@ -77,7 +78,7 @@ export async function _rollbackChangeLog({
       throw new Error("Invalid userId")
     }
 
-    const result = await db.transaction(async (tx) => {
+    const result = await runContentTransaction({ label: await describeWriter('a rollback', userId) }, async (tx) => {
       // Lock editor info before any entity locks. Publish and release rollback acquire
       // it first, so taking entity locks first here could deadlock against them.
       const lockedEditorInfo = await tx.execute<{ id: number; dataVersion: number }>(

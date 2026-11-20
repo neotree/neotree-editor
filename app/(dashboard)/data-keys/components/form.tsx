@@ -42,7 +42,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { useIsLocked } from '@/hooks/use-is-locked';
-import { isNuidManagedDataKey } from '@/lib/nuid-search';
+import { isNuidManagedDataKey, getNuidFieldTypeForDataKey, NUID_FIELD_TYPE_LABELS, NUID_SUPPORTED_KEYS_DESCRIPTION } from '@/lib/nuid-search';
 import { useAppContext } from "@/contexts/app";
 import { useContentViewOnly } from "@/hooks/use-content-lock";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,13 @@ import {
 import { DataKeySaveProgress } from '@/components/data-key-save-progress';
 import { DataKeyLabelNotice, DataKeyNameNotice, useDataKeyDuplicateCheck } from './duplicate-notice';
 import { getFractionLabels, getFractionStorageKeys, isFractionDataType, validateFractionDataKey } from '@/lib/fraction-data-keys';
+
+/** Opens the script's NUID Search page on the field. */
+function getNuidUsageHref(usage: { scriptId: string; fieldIndex?: number | null; }) {
+    return Number.isFinite(usage.fieldIndex)
+        ? `/script/${usage.scriptId}?nuidSearchField=${usage.fieldIndex}`
+        : `/script/${usage.scriptId}`;
+}
 
 type SaveRefsImpact = NonNullable<NonNullable<SaveDataKeysResponse['info']>['refs']>;
 
@@ -118,9 +125,9 @@ function Form({
     const isReadOnly = !!disabled || isLocked || viewOnly;
 
     const isNuidManaged = isNuidManagedDataKey(dataKey as any);
-    // Managed NUID keys are locked: key + type (below) and their option children
-    // (e.g. Y/N) can't be added, removed or reordered — only the label may change.
-    const optionsLocked = isReadOnly || isNuidManaged;
+    // Keys created for NUID Search edit like any other key; the note below the key says
+    // how NUID Search pages follow the change.
+    const optionsLocked = isReadOnly;
 
     const [shouldResetForm, setShouldResetForm] = useState(false);
     const [currentDataKey, setCurrentDataKey] = useState(dataKey);
@@ -299,6 +306,18 @@ function Form({
         savedOptionsSignature,
         loadImpactPreview,
     ]);
+
+    // A NUID Search field takes its type from its key: a new type the mobile app can show
+    // changes the fields that use this key (a choice becomes a search, or the reverse); any
+    // other type leaves them in error until they are linked to another key.
+    const nuidTypeChange = useMemo(() => {
+        if (!dataKey || !dataType) return null;
+        const from = getNuidFieldTypeForDataKey(dataKey);
+        const to = getNuidFieldTypeForDataKey({ dataType });
+        if (from === to) return null;
+        const usages = (impactPreview?.usages || []).filter(u => u.kind === 'script_nuid_search_field');
+        return { usages, checking: previewingImpact, to };
+    }, [dataKey, dataType, impactPreview, previewingImpact]);
 
     const onSave = handleSubmit(async (data) => {
         if (isReadOnly) return;
@@ -537,10 +556,12 @@ function Form({
             if (usage.kind === 'diagnosis') return 'diagnosis';
             if (usage.kind === 'diagnosis_symptom') return 'symptom';
             if (usage.kind === 'problem') return 'problem';
+            if (usage.kind === 'script_nuid_search_field') return 'NUID search field';
             return 'open';
         };
 
         const getUsageHref = (usage: NonNullable<UpdateDataKeysRefsResponse['affected']>['usages'][number]) => {
+            if (usage.kind === 'script_nuid_search_field') return getNuidUsageHref(usage);
             if (usage.kind === 'screen_field' && usage.screenId && usage.id) {
                 return `/script/${usage.scriptId}/screen/${usage.screenId}?field=${usage.id}`;
             }
@@ -773,7 +794,7 @@ function Form({
                                             <Select
                                                 value={value}
                                                 name="name"
-                                                disabled={isFormDisabled || isNuidManaged}
+                                                disabled={isFormDisabled}
                                                 onValueChange={val => {
                                                     onChange(val);
 
@@ -807,6 +828,31 @@ function Form({
                                                     </SelectGroup>
                                                 </SelectContent>
                                             </Select>
+                                            {!!nuidTypeChange && (nuidTypeChange.checking || !!nuidTypeChange.usages.length) && (
+                                                <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                                                    {nuidTypeChange.checking ? 'Checking NUID Search pages that use this key…' : (
+                                                        <>
+                                                            <div>
+                                                                {nuidTypeChange.usages.length} NUID Search field{nuidTypeChange.usages.length === 1 ? ' uses' : 's use'} this key.{' '}
+                                                                {nuidTypeChange.to ? (
+                                                                    <>After saving, {nuidTypeChange.usages.length === 1 ? 'it becomes a' : 'they become'} <b>{NUID_FIELD_TYPE_LABELS[nuidTypeChange.to]}</b>{nuidTypeChange.usages.length === 1 ? ' field' : ' fields'} on the app. Check the conditions that use {nuidTypeChange.usages.length === 1 ? 'it' : 'them'}.</>
+                                                                ) : (
+                                                                    <>The mobile app can&apos;t show a <b>{dataType}</b> key on the NUID Search page, so after saving {nuidTypeChange.usages.length === 1 ? 'it shows' : 'they show'} an error and block publishing until {nuidTypeChange.usages.length === 1 ? 'it is' : 'each is'} linked to another key. {NUID_SUPPORTED_KEYS_DESCRIPTION}</>
+                                                                )}
+                                                            </div>
+                                                            <ul className="mt-1 list-disc pl-5">
+                                                                {nuidTypeChange.usages.map(u => (
+                                                                    <li key={`${u.scriptId}:${u.id}`}>
+                                                                        <a className="underline" href={getNuidUsageHref(u)} target="_blank" rel="noopener noreferrer">
+                                                                            {u.scriptTitle || 'Script'}: {u.title}
+                                                                        </a>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </>
                                 );
@@ -816,15 +862,17 @@ function Form({
                         <div className="px-4">
                             <Label htmlFor="name">Key *</Label>
                             <Input
-                                disabled={isFormDisabled || isNuidManaged}
+                                disabled={isFormDisabled}
                                 {...register('name', {
-                                    disabled: isFormDisabled || isNuidManaged,
+                                    disabled: isFormDisabled,
                                     required: true,
                                 })}
                             />
                             {isNuidManaged && (
-                                <span className="text-xs text-muted-foreground">
-                                    Managed by NUID Search — the key, data type and options are locked, and it can&apos;t be deleted. You can still edit the label.
+                                <span className="block text-xs text-muted-foreground">
+                                    Created for NUID Search. Edit it like any other key: NUID Search pages that use it
+                                    pick up the new key, label and options. If you change its data type, link those
+                                    fields to a matching key on the script&apos;s NUID Search page.
                                 </span>
                             )}
                             <DataKeyNameNotice check={duplicateCheck} onUseKey={chooseExistingKey} />

@@ -11,6 +11,8 @@ import { removeHexCharacters } from '../../utils'
 import { normalizeSelectionRuleItems, validateSelectionRules } from '@/lib/selection-rules';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
 import { normalizeScreenTableConfig, tableCollectionName, validateScreenTable } from '@/lib/screen-table-config';
+import { queueContentWrite } from "@/lib/server/content-write-lock";
+import { describeError } from '@/lib/server/db-errors';
 
 
 export type SaveScreensData = Partial<ScreenType> & {
@@ -231,7 +233,7 @@ async function promoteDataKeysAsConfidentialLabelOnly(uniqueKeys: string[], user
     }
 }
 
-export async function _saveScreens({ data, broadcastAction, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
+async function _saveScreensNow({ data, broadcastAction, userId, client, draftOrigin: requestedDraftOrigin = "editor" }: {
     data: SaveScreensData[],
     broadcastAction?: boolean;
     userId?: string;
@@ -378,7 +380,7 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
                     }
                 }
             } catch(e: any) {
-                errors.push(e.message);
+                errors.push(describeError(e));
             }
         }
 
@@ -406,4 +408,9 @@ export async function _saveScreens({ data, broadcastAction, userId, client, draf
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'save_screens');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _saveScreens(...args: Parameters<typeof _saveScreensNow>): ReturnType<typeof _saveScreensNow> {
+    return queueContentWrite('a screen save', args[0] as any, () => _saveScreensNow(...args));
 }

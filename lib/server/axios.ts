@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import logger from "@/lib/logger";
+import { REMOTE_EDITOR_TIMEOUT_MS } from "@/lib/remote-timeout";
 import { _getSiteApiKey } from "@/databases/queries/sites";
 
 export async function getSiteAxiosClient(siteId: string, site?: {
@@ -25,6 +26,7 @@ export async function getSiteAxiosClient(siteId: string, site?: {
 
     const axiosClient = axios.create({
         baseURL: siteLink,
+        timeout: REMOTE_EDITOR_TIMEOUT_MS,
     });
     
     axiosClient.interceptors.request.use(async config => {

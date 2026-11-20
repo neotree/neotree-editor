@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath as _revalidatePath } from "next/cache"
+import { SCRIPT_COMPUTED_KEYS } from "@/lib/script-computed-props";
 
 import socket from "@/lib/socket"
 import logger from "@/lib/logger"
@@ -30,6 +31,7 @@ import type { PublishDataResponse } from "@/lib/publish-data"
 import { collectNuidSearchPublishErrors } from "@/lib/nuid-search/fields"
 import { indexDataKeysById } from "@/lib/nuid-search/resolve"
 import db from "@/databases/pg/drizzle"
+import { describeWriter, runContentTransaction } from "@/lib/server/content-write-lock"
 import {
   configKeysDrafts,
   dataKeysDrafts,
@@ -43,6 +45,7 @@ import {
   scriptsDrafts,
 } from "@/databases/pg/schema"
 import { count, eq, isNull, sql } from "drizzle-orm"
+import { describeError } from "@/lib/server/db-errors";
 
 export type PendingDraftQueueScope = "all" | "mine"
 export type PendingDraftQueueTab = "all" | "creates" | "updates" | "deletes" | "mine"
@@ -183,6 +186,8 @@ const ignoredDiffKeys = new Set([
   "itemId",
   "dataKeyId",
   "uuid",
+  // computed by the editor, never an edit (see lib/script-computed-props)
+  ...SCRIPT_COMPUTED_KEYS,
 ])
 
 function getCreatedByLabel(createdBy?: { displayName?: string | null; email?: string | null } | null) {
@@ -1254,7 +1259,7 @@ export async function getPendingDraftQueue(params?: {
         creators: [],
         entityTypes: [],
       },
-      errors: [e.message],
+      errors: [describeError(e)],
     }
   }
 }
@@ -1476,7 +1481,7 @@ export async function publishData({ scope, allowConfidentialDowngrade }: { scope
       ].join("<br />"))
     }
 
-    await db.transaction(async (tx) => {
+    await runContentTransaction({ label: await describeWriter('a publish', publisherUserId) }, async (tx) => {
       const lockedEditor = await tx.execute<{ id: number; dataVersion: number }>(
         sql`select id, data_version as "dataVersion" from nt_editor_info limit 1 for update`,
       )
@@ -1664,7 +1669,7 @@ export async function discardDrafts({ scope }: { scope: number }) {
       logger.error("discardDrafts affected-scripts lookup ERROR", e.message)
     }
 
-    await db.transaction(async (tx) => {
+    await runContentTransaction({ label: await describeWriter('a discard of unpublished changes', session?.user?.userId) }, async (tx) => {
       await tx.delete(configKeysDrafts).where(byUser(configKeysDrafts.createdByUserId))
       await tx.delete(hospitalsDrafts).where(byUser(hospitalsDrafts.createdByUserId))
       await tx.delete(drugsLibraryDrafts).where(byUser(drugsLibraryDrafts.createdByUserId))
@@ -1733,7 +1738,7 @@ export async function countOwnerlessDrafts(): Promise<{ total: number; byType: R
     }
     return { total: Object.values(byType).reduce((a, b) => a + b, 0), byType }
   } catch (e: any) {
-    return { total: 0, byType: {}, errors: [e.message] }
+    return { total: 0, byType: {}, errors: [describeError(e)] }
   }
 }
 
@@ -1742,7 +1747,7 @@ export async function adoptOwnerlessDrafts(): Promise<{ success: boolean; adopte
   try {
     const user = await assertAdmin()
     let adopted = 0
-    await db.transaction(async (tx) => {
+    await runContentTransaction({ label: await describeWriter('a take-over of drafts with no owner', user.userId) }, async (tx) => {
       for (const { table, owner } of OWNED_DRAFT_TABLES) {
         const rows = await tx
           .update(table as any)
@@ -1757,6 +1762,6 @@ export async function adoptOwnerlessDrafts(): Promise<{ success: boolean; adopte
     return { success: true, adopted }
   } catch (e: any) {
     logger.error("adoptOwnerlessDrafts ERROR", e.message)
-    return { success: false, errors: [e.message] }
+    return { success: false, errors: [describeError(e)] }
   }
 }

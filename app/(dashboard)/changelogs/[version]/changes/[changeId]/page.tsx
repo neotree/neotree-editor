@@ -35,6 +35,7 @@ import {
   type HighlightEntry,
 } from "./diff-insights"
 import { RollbackButton } from "../../../components/rollback-button"
+import { SCRIPT_COMPUTED_KEYS } from "@/lib/script-computed-props"
 
 type Params = {
   version: string
@@ -62,6 +63,8 @@ const systemFieldNames = new Set([
   "createdAt",
   "updatedAt",
   "deletedAt",
+  // computed by the editor, never an edit (see lib/script-computed-props)
+  ...SCRIPT_COMPUTED_KEYS,
 ])
 
 function isMeaningfulRestoreSnapshot(snapshot: unknown): boolean {

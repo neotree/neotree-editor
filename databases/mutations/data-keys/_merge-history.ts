@@ -2,6 +2,7 @@ import { and, eq, inArray, or, sql } from 'drizzle-orm';
 
 import logger from '@/lib/logger';
 import db from '@/databases/pg/drizzle';
+import { describeWriter, runContentTransaction } from '@/lib/server/content-write-lock'
 import type { DbOrTransaction } from '@/databases/pg/db-client';
 import socket from '@/lib/socket';
 import { changeLogs, dataKeyDuplicateDismissals, dataKeyMerges } from '@/databases/pg/schema';
@@ -13,6 +14,7 @@ import {
     sameMergeDraftRows,
     type MergeSnapshot,
 } from './_merge-snapshot';
+import { describeError } from '@/lib/server/db-errors';
 
 export { isMergeRevertible, type MergeSnapshot } from './_merge-snapshot';
 
@@ -26,7 +28,7 @@ export async function _revertDataKeyMerge({
     broadcastAction?: boolean;
 }): Promise<{ success: boolean; errors?: string[]; scriptIds?: string[] }> {
     try {
-        const scriptIds = await db.transaction(async (tx) => {
+        const scriptIds = await runContentTransaction({ label: await describeWriter('a merge revert', userId) }, async (tx) => {
             // Locks serialise two reverts of the same record, and keep the drafts
             // from changing between the "still as the merge left them" check and the restore.
             const [record] = await tx.select().from(dataKeyMerges).where(eq(dataKeyMerges.mergeId, mergeId)).for('update');
@@ -58,7 +60,7 @@ export async function _revertDataKeyMerge({
         return { success: true, scriptIds };
     } catch (e: any) {
         logger.error('_revertDataKeyMerge ERROR', e.message);
-        return { success: false, errors: [e.message] };
+        return { success: false, errors: [describeError(e)] };
     }
 }
 
@@ -204,7 +206,7 @@ export async function _dismissDuplicateGroup({
         return { success: true };
     } catch (e: any) {
         logger.error('_dismissDuplicateGroup ERROR', e.message);
-        return { success: false, errors: [e.message] };
+        return { success: false, errors: [describeError(e)] };
     }
 }
 
@@ -214,6 +216,6 @@ export async function _restoreDuplicateGroup({ groupKey }: { groupKey: string; }
         return { success: true };
     } catch (e: any) {
         logger.error('_restoreDuplicateGroup ERROR', e.message);
-        return { success: false, errors: [e.message] };
+        return { success: false, errors: [describeError(e)] };
     }
 }

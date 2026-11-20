@@ -20,6 +20,7 @@ import logger from "@/lib/logger";
 import { isAllowed } from "./is-allowed";
 import { actingUserHeaders } from "@/lib/acting-user";
 import { assertContentEditable } from "@/lib/server/content-sync";
+import { describeError } from "@/lib/server/db-errors";
 
 export const saveDrugsLibraryItemsIfKeysNotExist: typeof _saveDrugsLibraryItemsIfKeysNotExist = async params => {
     try {
@@ -31,7 +32,7 @@ export const saveDrugsLibraryItemsIfKeysNotExist: typeof _saveDrugsLibraryItemsI
         });
     } catch (e: any) {
         logger.error('saveDrugsLibraryItemsIfKeysNotExist ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [describeError(e)], data: undefined, success: false, };
     }
 };
 
@@ -45,7 +46,7 @@ export const saveDrugsLibraryItemsUpdateIfExists: typeof _saveDrugsLibraryItemsU
         });
     } catch (e: any) {
         logger.error('saveDrugsLibraryItemsUpdateIfExists ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [describeError(e)], data: undefined, success: false, };
     }
 };
 
@@ -59,7 +60,7 @@ export const copyDrugsLibraryItems: typeof _copyDrugsLibraryItems = async params
         });
     } catch (e: any) {
         logger.error('copyDrugsLibraryItems ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [describeError(e)], data: undefined, success: false, };
     }
 };
 
@@ -73,7 +74,7 @@ export const deleteDrugsLibraryItems: typeof _deleteDrugsLibraryItems = async pa
         });
     } catch(e: any) {
         logger.error('deleteDrugsLibraryItems ERROR', e.message);
-        return { errors: [e.message], success: false, };
+        return { errors: [describeError(e)], success: false, };
     }
 };
 
@@ -83,7 +84,7 @@ export const countDrugsLibraryItems: typeof _countDrugsLibraryItems = async (...
         return await _countDrugsLibraryItems(...args);
     } catch(e: any) {
         logger.error('countDrugsLibraryItems ERROR', e.message);
-        return { errors: [e.message], data: _defaultDrugsLibraryItemsCount, };
+        return { errors: [describeError(e)], data: _defaultDrugsLibraryItemsCount, };
     }
 };
 
@@ -93,7 +94,7 @@ export const getDrugsLibraryItems: typeof _getDrugsLibraryItems = async (...args
         return await _getDrugsLibraryItems(...args);
     } catch(e: any) {
         logger.error('getDrugsLibraryItems ERROR', e.message);
-        return { errors: [e.message], data: [], };
+        return { errors: [describeError(e)], data: [], };
     }
 };
 
@@ -108,7 +109,7 @@ export const getDrugsLibraryMetadata: typeof _getDrugsLibraryMetadata = async (.
         return await _getDrugsLibraryMetadata(...args);
     } catch(e: any) {
         logger.error('getDrugsLibraryMetadata ERROR', e.message);
-        return { errors: [e.message], data: [], };
+        return { errors: [describeError(e)], data: [], };
     }
 };
 
@@ -122,7 +123,7 @@ export const saveDrugsLibraryItems: typeof _saveDrugsLibraryItems = async params
         });
     } catch (e: any) {
         logger.error('saveDrugsLibraryItems ERROR', e.message);
-        return { errors: [e.message], data: undefined, success: false, };
+        return { errors: [describeError(e)], data: undefined, success: false, };
     }
 };
 
@@ -136,7 +137,7 @@ export const removeDrugLibraryItemsReferences: typeof _removeDrugLibraryItemsRef
         });
     } catch(e: any) {
         logger.error('removeDrugLibraryItemsReferences ERROR', e.message);
-        return { errors: [e.message], data: { success: false }, };
+        return { errors: [describeError(e)], data: { success: false }, };
     }
 };
 
@@ -196,7 +197,7 @@ export const exportDrugLibraryItems = async ({
     } catch(e: any) {
         return {
             success: false,
-            errors: [e.message],
+            errors: [describeError(e)],
         };
     }
 }

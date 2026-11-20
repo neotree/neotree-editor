@@ -6,6 +6,7 @@ import { hospitals, hospitalsDrafts, pendingDeletion, } from '@/databases/pg/sch
 import socket from '@/lib/socket';
 import { and } from 'drizzle-orm';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { queueContentWrite } from "@/lib/server/content-write-lock";
 
 export type DeleteHospitalsData = {
     hospitalsIds: string[];
@@ -29,7 +30,7 @@ export async function _deleteAllHospitalsDrafts(opts?: {
     }
 }
 
-export async function _deleteHospitals(
+async function _deleteHospitalsNow(
     { hospitalsIds: hospitalsIdsParam, broadcastAction = true, userId, }: DeleteHospitalsData,
 ) {
     const response: DeleteHospitalsResponse = { success: false, };
@@ -73,4 +74,9 @@ export async function _deleteHospitals(
         if (!response?.errors?.length && broadcastAction) socket.emit('data_changed', 'delete_hospitals');
         return response;
     }
+}
+
+/** Queued behind this editor's other content writers (lib/server/content-write-lock.ts), unless inside a caller's transaction. */
+export async function _deleteHospitals(...args: Parameters<typeof _deleteHospitalsNow>): ReturnType<typeof _deleteHospitalsNow> {
+    return queueContentWrite('a hospital deletion', args[0] as any, () => _deleteHospitalsNow(...args));
 }

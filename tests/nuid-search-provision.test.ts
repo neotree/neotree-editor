@@ -4,7 +4,6 @@ import {
   resolveNuidTemplate,
   buildNuidProvisionPayload,
   isNuidManagedDataKey,
-  lockManagedDataKeyPatch,
   NUID_MANAGED,
   type NuidFieldSpec,
   type NuidLibraryKey,
@@ -54,9 +53,18 @@ const template: NuidFieldSpec[] = [
   const res = resolveNuidTemplate(template, lib);
   assert.equal(res.conflicts.length, 1, "a wrong-type same-name key is a conflict");
   assert.equal(res.conflicts[0].key, "BabyTransfered");
-  assert.equal(res.conflicts[0].expectedType, "single_select");
+  assert.equal(res.conflicts[0].expectedType, "dropdown", "a template choice needs a dropdown key");
+  assert.equal(res.conflicts[0].foundType, "text");
   assert.equal(res.missing.length, 1, "patientNUID is still missing");
   assert.equal(res.linked.length, 0, "the wrong-type key is not linked");
+}
+
+// A same-name key the mobile app can't show on its NUID Search page is a conflict too.
+{
+  const lib: NuidLibraryKey[] = [{ uniqueKey: "dk-transfer-multi", name: "BabyTransfered", dataType: "multi_select" }];
+  const res = resolveNuidTemplate(template, lib);
+  assert.equal(res.conflicts.length, 1, "a multi select key is not used for a choice");
+  assert.equal(res.conflicts[0].foundType, "multi_select");
 }
 
 // dropdown and single_select are compatible -> resolves.
@@ -204,31 +212,22 @@ const genId = () => `gen-${++counter}`;
   assert.ok(!dropdown!.options!.includes("opt-y-wrong"), "the wrong-label option is not reused");
 }
 
-// ---- managed lock --------------------------------------------------------
+// A choice without options still becomes a dropdown key (never a text key it couldn't link to).
+{
+  const payload = buildNuidProvisionPayload([{ key: "NoOpts", type: "dropdown", label: "No options yet", options: [] }], [], () => "gen-no-opts");
+  const created = payload.find((k) => k.name === "NoOpts");
+  assert.equal(created?.dataType, "dropdown", "a choice is provisioned as a dropdown key");
+  assert.deepEqual(created?.options, []);
+}
+
+// ---- managed marker ------------------------------------------------------
+// Provenance only: managed keys are edited, merged and deleted like any other.
 
 {
   const managedKey = { name: "BabyTransfered", dataType: "dropdown", metadata: { managed: NUID_MANAGED } };
   assert.equal(isNuidManagedDataKey(managedKey), true);
   assert.equal(isNuidManagedDataKey({ metadata: {} }), false);
   assert.equal(isNuidManagedDataKey(null), false);
-
-  // Attempted key/type change is forced back; label change passes through; flag preserved.
-  const patched = lockManagedDataKeyPatch(
-    { name: "Renamed", dataType: "text", label: "New label", metadata: {} },
-    managedKey,
-  );
-  assert.equal(patched.name, "BabyTransfered", "name is immutable");
-  assert.equal(patched.dataType, "dropdown", "dataType is immutable");
-  assert.equal(patched.label, "New label", "label still changes");
-  assert.equal((patched.metadata as any).managed, NUID_MANAGED, "managed flag is preserved");
-
-  // Unmanaged existing key -> patch passes through untouched.
-  const unmanaged = lockManagedDataKeyPatch(
-    { name: "Renamed", dataType: "text" },
-    { name: "Old", dataType: "number", metadata: {} },
-  );
-  assert.equal(unmanaged.name, "Renamed", "unmanaged keys are not locked");
-  assert.equal(unmanaged.dataType, "text");
 }
 
 console.log("nuid search provision tests passed");

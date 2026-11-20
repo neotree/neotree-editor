@@ -5,6 +5,7 @@ import type { DbOrTransaction } from "@/databases/pg/db-client";
 import { configKeys, dataKeys, diagnoses, problems, drugsLibrary, pendingDeletion, screens, scripts } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
+import { describeError } from "@/lib/server/db-errors";
 
 export async function _clearPendingDeletion(params?: {
     items?: 'screens' | 'scripts' | 'diagnoses' | 'problems' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
@@ -38,7 +39,7 @@ export async function _clearPendingDeletion(params?: {
         return { success: true, };
     } catch(e: any) {
         logger.error('_clearPendingDeletion ERROR', e.message);
-        return { success: false, errors: [e.message], };
+        return { success: false, errors: [describeError(e)], };
     }
 }
 
@@ -145,6 +146,6 @@ export async function _processPendingDeletion(params?: {
         return { success: true, };
     } catch(e: any) {
         logger.error('_processPendingDeletion ERROR', e.message);
-        return { success: false, errors: [e.message], };
+        return { success: false, errors: [describeError(e)], };
     }
 }
