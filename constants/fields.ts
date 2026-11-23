@@ -35,6 +35,7 @@ export const DefaultValueType = {
     { name: 'date', label: 'Date' },
     { name: 'datetime', label: 'Date + Time' },
     { name: 'dropdown', label: 'Dropdown' },
+    { name: 'fraction', label: 'Fraction (e.g. blood pressure)' },
     { name: 'multi_select', label: 'Multiple choice list' },
     { name: 'number', label: 'Number' },
     { name: 'text', label: 'Text' },

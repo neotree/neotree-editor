@@ -106,6 +106,7 @@ export function useScreenForm({ formData, scriptId, script }: UseScreenFormParam
       repeatable: (isEmpty(formData?.repeatable) ? null : formData?.repeatable!) as boolean,
       collectionName: formData?.collectionName || "",
       collectionLabel: formData?.collectionLabel || "",
+      tableConfig: formData?.tableConfig || null,
       listStyle: formData?.listStyle || "none",
       printDisplayColumns: formData?.printDisplayColumns || 2,
       rankItems: formData?.rankItems || false,

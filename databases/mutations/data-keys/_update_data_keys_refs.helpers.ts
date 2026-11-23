@@ -1,4 +1,5 @@
-import { randomUUID } from "crypto";
+import { fractionFieldPatch } from "@/lib/fraction-data-keys";
+import { v4 as uuidv4 } from "uuid";
 
 import type { DataKey } from "@/databases/queries/data-keys";
 import type { ScriptItem, ScriptField } from "@/types";
@@ -172,6 +173,7 @@ export function syncFieldReference(current: ScriptField, dataKey?: DataKey) {
         confidential: !!item.confidential,
         confidentialLabelOnly: !!item.confidentialLabelOnly,
         optional: !!(item.metadata as Record<string, unknown> | undefined)?.optional,
+        ...fractionFieldPatch(item),
     }));
 }
 
@@ -247,7 +249,7 @@ export function rebuildFieldItemsFromDataKeyOptions({
         );
         return {
             ...existing,
-            itemId: `${existing?.itemId || ""}` || randomUUID(),
+            itemId: `${existing?.itemId || ""}` || uuidv4(),
             value: item.name,
             label: item.label,
             keyId: item.uniqueKey,
@@ -274,7 +276,7 @@ export function rebuildScreenItemsFromDataKeyOptions({
         );
         return {
             ...existing,
-            itemId: `${existing?.itemId || ""}` || randomUUID(),
+            itemId: `${existing?.itemId || ""}` || uuidv4(),
             id: item.name,
             key: item.name,
             label: item.label,

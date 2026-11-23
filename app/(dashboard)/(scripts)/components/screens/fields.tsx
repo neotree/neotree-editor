@@ -21,8 +21,11 @@ import { useConditionKeys } from "@/components/conditional-expression";
 import { useFieldKeyCollisions } from "@/components/field-key-collisions";
 import { ScriptIssueBadge, collisionIssues, conditionIssues } from "@/components/script-issues";
 import type { ScriptField } from "@/types";
+import { getTableColumnHeading } from "@/lib/screen-table-config";
 
 type Props = {
+    /** On a table screen the fields are the table's columns and are worded that way. */
+    variant?: 'fields' | 'columns';
     disabled?: boolean;
     form: ReturnType<typeof useScreenForm>;
     scriptId? : string;
@@ -36,7 +39,9 @@ export function Fields({
     scriptId,
     unavailableOutcomeKeys,
     persistedFields = [],
+    variant = 'fields',
 }: Props) {
+    const isColumns = variant === 'columns';
     const btnRef = useRef<HTMLButtonElement>(null);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
     const [manualOnly, setManualOnly] = useState(false);
@@ -73,6 +78,7 @@ export function Fields({
                 field.type,
                 field.key,
                 field.label,
+                field.tableHeading || '',
                 ...manualItems.map(item => `${item.label || ''}`),
                 ...manualItems.map(item => `${item.value || ''}`),
                 ...manualItems.map(item => `${item.enterValueManuallyLabel || ''}`),
@@ -201,6 +207,7 @@ export function Fields({
                     unavailableOutcomeKeys={unavailableOutcomeKeys}
                     baselineField={baselineField}
                     disabled={disabled}
+                    isColumn={isColumns}
                     field={!activeField || resolvedFieldIndex === null || resolvedFieldIndex < 0 ? undefined : {
                         data: activeField,
                         index: resolvedFieldIndex,
@@ -209,14 +216,14 @@ export function Fields({
             )}
 
             <DataTable 
-                title="Fields"
+                title={isColumns ? 'Columns' : 'Fields'}
                 sortable={!disabled && !manualOnly && !missingManualLabelOnly}
                 selectable={!disabled}
                 onSort={onSort}
                 selectedIndexes={selectedIndexes}
                 onSelect={setSelectedIndexes}
                 search={{
-                    inputPlaceholder: 'Search fields, manual labels, or option keys',
+                    inputPlaceholder: isColumns ? 'Search columns, manual labels, or option keys' : 'Search fields, manual labels, or option keys',
                 }}
                 filter={(rowIndex) => {
                     const meta = fieldMeta[rowIndex];
@@ -263,7 +270,7 @@ export function Fields({
                             onClick={() => openFieldEditor('new')}
                         >
                             <Plus className="h-4 w-4 mr-1" />
-                            New field
+                            {isColumns ? 'New column' : 'New field'}
                         </Button>
                     </>
                 )}
@@ -275,12 +282,12 @@ export function Fields({
                         name: 'Key',
                     },
                     {
-                        name: 'Label',
+                        name: isColumns ? 'Column heading' : 'Label',
                         cellRenderer(cell) {
                             const field = fields[cell.rowIndex];
                             return (
                                 <span className="inline-flex items-center gap-x-2">
-                                    <span>{field?.label}</span>
+                                    <span>{isColumns ? getTableColumnHeading(field) : field?.label}</span>
                                     {!!field && (
                                         <ScriptIssueBadge
                                             issues={[

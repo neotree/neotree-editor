@@ -2,10 +2,6 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { createHash } from "crypto";
-import fs from "fs";
-import os from "os";
-import path from "path";
-import { execFileSync } from "child_process";
 
 import { _saveFile, SaveFileOptions } from "@/databases/mutations/files";
 import { _getFileByFileId, _getFiles, _getFullFileByFileId, _getReferencedFiles } from "@/databases/queries/files";
@@ -17,6 +13,7 @@ import { getSiteAxiosClient } from "@/lib/axios";
 import queryString from "query-string";
 import { _getSites } from "@/databases/queries/sites";
 import { extractApkMetadataFromBuffer } from "@/lib/app-updates/apk-metadata";
+import { apkSignatureSha256FromBuffer } from "@/lib/app-updates/apk-signature";
 
 export const getFiles: typeof _getFiles = _getFiles;
 
@@ -77,19 +74,10 @@ export async function uploadFile(
                             // metadata extraction is best-effort
                         }
 
-                        const tmpFile = path.join(os.tmpdir(), `${fileId}.apk`);
-                        fs.writeFileSync(tmpFile, buffer);
-                        try {
-                            const output = execFileSync('apksigner', ['verify', '--print-certs', tmpFile], { encoding: 'utf-8' });
-                            const match = output.match(/SHA-256 digest:\s*([A-Fa-f0-9:]+)/);
-                            if (match?.[1]) {
-                                metadata.apkSignatureSha256 = match[1].replace(/:/g, '').toLowerCase();
-                                metadata.apkSignatureVerifiedAt = new Date().toISOString();
-                            }
-                        } catch (e: any) {
-                            logger.error('uploadFile APK signature verification ERROR', e.message || `${e}`);
-                        } finally {
-                            try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+                        const signatureSha256 = apkSignatureSha256FromBuffer(buffer);
+                        if (signatureSha256) {
+                            metadata.apkSignatureSha256 = signatureSha256;
+                            metadata.apkSignatureVerifiedAt = new Date().toISOString();
                         }
                     } catch (e) {
                         // ignore checksum/signature errors; upload should still succeed

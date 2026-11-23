@@ -17,9 +17,9 @@ import {
 } from "@/databases/pg/schema"
 import {
   coerceRollbackSnapshotValues,
-  computeRollbackSnapshotHash,
   shouldAutoRepairLegacySnapshotHash,
 } from "@/lib/changelog-rollback"
+import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback-hash"
 
 export type VersionedEntityBinding = {
   table: any

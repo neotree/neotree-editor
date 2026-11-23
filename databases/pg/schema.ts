@@ -28,6 +28,8 @@ import type {
   ScriptItem,
   FluidField,
   EligibilityCriteria,
+  ScreenTableConfig,
+  ScriptPrintOrientation,
 } from "@/types"
 import type { IntegrityBaseline, IntegrityPolicy } from "@/lib/integrity-policy"
 import type { ContentSyncSettings } from "@/lib/content-sync"
@@ -1157,6 +1159,8 @@ export const scripts = pgTable(
         headerFields: string[]
         footerFields: string[]
         sections: any[]
+        /** Page orientation of the printout. Missing = portrait. */
+        orientation?: ScriptPrintOrientation
       }>(),
     printSections: jsonb("print_sections").default("[]").notNull(),
 
@@ -1345,6 +1349,8 @@ export const screens = pgTable(
     collectionName: text("collection_name").notNull().default(""),
     collectionLabel: text("collection_label").notNull().default(""),
     repeatable: boolean("repeatable"),
+    // Table display of a repeatable form (null = ordinary repeatable form).
+    tableConfig: jsonb("table_config").$type<ScreenTableConfig | null>(),
   },
   (table) => ({
     searchIndex: index("screens_search_index").using(

@@ -17,6 +17,16 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { scriptPrintOrientations } from "@/constants";
+import type { ScriptPrintOrientation } from "@/types";
 import { useScriptsContext } from "@/contexts/scripts";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
@@ -72,6 +82,32 @@ export function ScriptPrintConfig(props: Props) {
                     }
                 }}
             />
+
+            <div className="px-4 mb-5 flex flex-col gap-y-2">
+                <Label htmlFor="print_config_orientation">Page orientation</Label>
+                <Select
+                    value={printConfig.orientation || 'portrait'}
+                    name="print_config_orientation"
+                    disabled={disabled}
+                    onValueChange={(value: ScriptPrintOrientation) => {
+                        setValue('printConfig.orientation', value || 'portrait', { shouldDirty: true, });
+                    }}
+                >
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectGroup>
+                            {scriptPrintOrientations.map(o => (
+                                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                            ))}
+                        </SelectGroup>
+                    </SelectContent>
+                </Select>
+                <span className="text-xs text-muted-foreground">
+                    Landscape gives wide tables more room. The header fields below identify the patient on every page.
+                </span>
+            </div>
 
             <div className="px-4 mb-5 flex flex-col gap-y-4">
                 <div className="flex items-center">

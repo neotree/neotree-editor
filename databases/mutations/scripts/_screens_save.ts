@@ -10,6 +10,7 @@ import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
 import { normalizeSelectionRuleItems, validateSelectionRules } from '@/lib/selection-rules';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
+import { normalizeScreenTableConfig, tableCollectionName, validateScreenTable } from '@/lib/screen-table-config';
 import { queueContentWrite } from "@/lib/server/content-write-lock";
 import { describeError } from '@/lib/server/db-errors';
 
@@ -256,7 +257,19 @@ async function _saveScreensNow({ data, broadcastAction, userId, client, draftOri
             try {
                 index++;
                 const normalized = normalizeScreenSelectionRuleItemIds(item);
-                const normalizedItem = normalized.value;
+                // Partial saves (e.g. only a title) must not clear the table settings.
+                const tableConfig = item.tableConfig === undefined
+                    ? undefined
+                    : normalizeScreenTableConfig(item, () => uuid.v4());
+                const normalizedItem = {
+                    ...normalized.value,
+                    ...(tableConfig === undefined ? {} : { tableConfig }),
+                    // A table's rows are stored under a collection named after the table, unless
+                    // the screen already has one (renaming a table must not move its data).
+                    ...(!tableConfig || `${item.collectionName || ''}`.trim() ? {} : {
+                        collectionName: tableCollectionName(tableConfig.title),
+                    }),
+                };
 
                 const screenId = itemScreenId || uuid.v4();
 
@@ -272,6 +285,7 @@ async function _saveScreensNow({ data, broadcastAction, userId, client, draftOri
                             `Screen "${screenLabel}" field "${field.label || field.key || fieldIndex}" items`
                         )
                     ),
+                    ...validateScreenTable(normalizedItem, screenLabel),
                 ];
 
                 if (validationErrors.length) {
