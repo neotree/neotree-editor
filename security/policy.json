@@ -16,5 +16,39 @@
     "**/*.stories.*",
     "lib/logger.ts"
   ],
-  "exceptions": []
+  "exceptions": [
+    {
+      "rule": "semgrep:res-render-injection",
+      "paths": [
+        "build/server/app/**/page.js"
+      ],
+      "reason": "Express rule matching Next.js's compiled app-page handler (renderer.render(NodeNextRequest, NodeNextResponse, ctx)) in committed build output; no application code reaches it. Remove when build/ stops being committed or security-ci scopes Express rules away from artifact_globs.",
+      "expires": "2027-03-01"
+    },
+    {
+      "rule": "semgrep:raw-html-format",
+      "paths": [
+        "build/server/app/**/page.js"
+      ],
+      "reason": "Matches Next.js's internal 'changed from static to dynamic at runtime ... reason: ${description}' error string in committed build output; it is a thrown message, not HTML. Remove with the res-render-injection exception.",
+      "expires": "2027-03-01"
+    },
+    {
+      "rule": "semgrep:js-ts-unsafe-raw-sql-template",
+      "paths": [
+        "build/server/chunks/*.js"
+      ],
+      "reason": "Matches drizzle-orm's set-operator builder (sql.raw(`${'union'|'intersect'|'except'} ${'all '}`)) in the committed server bundle; both values are library constants. Source code is still scanned without this exception.",
+      "expires": "2027-03-01"
+    },
+    {
+      "rule": "semgrep:wildcard-postmessage-configuration",
+      "paths": [
+        "build/server/chunks/*.js",
+        "build/static/chunks/*.js"
+      ],
+      "reason": "axios's bundled setImmediate shim posts a random `axios@<n>` token to its own window and its listener only accepts that token from that same window; no data crosses origins. Source code is still scanned without this exception.",
+      "expires": "2027-03-01"
+    }
+  ]
 }

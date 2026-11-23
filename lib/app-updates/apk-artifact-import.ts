@@ -1,5 +1,4 @@
 import { createHash } from "crypto"
-import { execFileSync } from "child_process"
 import { once } from "events"
 import fs from "fs"
 import os from "os"
@@ -8,7 +7,7 @@ import { v4 as uuidv4 } from "uuid"
 
 import { _saveFile } from "@/databases/mutations/files"
 import { extractApkMetadataFromFile } from "@/lib/app-updates/apk-metadata"
-import logger from "@/lib/logger"
+import { apkSignatureSha256FromFile } from "@/lib/app-updates/apk-signature"
 
 const APK_CONTENT_TYPE = "application/vnd.android.package-archive"
 const MAX_APK_BYTES = 300 * 1024 * 1024
@@ -20,17 +19,6 @@ function filenameFromUrl(url: string) {
     return name.toLowerCase().endsWith(".apk") ? name : "neotree-eas-build.apk"
   } catch {
     return "neotree-eas-build.apk"
-  }
-}
-
-function signatureSha256FromApk(filePath: string) {
-  try {
-    const output = execFileSync("apksigner", ["verify", "--print-certs", filePath], { encoding: "utf-8" })
-    const match = output.match(/SHA-256 digest:\s*([A-Fa-f0-9:]+)/)
-    return match?.[1] ? match[1].replace(/:/g, "").toLowerCase() : null
-  } catch (e: any) {
-    logger.error("signatureSha256FromApk ERROR", e.message)
-    return null
   }
 }
 
@@ -108,7 +96,7 @@ export async function importApkArtifactFromUrl({
     const { size, checksumSha256 } = await downloadApkToTempFile(response, tmpFile)
     const filename = filenameFromUrl(normalizedUrl)
     const contentType = response.headers.get("content-type")?.split(";")[0] || APK_CONTENT_TYPE
-    const signatureSha256 = signatureSha256FromApk(tmpFile)
+    const signatureSha256 = apkSignatureSha256FromFile(tmpFile)
     const apkMetadata = await extractApkMetadataFromFile(tmpFile)
 
     buffer = fs.readFileSync(tmpFile)
