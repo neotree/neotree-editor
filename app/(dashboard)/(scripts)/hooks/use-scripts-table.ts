@@ -131,7 +131,11 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
   )
 
   const onArchive = useCallback(
-    async (scriptsIds: string[]) => {
+    async (scriptsIds: string[], opts?: {
+      action?: 'archive' | 'unarchive';
+    }) => {
+      const action = opts?.action || 'archive';
+
       confirm(
         async () => {
           const _scripts = { ...scripts }
@@ -166,7 +170,7 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
             router.refresh()
             alert({
               title: "Success",
-              message: "Scripts archived successfully!",
+              message: `Scripts ${action === 'archive' ? 'archived' : 'unarchived'} successfully!`,
               variant: "success",
             })
           }
@@ -175,9 +179,9 @@ export function useScriptsTable({ scripts: scriptsParam }: UseScriptsTableParams
         },
         {
           danger: true,
-          title: "Archive scripts",
-          message: "Are you sure you want to archive scripts?",
-          positiveLabel: "Yes, archive",
+          title: `${action === 'archive' ? 'Archived' : 'Unarchived'} scripts`,
+          message: `Are you sure you want to ${action === 'archive' ? 'archive' : 'unarchive'} scripts?`,
+          positiveLabel: `Yes, ${action === 'archive' ? 'archive' : 'unarchive'}`,
         },
       )
     },
