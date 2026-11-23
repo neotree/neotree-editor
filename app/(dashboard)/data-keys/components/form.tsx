@@ -226,6 +226,7 @@ function Form({
             setValue('options', dataKey?.options || []);
             setValue('metadata', dataKey?.metadata || {});
             setValue('version', dataKey?.version || 1);
+            setValue('deletedUniqueKeys', [] as string[]);
         }
     }, [dataKey, options, currentDataKey, isLocked, shouldResetForm, setValue]);
 
@@ -324,14 +325,17 @@ function Form({
 
         const uuid = (data as any)?.uuid || dataKey?.uuid || uuidv4();
         const uniqueKey = (data as any)?.uniqueKey ?? dataKey?.uniqueKey ?? null;
-        // What this form started from (it is not refreshed while you edit). When the key changed since
-        // (another user, an import), the server applies only this edit's own additions and removals.
+        // Reconcile removals from the snapshot this form opened with. This also
+        // prevents a remove-then-readd sequence from being sent as an unlink.
+        const finalOptions = data.options || [];
         const baseOptions = currentDataKey?.options || [];
+        const removedOptions = baseOptions.filter(option => !finalOptions.includes(option));
         const payload = {
             ...data,
             uuid,
             uniqueKey,
-            ...(currentDataKey ? { baseOptions, } : {}),
+            deletedUniqueKeys: removedOptions,
+            ...(currentDataKey ? { baseOptions } : {}),
             version: typeof data.version === "string" ? Number(data.version) : data.version,
         } as DataKeyFormData & {
             uuid: string;
@@ -343,7 +347,7 @@ function Form({
             setValue("uniqueKey" as any, uniqueKey);
         }
 
-        if ((getValues('deletedUniqueKeys') || []).length) {
+        if (removedOptions.length) {
             await reviewUnlinks(payload as unknown as DataKeyFormData);
             return;
         }
@@ -409,7 +413,7 @@ function Form({
             label: o,
             dataType: '',
             missing: true,
-        } as unknown as (typeof dataKeys)[0] & { missing?: boolean; });
+        } as unknown as (typeof dataKeys)[0] & { missing?: boolean });
     }, [dataKeys, options]);
 
     // Parents that link this key as a child option — shown so users understand

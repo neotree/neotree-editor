@@ -2,8 +2,7 @@
 
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { DataTable, DataTableProps } from "@/components/data-table";
-import { useAppContext } from '@/contexts/app';
-import { useContentViewOnly } from "@/hooks/use-content-lock";
+import { useContentViewOnly } from '@/hooks/use-content-lock';
 import { cn } from '@/lib/utils';
 import { Loader } from '@/components/loader';
 import { DataKeysTableHeader } from './table-header';
@@ -23,7 +22,7 @@ import {
 export function DataKeysTable({ disabled, }: {
     disabled: boolean;
 }) {
-    const viewOnly = useContentViewOnly("dataKeys", null);
+    const viewOnly = useContentViewOnly('dataKeys', null);
 
     disabled = disabled || viewOnly;
 

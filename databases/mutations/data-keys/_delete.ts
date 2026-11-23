@@ -10,11 +10,11 @@ import { buildDataKeysDeleteImpact, type DataKeyDeleteImpactItem } from '@/lib/d
 import { getDataKeyReplacementCompatibilityError } from '@/lib/data-key-option-compatibility';
 import { getBlockedChildDeletions, getDataKeyParentTitle } from '@/lib/data-key-children';
 import { resolveScriptRemovalExclusions, resolveScriptsOnlyPlan } from '@/lib/data-key-script-removals';
+import { assertDraftOwner } from '@/lib/server/draft-owner';
 import { _deleteReferencedDataKeyOptions } from './_delete-referenced-options';
 import { _updateDataKeysRefs } from './_update_data_keys_refs';
 import { reportKeyDescriber, runRecordedDataKeyOperation, type OperationPreview } from './_recorded-operation';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
-import { assertDraftOwner } from "@/lib/server/draft-owner";
 import { uniqueValues } from '@/lib/unique-values';
 
 export type DeleteDataKeysParams = {
@@ -376,6 +376,11 @@ export async function _deleteDataKeys(
                             client: tx,
                         });
                         if (res.errors?.length) throw new Error(res.errors[0]);
+                        if (res.skipped?.length) {
+                            throw new Error(
+                                `Not saved: ${res.skipped.length === 1 ? 'a referenced draft is' : `${res.skipped.length} referenced drafts are`} still being edited by another user.`,
+                            );
+                        }
                     },
                     record: () => ({
                         kind: 'scripts',
@@ -423,40 +428,49 @@ export async function _deleteDataKeys(
                         client: tx,
                     });
 
-                    // Keys with a replacement were just rewritten to it; removing their leftover references
-                    // everywhere would delete whatever the rewrite could not reach. They are only stripped
-                    // from the scripts the user chose to remove them from instead of replacing.
-                    const replacedIds = new Set(Object.keys(replacements || {}).filter(id => !!replacements[id]));
-                    const deletedUniqueKeys = uniqueValues(targets
-                        .filter((dataKey) => !replacedIds.has(dataKey.uuid))
-                        .map((dataKey) => dataKey.uniqueKey || ''));
-                    if (deletedUniqueKeys.length) {
-                        const deleteReferencedOptionsRes = await _deleteReferencedDataKeyOptions({
-                            userId: userId || undefined,
-                            uniqueKeys: deletedUniqueKeys,
-                            client: tx,
-                        });
+                    // Replacements have already rewritten their reachable references. Only strip
+                    // a replaced key in scripts where the user explicitly chose removal; otherwise
+                    // a missed rewrite must fail visibly instead of silently becoming a deletion.
+                    const replacedTargetIds = new Set(
+                        Object.entries(replacements)
+                            .filter(([, replacementId]) => !!`${replacementId || ''}`.trim())
+                            .map(([targetId]) => targetId),
+                    );
+                    const unreplacedUniqueKeys = uniqueValues(
+                        targets
+                            .filter(target => !replacedTargetIds.has(target.uuid))
+                            .map(target => target.uniqueKey || ''),
+                    );
+                    const replacementRemovalScripts = resolveScriptRemovalExclusions({
+                        impact,
+                        replacements,
+                        scriptRemovals,
+                    });
 
-                        if (deleteReferencedOptionsRes.errors?.length) {
-                            throw new Error(deleteReferencedOptionsRes.errors[0]);
-                        }
+                    const cleanupResults = [];
+                    if (unreplacedUniqueKeys.length) {
+                        cleanupResults.push(await _deleteReferencedDataKeyOptions({
+                            userId: userId || undefined,
+                            uniqueKeys: unreplacedUniqueKeys,
+                            client: tx,
+                        }));
+                    }
+                    const replacementKeysToStrip = Object.keys(replacementRemovalScripts);
+                    if (replacementKeysToStrip.length) {
+                        cleanupResults.push(await _deleteReferencedDataKeyOptions({
+                            userId: userId || undefined,
+                            uniqueKeys: replacementKeysToStrip,
+                            scriptIdsByUniqueKey: replacementRemovalScripts,
+                            client: tx,
+                        }));
                     }
 
-                    const removalScriptIdsByUniqueKey = Object.fromEntries(Object.entries(resolveScriptRemovalExclusions({
-                        impact,
-                        replacements: replacements || {},
-                        scriptRemovals: scriptRemovals || {},
-                    })).filter(([, scriptIds]) => scriptIds.length));
-                    if (Object.keys(removalScriptIdsByUniqueKey).length) {
-                        const removalsRes = await _deleteReferencedDataKeyOptions({
-                            userId: userId || undefined,
-                            uniqueKeys: Object.keys(removalScriptIdsByUniqueKey),
-                            scriptIdsByUniqueKey: removalScriptIdsByUniqueKey,
-                            client: tx,
-                        });
-
-                        if (removalsRes.errors?.length) {
-                            throw new Error(removalsRes.errors[0]);
+                    for (const cleanup of cleanupResults) {
+                        if (cleanup.errors?.length) throw new Error(cleanup.errors[0]);
+                        if (cleanup.skipped?.length) {
+                            throw new Error(
+                                `Not saved: ${cleanup.skipped.length === 1 ? 'a referenced draft is' : `${cleanup.skipped.length} referenced drafts are`} still being edited by another user.`,
+                            );
                         }
                     }
 

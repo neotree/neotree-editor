@@ -1684,10 +1684,10 @@ export async function discardDrafts({ scope }: { scope: number }) {
         throw new Error(clearPendingDeletion.errors?.join(", ") || "Failed to clear queued deletions")
       }
 
-      // Their drafts are gone, so data key operations that made them never happened.
-      await dataKeysMutations._settleDataKeyOperations({ outcome: "discarded", userId, client: tx })
       // An import whose drafts were all discarded is forgotten; the previous import stays the base.
       await _settlePendingScriptImports({ outcome: "discarded", client: tx })
+      // Their drafts are gone, so data key operations that made them never happened.
+      await dataKeysMutations._settleDataKeyOperations({ outcome: "discarded", userId, client: tx })
     })
 
     if (affectedScriptIds.size) void recomputeScriptsConditionErrors(Array.from(affectedScriptIds))

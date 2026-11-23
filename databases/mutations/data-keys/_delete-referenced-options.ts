@@ -5,7 +5,7 @@ import type { DbOrTransaction } from '@/databases/pg/db-client';
 import { _syncConditionRefsAfterReplacement } from './_sync_condition_refs';
 import { describeError } from '@/lib/server/db-errors';
 
-type RefRow = Awaited<ReturnType<typeof _getDataKeysRefs>>['data'][0];
+type RefRow = Awaited<ReturnType<typeof _getDataKeysRefs>>['data'][number];
 
 export type UnlinkReplacementDataKey = {
     uniqueKey: string;
@@ -64,10 +64,11 @@ export async function _deleteReferencedDataKeyOptions({
     success: boolean;
     skipped?: { refType: string; refId: string; title: string; draftOwnerId: string | null }[];
 }> {
+    const skipped: NonNullable<Awaited<ReturnType<typeof _deleteReferencedDataKeyOptions>>['skipped']> = [];
+
     try {
         const scope: DeleteReferencedDataKeyOptionsScope | undefined = scopeParam
             || (parentUniqueKey ? { parentUniqueKeys: [parentUniqueKey] } : undefined);
-        const skipped: NonNullable<Awaited<ReturnType<typeof _deleteReferencedDataKeyOptions>>['skipped']> = [];
 
         if (uniqueKeys.length) {
             const refs = await _getDataKeysRefs({ uniqueKeys, client, });
@@ -121,6 +122,7 @@ export async function _deleteReferencedDataKeyOptions({
                 scriptId: string,
                 items: T[],
                 rebuildItem: (item: T, replacement: UnlinkReplacementDataKey) => T,
+                appliedReplacements: Set<UnlinkReplacementDataKey>,
                 onChange: () => void,
             ): T[] => {
                 const presentKeyIds = new Set(items.map((item) => `${item.keyId || ''}`.trim()).filter(Boolean));
@@ -134,11 +136,7 @@ export async function _deleteReferencedDataKeyOptions({
                         if (!replacement || presentKeyIds.has(replacement.uniqueKey)) return null;
 
                         presentKeyIds.add(replacement.uniqueKey);
-                        if (scriptId) {
-                            const applied = appliedReplacementsByScript.get(scriptId) || new Set();
-                            applied.add(replacement);
-                            appliedReplacementsByScript.set(scriptId, applied);
-                        }
+                        appliedReplacements.add(replacement);
                         return rebuildItem(item, replacement);
                     })
                     .filter((item): item is T => !!item);
@@ -186,6 +184,7 @@ export async function _deleteReferencedDataKeyOptions({
                     const referencesDeletedKey = referencesDeletedKeyIn(screenScriptId);
                     let changed = false;
                     const markChanged = () => { changed = true; };
+                    const appliedReplacements = new Set<UnlinkReplacementDataKey>();
 
                     const items = !isOwnedByScope(screen?.keyId)
                         ? (screen?.items || [])
@@ -201,6 +200,7 @@ export async function _deleteReferencedDataKeyOptions({
                                 keyId: replacement.uniqueKey,
                                 confidential: !!replacement.confidential,
                             }),
+                            appliedReplacements,
                             markChanged,
                         );
 
@@ -237,6 +237,7 @@ export async function _deleteReferencedDataKeyOptions({
                                             label: replacement.label,
                                             keyId: replacement.uniqueKey,
                                         }),
+                                        appliedReplacements,
                                         markChanged,
                                     ),
                             };
@@ -248,6 +249,11 @@ export async function _deleteReferencedDataKeyOptions({
                     ], markChanged);
 
                     if (!changed || !writable(d, screen?.title || screen?.label || d.refId)) return null;
+                    if (screenScriptId && appliedReplacements.size) {
+                        const applied = appliedReplacementsByScript.get(screenScriptId) || new Set();
+                        appliedReplacements.forEach(replacement => applied.add(replacement));
+                        appliedReplacementsByScript.set(screenScriptId, applied);
+                    }
                     return { ...clearedScreen, items, fields };
                 })
                 .filter((screen): screen is NonNullable<typeof screen> => !!screen);
@@ -278,14 +284,22 @@ export async function _deleteReferencedDataKeyOptions({
                         const markChanged = () => { changed = true; };
 
                         // Replaced like an option (a merge's match, an unlink's replacement), or removed.
+                        const appliedReplacements = new Set<UnlinkReplacementDataKey>();
                         const ownsSymptoms = isOwnedByScope(diagnosis?.keyId);
                         const symptoms = !ownsSymptoms
                             ? (diagnosis?.symptoms || [])
-                            : syncOwnedItems(referencesDeletedKey, getEntityScriptId(diagnosis as any), diagnosis?.symptoms || [], rebuildSymptom, markChanged);
+                            : syncOwnedItems(referencesDeletedKey, getEntityScriptId(diagnosis as any), diagnosis?.symptoms || [], rebuildSymptom, appliedReplacements, markChanged);
 
                         const clearedDiagnosis = scope ? diagnosis : clearScalarRefs(referencesDeletedKey, diagnosis, [{ id: 'keyId' }], markChanged);
 
                         if (!changed || !writable(d, (diagnosis as any)?.name || d.refId)) return null;
+                        // Conditions follow only the replacements that are actually written.
+                        const diagnosisScriptId = getEntityScriptId(diagnosis as any);
+                        if (diagnosisScriptId && appliedReplacements.size) {
+                            const applied = appliedReplacementsByScript.get(diagnosisScriptId) || new Set();
+                            appliedReplacements.forEach(replacement => applied.add(replacement));
+                            appliedReplacementsByScript.set(diagnosisScriptId, applied);
+                        }
                         return { ...clearedDiagnosis, symptoms };
                     })
                     .filter((diagnosis): diagnosis is NonNullable<typeof diagnosis> => !!diagnosis);
@@ -308,14 +322,22 @@ export async function _deleteReferencedDataKeyOptions({
                         let changed = false;
                         const markChanged = () => { changed = true; };
 
+                        const appliedReplacements = new Set<UnlinkReplacementDataKey>();
                         const ownsSymptoms = isOwnedByScope(problem?.keyId);
                         const symptoms = !ownsSymptoms
                             ? (problem?.symptoms || [])
-                            : syncOwnedItems(referencesDeletedKey, getEntityScriptId(problem as any), problem?.symptoms || [], rebuildSymptom, markChanged);
+                            : syncOwnedItems(referencesDeletedKey, getEntityScriptId(problem as any), problem?.symptoms || [], rebuildSymptom, appliedReplacements, markChanged);
 
                         const clearedProblem = scope ? problem : clearScalarRefs(referencesDeletedKey, problem, [{ id: 'keyId' }], markChanged);
 
                         if (!changed || !writable(d, (problem as any)?.name || d.refId)) return null;
+                        // Conditions follow only the replacements that are actually written.
+                        const problemScriptId = getEntityScriptId(problem as any);
+                        if (problemScriptId && appliedReplacements.size) {
+                            const applied = appliedReplacementsByScript.get(problemScriptId) || new Set();
+                            appliedReplacements.forEach(replacement => applied.add(replacement));
+                            appliedReplacementsByScript.set(problemScriptId, applied);
+                        }
                         return { ...clearedProblem, symptoms };
                     })
                     .filter((problem): problem is NonNullable<typeof problem> => !!problem);
@@ -388,6 +410,7 @@ export async function _deleteReferencedDataKeyOptions({
         return {
             success: false,
             errors: [describeError(e)],
+            skipped,
         };
     }
 }

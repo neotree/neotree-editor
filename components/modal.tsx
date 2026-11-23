@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from "react";
+import { isValidElement, useEffect } from "react";
 
 import {
     Dialog,
@@ -47,6 +47,15 @@ export function Modal({
     const contentClassName = contentProps?.className;
     const bodyClassName = bodyProps?.className;
     const footerClassName = footerProps?.className;
+    const renderedTrigger = !trigger
+        ? null
+        : isValidElement(trigger) && trigger.type === DialogTrigger
+            ? trigger
+            : (
+                <DialogTrigger asChild={isValidElement(trigger)}>
+                    {trigger}
+                </DialogTrigger>
+            );
 
     // A confirm or alert opened from inside this modal is its own top-level dialog, so a
     // click or focus in it reads as "outside" here. Without this, answering "Keep
@@ -70,7 +79,7 @@ export function Modal({
                     props?.onOpenChange?.(open);
                 }}
             >
-                {trigger}
+                {renderedTrigger}
 
                 <DialogContent 
                     {...contentProps}

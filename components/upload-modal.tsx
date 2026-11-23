@@ -17,6 +17,8 @@ type Props = ModalProps & {
     type?: string;
     fileDetails?: { [key: string]: any; };
     inputProps?: React.HTMLProps<HTMLInputElement>;
+    successTitle?: string;
+    successMessage?: string;
     onUpload: (formData: FormData) => Promise<any>;
 };
 
@@ -34,6 +36,8 @@ export function UploadModal({
     children,
     inputProps,
     fileDetails,
+    successTitle,
+    successMessage,
     onUpload,
     ...props
 }: Props) {
@@ -71,8 +75,8 @@ export function UploadModal({
             setOpen(false);
             setFiles([]);
             alert({
-                title: 'Success',
-                message: `File${queue.length > 1 ? 's' : ''} uploaded successfully!`,
+                title: successTitle || 'Success',
+                message: successMessage || `File${queue.length > 1 ? 's' : ''} uploaded successfully!`,
                 variant: 'success',
             });
         } catch(e: any) {
@@ -84,7 +88,7 @@ export function UploadModal({
         } finally {
             setUploading(false);
         }
-    }, [onUpload, alert, files, inputProps?.multiple, fileDetails]);
+    }, [onUpload, alert, files, inputProps?.multiple, fileDetails, successTitle, successMessage]);
 
     const onInputChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         try {

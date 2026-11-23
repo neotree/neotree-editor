@@ -1,0 +1,601 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UploadModal } from "@/components/upload-modal";
+import { Loader } from "@/components/loader";
+import { useAlertModal } from "@/hooks/use-alert-modal";
+import { useAppContext } from "@/contexts/app";
+import { AlertTriangle, CheckCircle2, FileArchive, Link2, Loader2Icon } from "lucide-react";
+
+import type { importEasApkReleaseDraft, saveApkReleases } from "@/app/actions/app-updates";
+import type { ApkReleaseDraft } from "@/databases/queries/app-updates";
+import type { apkReleases } from "@/databases/pg/schema";
+import { buildAppUpdateReleaseRows } from "@/lib/app-updates/release-rows";
+import { getApkReleaseReadiness, normalizeApkReleasePayload, validateApkReleasePayload } from "@/lib/app-updates/validation";
+
+const apkReleaseStatuses = [
+  "uploaded",
+  "validated",
+  "approved",
+  "available",
+  "deprecated",
+  "revoked",
+  "rolled_back",
+] as const;
+
+type ApkRelease = typeof apkReleases.$inferSelect;
+
+type Props = {
+  apkReleases: ApkRelease[];
+  apkReleaseDrafts: ApkReleaseDraft[];
+  apkReleaseId?: string | null;
+  saveApkReleases: typeof saveApkReleases;
+  importEasApkReleaseDraft: typeof importEasApkReleaseDraft;
+};
+
+type ApkFormState = {
+  apkReleaseId?: string | null;
+  runtimeVersion: string;
+  versionName: string;
+  versionCode: number | null;
+  status: string;
+  isAvailable: boolean;
+  fileId?: string | null;
+  fileSize?: number | null;
+  checksumSha256?: string | null;
+  signatureSha256?: string | null;
+  releaseNotes?: string | null;
+  // Informational metadata read from the APK (not persisted on the release row).
+  packageName?: string | null;
+  minSdkVersion?: number | null;
+  targetSdkVersion?: number | null;
+};
+
+const defaultApkForm = (): ApkFormState => ({
+  runtimeVersion: "",
+  versionName: "",
+  versionCode: null,
+  status: "uploaded",
+  isAvailable: false,
+  fileId: null,
+  fileSize: null,
+  checksumSha256: null,
+  signatureSha256: null,
+  releaseNotes: "",
+  packageName: null,
+  minSdkVersion: null,
+  targetSdkVersion: null,
+});
+
+const toNumberOrNull = (value: string) => {
+  if (value === "" || value === undefined || value === null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatBytes = (value?: number | null) => {
+  if (!value) return null;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+};
+
+export function ApkReleaseForm({
+  apkReleases,
+  apkReleaseDrafts,
+  apkReleaseId,
+  saveApkReleases,
+  importEasApkReleaseDraft,
+}: Props) {
+  const router = useRouter();
+  const { alert } = useAlertModal();
+  const { viewOnly, mode } = useAppContext();
+  const editingDisabled = viewOnly;
+
+  const [loading, setLoading] = useState(false);
+  const [artifactUrl, setArtifactUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [apkSource, setApkSource] = useState<"eas" | "upload">("eas");
+
+  const releaseRows = useMemo(() => {
+    return buildAppUpdateReleaseRows(apkReleases, apkReleaseDrafts);
+  }, [apkReleaseDrafts, apkReleases]);
+
+  const latestRelease = useMemo(() => {
+    return releaseRows[0] || null;
+  }, [releaseRows]);
+
+  const initialRelease = useMemo(() => {
+    if (!apkReleaseId) return null;
+    return releaseRows.find((release) => release.apkReleaseId === apkReleaseId) || null;
+  }, [apkReleaseId, releaseRows]);
+
+  const [apkForm, setApkForm] = useState<ApkFormState>(() => defaultApkForm());
+
+  useEffect(() => {
+    if (initialRelease) {
+      setApkForm({
+        ...defaultApkForm(),
+        ...initialRelease,
+        apkReleaseId: initialRelease.apkReleaseId,
+        versionCode: initialRelease.versionCode ?? null,
+      });
+      return;
+    }
+    setApkForm(defaultApkForm());
+  }, [initialRelease]);
+
+  useEffect(() => {
+    if (initialRelease) return;
+    if (!latestRelease) return;
+    setApkForm((prev) => {
+      if (prev.runtimeVersion || prev.versionName || prev.versionCode) return prev;
+      return {
+        ...prev,
+        runtimeVersion: latestRelease.runtimeVersion || "",
+        versionName: latestRelease.versionName || "",
+        versionCode: typeof latestRelease.versionCode === "number" ? latestRelease.versionCode + 1 : null,
+      };
+    });
+  }, [initialRelease, latestRelease]);
+
+  const onSaveApkRelease = useCallback(async () => {
+    try {
+      if (editingDisabled) return;
+      setLoading(true);
+
+      if (!apkForm.runtimeVersion) throw new Error("Runtime version is required");
+      if (!apkForm.versionName) throw new Error("Version name is required");
+      if (!apkForm.versionCode) throw new Error("Version code is required");
+
+      const payload = normalizeApkReleasePayload({
+        ...apkForm,
+        versionCode: Number(apkForm.versionCode || 0),
+      } as any);
+
+      const errors = validateApkReleasePayload(payload);
+      if (errors.length) throw new Error(errors.join(", "));
+
+      const res = await saveApkReleases({ data: [payload] });
+
+      if (res.errors?.length) {
+        throw new Error(res.errors.join(", "));
+      }
+
+      router.refresh();
+
+      alert({
+        title: "Success",
+        message: "APK release saved to drafts.",
+        variant: "success",
+      });
+    } catch (e: any) {
+      alert({
+        title: "Error",
+        message: `Failed to save APK release: ${e.message}`,
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [alert, apkForm, editingDisabled, router, saveApkReleases]);
+
+  const onUploadApk = useCallback(async (formData: FormData) => {
+    if (editingDisabled) return;
+    const response = await axios.post("/api/files/upload", formData);
+    const res = response.data as { data?: any; errors?: string[] };
+    if (res.errors?.length) throw new Error(res.errors.join(", "));
+    const file = res.data;
+    if (!file?.fileId) throw new Error("File upload failed");
+
+    setApkForm((prev) => ({
+      ...prev,
+      status: prev.status === "available" ? "uploaded" : prev.status || "uploaded",
+      isAvailable: false,
+      fileId: file.fileId,
+      fileSize: file.size || prev.fileSize || null,
+      checksumSha256: file.metadata?.apkChecksumSha256 || prev.checksumSha256 || null,
+      signatureSha256: file.metadata?.apkSignatureSha256 || prev.signatureSha256 || null,
+      // Auto-fill version details extracted from the APK (like Headwind).
+      versionName: file.metadata?.apkVersionName || prev.versionName,
+      versionCode: file.metadata?.apkVersionCode ?? prev.versionCode,
+      packageName: file.metadata?.apkPackageName || prev.packageName || null,
+      minSdkVersion: file.metadata?.apkMinSdkVersion ?? prev.minSdkVersion ?? null,
+      targetSdkVersion: file.metadata?.apkTargetSdkVersion ?? prev.targetSdkVersion ?? null,
+    }));
+  }, [editingDisabled]);
+
+  const onImportEasArtifact = useCallback(async () => {
+    try {
+      if (editingDisabled) return;
+      if (!artifactUrl.trim()) throw new Error("Paste the EAS APK link first");
+      if (!apkForm.runtimeVersion) throw new Error("Enter the runtime version first");
+      // Version name/code are read from the APK automatically; no need to type them.
+
+      setImporting(true);
+      const formData = new FormData();
+      formData.set("artifactUrl", artifactUrl.trim());
+      formData.set("apkReleaseId", apkForm.apkReleaseId || "");
+      formData.set("runtimeVersion", apkForm.runtimeVersion);
+      formData.set("versionName", apkForm.versionName);
+      formData.set("versionCode", `${apkForm.versionCode}`);
+      formData.set("releaseNotes", apkForm.releaseNotes || "");
+
+      const result = await importEasApkReleaseDraft(formData);
+      if (!result.success) throw new Error(result.errors?.join(", ") || "Could not import APK");
+
+      setApkForm((prev) => ({
+        ...prev,
+        status: "uploaded",
+        isAvailable: false,
+        fileId: result.data?.fileId || prev.fileId,
+        fileSize: result.data?.fileSize || prev.fileSize,
+        checksumSha256: result.data?.checksumSha256 || prev.checksumSha256,
+        signatureSha256: result.data?.signatureSha256 || prev.signatureSha256,
+        versionName: result.data?.versionName || prev.versionName,
+        versionCode: result.data?.versionCode ?? prev.versionCode,
+        packageName: result.data?.packageName || prev.packageName || null,
+        minSdkVersion: result.data?.minSdkVersion ?? prev.minSdkVersion ?? null,
+        targetSdkVersion: result.data?.targetSdkVersion ?? prev.targetSdkVersion ?? null,
+      }));
+      router.refresh();
+      if (!result.data?.signatureSha256) {
+        alert({
+          title: "APK imported - verification pending",
+          message: "NeoTree copied the EAS APK, but the server could not verify its signing certificate yet. The release is saved as a draft and will stay blocked from device rollout until APK verification is enabled on the server and the APK is imported or uploaded again.",
+          variant: "info",
+        });
+      } else {
+        alert({
+          title: "APK imported",
+          message: "NeoTree copied the EAS APK into its own storage and saved a release draft for review.",
+          variant: "success",
+        });
+      }
+    } catch (e: any) {
+      alert({
+        title: "Import failed",
+        message: e.message || "Could not import the EAS APK link.",
+        variant: "error",
+      });
+    } finally {
+      setImporting(false);
+    }
+  }, [alert, apkForm, artifactUrl, editingDisabled, importEasApkReleaseDraft, router]);
+
+  const resetApkForm = useCallback(() => {
+    setApkForm(defaultApkForm());
+  }, []);
+
+  const readiness = useMemo(() => getApkReleaseReadiness(normalizeApkReleasePayload(apkForm)), [apkForm]);
+  const uploadedApkVerified = !!apkForm.fileId && !!apkForm.checksumSha256 && !!apkForm.signatureSha256;
+  const uploadedApkSummary = useMemo(() => {
+    if (!apkForm.fileId) return "Upload a local APK build from this computer.";
+    if (uploadedApkVerified) return "APK uploaded and verified. It can be saved as a release draft.";
+    return "APK uploaded, but automatic verification is not complete yet.";
+  }, [apkForm.fileId, uploadedApkVerified]);
+  const apkArtifactReady = useMemo(
+    () => readiness.filter((check) => check.key !== "status").every((check) => check.passed),
+    [readiness],
+  );
+  const explainBlockedAvailability = useCallback(() => {
+    const openChecks = readiness
+      .filter((check) => check.key !== "status" && !check.passed)
+      .map((check) => check.label);
+
+    alert({
+      title: "Release is not ready",
+      message: openChecks.length
+        ? `NeoTree cannot make this APK available yet. Missing: ${openChecks.join(", ")}.`
+        : "NeoTree cannot make this APK available yet. Review the release checks first.",
+      variant: "error",
+    });
+  }, [alert, readiness]);
+
+  return (
+    <>
+      {loading && <Loader overlay />}
+
+      <Card>
+        <CardContent className="p-4">
+          <div>
+            <div className="text-sm text-muted-foreground">APK release draft</div>
+            {latestRelease ? (
+              <div className="text-xs text-muted-foreground">
+                Latest APK: {latestRelease.versionName} ({latestRelease.versionCode})
+              </div>
+            ) : null}
+            
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-6">
+            <div>
+              <Label>Runtime Version</Label>
+              <Input
+                value={apkForm.runtimeVersion}
+                onChange={(e) => setApkForm((prev) => ({ ...prev, runtimeVersion: e.target.value }))}
+                disabled={editingDisabled}
+              />
+            </div>
+
+            <div>
+              <Label>Version Name</Label>
+              <Input
+                value={apkForm.versionName}
+                onChange={(e) => setApkForm((prev) => ({ ...prev, versionName: e.target.value }))}
+                disabled={editingDisabled}
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-md border p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-medium">APK source</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Choose where NeoTree should get the APK from. EAS build link is recommended because it avoids manual file handling.
+                </div>
+              </div>
+              <div className="w-full lg:w-64">
+                <Select
+                  value={apkSource}
+                  onValueChange={(value) => setApkSource(value as "eas" | "upload")}
+                  disabled={editingDisabled || importing}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select APK source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="eas">EAS build link</SelectItem>
+                    <SelectItem value="upload">Upload APK file</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {apkSource === "eas" ? (
+              <>
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
+                  <div className="relative">
+                    <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      value={artifactUrl}
+                      onChange={(event) => setArtifactUrl(event.target.value)}
+                      placeholder="Paste EAS APK download link"
+                      disabled={editingDisabled || importing}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={onImportEasArtifact}
+                    disabled={editingDisabled || importing}
+                  >
+                    {importing ? (
+                      <>
+                        <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                        Importing APK...
+                      </>
+                    ) : (
+                      "Import APK"
+                    )}
+                  </Button>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Enter the runtime version first. NeoTree copies the APK, reads version details, captures checksum and signing certificate, then saves a draft for review.
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 rounded-md border bg-muted/30 p-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-background">
+                      <FileArchive className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium">
+                          {apkForm.fileId ? "APK file attached" : "No APK file uploaded"}
+                        </p>
+                        {apkForm.fileId ? (
+                          <Badge variant={uploadedApkVerified ? "default" : "secondary"}>
+                            {uploadedApkVerified ? "Verified" : "Needs verification"}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{uploadedApkSummary}</p>
+                    </div>
+                  </div>
+
+                  <UploadModal
+                    title="Upload APK file"
+                    description="Choose the APK from your local build. NeoTree will attach it and read the package details automatically."
+                    type=".apk,application/vnd.android.package-archive"
+                    inputProps={{ multiple: false, placeholder: "Choose APK" }}
+                    successTitle="APK uploaded"
+                    successMessage="NeoTree attached the APK and read the package details it could verify."
+                    onUpload={onUploadApk}
+                  >
+                    <Button variant="primary-outline" disabled={editingDisabled}>
+                      {apkForm.fileId ? "Replace APK" : "Upload APK"}
+                    </Button>
+                  </UploadModal>
+                </div>
+
+                {apkForm.fileId ? (
+                  <div className="mt-3 grid grid-cols-1 gap-2 border-t pt-3 text-xs text-muted-foreground md:grid-cols-3">
+                    <div>
+                      <span className="font-medium text-foreground">File size</span>
+                      <div>{formatBytes(apkForm.fileSize) || "Captured"}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">Checksum</span>
+                      <div className="flex items-center gap-1">
+                        {apkForm.checksumSha256 ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                        ) : (
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                        )}
+                        {apkForm.checksumSha256 ? "Captured" : "Missing"}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">Signing certificate</span>
+                      <div className="flex items-center gap-1">
+                        {apkForm.signatureSha256 ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                        ) : (
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                        )}
+                        {apkForm.signatureSha256 ? "Captured" : "Missing"}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-6">
+
+            <div>
+              <Label>Version Code</Label>
+              <Input
+                type="number"
+                value={apkForm.versionCode ?? ""}
+                onChange={(e) =>
+                  setApkForm((prev) => ({ ...prev, versionCode: toNumberOrNull(e.target.value) }))
+                }
+                disabled={editingDisabled}
+              />
+            </div>
+
+            <div>
+              <Label>Status</Label>
+              <Select
+                value={apkForm.status}
+                onValueChange={(value) => {
+                  if (value === "available" && !apkArtifactReady) {
+                    explainBlockedAvailability();
+                    return;
+                  }
+                  setApkForm((prev) => ({
+                    ...prev,
+                    status: value,
+                    isAvailable: value === "available" ? true : prev.isAvailable,
+                  }));
+                }}
+                disabled={editingDisabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {apkReleaseStatuses.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={apkForm.isAvailable}
+                onCheckedChange={(checked) => {
+                  if (checked && !apkArtifactReady) {
+                    explainBlockedAvailability();
+                    return;
+                  }
+                  setApkForm((prev) => ({
+                    ...prev,
+                    isAvailable: checked,
+                    status: checked ? "available" : prev.status === "available" ? "approved" : prev.status,
+                  }));
+                }}
+                disabled={editingDisabled}
+              />
+              <Label>Available to devices</Label>
+            </div>
+
+            {apkForm.packageName ? (
+              <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                <p className="font-medium mb-1">Detected from APK</p>
+                <p className="text-muted-foreground">Package: {apkForm.packageName}</p>
+                {apkForm.minSdkVersion != null ? (
+                  <p className="text-muted-foreground">Min Android SDK: {apkForm.minSdkVersion}</p>
+                ) : null}
+                {apkForm.targetSdkVersion != null ? (
+                  <p className="text-muted-foreground">Target Android SDK: {apkForm.targetSdkVersion}</p>
+                ) : null}
+                <p className="text-muted-foreground">Version: {apkForm.versionName || "—"} ({apkForm.versionCode ?? "—"})</p>
+              </div>
+            ) : null}
+
+            <div>
+              <Label>Checksum (SHA-256)</Label>
+              <Input value={apkForm.checksumSha256 || ""} disabled />
+            </div>
+
+            <div>
+              <Label>Signature (SHA-256)</Label>
+              <div className="flex min-h-10 items-center justify-between gap-3 rounded-md border px-3 py-2">
+                <span className="min-w-0 truncate text-sm text-muted-foreground">
+                  {apkForm.signatureSha256 || "Waiting for automatic APK verification"}
+                </span>
+                <Badge variant={apkForm.signatureSha256 ? "default" : "secondary"}>
+                  {apkForm.signatureSha256 ? "Captured" : "Blocked"}
+                </Badge>
+              </div>
+              {!apkForm.signatureSha256 ? (
+                <p className="text-xs text-muted-foreground mt-1">
+                  This is captured automatically from the APK. Releases without a verified signing certificate cannot be made available to devices.
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <Label>Release Notes</Label>
+            <Textarea
+              value={apkForm.releaseNotes || ""}
+              onChange={(e) => setApkForm((prev) => ({ ...prev, releaseNotes: e.target.value }))}
+              disabled={editingDisabled}
+            />
+          </div>
+
+          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => router.push("/app-updates")}>
+              Cancel
+            </Button>
+            <Button variant="primary-outline" onClick={resetApkForm} disabled={editingDisabled}>
+              Reset
+            </Button>
+            <Button onClick={onSaveApkRelease} disabled={loading || editingDisabled} aria-busy={loading}>
+              {loading ? (
+                <>
+                  <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                  Saving draft...
+                </>
+              ) : (
+                "Save Draft"
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+}

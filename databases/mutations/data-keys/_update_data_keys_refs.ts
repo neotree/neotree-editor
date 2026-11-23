@@ -701,8 +701,9 @@ export async function _updateDataKeysRefs({
                         ...syncedItem.value,
                     };
                 }), relinkedItems);
-            // relinked items that collided with a sibling were dropped
-            if (items.length !== (s.items || []).length) updated = true;
+            if (items.length !== (s.items || []).length) {
+                updated = true;
+            }
             if (shouldSyncScreenOptions && (items || []).some((item) => {
                 const keyId = `${item.keyId || ''}`.trim();
                 return !!keyId && !screenOptionUniqueKeys.has(keyId);
@@ -822,7 +823,9 @@ export async function _updateDataKeysRefs({
                         ...fieldItemValue,
                     };
                 }), relinkedFieldItems);
-                if (fieldItems.length !== (field.items || []).length) updated = true;
+                if (fieldItems.length !== (field.items || []).length) {
+                    updated = true;
+                }
                 const syncedField = syncFieldReference(field, fieldDataKey);
                 const syncedRefField = syncKeyOnlyReference(syncedField.value, refKeyDataKey, {
                     id: "refKeyId",
@@ -933,7 +936,9 @@ export async function _updateDataKeysRefs({
                     ...syncedSymptom.value,
                 };
             }), relinkedSymptoms);
-            if (symptoms.length !== (d.symptoms || []).length) updated = true;
+            if (symptoms.length !== (d.symptoms || []).length) {
+                updated = true;
+            }
             const syncedDiagnosis = syncDiagnosisReference({
                 ...d,
                 key: name,

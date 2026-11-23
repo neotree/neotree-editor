@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useDataKeysCtx } from '@/contexts/data-keys';
 import { useAppContext } from '@/contexts/app';
-import { useContentViewOnly } from "@/hooks/use-content-lock";
-import { ContentLockNotice } from "@/components/content-lock-notice";
+import { useContentViewOnly } from '@/hooks/use-content-lock';
+import { ContentLockNotice } from '@/components/content-lock-notice';
 import { dataKeysSortOpts, dataKeysStatuses, dataKeyTypes, } from "@/constants";
 import { ExportMetadataButton } from './export-metadata-button';
 import { DuplicatesButton } from './duplicates-button';
@@ -25,7 +25,7 @@ import {
 
 export function DataKeysTableHeader() {
     const { isSuperUser } = useAppContext();
-    const viewOnly = useContentViewOnly("dataKeys", null);
+    const viewOnly = useContentViewOnly('dataKeys', null);
     const { 
         sort,
         filter,

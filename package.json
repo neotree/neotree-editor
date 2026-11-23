@@ -19,6 +19,7 @@
         "lint": "next lint",
         "db:studio": "npx drizzle-kit studio",
         "db:push": "npx drizzle-kit push",
+        "mdm:sync": "tsx scripts/run-mdm-sync.ts",
         "prestart:stage": "yarn",
         "prestart:production": "yarn",
         "start:stage": "NODE_ENV=production pm2 start pm2.stage.json",
@@ -27,7 +28,8 @@
         "test:e2e": "playwright test"
     },
     "dependencies": {
-        "@auth/drizzle-adapter": "^1.11.3",
+        "@auth/drizzle-adapter": "^1.4.1",
+        "@devicefarmer/adbkit-apkreader": "^3.2.4",
         "@prisma/client": "^5.18.0",
         "@radix-ui/react-alert-dialog": "^1.2.1",
         "@radix-ui/react-checkbox": "^1.1.1",
