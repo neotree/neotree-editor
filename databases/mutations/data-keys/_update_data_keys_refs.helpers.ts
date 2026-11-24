@@ -1,3 +1,4 @@
+import { fractionFieldPatch } from "@/lib/fraction-data-keys";
 import { randomUUID } from "crypto";
 
 import type { DataKey } from "@/databases/queries/data-keys";
@@ -172,6 +173,7 @@ export function syncFieldReference(current: ScriptField, dataKey?: DataKey) {
         confidential: !!item.confidential,
         confidentialLabelOnly: !!item.confidentialLabelOnly,
         optional: !!(item.metadata as Record<string, unknown> | undefined)?.optional,
+        ...fractionFieldPatch(item),
     }));
 }
 

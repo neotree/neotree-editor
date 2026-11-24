@@ -192,6 +192,8 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                 repeatable: s.repeatable,
                 collectionLabel: s.collectionLabel,
                 collectionName: s.collectionName,
+                // Only a repeatable form can be a table; null = ordinary form.
+                tableConfig: s.repeatable ? (s.tableConfig || null) : null,
                 image1: !s.image1 ? null : {
                     ...s.image1,
                     data: s.image1?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image1,
