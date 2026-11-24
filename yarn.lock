@@ -2601,9 +2601,9 @@ dom-helpers@^5.0.1:
     csstype "^3.0.2"
 
 dompurify@^3.4.16:
-  version "3.4.17"
-  resolved "https://registry.yarnpkg.com/dompurify/-/dompurify-3.4.17.tgz#074bbb24eaa419535ac19ffe7f663104b0e1543d"
-  integrity sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==
+  version "3.4.18"
+  resolved "https://registry.yarnpkg.com/dompurify/-/dompurify-3.4.18.tgz#82161003672c8780ad1db0335787e6aa6587e5d2"
+  integrity sha512-ofe3wI/uNm68HInABYFJYqQxRw1EaKAjNdrFVKqjUY+UZurvNd2L/HuQe097s/4RivWiZyP6tT7aoT8atjfhwg==
   optionalDependencies:
     "@types/trusted-types" "^2.0.7"
 
@@ -4442,9 +4442,9 @@ nodemailer@^10.0.10:
   integrity sha512-EsMnOR2oRv4LGnWvHgcVYkkQ4O2j8KO4WTw6l+PHR4sOXo8SAgIraxtEnGDmotjbhv0hDsu3IuDIFZm8iXwO4A==
 
 nuqs@^2.4.3:
-  version "2.10.2"
-  resolved "https://registry.yarnpkg.com/nuqs/-/nuqs-2.10.2.tgz#6e6daaf6c866c4285789cf5763ede045d16af266"
-  integrity sha512-HaLMCr9H2wywEnTu3j+QW98EteDT3Kfmx3SJJ6JfcvCvkFi/g/fKd/oCXa5DF0x1s1l4zcFtzsq9bflj6RcM6A==
+  version "2.10.3"
+  resolved "https://registry.yarnpkg.com/nuqs/-/nuqs-2.10.3.tgz#3382fb728d6c2d955069b7af268fda0823d1b028"
+  integrity sha512-dNGDsvpKFoxyDLOWZh+OiQ02od3RLJ52044I+Ld1wjTCVOv7ZZtBmd2Aq7CHFdDGYRn+hg6FPPh6FUMFX2YLaQ==
   dependencies:
     "@standard-schema/spec" "1.1.0"
 
@@ -5655,9 +5655,9 @@ supports-preserve-symlinks-flag@^1.0.0:
   integrity sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==
 
 tailwind-merge@^3.7.0:
-  version "3.7.0"
-  resolved "https://registry.yarnpkg.com/tailwind-merge/-/tailwind-merge-3.7.0.tgz#61e9a67ab11b64138dea7d4fa5b74a33e17f2c87"
-  integrity sha512-XPPUyAc+cvspz3lHTcR/QgPfW2A0lv/xQNIjX3HGhLR+Nq2lHaLq5MtTesHn8GUr3W3DguT2KT5x3NVgRtYwmA==
+  version "3.7.1"
+  resolved "https://registry.yarnpkg.com/tailwind-merge/-/tailwind-merge-3.7.1.tgz#9991f80b90d80306ca17ff89eb655b8e773192e2"
+  integrity sha512-v7y4BV4FUlO8exj/4M5UXKeoowDiuugVUg3tkMNIyOUCOHy5xp8+5aWQeXCtZ2491sUV1YPsVeM9EveZ6/xuZQ==
 
 tailwindcss-animate@^1.0.7:
   version "1.0.7"
