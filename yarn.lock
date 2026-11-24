@@ -4732,10 +4732,10 @@ postcss@8.4.31, postcss@8.4.49, postcss@8.5.33, postcss@^8.5.29:
     picocolors "^1.1.1"
     source-map-js "^1.2.2"
 
-postgres@^3.4.4:
-  version "3.4.9"
-  resolved "https://registry.yarnpkg.com/postgres/-/postgres-3.4.9.tgz#8e9a49cecb1b0e7d67a607f32a53ed54b3055271"
-  integrity sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw==
+postgres@^4.1.1:
+  version "4.1.1"
+  resolved "https://registry.yarnpkg.com/postgres/-/postgres-4.1.1.tgz#19f4b317d6fb7aac1ed4a9f7550957ddadee65da"
+  integrity sha512-1kJDojqNZC+iTHHXh6eif0J98LUtyLAePe/qkW1GK35eh2JixlsAiIKq3FGI+xqI+SUGTNodzf7TScVeIIyUug==
 
 preact-render-to-string@6.5.11:
   version "6.5.11"
