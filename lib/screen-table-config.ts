@@ -151,3 +151,16 @@ export function validateTableCollectionName(
 export function validateScreenTable(screen: TableScreen, screenLabel: string): string[] {
     return validateScreenTableConfig(screen?.tableConfig as ScreenTableConfig | null | undefined, `Screen "${screenLabel}" table`);
 }
+
+/**
+ * The collection label a table saves for app versions that do not know about tables. Those apps show a
+ * table as a repeatable form, which names each entry after its collection label field and only counts
+ * an entry as filled in once that field has a value; with no label no entry could ever be completed.
+ * The first required column is used, else the first column; fraction columns are skipped (older apps
+ * cannot capture them). Empty when the table has no usable column.
+ */
+export function tableLegacyCollectionLabel(fields?: { key?: string | null; type?: string | null; optional?: boolean | null; }[] | null) {
+    const columns = (fields || []).filter(f => `${f?.key || ""}`.trim() && `${f?.type || ""}`.trim().toLowerCase() !== "fraction");
+    const pick = columns.find(f => !f.optional) || columns[0];
+    return pick ? `${pick.key}`.trim() : "";
+}

@@ -8,6 +8,7 @@ import {
     isTableScreen,
     normalizeScreenTableConfig,
     tableCollectionName,
+    tableLegacyCollectionLabel,
     validateTableCollectionName,
     validateScreenTable,
     validateScreenTableConfig,
@@ -285,6 +286,26 @@ import { mapNewScreenToOld } from "../lib/map-old-and-new";
         mapNewScreenToOld({ ...row, repeatable: false }).data.metadata.tableConfig,
         null,
         "a screen that is no longer repeatable is never sent as a table",
+    );
+
+    // ── Older apps: a table names its entries after a column ─────────────────────────────────
+    assert.equal(tableLegacyCollectionLabel([
+        { key: "BP", type: "fraction" },
+        { key: "Note", type: "text", optional: true },
+        { key: "Age", type: "number" },
+    ]), "Age", "the first required column, never a fraction");
+    assert.equal(tableLegacyCollectionLabel([{ key: "Note", type: "text", optional: true }]), "Note", "else the first column");
+    assert.equal(tableLegacyCollectionLabel([{ key: "BP", type: "fraction" }]), "", "no usable column");
+    assert.equal(tableLegacyCollectionLabel(null), "");
+    assert.equal(
+        mapNewScreenToOld({ ...row, collectionLabel: "", fields: [{ key: "Age", type: "number" }] }).data.metadata.collectionLabel,
+        "Age",
+        "a table saved without a collection label still gets one on the app",
+    );
+    assert.equal(
+        mapNewScreenToOld({ ...row, collectionLabel: "Visit", fields: [{ key: "Age", type: "number" }] }).data.metadata.collectionLabel,
+        "Visit",
+        "a set collection label is kept",
     );
 
     console.log("screen-table-config: ok");
