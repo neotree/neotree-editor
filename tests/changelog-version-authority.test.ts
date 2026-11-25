@@ -2,7 +2,6 @@ import assert from "node:assert/strict"
 
 import {
   coerceRollbackSnapshotValues,
-  computeRollbackSnapshotHash,
   evaluateEntityRollbackTargetPolicy,
   evaluateReleaseRollbackTargetPolicy,
   getEntityRollbackSummary,
@@ -16,6 +15,7 @@ import {
   SNAPSHOT_HASH_STRICT_ENFORCEMENT_AT,
   STALE_CHILD_ROLLBACK_MAX_DEPTH,
 } from "@/lib/changelog-rollback"
+import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback-hash"
 import { isMeaningfulSnapshot } from "@/databases/mutations/changelogs/_rollback-shared"
 import { buildOwnDraftRollbackWarning } from "@/databases/mutations/changelogs/_rollback-draft-guard"
 

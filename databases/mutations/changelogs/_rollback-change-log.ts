@@ -8,7 +8,6 @@ import { changeLogs, editorInfo } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
 import {
   applySoftDeleteRollbackSideEffects,
-  computeRollbackSnapshotHash,
   evaluateEntityRollbackTargetPolicy,
   getNextRollbackDataVersion,
   getRollbackParentVersion,
@@ -16,6 +15,7 @@ import {
   isChangeAlreadyAlignedToRollbackTarget,
   normalizePublishedRollbackVersion,
 } from "@/lib/changelog-rollback"
+import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback-hash"
 import {
   applyRollbackSnapshot,
   assertSnapshotIntegrity,
