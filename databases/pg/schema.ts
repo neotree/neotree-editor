@@ -300,6 +300,29 @@ export const mobileAnalyticsConfig = pgTable(
   }),
 )
 
+// Reusable calculation formulas written in plain language with {placeholders} (BMI, BSA, MAP, EDD...).
+// Managed by administrators; offered in the calculation editor under "Use a template".
+export const calculationTemplates = pgTable(
+  "nt_calculation_templates",
+  {
+    id: serial("id").primaryKey(),
+    templateId: uuid("template_id").notNull().unique().defaultRandom(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    resultType: text("result_type").$type<"number" | "date">().notNull(),
+    formula: text("formula").notNull(),
+    inputs: jsonb("inputs").$type<{ id: string; label: string; type: "number" | "date" }[]>().notNull().default([]),
+    sortOrder: integer("sort_order").notNull().default(0),
+    updatedByUserId: uuid("updated_by_user_id").references(() => users.userId, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    resultTypeCheck: check("nt_calculation_templates_result_type_check", sql`${table.resultType} IN ('number', 'date')`),
+  }),
+)
+
 // Dedicated, revocable key for the mobile analytics config endpoints ONLY. Deliberately NOT stored in
 // nt_api_keys so that general API keys can never read analytics config and this key can never
 // authenticate anywhere else. Only a SHA-256 hash is stored; the plaintext is shown once on generation.
