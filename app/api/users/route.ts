@@ -33,7 +33,8 @@ export async function DELETE(req: NextRequest) {
 
 		return NextResponse.json(res);
 	} catch(e: any) {
-		logger.error('[GET] /api/users', e.message);
-		return NextResponse.json({ errors: ['Internal Error'] });
+		logger.error('[DELETE] /api/users', e.message);
+		// deleting users is disabled, the message tells the caller to deactivate instead
+		return NextResponse.json({ errors: [e.message || 'Internal Error'] });
 	}
 }

@@ -5,6 +5,7 @@ import * as mutations from '@/databases/mutations/tokens';
 import logger from "@/lib/logger";
 import { sendMail } from '@/mailer';
 import { _getToken } from '@/databases/queries/tokens';
+import { isUserDeactivated } from '@/lib/user-status';
 import { getAuthLinkEmail } from '@/mailer/get-auth-link-email';
 
 export async function sendAuthLink({ userIdOrEmail, tokenId }: {
@@ -16,7 +17,7 @@ export async function sendAuthLink({ userIdOrEmail, tokenId }: {
 
         let newTokenId: number | null = null;
 
-        if (user) {
+        if (user && !isUserDeactivated(user)) {
             let token: Awaited<ReturnType<typeof _getToken>>;
 
             if (tokenId) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
+import { isUserDeactivated } from "@/lib/user-status";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { _getFullUser } from "@/databases/queries/users";
 
@@ -22,6 +23,8 @@ export async function GET(req: NextRequest) {
             userId: res.id,
             activated: !!res.password,
             email: res.email,
+            // lets a tablet that is still signed in find out it has been switched off
+            deactivated: isUserDeactivated(res),
         };
 
 		return NextResponse.json(data);

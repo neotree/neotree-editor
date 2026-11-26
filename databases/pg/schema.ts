@@ -117,6 +117,7 @@ export const changeLogEntityEnum = pgEnum("change_log_entity", [
   "alias",
   "hospital",
   "release",
+  "user",
 ])
 
 
@@ -219,6 +220,10 @@ export const users = pgTable(
 
     activationDate: timestamp("activation_date"),
     lastLoginDate: timestamp("last_login_date"),
+
+    // Set while the account is switched off: the person cannot sign in (editor or mobile app) or do
+    // anything else, but everything they created stays linked to them. Cleared to reactivate.
+    deactivatedAt: timestamp("deactivated_at"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

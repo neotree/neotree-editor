@@ -3,6 +3,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/authOptions";
 import * as queries from "@/databases/queries/users";
+import { isUserDeactivated } from "@/lib/user-status";
 
 export async function getSession() {
   return await getServerSession(authOptions);
@@ -16,7 +17,10 @@ export async function getAuthenticatedUser() {
 
         const currentUser = await queries._getUser(session.user.email);
 
-        return currentUser || null;
+        // a deactivated person is signed out of everything, including sessions that were already open
+        if (!currentUser || isUserDeactivated(currentUser)) return null;
+
+        return currentUser;
     } catch(e) {
         return null;
     }

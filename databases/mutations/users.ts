@@ -1,10 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { v4 } from "uuid";
 import bcrypt from 'bcrypt';
 
 import { validEmailRegex } from "@/constants/email";
 import db from "../pg/drizzle";
 import { users } from "../pg/schema";
+import socket from "@/lib/socket";
+import { _saveChangeLog } from "./changelogs";
 import { _getUser, _getUsers } from '../queries/users';
 
 export async function _resetUsersPasswords(usersIds: string[]) {
@@ -18,6 +20,98 @@ export async function _resetUsersPasswords(usersIds: string[]) {
     }
     return true;
 }
+
+type SetUsersActiveStateParams = {
+    userIds: string[];
+    /** the administrator making the change; recorded in the change log */
+    actorUserId: string;
+};
+
+/**
+ * Switches accounts off (deactivate) or back on (reactivate) and records who did it:
+ * one change-log entry per account that actually changed, with the administrator, the time and the
+ * before / after state. It does NOT change the data version: that stays reserved for content
+ * releases. Tablets learn about it from the broadcast below and from the sign-out check they run
+ * at every sync. Everything happens in one transaction; accounts already in the requested state are
+ * skipped. Returns how many accounts changed.
+ */
+async function _setUsersActiveState(deactivate: boolean, { userIds, actorUserId }: SetUsersActiveStateParams) {
+    const ids = [...new Set(userIds || [])];
+    if (!ids.length) return { count: 0 };
+    if (!actorUserId) throw new Error('Who made this change could not be determined.');
+
+    const result = await db.transaction(async tx => {
+        const targets = await tx
+            .select({
+                userId: users.userId,
+                email: users.email,
+                displayName: users.displayName,
+                role: users.role,
+                deactivatedAt: users.deactivatedAt,
+            })
+            .from(users)
+            .where(and(
+                inArray(users.userId, ids),
+                isNull(users.deletedAt),
+                deactivate ? isNull(users.deactivatedAt) : isNotNull(users.deactivatedAt),
+            ));
+
+        if (!targets.length) return { count: 0 };
+
+        const nextState = deactivate ? new Date() : null;
+
+        await tx
+            .update(users)
+            .set({ deactivatedAt: nextState })
+            .where(inArray(users.userId, targets.map(t => t.userId)));
+
+        const verb = deactivate ? 'deactivated' : 'reactivated';
+
+        for (const t of targets) {
+            const snapshot = (deactivatedAt: Date | null) => ({
+                userId: t.userId,
+                email: t.email,
+                displayName: t.displayName,
+                role: t.role,
+                deactivatedAt: deactivatedAt ? deactivatedAt.toISOString() : null,
+            });
+            const description = `User ${t.displayName} (${t.email}) ${verb}`;
+
+            const log = await _saveChangeLog({
+                client: tx,
+                data: {
+                    entityId: t.userId,
+                    entityType: 'user',
+                    action: 'update',
+                    dataVersion: null,
+                    changes: [{
+                        field: 'deactivatedAt',
+                        previousValue: t.deactivatedAt ? t.deactivatedAt.toISOString() : null,
+                        newValue: nextState ? nextState.toISOString() : null,
+                        dataType: 'date',
+                    }],
+                    previousSnapshot: snapshot(t.deactivatedAt),
+                    fullSnapshot: snapshot(nextState),
+                    description,
+                    changeReason: description,
+                    userId: actorUserId,
+                },
+            });
+            if (!log.success) throw new Error(log.errors?.join(', ') || 'Failed to save the change log');
+        }
+
+        return { count: targets.length };
+    });
+
+    // connected tablets sync now and sign a deactivated user out; no new data version is involved
+    if (result.count) socket.emit('data_changed', 'user_access_changed');
+
+    return result;
+}
+
+export const _deactivateUsers = (params: SetUsersActiveStateParams) => _setUsersActiveState(true, params);
+
+export const _reactivateUsers = (params: SetUsersActiveStateParams) => _setUsersActiveState(false, params);
 
 export async function _deleteUsers(usersIds: string[]) {
     // clear user's personal information, but keep the user as it is linked to some actions they performed
@@ -99,7 +193,7 @@ export async function _updateUsers(
         error?: string; 
     })[] = [];
 
-    for(const { userId, data: { userId: _userId, deletedAt, id, createdAt, updatedAt, email, ...u },  } of data) {
+    for(const { userId, data: { userId: _userId, deletedAt, deactivatedAt, id, createdAt, updatedAt, email, ...u },  } of data) {
         try {
             const where = validEmailRegex.test(userId) ? eq(users.email, userId) : eq(users.userId, userId);
 

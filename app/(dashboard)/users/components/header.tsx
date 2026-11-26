@@ -23,7 +23,6 @@ type Props = {
     roles: Awaited<ReturnType<typeof getRoles>>;
     disabled?: boolean;
     selected: string[];
-    onDelete: (ids: string[], cb?: () => void) => void;
     searchUsers: typeof searchUsers;
     getUsers: (
         filters: Partial<Parameters<typeof getUsers>[0]>,
@@ -34,6 +33,7 @@ type Props = {
 const statuses = [
     { value: 'active', label: 'Active', },
     { value: 'inactive', label: 'Inactive', },
+    { value: 'deactivated', label: 'Deactivated', },
 ];
 
 export function Header({ 
@@ -41,7 +41,6 @@ export function Header({
     roles, 
     disabled,
     getUsers, 
-    onDelete, 
     searchUsers, 
 }: Props) {
     const searchParams = useSearchParams();
