@@ -18,6 +18,10 @@ const positiveInt = (value: string | undefined, fallback: number) => {
 
 export function dbInit() {
     const client = postgres(process.env.POSTGRES_DB_URL!, {
+        // postgres v4 stopped typing Date/boolean/bigint/Buffer parameters client-side and lets the
+        // server infer them, which shifts `timestamp`/`date` values when the session or process isn't
+        // UTC and breaks untyped Dates in raw `sql` (date_trunc, + interval). Keep v3's behaviour.
+        infer: true,
         connection: {
             // No statement waits forever for a lock held by another one: it fails with "lock timeout"
             // (55P03), which lib/server/db-errors.ts turns into a message. Content writers queue before

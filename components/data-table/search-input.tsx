@@ -32,7 +32,7 @@ const SearchInput = forwardRef<HTMLInputElement, Props>(({
 						placeholder="Search"
 						{...props}
 						className={cn(
-							'w-full pl-4 py-2 rounded-l-full border focus:outline-none focus:border-secondary bg-transparent',
+							'w-full pl-4 py-2 rounded-l-full border focus:outline-hidden focus:border-secondary bg-transparent',
 							props.className,
 						)}
 					/>

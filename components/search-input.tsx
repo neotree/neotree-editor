@@ -49,7 +49,7 @@ const SearchInput = forwardRef<HTMLInputElement, Props>(({
 							if (!value) onSearch?.(value);
 						}}
 						className={cn(
-							'w-full pl-4 py-2 rounded-l-full border focus:outline-none focus:border-secondary bg-transparent',
+							'w-full pl-4 py-2 rounded-l-full border focus:outline-hidden focus:border-secondary bg-transparent',
 							props.className,
 						)}
 					/>
