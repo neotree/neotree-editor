@@ -323,6 +323,12 @@
       "namedRegex": "^/account(?:/)?$"
     },
     {
+      "page": "/calculation-templates",
+      "regex": "^/calculation\\-templates(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/calculation\\-templates(?:/)?$"
+    },
+    {
       "page": "/changelogs",
       "regex": "^/changelogs(?:/)?$",
       "routeKeys": {},
