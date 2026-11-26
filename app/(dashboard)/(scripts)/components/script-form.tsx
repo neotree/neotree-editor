@@ -1,5 +1,6 @@
 'use client';
 
+import { DEFAULT_SCRIPT_ID_TYPE, SCRIPT_ID_TYPE_OPTIONS, normaliseScriptIdType } from "@/lib/script-id-type";
 import { useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 
@@ -74,6 +75,7 @@ export function ScriptForm() {
     const type = watch('type');
     const hospitalId = watch('hospitalId');
     const exportable = watch('exportable');
+    const idType = watch('idType');
     const nuidSearchFields = watch('nuidSearchFields');
     const nuidSearchEnabled = watch('nuidSearchEnabled');
 
@@ -250,6 +252,32 @@ export function ScriptForm() {
                             onCheckedChange={() => setValue('exportable', !exportable, { shouldDirty: true, })}
                         />
                         <Label secondary htmlFor="exportable">Exportable</Label>
+                    </div>
+
+                    <div>
+                        <Label secondary htmlFor="idType">Session ID type</Label>
+                        <Select
+                            value={idType || DEFAULT_SCRIPT_ID_TYPE}
+                            name="idType"
+                            disabled={disabled}
+                            onValueChange={value => setValue('idType', normaliseScriptIdType(value), { shouldDirty: true, })}
+                        >
+                            <SelectTrigger id="idType">
+                                <SelectValue placeholder="Select ID type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    {SCRIPT_ID_TYPE_OPTIONS.map(o => (
+                                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {SCRIPT_ID_TYPE_OPTIONS.find(o => o.value === (idType || DEFAULT_SCRIPT_ID_TYPE))?.description}
+                            {' '}The app generates this kind of ID for new sessions and only accepts it on the NUID page.
+                            Changing it later doesn&apos;t change IDs of sessions already recorded.
+                        </p>
                     </div>
 
                     <div className="pt-4">

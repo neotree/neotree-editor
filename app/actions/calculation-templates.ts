@@ -28,6 +28,7 @@ const toTemplate = (r: Awaited<ReturnType<typeof _getCalculationTemplates>>[numb
     resultType: r.resultType,
     formula: r.formula,
     inputs: r.inputs,
+    example: r.example,
     sortOrder: r.sortOrder,
 });
 

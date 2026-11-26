@@ -8,7 +8,7 @@ export const CALCULATION_TEMPLATES_AUDIT_AREA = 'calculation_templates';
 
 const snapshot = (t: typeof calculationTemplates.$inferSelect) => ({
     templateId: t.templateId, slug: t.slug, name: t.name, description: t.description,
-    resultType: t.resultType, formula: t.formula, inputs: t.inputs,
+    resultType: t.resultType, formula: t.formula, inputs: t.inputs, example: t.example,
 });
 
 /** An unused slug derived from the name ("bmi", then "bmi-2", ...). */
@@ -31,6 +31,10 @@ export async function _saveCalculationTemplate(params: { templateId?: string; da
         resultType: data.resultType,
         formula: data.formula.trim(),
         inputs: data.inputs.map(i => ({ id: i.id, label: i.label.trim(), type: i.type })),
+        example: data.example ? {
+            values: Object.fromEntries(data.inputs.map(i => [i.id, `${data.example!.values?.[i.id] ?? ''}`.trim()])),
+            expected: `${data.example.expected ?? ''}`.trim(),
+        } : null,
     };
 
     return db.transaction(async tx => {

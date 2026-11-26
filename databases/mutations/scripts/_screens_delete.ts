@@ -7,6 +7,7 @@ import { screens, screensDrafts, pendingDeletion, scriptsDrafts, } from '@/datab
 import socket from '@/lib/socket';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
 import { queueContentWrite } from "@/lib/server/content-write-lock";
+import { _removeScreenReferencesFromReviews } from './_review_references';
 
 export type DeleteScreensData = {
     screensIds?: string[];
@@ -88,6 +89,19 @@ async function _deleteScreensNow(
         }));
         
         if (pendingDeletionInsertData.length) await executor.insert(pendingDeletion).values(pendingDeletionInsertData);
+
+        // The deleted screens' entries in each script's Screen review list go with them. (The published
+        // scripts are cleaned when this deletion is published.)
+        if (screensIds.length) {
+            const oldIds = await executor
+                .select({ oldScreenId: screens.oldScreenId })
+                .from(screens)
+                .where(inArray(screens.screenId, screensIds));
+            await _removeScreenReferencesFromReviews({
+                removedIds: [...screensIds, ...oldIds.map(r => r.oldScreenId || '')],
+                client: executor,
+            });
+        }
 
         response.success = true;
     } catch(e: any) {

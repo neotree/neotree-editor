@@ -3,6 +3,7 @@ import { _getDevice } from "@/databases/queries/devices";
 import { _getDatesWhenUpdatesWereMade } from "@/databases/queries/ops";
 import { _getEditorInfo } from "@/databases/queries/editor-info";
 import { _saveDevices } from "@/databases/mutations/devices";
+import { getUidCounterFloor } from "@/lib/device-uid";
 
 export async function getDevice(deviceId: string) {
 	try {
@@ -44,6 +45,9 @@ export async function getDevice(deviceId: string) {
                 details: device?.details,
                 device_id: device?.deviceId,
                 device_hash: device?.deviceHash,
+                // Where a tablet whose own session counter is behind this device's reported count must
+                // resume so no UID number is reused (0 = nothing reported yet).
+                uid_counter_floor: getUidCounterFloor((device?.details as any)?.scripts_count),
                 deletedAt: device?.deletedAt,
                 createdAt: device?.createdAt,
                 updatedAt: device?.updatedAt,

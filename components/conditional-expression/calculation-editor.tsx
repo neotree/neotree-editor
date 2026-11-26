@@ -177,6 +177,11 @@ export function CalculationEditor({ resultType, ...props }: CalculationEditorPro
               {template && (
                 <>
                   {template.description && <p className="text-xs text-muted-foreground">{template.description}</p>}
+                  {template.example && (
+                    <p className="text-xs text-muted-foreground">
+                      Example: {template.inputs.map((i) => `${i.label} = ${template.example!.values?.[i.id] ?? ""}`).join(", ")} gives {template.example.expected}.
+                    </p>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                     {template.inputs.map((i) => {
                       const options = getCompatibleKeys(mergedKeys, i.type);

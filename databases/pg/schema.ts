@@ -313,6 +313,9 @@ export const calculationTemplates = pgTable(
     resultType: text("result_type").$type<"number" | "date">().notNull(),
     formula: text("formula").notNull(),
     inputs: jsonb("inputs").$type<{ id: string; label: string; type: "number" | "date" }[]>().notNull().default([]),
+    // The worked example the formula must reproduce to be saved (lib/calculation-templates.ts). Null only for
+    // templates saved before it existed.
+    example: jsonb("example").$type<{ values: Record<string, string>; expected: string } | null>(),
     sortOrder: integer("sort_order").notNull().default(0),
     updatedByUserId: uuid("updated_by_user_id").references(() => users.userId, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -650,6 +653,8 @@ export const scripts = pgTable(
     description: text("description").notNull().default(""),
     hospitalId: uuid("hospital_id").references(() => hospitals.hospitalId, { onDelete: "set null" }),
     exportable: boolean("exportable").notNull().default(true),
+    // Which session ID the app generates and accepts for this script: "nuid" or "muid" (lib/script-id-type.ts).
+    idType: text("id_type").$type<"nuid" | "muid">().notNull().default("nuid"),
     nuidSearchEnabled: boolean("nuid_search_enabled").notNull().default(false),
     nuidSearchFields: jsonb("nuid_search_fields").default("[]").notNull(),
     eligibilityCriteria: jsonb("eligibility_criteria").$type<EligibilityCriteria | null>(),
@@ -696,6 +701,7 @@ export const scripts = pgTable(
                     to_tsvector('english', ${table.description})
                 )`,
     ),
+    idTypeCheck: check("nt_scripts_id_type_check", sql`${table.idType} IN ('nuid', 'muid')`),
   }),
 )
 

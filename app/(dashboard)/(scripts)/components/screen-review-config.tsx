@@ -24,6 +24,7 @@ import { DialogClose, } from "@/components/ui/dialog";
 import { Modal } from "@/components/modal";
 import { Button } from "@/components/ui/button";
 import { ScreenReviewField } from "@/types";
+import { findStaleReviewConfigurations } from "@/lib/review-configurations";
 import { DataTable } from "@/components/data-table";
 import { useScreenReviewField } from "../hooks/use-field";
 import { Label } from "@/components/ui/label";
@@ -67,6 +68,16 @@ export function ScreenReviewConfig({
     const [open, setOpen] = useState(false);
    
     const [screens, setScreens] = useState<Awaited<ReturnType<typeof scriptsActions.getScreens>>>({ data: [], });
+    const [screensLoaded, setScreensLoaded] = useState(false);
+
+    // Entries whose screen has been deleted. Deleting a screen now removes them, but older data can still hold
+    // some. Only judged once the screens have loaded, or every entry would look stale.
+    const stale = screensLoaded ? findStaleReviewConfigurations(fields, screens.data) : [];
+    const removeStale = () => setValue(
+        'reviewConfigurations',
+        fields.filter(f => !stale.includes(f)),
+        { shouldDirty: true, },
+    );
     
     
     useEffect(() => {
@@ -76,6 +87,7 @@ export function ScreenReviewConfig({
                 try {
                     const res = await axios.get<Awaited<ReturnType<typeof scriptsActions.getScreens>>>('/api/screens?data='+JSON.stringify({ scriptsIds: [scriptId], returnDraftsIfExist: true, }))
                     setScreens(res.data);
+                    setScreensLoaded(!res.data?.errors?.length);
                 } catch(e: any) {
                     mounted.current = false;
                     alert({
@@ -190,6 +202,18 @@ export function ScreenReviewConfig({
                     </SheetHeader>
 
                     <div className="flex-1 flex flex-col py-2 px-0 gap-y-4 overflow-y-auto">
+                        {stale.length > 0 && (
+                            <div className="mx-4 flex items-center gap-x-3 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm">
+                                <span className="flex-1">
+                                    {stale.length === 1 ? '1 entry points' : `${stale.length} entries point`} to a screen that has been deleted.
+                                    The tablet would list {stale.length === 1 ? 'it' : 'them'} on its review page.
+                                </span>
+                                <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={removeStale}>
+                                    Remove {stale.length === 1 ? 'it' : 'them'}
+                                </Button>
+                            </div>
+                        )}
+
                         <DataTable
                             title="Fields"
                             sortable
