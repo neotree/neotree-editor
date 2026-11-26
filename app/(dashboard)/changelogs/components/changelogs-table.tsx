@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
@@ -100,7 +100,16 @@ function VersionStatus({ entry }: { entry: DataVersionSummary }) {
     )
   }
 
-  if (entry.isLatestVersion) {
+  if (entry.isAccessOnly) {
+    return (
+      <div className="inline-flex items-center gap-x-1.5" title="This version only changed a user's access. It has no content to roll back.">
+        <div className="w-2 h-2 rounded-full bg-sky-400" />
+        <span>User access</span>
+      </div>
+    )
+  }
+
+  if (entry.isLatestVersion || entry.isLatestContentVersion) {
     return (
       <div className="inline-flex items-center gap-x-1.5" title="This is the latest published version.">
         <div className="w-2 h-2 rounded-full bg-green-400" />
@@ -171,6 +180,20 @@ export function ChangelogsTable(props: Props) {
     setDeepRollbackConfirmText("")
   }, [viewOnly])
 
+  // Versions that only changed user access (deactivate / reactivate) have nothing to restore.
+  const accessOnlyVersions = useMemo(
+    () => new Set(dataVersions.filter((entry) => entry.isAccessOnly).map((entry) => entry.dataVersion)),
+    [dataVersions],
+  )
+  const previousContentVersion = useCallback(
+    (version: number) => {
+      let previous = version - 1
+      while (previous > 1 && accessOnlyVersions.has(previous)) previous--
+      return previous
+    },
+    [accessOnlyVersions],
+  )
+
   const currentRollbackVersion = pendingRollbackEntry?.dataVersion ?? latestDataVersion ?? null
   const publishedAtByVersion = useMemo(
     () => new Map(dataVersions.map((entry) => [entry.dataVersion, entry.publishedAt])),
@@ -179,8 +202,9 @@ export function ChangelogsTable(props: Props) {
   const recentRollbackTargets = useMemo(() => {
     if (!currentRollbackVersion || currentRollbackVersion < 2) return []
     const targets: number[] = []
-    const minVersion = Math.max(1, currentRollbackVersion - RELEASE_ROLLBACK_MAX_RECENT_DEPTH)
-    for (let version = currentRollbackVersion - 1; version >= minVersion; version--) {
+    // The window counts releases that changed content, so access-only versions never use it up.
+    for (let version = currentRollbackVersion - 1; version >= 1 && targets.length < RELEASE_ROLLBACK_MAX_RECENT_DEPTH; version--) {
+      if (accessOnlyVersions.has(version)) continue
       // When the release's publish date is loaded, hide targets the server would reject
       // (older than the age window or before the clean-slate floor); unknown dates are
       // kept and validated server-side.
@@ -194,7 +218,7 @@ export function ChangelogsTable(props: Props) {
       targets.push(version)
     }
     return targets
-  }, [currentRollbackVersion, publishedAtByVersion])
+  }, [currentRollbackVersion, publishedAtByVersion, accessOnlyVersions])
 
   const handleNavigate = (version: number) => {
     router.push(buildDetailsHref(version))
@@ -436,13 +460,13 @@ export function ChangelogsTable(props: Props) {
                           <DropdownMenuItem onClick={() => handleNavigate(entry.dataVersion)} className="cursor-pointer">
                             View details
                           </DropdownMenuItem>
-                          {isSuperUser && !viewOnly && entry.isLatestVersion && entry.dataVersion > 1 && (
+                          {isSuperUser && !viewOnly && !entry.isAccessOnly && (entry.isLatestContentVersion ?? entry.isLatestVersion) && entry.dataVersion > 1 && (
                             <DropdownMenuItem
                               disabled={rollbacking === entry.dataVersion}
                               onClick={() => {
                                 setPendingRollbackEntry(entry)
                                 setAllowDeepRollback(false)
-                                setTargetRollbackVersion(entry.dataVersion - 1)
+                                setTargetRollbackVersion(previousContentVersion(entry.dataVersion))
                               }}
                               className="cursor-pointer text-orange-600 dark:text-orange-400 focus:text-orange-700"
                             >
@@ -496,7 +520,7 @@ export function ChangelogsTable(props: Props) {
                   <>
                     <p>
                       You are about to publish a rollback for release v{pendingRollbackEntry.dataVersion}, restoring the state of an earlier
-                      release. This will publish a new release v{pendingRollbackEntry.dataVersion + 1}.
+                      release. This will publish a new release v{Math.max(latestDataVersion ?? 0, pendingRollbackEntry.dataVersion) + 1}.
                     </p>
                     {rollbacking !== null && <p className="text-sm text-muted-foreground">Rollback in progress. Please wait...</p>}
                     <div>
@@ -564,7 +588,7 @@ export function ChangelogsTable(props: Props) {
                             setAllowDeepRollback(checked)
                             setDeepRollbackConfirmText("")
                             if (!checked) {
-                              setTargetRollbackVersion(pendingRollbackEntry.dataVersion - 1)
+                              setTargetRollbackVersion(previousContentVersion(pendingRollbackEntry.dataVersion))
                             }
                           }}
                           className="rounded"

@@ -3,6 +3,7 @@
 import { _getUser } from '@/databases/queries/users';
 import * as mutations from '@/databases/mutations/tokens';
 import logger from "@/lib/logger";
+import { DEACTIVATED_ACCOUNT_MESSAGE, isUserDeactivated } from '@/lib/user-status';
 import { sendMail } from '@/mailer';
 import { getAuthCodeEmail } from '@/mailer/get-auth-code-email';
 import { _getToken } from '@/databases/queries/tokens';
@@ -17,6 +18,8 @@ export async function sendAuthCode({ email, tokenId }: {
         const user = await _getUser(email);
 
         if (!user) throw new Error('Email address not registered, are you sure that address is typed correctly?');
+
+        if (isUserDeactivated(user)) throw new Error(DEACTIVATED_ACCOUNT_MESSAGE);
 
         let token: Awaited<ReturnType<typeof _getToken>>;
 

@@ -48,7 +48,15 @@ export type DiagnosticCode =
   | "BLANK_LINE"
   | "OPERATOR_SPACING"
   | "TAB_CHARACTER"
-  | "EMPTY_OUTCOME_EXPRESSION";
+  | "EMPTY_OUTCOME_EXPRESSION"
+  // Calculation (reference expression) language
+  | "UNKNOWN_FUNCTION"
+  | "FUNCTION_ARGS"
+  | "DIVIDE_BY_ZERO"
+  | "UNKNOWN_UNIT"
+  | "DATE_AMOUNT"
+  | "FORMULA_UNWRAPPED"
+  | "MIXED_FORMULA";
 
 export interface Diagnostic {
   severity: Severity;

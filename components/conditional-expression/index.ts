@@ -1,3 +1,4 @@
+export { CalculationEditor, type CalculationEditorProps } from "./calculation-editor";
 export { ConditionEditor, type ConditionEditorProps } from "./condition-editor";
 export {
   ConditionErrorBadge,

@@ -66,6 +66,7 @@ const friendlyFieldLabels: Record<string, string> = {
   name: "Name",
   title: "Title",
   printTitle: "Printed title",
+  idType: "Session ID type",
   sectionTitle: "Section title",
   previewTitle: "Preview title",
   positiveLabel: "Positive answer label",

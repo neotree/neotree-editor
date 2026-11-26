@@ -39,7 +39,7 @@ import { useField } from "../../hooks/use-field"
 import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
-import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
+import { CalculationEditor, ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
 import { useFieldKeyCollisions } from "@/components/field-key-collisions"
 import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { collectNewOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
@@ -335,6 +335,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, isColumn,
     <>
       <Modal
         open={open}
+        contentProps={{ className: "sm:max-w-2xl" }}
         onOpenChange={(open) => {
           const applyOpenChange = () => {
             if (!open) onClose()
@@ -807,17 +808,17 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, isColumn,
                 </>
               )}
 
-              {(isPeriodField || isNumberField) && (
+              {(isPeriodField || isNumberField || isDateField) && (
                 <>
                   <div>
-                    <Label htmlFor="calculation">Reference expression <ConditionalExpressionModal /></Label>
+                    <Label htmlFor="calculation">{isDateField ? "Date calculation" : "Reference expression"} <ConditionalExpressionModal /></Label>
                     <Controller
                       control={control}
                       name="calculation"
                       render={({ field: { value, onChange } }) => (
-                        <ConditionEditor
+                        <CalculationEditor
                           id="calculation"
-                          mode="reference"
+                          resultType={isDateField ? "date" : "number"}
                           rows={2}
                           value={value || ""}
                           onChange={onChange}
@@ -832,9 +833,10 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, isColumn,
                         />
                       )}
                     />
-                    <span className="text-xs text-muted-foreground">
-                      Example: $key or SUM($key1,$key2...) or DIVIDE($key1,$key2...) or MULTIPLY($key1,$key2...) or
-                      SUBTRACT($key1,$key2...)
+                    <span className="mt-3 block text-xs text-muted-foreground">
+                      {isDateField
+                        ? "Example: $LMPDate + 280 days"
+                        : "Example: $key, SUM($a,$b), or plain language like $Weight plus $Height"}
                     </span>
                   </div>
                 </>

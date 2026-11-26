@@ -36,6 +36,11 @@ export function Form({ sendAuthCode, isEmailRegistered, setPassword }: Props) {
             {(show === 'signInForm') && (
                 <SignIn 
                     email={email}
+                    onChangeEmail={() => {
+                        // back to the email step, keeping what was typed so a typo can be fixed
+                        setShow('verifyEmailForm');
+                        setShouldSetPassword(false);
+                    }}
                     onSendCode={() => {
                         setShow('verifyEmailForm');
                         setShouldSetPassword(false);

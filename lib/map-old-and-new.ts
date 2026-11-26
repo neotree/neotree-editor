@@ -1,3 +1,4 @@
+import { normaliseScriptIdType } from "@/lib/script-id-type";
 import { configKeys, diagnoses, problems, screens, scripts } from "@/databases/pg/schema";
 import { ScreenReviewField, ScriptField } from "@/types";
 import { tableLegacyCollectionLabel } from "@/lib/screen-table-config";
@@ -244,6 +245,8 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
             deletedAt: s.deletedAt,
             type: s.type,
             exportable: s.exportable,
+            // "nuid" | "muid": the app generates and checks this kind of session ID for the script.
+            idType: normaliseScriptIdType((s as { idType?: unknown }).idType),
             hospital: s.hospitalId,
             printTitle: s.printTitle,
             id: s.id,

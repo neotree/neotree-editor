@@ -6,6 +6,7 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 
 import db from "@/databases/pg/drizzle";
 import * as schema from '@/databases/pg/schema';
+import { DEACTIVATED_ACCOUNT_MESSAGE, isUserDeactivated } from '@/lib/user-status';
 
 export const authOptions: AuthOptions = {
     // @ts-ignore
@@ -41,6 +42,8 @@ export const authOptions: AuthOptions = {
                 });
 
                 if (!user) throw new Error('Invalid credentials');
+
+                if (isUserDeactivated(user)) throw new Error(DEACTIVATED_ACCOUNT_MESSAGE);
 
                 if (credentials.code) {
                     const token = await db.query.tokens.findFirst({

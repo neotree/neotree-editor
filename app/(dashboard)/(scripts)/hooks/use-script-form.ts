@@ -1,5 +1,6 @@
 "use client"
 
+import { normaliseScriptIdType } from "@/lib/script-id-type"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { useRouter } from "next/navigation"
@@ -48,6 +49,7 @@ export function useScriptForm(params: UseScriptFormParams) {
       description: formData?.description || "",
       hospitalId: formData?.hospitalId || null,
       exportable: isEmpty(formData?.exportable) ? true : formData?.exportable,
+      idType: normaliseScriptIdType(formData?.idType),
       nuidSearchEnabled: isEmpty(formData?.nuidSearchEnabled) ? false : formData?.nuidSearchEnabled,
       nuidSearchFields: formData?.nuidSearchFields || [],
       eligibilityCriteria: formData?.eligibilityCriteria || null,
