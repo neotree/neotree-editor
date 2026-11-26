@@ -44,7 +44,10 @@ assert.ok(codes("MATH(Math.floor($Weight, 2))").includes("FUNCTION_ARGS"));
 assert.ok(codes("MATH($Weight / 0)").includes("DIVIDE_BY_ZERO"));
 assert.ok(codes("MATH($Weight / (2 - 2))").includes("DIVIDE_BY_ZERO"));
 assert.ok(codes("DIVIDE($Weight)").includes("FUNCTION_ARGS"));
-assert.ok(codes("MATH(eval($Weight))").includes("UNKNOWN_FUNCTION"), "no arbitrary functions");
+// Only allow-listed functions are accepted: code-execution / host-access primitives are rejected as unknown.
+for (const fn of ["Function", "setTimeout", "setInterval", "require", "import", "fetch", "constructor", "globalThis"]) {
+  assert.ok(codes(`MATH(${fn}($Weight))`).includes("UNKNOWN_FUNCTION"), `no arbitrary functions: ${fn}`);
+}
 assert.ok(codes("MATH(window.x)").length > 0, "no identifiers");
 assert.ok(codes("MATH(MATH($Weight))").includes("UNKNOWN_FUNCTION"));
 assert.ok(codes("MATH($Weight) + 1").length > 0, "trailing tokens after MATH()");
