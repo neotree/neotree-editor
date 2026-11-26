@@ -1,3 +1,4 @@
+import { normaliseScriptIdType } from "@/lib/script-id-type";
 import { desc, eq, Query } from 'drizzle-orm';
 import { scriptContentChanged, stripScriptComputedProps } from '@/lib/script-computed-props';
 import * as uuid from 'uuid';
@@ -49,6 +50,9 @@ async function _saveScriptsNow({ data, broadcastAction, syncSilently, userId, dr
         for (const { scriptId: itemScriptId, baseRevision: _baseRevision, revision: _revision, ...item } of data) {
             try {
                 index++;
+
+                // Only "nuid" or "muid" may reach a draft; the published column rejects anything else.
+                if ('idType' in item) item.idType = normaliseScriptIdType(item.idType);
 
                 const scriptId = itemScriptId || uuid.v4();
 

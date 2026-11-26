@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from "jsonwebtoken";
 
 import logger from "@/lib/logger";
+import { DEACTIVATED_ACCOUNT_MESSAGE, isUserDeactivated } from "@/lib/user-status";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { _getFullUser } from "@/databases/queries/users";
 
@@ -24,6 +25,8 @@ export async function POST(req: NextRequest) {
         const isCorrectPassword = await bcrypt.compare(password, `${user.password}`);
 
         if (!isCorrectPassword) return NextResponse.json({ errors: ['Invalid credentials'], });
+
+        if (isUserDeactivated(user)) return NextResponse.json({ errors: [DEACTIVATED_ACCOUNT_MESSAGE], });
 
         const data = {
             id: user.id,

@@ -5,7 +5,7 @@ import { isEmpty } from "@/lib/isEmpty";
 import logger from "@/lib/logger";
 import { validEmailRegex } from "@/constants/email";
 import db from "../pg/drizzle";
-import { users } from "../pg/schema";
+import { changeLogs, users } from "../pg/schema";
 
 export type GetUserParams = string;
 
@@ -61,6 +61,7 @@ export async function _getUser(params: GetUserParams) {
             role: true,
             createdAt: true,
             lastLoginDate: true,
+            deactivatedAt: true,
             password: true,
         },
     });
@@ -83,6 +84,7 @@ export async function _getUserMini(params: GetUserParams) {
             email: true,
             role: true,
             lastLoginDate: true,
+            deactivatedAt: true,
         },
     });
 }
@@ -123,9 +125,11 @@ async function __getUsers({
 
     if (roles?.length) conditions.push(inArray(users.role, roles as (typeof users.$inferSelect['role'])[]));
 
-    if (status === 'active') conditions.push(isNotNull(users.activationDate));
+    if (status === 'active') conditions.push(isNotNull(users.activationDate), isNull(users.deactivatedAt));
 
-    if (status === 'inactive') conditions.push(isNull(users.activationDate));
+    if (status === 'inactive') conditions.push(isNull(users.activationDate), isNull(users.deactivatedAt));
+
+    if (status === 'deactivated') conditions.push(isNotNull(users.deactivatedAt));
 
     searchValue = `${searchValue || ''}`.trim();
     if (searchValue) {
@@ -165,6 +169,7 @@ async function __getUsers({
             role: true,
             createdAt: true,
             lastLoginDate: true,
+            deactivatedAt: true,
         },
     });
 
@@ -199,4 +204,45 @@ export async function _getUsers(params: GetUsersParams) {
     } finally {
         return rslts;
     }
+}
+
+export type UserAccessHistoryEntry = {
+    id: string;
+    action: 'deactivated' | 'reactivated';
+    description: string;
+    date: string;
+    byName: string;
+    byEmail: string;
+};
+
+/** Who deactivated / reactivated this user, and when, newest first. */
+export async function _getUserAccessHistory(userId: string): Promise<UserAccessHistoryEntry[]> {
+    if (!uuid.validate(userId)) return [];
+
+    const rows = await db
+        .select({
+            id: changeLogs.changeLogId,
+            description: changeLogs.description,
+            changes: changeLogs.changes,
+            date: changeLogs.dateOfChange,
+            byName: users.displayName,
+            byEmail: users.email,
+        })
+        .from(changeLogs)
+        .leftJoin(users, eq(users.userId, changeLogs.userId))
+        .where(and(eq(changeLogs.entityType, 'user'), eq(changeLogs.entityId, userId), eq(changeLogs.action, 'update')))
+        .orderBy(desc(changeLogs.dateOfChange));
+
+    return rows.map(r => {
+        const change = (r.changes || []).find(c => c.field === 'deactivatedAt');
+        return {
+            id: r.id,
+            // a new deactivation date means the account was switched off; an empty one means back on
+            action: change?.newValue ? 'deactivated' as const : 'reactivated' as const,
+            description: r.description,
+            date: r.date.toISOString(),
+            byName: r.byName || 'Unknown user',
+            byEmail: r.byEmail || '',
+        };
+    });
 }

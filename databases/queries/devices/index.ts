@@ -3,7 +3,7 @@ import { and, eq, count, inArray, or } from "drizzle-orm";
 import db from "@/databases/pg/drizzle";
 import { devices } from "@/databases/pg/schema";
 import logger from "@/lib/logger";
-import { generateDeviceHash } from '@/lib/generate-device-hash';
+import { generateUniqueDeviceHash } from '@/lib/device-uid';
 import { DeviceDetails } from "@/types";
 
 export async function deviceHashExists(hash: string) {
@@ -12,11 +12,8 @@ export async function deviceHashExists(hash: string) {
 } 
 
 export async function _getUniqueDeviceHash(deviceId: string, length = 4) {
-    let hash = generateDeviceHash(deviceId, length);
-    const hashExists = await deviceHashExists(hash);
-    if (hashExists) hash = await generateDeviceHash(deviceId, length);
-    return hash;
-} 
+    return generateUniqueDeviceHash(deviceId, deviceHashExists, { length });
+}
 
 export type GetDevicesParams = {
     devicesHashKeys?: string[];

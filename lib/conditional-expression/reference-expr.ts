@@ -1,10 +1,11 @@
 import type { ValidationContext, ValidationResult } from "./ast";
+import { validateCalculation } from "./calculation";
 
-// The reference-expression sublanguage (field calculations) is not validated
-// yet — this stub accepts everything so calculations are never false-flagged.
-// When it lands it will need its own diagnostic codes (e.g. UNKNOWN_FUNCTION,
-// FUNCTION_ARG) added back to DiagnosticCode in ./ast.
-
-export function validateReferenceExpression(_input: string, _ctx: ValidationContext): ValidationResult {
-  return { diagnostics: [], hasErrors: false, ast: null };
+/**
+ * Validates a field calculation ("reference expression"): $key, SUM/SUBTRACT/MULTIPLY/DIVIDE,
+ * MATH(...) arithmetic and DATE_ADD(...) date formulas. Plain-language input is accepted with a
+ * warning that shows the formula it will be converted to (see compileCalculation).
+ */
+export function validateReferenceExpression(input: string, ctx: ValidationContext): ValidationResult {
+  return validateCalculation(input, ctx);
 }

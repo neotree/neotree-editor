@@ -1,3 +1,4 @@
+import { pruneReviewConfigurations } from "@/lib/review-configurations";
 import { NextRequest, NextResponse } from "next/server";
 
 import logger from "@/lib/logger";
@@ -99,10 +100,21 @@ export async function GET(req: NextRequest) {
         // scripts
         const scriptIdToOldScriptId:  { [key: string]: null | string; } = {};
         const scripts = (() => {
+            // A script's Screen review list may only name screens that still exist. Deleting a screen now removes
+            // its entries, but older data may still hold some, and the tablet would list them on its review page.
+            const liveScreensByScript = getScreens.data.filter(s => !s.isDeleted).reduce((acc, s) => {
+                (acc[s.scriptId] = acc[s.scriptId] || []).push(s);
+                return acc;
+            }, {} as { [scriptId: string]: { screenId: string; oldScreenId?: string | null; }[]; });
+
             const _scripts = getScripts.data.filter(s => !s.isDeleted)?.map(s => {
                 const hospitalId = hospitals.data.filter(h => h.hospitalId === s.hospitalId)[0]?.oldHospitalId;
                 scriptIdToOldScriptId[s.scriptId] = s.oldScriptId || null;
-                return mapNewScriptToOld({ ...s, hospitalId: hospitalId || s.hospitalId, });
+                return mapNewScriptToOld({
+                    ...s,
+                    hospitalId: hospitalId || s.hospitalId,
+                    reviewConfigurations: pruneReviewConfigurations(s.reviewConfigurations as any[], liveScreensByScript[s.scriptId]),
+                });
             });
             logger.log(
                 'sync-data eligibilityCriteria',

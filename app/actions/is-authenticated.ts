@@ -5,6 +5,7 @@ import { getAuthenticatedUser } from "@/app/actions/get-authenticated-user";
 import { _getUser } from "@/databases/queries/users";
 import { ACTING_USER_EMAIL_HEADER } from "@/lib/acting-user";
 import logger from "@/lib/logger";
+import { isUserDeactivated } from "@/lib/user-status";
 
 /**
  * Server-to-server calls from another editor (script export, data-key export, drugs-library export)
@@ -20,7 +21,7 @@ async function resolveActingUser() {
     const email = `${headersList.get(ACTING_USER_EMAIL_HEADER) || ''}`.trim();
     if (!email) return null;
     const user = await _getUser(email);
-    if (!user?.isActive) return null;
+    if (!user?.isActive || isUserDeactivated(user)) return null;
     const { password: _password, ...rest } = user;
     return { ...rest, role: 'user' as const };
 }
