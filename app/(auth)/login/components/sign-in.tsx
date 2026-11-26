@@ -24,9 +24,10 @@ type Props = {
     setPassword: typeof setPassword;
     sendAuthCode: typeof sendAuthCode;
     onSendCode: () => void;
+    onChangeEmail: () => void;
 };
 
-export function SignIn({ email, onSendCode, sendAuthCode, setPassword, shouldSetPassword }: Props) {
+export function SignIn({ email, onSendCode, onChangeEmail, sendAuthCode, setPassword, shouldSetPassword }: Props) {
     const { alert } = useAlertModal();
     
     const router = useRouter();
@@ -161,6 +162,22 @@ export function SignIn({ email, onSendCode, sendAuthCode, setPassword, shouldSet
                     >
                         {loading ? 'Please wait...' : 'Sign in'}
                     </Button>
+
+                    <div className="flex flex-col items-end gap-y-1">
+                        <a
+                            href="#"
+                            className={cn(
+                                'text text-sm transition-colors text-secondary/60 hover:text-secondary',
+                                loading && 'opacity-20',
+                            )}
+                            onClick={e => {
+                                e.preventDefault();
+                                if (!loading) onChangeEmail();
+                            }}
+                        >
+                            Use a different email
+                        </a>
+                    </div>
 
                     <div className={cn('flex flex-col items-end gap-y-1', shouldSetPassword && 'hidden')}>
                         <a

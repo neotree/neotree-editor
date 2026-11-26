@@ -26,6 +26,10 @@ export type DataVersionSummary = {
   totalChanges: number
   hasActiveChanges: boolean
   isLatestVersion: boolean
+  // The version only recorded user access changes (deactivate / reactivate): no content to roll back or restore
+  isAccessOnly?: boolean
+  // The newest version that actually changed content, i.e. the release a rollback undoes
+  isLatestContentVersion?: boolean
   entityCounts: Record<string, number>
   actionCounts: Record<string, number>
   descriptions: string[]
@@ -96,6 +100,7 @@ export async function _getDataVersionSummaries(params?: DataVersionSummaryParams
       alias: ["alias", "aliases"],
       hospital: ["hospital", "hospitals"],
       release: ["release", "releases"],
+      user: ["user", "users", "user access"],
     }
 
     const matchedEntityTypes = Object.entries(entityTypeAliases)
@@ -248,14 +253,34 @@ export async function _getDataVersionSummaries(params?: DataVersionSummaryParams
       latestVersionMap.set(`${row.entityType}:${row.entityId}`, Number(row.latestVersion))
     }
 
-    const summaries: DataVersionSummary[] = paginatedVersions.map((dv) =>
-      buildDataVersionSummary({
+    // Classified from ALL rows of each version, not from the (possibly filtered) counts above.
+    const kinds = await db
+      .select({
+        dataVersion: changeLogs.dataVersion,
+        hasContent: sql<boolean>`bool_or(${changeLogs.entityType} not in ('user', 'release'))`,
+        hasUser: sql<boolean>`bool_or(${changeLogs.entityType} = 'user')`,
+      })
+      .from(changeLogs)
+      .where(inArray(changeLogs.dataVersion, paginatedVersions))
+      .groupBy(changeLogs.dataVersion)
+    const accessOnly = new Set(kinds.filter((k) => k.hasUser && !k.hasContent).map((k) => Number(k.dataVersion)))
+
+    const [latestContentRes] = await db
+      .select({ v: sql<number>`max(${changeLogs.dataVersion})` })
+      .from(changeLogs)
+      .where(sql`${changeLogs.entityType} not in ('user', 'release') and ${changeLogs.dataVersion} is not null`)
+    const latestContentDataVersion = Number.isFinite(latestContentRes?.v) ? Number(latestContentRes.v) : null
+
+    const summaries: DataVersionSummary[] = paginatedVersions.map((dv) => ({
+      ...buildDataVersionSummary({
         dataVersion: dv,
         versionLogs: grouped.get(dv) || [],
         latestDataVersion,
         latestVersionMap,
       }),
-    )
+      isAccessOnly: accessOnly.has(dv),
+      isLatestContentVersion: latestContentDataVersion !== null && dv === latestContentDataVersion,
+    }))
 
     return {
       data: summaries,

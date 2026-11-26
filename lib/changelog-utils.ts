@@ -19,6 +19,7 @@ export const CHANGELOG_ENTITY_TYPE_LABELS: Record<string, string> = {
   alias: "Alias",
   hospital: "Hospital",
   release: "Release",
+  user: "User access",
 }
 
 export function getChangelogEntityTypeLabel(entityType: string): string {

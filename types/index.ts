@@ -237,6 +237,7 @@ export type Script = {
     description: string;
     hospitalId: string;
     exportable: boolean;
+    idType: "nuid" | "muid";
     eligibilityCriteria: EligibilityCriteria | null;
     nuidSearchEnabled: boolean;
     publishDate: boolean;

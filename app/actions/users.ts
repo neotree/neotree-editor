@@ -3,7 +3,8 @@
 import bcrypt from 'bcrypt';
 
 import { 
-    _deleteUsers, 
+    _deactivateUsers,
+    _reactivateUsers,
     _createUsers,
     _updateUsers,
     _resetUsersPasswords,
@@ -17,6 +18,7 @@ import {
     GetUserParams, 
 } from "@/databases/queries/users";
 import logger from "@/lib/logger";
+import { DEACTIVATED_ACCOUNT_MESSAGE, isUserDeactivated } from "@/lib/user-status";
 // import { sendMail } from "@/mailer";
 // import { getUserDeletedEmail } from "@/mailer/get-user-deleted-email";
 // import { getUserOnboardingEmail } from "@/mailer/get-user-onboarding-email";
@@ -97,19 +99,32 @@ export const searchUsers: typeof _getUsers = async (...args) => {
     }
 };
 
-export async function deleteUsers(userIds: string[]) {
+const DELETE_USERS_DISABLED_MESSAGE = 'Deleting users is disabled because their work is linked across the system. Deactivate the user instead.';
+
+async function requireUserAdmin() {
+    const auth = await isAllowed('users_page');
+    if (!auth.yes) throw new Error('You are not allowed to manage users.');
+    return auth;
+}
+
+export async function deactivateUsers(userIds: string[]) {
+    const auth = await requireUserAdmin();
+
+    const ids = (userIds || []).filter(id => id !== auth.user?.userId);
+    if (!ids.length) throw new Error('You cannot deactivate your own account.');
+
+    return await _deactivateUsers({ userIds: ids, actorUserId: auth.user!.userId, });
+}
+
+export async function reactivateUsers(userIds: string[]) {
+    const auth = await requireUserAdmin();
+    return await _reactivateUsers({ userIds: userIds || [], actorUserId: auth.user!.userId, });
+}
+
+/** Deleting is switched off: users are deactivated instead (see deactivateUsers). */
+export async function deleteUsers(_userIds: string[]): Promise<boolean> {
     await isAllowed('delete_users');
-
-    if (userIds.length) {
-        const { data: users } = await _getUsers({ userIds, });
-        await _deleteUsers(userIds);
-        // await Promise.all(users.filter(u => u.activationDate).map(u => sendMail({
-        //     toEmail: u.email,
-        //     ...getUserDeletedEmail({ name: u.displayName, }),
-        // })));
-    }
-
-    return true;
+    throw new Error(DELETE_USERS_DISABLED_MESSAGE);
 }
 
 export const createUsers: typeof _createUsers = async (...args) => {
@@ -159,6 +174,9 @@ export const setPassword = async (params: {
     try {
         if (!params.password) throw new Error('Missing: password');
         if (!params.email) throw new Error('Missing: email');
+
+        const existing = await _getUser(params.email);
+        if (isUserDeactivated(existing)) throw new Error(DEACTIVATED_ACCOUNT_MESSAGE);
 
         if (params.password.length < 6) throw new Error('Password is too short: min 6 characters');
 

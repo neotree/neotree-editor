@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
-import { CheckCircle } from "lucide-react";
+import { Ban, CheckCircle } from "lucide-react";
 import moment from "moment";
 import axios from "axios";
 
 import { 
     getUsers, 
-    deleteUsers, 
     getUser, 
     updateUsers, 
     createUsers,
@@ -33,13 +32,13 @@ import { useAppContext } from "@/contexts/app";
 import { UserAction } from "./action";
 import { Header } from "./header";
 import { BulkEdit } from "./bulk-edit";
+import { AccessHistory } from "./access-history";
 
 type Props = {
     user?: Awaited<ReturnType<typeof getUser>>;
     users: Awaited<ReturnType<typeof getUsers>>;
     roles: Awaited<ReturnType<typeof getRoles>>;
     getUsers: typeof getUsers;
-    deleteUsers: typeof deleteUsers;
     getUser: typeof getUser;
     updateUsers: typeof updateUsers;
     createUsers: typeof createUsers;
@@ -52,7 +51,6 @@ export function UsersTable({
     roles, 
     user,
     getUsers: _getUsers, 
-    deleteUsers, 
     getUser,
     updateUsers,
     createUsers,
@@ -65,6 +63,7 @@ export function UsersTable({
     const [users, setUsers] = useState(initialData);
     const [loading, setLoading] = useState(false);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
+    const [historyUser, setHistoryUser] = useState<{ userId: string; name: string; } | null>(null);
 
     const { confirm } = useConfirmModal();
     const disabled = useMemo(() => (mode === 'view'), [mode]);
@@ -110,19 +109,22 @@ export function UsersTable({
         setLoading(false);
     }, [_getUsers, searchParams, initialData]);
 
-    const onDelete = useCallback((userIds: string[], cb?: () => void) => {
+    const changeStatus = useCallback((kind: 'deactivate' | 'reactivate', userIds: string[], cb?: () => void) => {
         if (disabled) return;
 
         const names = users.data.filter(u => userIds.includes(u.userId)).map(u => u.displayName);
+        const deactivating = kind === 'deactivate';
+        const many = names.length > 1;
         confirm(() => {
             (async () => {
                 try {
                     setLoading(true);
 
-                    // await deleteUsers(userIds);
-
                     // TODO: replace with server action
-                    await axios.delete('/api/users?data=' + JSON.stringify(userIds));
+                    const res = await axios.post(`/api/users/${kind}`, { usersIds: userIds, });
+                    if (res.data?.errors?.length) throw new Error(res.data.errors.join(', '));
+
+                    toast.success((many ? 'Users ' : 'User ') + (deactivating ? 'deactivated' : 'reactivated'));
 
                     await getUsers();
 
@@ -134,13 +136,23 @@ export function UsersTable({
                 }
             })();
         }, {
-            title: 'Delete ' + (names.length > 1 ? 'users' : 'user'),
-            message: `<p>Are you sure you want to delete:</p> ${names.map(n => `<div class="font-bold text-danger">${n}</div>`).join('')}`,
+            title: (deactivating ? 'Deactivate ' : 'Reactivate ') + (many ? `${names.length} users` : names[0] || 'user'),
+            message: (() => {
+                const esc = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+                const who = names.map(n => `<div class="rounded-md border px-3 py-2 font-semibold">${esc(n)}</div>`).join('');
+                const subject = many ? 'These users' : 'This user';
+                const intro = deactivating ?
+                    `${subject} will be signed out and will not be able to sign in to the editor or the mobile app until ${many ? 'they are reactivated' : 'reactivated'}.`
+                    :
+                    `${subject} will be able to sign in again.`;
+                const note = deactivating ? `<p class="text-sm text-muted-foreground">All existing work is kept.</p>` : '';
+                return `<div class="flex flex-col gap-3 text-left">${who}<p>${intro}</p>${note}</div>`;
+            })(),
             negativeLabel: 'Cancel',
-            positiveLabel: 'Delete',
-            danger: true,
+            positiveLabel: deactivating ? 'Deactivate' : 'Reactivate',
+            danger: deactivating,
         });
-    }, [confirm, deleteUsers, getUsers, users, disabled]);
+    }, [confirm, getUsers, users, disabled]);
 
     const onResetPasswords = useCallback((usersIds: string[], cb?: () => void) => {
         if (disabled) return;
@@ -197,6 +209,8 @@ export function UsersTable({
             {loading && <Loader overlay />}
 
             {bulkEditForm}
+
+            <AccessHistory user={historyUser} onClose={() => setHistoryUser(null)} />
             
             <div className="flex flex-col">
                 <DataTable
@@ -213,7 +227,6 @@ export function UsersTable({
                             roles={roles}
                             disabled={disabled}
                             selected={selectedIndexes.map(i => users.data[i].userId)}
-                            onDelete={onDelete}
                             getUsers={getUsers}
                             searchUsers={searchUsers}
                         />
@@ -236,6 +249,20 @@ export function UsersTable({
                             align: 'right',
                             cellRenderer(cell) {
                                 const u = users.data[cell.rowIndex];
+                                if (u.deactivatedAt) {
+                                    return (
+                                        <TooltipProvider delayDuration={0}>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Ban className="text-danger w-4 h-4" />
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p className="text-xs text-muted-foreground">Deactivated: {moment(u.deactivatedAt).format('LLL')}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    );
+                                }
                                 return (
                                     <TooltipProvider delayDuration={0}>
                                         <Tooltip>
@@ -265,7 +292,10 @@ export function UsersTable({
                                         userName={u.displayName}
                                         isActivated={!!u.activationDate}
                                         disabled={disabled}
-                                        onDelete={() => onDelete([u.userId])}
+                                        isDeactivated={!!u.deactivatedAt}
+                                        onDeactivate={() => changeStatus('deactivate', [u.userId])}
+                                        onReactivate={() => changeStatus('reactivate', [u.userId])}
+                                        onViewHistory={() => setHistoryUser({ userId: u.userId, name: u.displayName, })}
                                         onResetPasswords={() => onResetPasswords([u.userId])}
                                     />
                                 );

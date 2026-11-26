@@ -5,8 +5,20 @@ import db from '@/databases/pg/drizzle';
 import { devices } from '@/databases/pg/schema';
 import socket from '@/lib/socket';
 import { _getUniqueDeviceHash } from '@/databases/queries/devices';
+
+async function deviceIdExists(deviceId: string) {
+    const [{ n }] = await db.select({ n: count() }).from(devices).where(eq(devices.deviceId, deviceId));
+    return !!n;
+}
 import { DeviceDetails } from '@/types';
 import { describeError } from '@/lib/server/db-errors';
+import { mergeDeviceDetails } from '@/lib/device-uid';
+
+/** A unique-constraint violation (Postgres 23505), however deep the driver nests it. */
+const isUniqueViolation = (e: any): boolean => {
+    for (let c = e, depth = 0; c && depth < 5; c = c.cause, depth++) if (c.code === '23505') return true;
+    return false;
+};
 
 export type SaveDevicesData = Omit<typeof devices.$inferInsert, 'deviceHash'> & {
     deviceHash?: string;
@@ -41,42 +53,43 @@ export async function _saveDevices({ data, returnSaved, }: {
 
         for (const { deviceId, ...item } of updateData) {
             try {
-                const q = db.update(devices).set(item).where(or(
-                    eq(devices.deviceId, deviceId)
-                ));
+                // Merge details and never lower the session count: the row is locked so two tablets'
+                // uploads (or a stale one arriving late) cannot overwrite each other.
+                const updated = await db.transaction(async tx => {
+                    const [current] = await tx.select({ details: devices.details }).from(devices).where(eq(devices.deviceId, deviceId)).for('update');
+                    const set = item.details === undefined ? item : { ...item, details: mergeDeviceDetails(current?.details as DeviceDetails, item.details as DeviceDetails) };
+                    return tx.update(devices).set(set).where(eq(devices.deviceId, deviceId)).returning();
+                });
 
                 if (returnSaved) {
-                    const inserted = await q.returning();
-                    response.inserted = inserted.map(d => ({
+                    response.inserted.push(...updated.map(d => ({
                         ...d,
                         details: d.details as DeviceDetails,
-                    }));
-                } else {
-                    await q.execute();
+                    })));
                 }
             } catch(e: any) {
                 errors.push(describeError(e));
             }
         }
 
-        if (insertData.length) {
-            const _insertData: typeof devices.$inferInsert[] = [];
-
-            for(const d of insertData) {
-                const deviceHash = await _getUniqueDeviceHash(d.deviceId);
-                _insertData.push({ ...d, deviceHash, });
-            }
-
-            const q = db.insert(devices).values(_insertData);
-
-            if (returnSaved) {
-                const inserted = await q.returning();
-                response.inserted = inserted.map(d => ({
-                    ...d,
-                    details: d.details as DeviceDetails,
-                }));
-            } else {
-                await q.execute();
+        for (const d of insertData) {
+            // Two tablets registering at once can pick the same free hash; the unique constraint
+            // rejects the second, which then simply picks again.
+            for (let attempt = 1; ; attempt++) {
+                try {
+                    const deviceHash = await _getUniqueDeviceHash(d.deviceId);
+                    const inserted = await db.insert(devices).values({ ...d, deviceHash, }).returning();
+                    if (returnSaved) {
+                        response.inserted.push(...inserted.map(r => ({
+                            ...r,
+                            details: r.details as DeviceDetails,
+                        })));
+                    }
+                    break;
+                } catch(e: any) {
+                    if (attempt < 5 && isUniqueViolation(e) && !(await deviceIdExists(d.deviceId))) continue;
+                    throw e;
+                }
             }
         }
 
