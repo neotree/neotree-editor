@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import queryString from "query-string";
 
-import { _getSessions } from "@/databases/queries/sessions";
 import logger from "@/lib/logger";
 import { isAuthenticated } from "@/app/actions/is-authenticated";
 import { getLogs } from "@/app/actions/logs";
