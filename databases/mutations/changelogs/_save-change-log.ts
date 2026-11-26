@@ -19,7 +19,7 @@ import {
   scripts,
 } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
-import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback"
+import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback-hash"
 import { lockChangeLogChain } from "./_rollback-shared"
 
 export type SaveChangeLogData = {
@@ -88,8 +88,9 @@ type EntityFetchConfig = {
 }
 
 type EntityType = SaveChangeLogData["entityType"]
-const VERSIONLESS_ENTITY_TYPES: EntityType[] = ["alias", "release"]
-const NO_FK_ENTITY_TYPES: EntityType[] = ["release"]
+// "user" entries record who switched an account on or off; the user is not a versioned entity and has no FK column
+const VERSIONLESS_ENTITY_TYPES: EntityType[] = ["alias", "release", "user"]
+const NO_FK_ENTITY_TYPES: EntityType[] = ["release", "user"]
 const VERSIONED_ENTITY_TYPES = [
   "script",
   "screen",

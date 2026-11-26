@@ -4,6 +4,8 @@ import db from "@/databases/pg/drizzle";
 import { scripts, screens, hospitals, scriptsDrafts, problems, diagnoses } from "@/databases/pg/schema";
 import { DiagnosisSymptom, ScriptField, FileReference, ScriptItem } from "@/types";
 import * as uuid from "uuid";
+import { getFractionStorageKeys } from "@/lib/fraction-data-keys";
+import { nuidSearchOptions } from "@/constants/fields"
 
 export type GetScriptsMetadataParams = {
     scriptsIds?: string[];
@@ -23,6 +25,8 @@ export type GetScriptsMetadataResponse = {
             ref: string;
             condition?: typeof screens.$inferSelect['condition'];
             skipToCondition?: typeof screens.$inferSelect['skipToCondition'];
+            foundInAdmissionSearches: boolean;
+            foundInTwinSearches: boolean;
             skipToScreen?: {
                 screenId: string;
                 position: number | null;
@@ -55,6 +59,8 @@ export type GetScriptsMetadataResponse = {
             fields: {
                 label: string;
                 key: string;
+                foundInAdmissionSearches: boolean;
+                foundInTwinSearches: boolean;
                 type: string;
                 dataType: string | null;
                 value?: any;
@@ -65,6 +71,8 @@ export type GetScriptsMetadataResponse = {
                 minValue?: string | number | null;
                 maxValue?: string | number | null;
                 condition?: string | null;
+                /** Set on the two number fields a fraction field exports as: the fraction's own key. */
+                fractionKey?: string;
                 options?: {
                     value: string;
                     valueLabel: string;
@@ -423,6 +431,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         minValue: screen.minValue,
                                         maxValue: screen.maxValue,
                                         condition: screen.condition || '',
+                                        foundInAdmissionSearches: (screen.prePopulate || []).includes('admissionSearches') || 
+                                            (screen.prePopulate || []).includes('allSearches'),
+                                        foundInTwinSearches: (screen.prePopulate || []).includes('twinSearches') ||
+                                            (screen.prePopulate || []).includes('allSearches'),
                                     };
                             }
                         })(),
@@ -447,6 +459,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 confidential: screen.confidential,
                                 confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
+                                foundInAdmissionSearches: (screen.prePopulate || []).includes('admissionSearches') || 
+                                    (screen.prePopulate || []).includes('allSearches'),
+                                foundInTwinSearches: (screen.prePopulate || []).includes('twinSearches') ||
+                                    (screen.prePopulate || []).includes('allSearches'),
                                 options: [
                                     {
                                         value: 'true',
@@ -471,6 +487,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
+                                foundInAdmissionSearches: (screen.prePopulate || []).includes('admissionSearches') || 
+                                    (screen.prePopulate || []).includes('allSearches'),
+                                foundInTwinSearches: (screen.prePopulate || []).includes('twinSearches') ||
+                                    (screen.prePopulate || []).includes('allSearches'),
                             }];
                             break;
 
@@ -485,6 +505,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
+                                foundInAdmissionSearches: (screen.prePopulate || []).includes('admissionSearches') || 
+                                    (screen.prePopulate || []).includes('allSearches'),
+                                foundInTwinSearches: (screen.prePopulate || []).includes('twinSearches') ||
+                                    (screen.prePopulate || []).includes('allSearches'),
                             }];
                             break;
 
@@ -521,6 +545,37 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         break;
                                     default:
                                         dataType = f.dataType;
+                                }
+
+                                // A fraction is stored as two numbers under keys of their own
+                                // (lib/fraction-data-keys.ts), so it exports as two number fields.
+                                if (f.type === 'fraction') {
+                                    const { numeratorKey, denominatorKey } = getFractionStorageKeys(f.key);
+                                    const numeratorLabel = `${f.numeratorLabel || ''}`.trim() || 'numerator';
+                                    const denominatorLabel = `${f.denominatorLabel || ''}`.trim() || 'denominator';
+                                    const part = (key: string, partLabel: string, minValue: any, maxValue: any) => ({
+                                        label: `${f.label || f.key} (${partLabel})`,
+                                        key,
+                                        type: 'number',
+                                        dataType: 'number',
+                                        value: null,
+                                        valueLabel: null,
+                                        optional: f.optional,
+                                        confidential: f.confidential,
+                                        confidentialLabelOnly: f.confidentialLabelOnly,
+                                        foundInAdmissionSearches: (f.prePopulate || []).includes('admissionSearches') || 
+                                            (f.prePopulate || []).includes('allSearches'),
+                                        foundInTwinSearches: (f.prePopulate || []).includes('twinSearches') ||
+                                            (f.prePopulate || []).includes('allSearches'),
+                                        minValue,
+                                        maxValue,
+                                        condition: f.condition || '',
+                                        fractionKey: f.key,
+                                    });
+                                    return [
+                                        part(numeratorKey, numeratorLabel, f.minValue, f.maxValue),
+                                        part(denominatorKey, denominatorLabel, f.denominatorMinValue, f.denominatorMaxValue),
+                                    ];
                                 }
 
                                 if (['multi_select', 'dropdown'].includes(f.type)) {
@@ -571,6 +626,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                         confidentialLabelOnly: f.confidentialLabelOnly,
                                         condition: f.condition || '',
                                         options,
+                                        foundInAdmissionSearches: (f.prePopulate || []).includes('admissionSearches') || 
+                                            (f.prePopulate || []).includes('allSearches'),
+                                        foundInTwinSearches: (f.prePopulate || []).includes('twinSearches') ||
+                                            (f.prePopulate || []).includes('allSearches'),
                                     }];
                                 }
 
@@ -587,6 +646,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                     minValue: f.minValue ?? f.minDate ?? f.minTime,
                                     maxValue: f.maxValue ?? f.maxDate ?? f.maxTime,
                                     condition: f.condition || '',
+                                    foundInAdmissionSearches: (f.prePopulate || []).includes('admissionSearches') || 
+                                        (f.prePopulate || []).includes('allSearches'),
+                                    foundInTwinSearches: (f.prePopulate || []).includes('twinSearches') ||
+                                        (f.prePopulate || []).includes('allSearches'),
                                 }];
                             });
                             fields = formFields.reduce((acc, f) => {
@@ -605,6 +668,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
+                                foundInAdmissionSearches: (screen.prePopulate || []).includes('admissionSearches') || 
+                                    (screen.prePopulate || []).includes('allSearches'),
+                                foundInTwinSearches: (screen.prePopulate || []).includes('twinSearches') ||
+                                    (screen.prePopulate || []).includes('allSearches'),
                             }];
                             break;
 
@@ -619,6 +686,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                                 confidentialLabelOnly: screen.confidentialLabelOnly,
                                 condition: screen.condition || '',
                                 options: screenOptions,
+                                foundInAdmissionSearches: (screen.prePopulate || []).includes('admissionSearches') || 
+                                    (screen.prePopulate || []).includes('allSearches'),
+                                foundInTwinSearches: (screen.prePopulate || []).includes('twinSearches') ||
+                                    (screen.prePopulate || []).includes('allSearches'),
                             }];
                             break;
                         default:
@@ -636,6 +707,10 @@ export async function _getScriptsMetadata(params?: GetScriptsMetadataParams): Pr
                         managementMetadata,
                         fields,
                         items: screen.type === 'multi_select' ? undefined : screenItems,
+                        foundInAdmissionSearches: (screen.prePopulate || []).includes('admissionSearches') || 
+                            (screen.prePopulate || []).includes('allSearches'),
+                        foundInTwinSearches: (screen.prePopulate || []).includes('twinSearches') ||
+                            (screen.prePopulate || []).includes('allSearches'),
                     };
                 }),
             });

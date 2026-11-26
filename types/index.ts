@@ -24,6 +24,27 @@ export type Preferences = {
     enableSeverityRanking?: boolean;
 };
 
+/**
+ * Table display of a repeatable form screen (NEOAPP-1575). The screen's fields are the
+ * columns (the field label is the column heading) and each collection entry is a row.
+ * null / undefined = the screen is shown as an ordinary repeatable form.
+ */
+export type ScreenTableConfig = {
+    /** Name of the table, shown above it on the app and on the printout. Required. */
+    title: string;
+    /** dynamic: rows are added while capturing. fixed: one row per configured heading. */
+    rowMode: 'dynamic' | 'fixed';
+    /** Heading of the row-headings column (fixed rows only), e.g. "Pregnancy". */
+    rowsHeading: string;
+    /** Row headings, in order (fixed rows only). */
+    rows: { rowId: string; label: string; }[];
+    /** Limits on the number of rows (dynamic rows only). Empty = no limit. */
+    minRows?: number | null;
+    maxRows?: number | null;
+};
+
+export type ScriptPrintOrientation = 'portrait' | 'landscape';
+
 export type PrintSection = {
     sectionId: string;
     title: string;
@@ -95,6 +116,16 @@ export type ScriptField = {
     maxDateKeyId?: string;
     minTimeKeyId?: string;
     maxTimeKeyId?: string;
+    /**
+     * Fraction fields only (e.g. blood pressure 120 / 80). The labels of the two numbers are
+     * copied from the field's fraction data key; minValue / maxValue limit the numerator.
+     */
+    numeratorLabel?: string;
+    denominatorLabel?: string;
+    /** Table screens only: the column heading, when it should differ from the label. */
+    tableHeading?: string;
+    denominatorMinValue?: string;
+    denominatorMaxValue?: string;
     values: string;
     unit?: string;
     valuesOptions: {
@@ -206,6 +237,7 @@ export type Script = {
     description: string;
     hospitalId: string;
     exportable: boolean;
+    idType: "nuid" | "muid";
     eligibilityCriteria: EligibilityCriteria | null;
     nuidSearchEnabled: boolean;
     publishDate: boolean;

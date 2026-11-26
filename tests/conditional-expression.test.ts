@@ -847,28 +847,21 @@ assert.equal(
   "multi_select membership has no type warning",
 );
 
-// ---- Reference expressions are EXEMPT from validation -----------------------
-// Reference/calculation expressions use a free-form MATH/arithmetic grammar the
-// checker doesn't model, so they are intentionally never flagged (no errors or
-// warnings) regardless of content.
+// ---- Reference expressions are validated (see tests/calculation.test.ts for depth) ----
 
 const refDiags = (input: string) => validateReferenceExpression(input, ctx).diagnostics;
 
-assert.equal(refDiags("$Weight").length, 0, "reference expressions are exempt");
-assert.equal(refDiags("SUM($Weight, $Height)").length, 0, "SUM ref exempt");
-assert.equal(refDiags("SUM($Nope)").length, 0, "unknown key in a reference is not flagged (exempt)");
-assert.equal(refDiags("SUMM($Weight)").length, 0, "unknown function is not flagged (exempt)");
-assert.equal(refDiags("SUM($Weight").length, 0, "unbalanced paren is not flagged (exempt)");
+assert.equal(refDiags("$Weight").length, 0, "valid reference is clean");
+assert.equal(refDiags("SUM($Weight, $Height)").length, 0, "SUM ref is clean");
+assert.equal(refDiags("SUM($Nope)").some((d) => d.code === "UNKNOWN_KEY"), true, "unknown key in a reference is flagged");
+assert.equal(refDiags("SUMM($Weight)").some((d) => d.code === "UNKNOWN_FUNCTION" || d.severity === "error"), true, "unknown function is flagged");
+assert.equal(validateReferenceExpression("SUM($Weight", ctx).hasErrors, true, "unbalanced paren is an error");
 assert.equal(
-  refDiags("MATH(Math.floor($Gestation) + Math.round(($Age / 24) % 7) / 10)").length,
+  refDiags("MATH(Math.floor($Gestation) + Math.round(($Weight / 24) % 7) / 10)").length,
   0,
-  "MATH/arithmetic reference expressions are not flagged (exempt)",
+  "MATH reference expressions are clean",
 );
-assert.equal(
-  validateReferenceExpression("MATH($A + $B * 2.5)", ctx).hasErrors,
-  false,
-  "reference expressions never report errors",
-);
+assert.equal(validateReferenceExpression("MATH($Weight + $Height * 2.5)", ctx).hasErrors, false, "valid MATH has no errors");
 
 // ---- mergeConditionKeys -----------------------------------------------------
 

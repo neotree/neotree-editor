@@ -425,7 +425,9 @@ export function ScriptsTable(props: Props) {
                                         setScriptsIdsToExport={() => setScriptsIdsToExport([s.scriptId])}
                                         onDelete={() => onDelete([s.scriptId])}
                                         onDuplicate={() => onDuplicate([s.scriptId])}
-                                        onArchive={() => onArchive([s.scriptId])}
+                                        onArchive={() => onArchive([s.scriptId], {
+                                            action: s.archived ? 'unarchive' : 'archive',
+                                        })}
                                     />
                                 );
                             },

@@ -1,7 +1,9 @@
 import type { Config } from "tailwindcss"
 
+import { tailwindV3Palette } from "./tailwind.v3-palette"
+
 const config = {
-    darkMode: ["class"],
+    darkMode: "class",
     content: [
         './pages/**/*.{ts,tsx}',
         './components/**/*.{ts,tsx}',
@@ -19,6 +21,7 @@ const config = {
         },
         extend: {
             colors: {
+                ...tailwindV3Palette,
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
                 ring: "hsl(var(--ring))",

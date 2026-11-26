@@ -1,5 +1,7 @@
+import { normaliseScriptIdType } from "@/lib/script-id-type";
 import { configKeys, diagnoses, problems, screens, scripts } from "@/databases/pg/schema";
 import { ScreenReviewField, ScriptField } from "@/types";
+import { tableLegacyCollectionLabel } from "@/lib/screen-table-config";
 
 export function mapNewConfigKeysToOld(s: typeof configKeys.$inferSelect) {
     return {
@@ -190,8 +192,11 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                 text1: s.text1,
                 text2: s.text2,
                 repeatable: s.repeatable,
-                collectionLabel: s.collectionLabel,
+                // A table saved before it set one still needs a collection label on older apps.
+                collectionLabel: s.collectionLabel || (s.repeatable && s.tableConfig ? tableLegacyCollectionLabel(s.fields as any) : s.collectionLabel),
                 collectionName: s.collectionName,
+                // Only a repeatable form can be a table; null = ordinary form.
+                tableConfig: s.repeatable ? (s.tableConfig || null) : null,
                 image1: !s.image1 ? null : {
                     ...s.image1,
                     data: s.image1?.data?.replaceAll?.('api/files', 'file')?.split?.('?')[0] || s.image1,
@@ -240,6 +245,8 @@ export function mapNewScriptToOld(s: typeof scripts.$inferSelect) {
             deletedAt: s.deletedAt,
             type: s.type,
             exportable: s.exportable,
+            // "nuid" | "muid": the app generates and checks this kind of session ID for the script.
+            idType: normaliseScriptIdType((s as { idType?: unknown }).idType),
             hospital: s.hospitalId,
             printTitle: s.printTitle,
             id: s.id,

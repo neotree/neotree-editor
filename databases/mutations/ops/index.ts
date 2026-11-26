@@ -6,6 +6,7 @@ import { configKeys, dataKeys, diagnoses, problems, drugsLibrary, pendingDeletio
 import logger from "@/lib/logger";
 import socket from "@/lib/socket";
 import { describeError } from "@/lib/server/db-errors";
+import { _removeScreenReferencesFromReviews } from "@/databases/mutations/scripts/_review_references";
 
 export async function _clearPendingDeletion(params?: {
     items?: 'screens' | 'scripts' | 'diagnoses' | 'problems' | 'configKeys' | 'drugsLibrary' | 'dataKeys',
@@ -120,9 +121,22 @@ export async function _processPendingDeletion(params?: {
         const _screens = await rowsFor('screens', isNotNull(pendingDeletion.screenId));
 
         if (_screens.length) {
+            const screenIds = _screens.map(c => c.screenId!);
+
             await executor.update(screens)
                 .set({ deletedAt: new Date(), })
-                .where(inArray(screens.screenId, _screens.map(c => c.screenId!)));
+                .where(inArray(screens.screenId, screenIds));
+
+            // A deleted screen can't stay in a script's Screen review list, published or draft.
+            const oldIds = await executor
+                .select({ oldScreenId: screens.oldScreenId })
+                .from(screens)
+                .where(inArray(screens.screenId, screenIds));
+            await _removeScreenReferencesFromReviews({
+                removedIds: [...screenIds, ...oldIds.map(r => r.oldScreenId || '')],
+                includePublished: true,
+                client: executor,
+            });
         }
 
         const _diagnoses = await rowsFor('diagnoses', isNotNull(pendingDeletion.diagnosisId));

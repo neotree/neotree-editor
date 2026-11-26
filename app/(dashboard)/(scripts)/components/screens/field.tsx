@@ -39,11 +39,12 @@ import { useField } from "../../hooks/use-field"
 import { FieldItems } from "./field-items"
 import { useAlertModal } from "@/hooks/use-alert-modal"
 import { ConditionalExpressionModal } from "@/components/conditional-expression-modal"
-import { ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
+import { CalculationEditor, ConditionEditor, useConditionKeys } from "@/components/conditional-expression"
 import { useFieldKeyCollisions } from "@/components/field-key-collisions"
 import { useConfirmModal } from "@/hooks/use-confirm-modal"
 import { collectNewOutcomeKeyCollisions, type ConditionKey } from "@/lib/conditional-expression"
 import { ParentKeyOptionsHint } from "./parent-key-options-hint"
+import { fractionFieldPatch, getFractionStorageKeys } from "@/lib/fraction-data-keys"
 
 type Props = {
   open: boolean
@@ -52,6 +53,8 @@ type Props = {
     index: number
     data: FieldType
   }
+  /** The field is a column of a table screen: worded as a column and given a column heading. */
+  isColumn?: boolean
   /** Persisted field used to grandfather only pre-existing key collisions. */
   baselineField?: FieldType
   form: ReturnType<typeof useScreenForm>
@@ -60,7 +63,7 @@ type Props = {
   unavailableOutcomeKeys?: Record<string, string>
 }
 
-export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
+export function Field<P = {}>({ open, field: fieldProp, baselineField, isColumn, form, scriptId, unavailableOutcomeKeys, disabled: disabledProp, onClose }: Props & P) {
   const { confirm: confirmDiscard } = useConfirmModal()
   const { extractDataKeys } = useDataKeysCtx()
   const { alert } = useAlertModal()
@@ -126,6 +129,8 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
   const valuesOptions = watch("valuesOptions")
   const editable = watch("editable")
   const printDisplayColumns = watch('printDisplayColumns');
+  const numeratorLabel = watch("numeratorLabel")
+  const denominatorLabel = watch("denominatorLabel")
   const reservedKeyCollisions = useMemo(
     () => collectNewOutcomeKeyCollisions(
       { screens: [{ type: "form", fields: [{ fieldId: field?.fieldId, key, label, items }] }] },
@@ -178,6 +183,8 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
   const isNumberField = useMemo(() => type === "number", [type])
   const isDropdownField = useMemo(() => type === "dropdown", [type])
   const isMultiSelectField = useMemo(() => type === "multi_select", [type])
+  const isFractionField = useMemo(() => type === "fraction", [type])
+
 
   const getAlias = useCallback(async (name: string) => {
     if (!name) return
@@ -247,6 +254,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
 
     const normalizedData = {
       ...data,
+      tableHeading: `${data.tableHeading || ""}`.trim(),
       minLength: normalizedMinLength.value,
       maxLength: normalizedMaxLength.value,
     }
@@ -306,12 +314,28 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
     }
   }, [confidentialLabelOnly, inheritedConfidentialLabelOnly, setValue]);
 
+  // A fraction field shows its data key's numerator and denominator labels (same rule as above:
+  // following the key on load is not an edit).
+  const inheritedNumeratorLabel = useMemo(() => fractionFieldPatch(dataKey).numeratorLabel, [dataKey])
+  const inheritedDenominatorLabel = useMemo(() => fractionFieldPatch(dataKey).denominatorLabel, [dataKey])
+
+  useEffect(() => {
+    if (!isFractionField || !dataKey) return
+    if ((numeratorLabel || "") !== (inheritedNumeratorLabel || "")) {
+      setValue("numeratorLabel", inheritedNumeratorLabel || "", { shouldDirty: false, })
+    }
+    if ((denominatorLabel || "") !== (inheritedDenominatorLabel || "")) {
+      setValue("denominatorLabel", inheritedDenominatorLabel || "", { shouldDirty: false, })
+    }
+  }, [isFractionField, dataKey, numeratorLabel, denominatorLabel, inheritedNumeratorLabel, inheritedDenominatorLabel, setValue]);
+
   const isKeyDisabled = disabled || !!field;
 
   return (
     <>
       <Modal
         open={open}
+        contentProps={{ className: "sm:max-w-2xl" }}
         onOpenChange={(open) => {
           const applyOpenChange = () => {
             if (!open) onClose()
@@ -322,7 +346,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
           if (!open && fieldFormIsDirty) {
             confirmDiscard(applyOpenChange, {
               title: "Discard changes?",
-              message: "Discard your changes to this field?",
+              message: `Discard your changes to this ${isColumn ? "column" : "field"}?`,
               positiveLabel: "Discard",
               negativeLabel: "Keep editing",
               danger: true,
@@ -331,7 +355,7 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
           }
           applyOpenChange()
         }}
-        title={field ? "Edit field" : "New field"}
+        title={isColumn ? (field ? "Edit column" : "New column") : (field ? "Edit field" : "New field")}
         actions={
           <>
             <span className={cn("text-danger text-xs", disabled && "hidden")}>* Required</span>
@@ -500,7 +524,85 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                 <p className="text-xs text-destructive">{reservedKeyCollisions[0].message}</p>
               )}
 
-              {(isTextField || isNumberField) && (
+              {isColumn && (
+                <div>
+                  <Label htmlFor="tableHeading">Column heading (optional)</Label>
+                  <Input
+                    {...register("tableHeading", { disabled })}
+                    name="tableHeading"
+                    noRing={false}
+                    placeholder={label || ""}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Shown at the top of this column. Leave empty to use the label.
+                  </span>
+                </div>
+              )}
+
+              {isFractionField && (
+                <>
+                  <span className="text-xs text-muted-foreground">
+                    A fraction is captured as two numbers shown together, e.g. blood pressure 120 / 80.
+                    The labels of the two numbers come from the data key and are edited in the data keys library.
+                    {!!`${key || ""}`.trim() && (
+                      <>
+                        {" "}The numbers are saved separately
+                        as <span className="font-mono">{getFractionStorageKeys(key).numeratorKey}</span> and{" "}
+                        <span className="font-mono">{getFractionStorageKeys(key).denominatorKey}</span>; use these keys in conditions.
+                      </>
+                    )}
+                  </span>
+
+                  <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                    <div className="sm:flex-1">
+                      <Label htmlFor="numeratorLabel">Numerator label</Label>
+                      <Input name="numeratorLabel" value={numeratorLabel || ""} disabled readOnly noRing={false} />
+                    </div>
+
+                    <div className="sm:flex-1">
+                      <Label htmlFor="denominatorLabel">Denominator label</Label>
+                      <Input name="denominatorLabel" value={denominatorLabel || ""} disabled readOnly noRing={false} />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-y-2">
+                    <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                      <div className="sm:flex-1">
+                        <Label htmlFor="minValue">{numeratorLabel || "Numerator"} min value</Label>
+                        <Input {...register("minValue", { disabled })} name="minValue" noRing={false} />
+                      </div>
+
+                      <div className="sm:flex-1">
+                        <Label htmlFor="maxValue">{numeratorLabel || "Numerator"} max value</Label>
+                        <Input {...register("maxValue", { disabled })} name="maxValue" noRing={false} />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-y-5 sm:gap-y-0 sm:flex-row sm:gap-x-2 sm:items-center">
+                      <div className="sm:flex-1">
+                        <Label htmlFor="denominatorMinValue">{denominatorLabel || "Denominator"} min value</Label>
+                        <Input {...register("denominatorMinValue", { disabled })} name="denominatorMinValue" noRing={false} />
+                      </div>
+
+                      <div className="sm:flex-1">
+                        <Label htmlFor="denominatorMaxValue">{denominatorLabel || "Denominator"} max value</Label>
+                        <Input {...register("denominatorMaxValue", { disabled })} name="denominatorMaxValue" noRing={false} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="format">Format</Label>
+                      <Input {...register("format", { disabled })} name="format" noRing={false} />
+                    </div>
+
+                    <span className="text-xs text-muted-foreground">
+                      Format: Add as many # as the number of decimal digits or leave empty
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {(isTextField || isNumberField || isFractionField) && (
                 <div>
                   <Label htmlFor="unit">Unit (optional)</Label>
                   <Input {...register("unit", { disabled })} name="unit" noRing={false} />
@@ -706,17 +808,17 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                 </>
               )}
 
-              {(isPeriodField || isNumberField) && (
+              {(isPeriodField || isNumberField || isDateField) && (
                 <>
                   <div>
-                    <Label htmlFor="calculation">Reference expression <ConditionalExpressionModal /></Label>
+                    <Label htmlFor="calculation">{isDateField ? "Date calculation" : "Reference expression"} <ConditionalExpressionModal /></Label>
                     <Controller
                       control={control}
                       name="calculation"
                       render={({ field: { value, onChange } }) => (
-                        <ConditionEditor
+                        <CalculationEditor
                           id="calculation"
-                          mode="reference"
+                          resultType={isDateField ? "date" : "number"}
                           rows={2}
                           value={value || ""}
                           onChange={onChange}
@@ -731,9 +833,10 @@ export function Field<P = {}>({ open, field: fieldProp, baselineField, form, scr
                         />
                       )}
                     />
-                    <span className="text-xs text-muted-foreground">
-                      Example: $key or SUM($key1,$key2...) or DIVIDE($key1,$key2...) or MULTIPLY($key1,$key2...) or
-                      SUBTRACT($key1,$key2...)
+                    <span className="mt-3 block text-xs text-muted-foreground">
+                      {isDateField
+                        ? "Example: $LMPDate + 280 days"
+                        : "Example: $key, SUM($a,$b), or plain language like $Weight plus $Height"}
                     </span>
                   </div>
                 </>

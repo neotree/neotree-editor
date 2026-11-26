@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from "next-auth/react";
-import { MoreVertical, Trash } from "lucide-react"
+import { MoreVertical, UserCheck, UserX } from "lucide-react"
 import Link from "next/link";
 
 import {
@@ -21,8 +21,11 @@ type Props = {
     userId: string;
     userName: string;
     isActivated: boolean;
+    isDeactivated: boolean;
     disabled?: boolean;
-    onDelete: () => void;
+    onDeactivate: () => void;
+    onReactivate: () => void;
+    onViewHistory: () => void;
     onResetPasswords: () => void;
 };
 
@@ -31,8 +34,11 @@ export function UserAction({
     userId,
     userName, 
     isActivated, 
+    isDeactivated,
     disabled: disabledProp,
-    onDelete, 
+    onDeactivate,
+    onReactivate,
+    onViewHistory,
     onResetPasswords,
 }: Props) {
     const session = useSession();
@@ -67,7 +73,7 @@ export function UserAction({
                     </DropdownMenuItem>
 
                     <DropdownMenuItem 
-                        disabled={isActivated}
+                        disabled={isActivated || isDeactivated}
                     >
                         Send activation code
                     </DropdownMenuItem>
@@ -80,16 +86,30 @@ export function UserAction({
                         Reset password
                     </DropdownMenuItem>
 
+                    <DropdownMenuItem onClick={() => setTimeout(() => onViewHistory(), 0)}>
+                        Access history
+                    </DropdownMenuItem>
+
                     <DropdownMenuSeparator />
 
-                    <DropdownMenuItem
-                        onClick={() => setTimeout(() => onDelete(), 0)}
-                        className="text-danger focus:bg-danger focus:text-danger-foreground"
-                        disabled={disabled || (email === session.data?.user?.email)}
-                    >
-                        <Trash className="mr-2 h-4 w-4" />
-                        <span>Delete</span>
-                    </DropdownMenuItem>
+                    {isDeactivated ? (
+                        <DropdownMenuItem
+                            onClick={() => setTimeout(() => onReactivate(), 0)}
+                            disabled={disabled}
+                        >
+                            <UserCheck className="mr-2 h-4 w-4" />
+                            <span>Reactivate</span>
+                        </DropdownMenuItem>
+                    ) : (
+                        <DropdownMenuItem
+                            onClick={() => setTimeout(() => onDeactivate(), 0)}
+                            className="text-danger focus:bg-danger focus:text-danger-foreground"
+                            disabled={disabled || (email === session.data?.user?.email)}
+                        >
+                            <UserX className="mr-2 h-4 w-4" />
+                            <span>Deactivate</span>
+                        </DropdownMenuItem>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
         </>

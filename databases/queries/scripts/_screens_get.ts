@@ -315,6 +315,8 @@ export type ListScreensResults = {
         screenId: typeof screens.$inferSelect['screenId'];
         oldScreenId: typeof screens.$inferSelect['oldScreenId'];
         position: typeof screens.$inferSelect['position'];
+        collectionName?: typeof screens.$inferSelect['collectionName'];
+        repeatable?: typeof screens.$inferSelect['repeatable'];
         isDraft: boolean;
         isDeleted: boolean;
     }[];
@@ -381,6 +383,8 @@ export async function _listScreens(
                     position: screens.position,
                     type: screens.type,
                     refId: screens.refId,
+                    collectionName: screens.collectionName,
+                    repeatable: screens.repeatable,
                 },
                 pendingDeletion: pendingDeletion,
             })

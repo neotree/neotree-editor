@@ -3,7 +3,6 @@ import { ExternalLink } from 'lucide-react';
 
 import * as scriptsActions from '@/app/actions/scripts';
 import * as configKeysActions from '@/app/actions/config-keys';
-import * as sessionsActions from '@/app/actions/sessions';
 import { Content } from '@/components/content';
 import { Button } from '@/components/ui/button';
 import { Title } from "@/components/title";
@@ -13,13 +12,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function DataSettingsPage() {
     const [
-        countSessions,
         countScripts,
         countDiagnoses,
         countScreens,
         countConfigKeys,
     ] = await Promise.all([
-        sessionsActions.countSessions(),
         scriptsActions.countScripts(),
         scriptsActions.countDiagnoses(),
         scriptsActions.countScreens(),
@@ -31,25 +28,6 @@ export default async function DataSettingsPage() {
             <Title>Data Settings</Title>
             
             <Content>
-                <StatsCard 
-                    mainCount={countSessions.total}
-                    title="Total sessions"
-                    errors={countSessions.errors}
-                    moreStats={[]}
-                >
-                        <Button 
-                            asChild
-                            variant="primary-outline"
-                        >
-                            <Link href="/sessions" target="_blank">
-                                View sessions
-                                <ExternalLink className="h-4 w-4 ml-2" />
-                            </Link>
-                        </Button>
-                </StatsCard>
-
-                <br />
-
                 <div
                     className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4"
                 >

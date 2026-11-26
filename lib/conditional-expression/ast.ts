@@ -35,6 +35,7 @@ export type DiagnosticCode =
   | "RESERVED_KEY_COLLISION"
   | "SELF_NOT_ALLOWED"
   | "TYPE_MISMATCH"
+  | "FRACTION_COMPARISON"
   | "VALUE_TYPE"
   | "MEMBERSHIP_TYPE"
   | "UNKNOWN_OPTION"
@@ -47,7 +48,15 @@ export type DiagnosticCode =
   | "BLANK_LINE"
   | "OPERATOR_SPACING"
   | "TAB_CHARACTER"
-  | "EMPTY_OUTCOME_EXPRESSION";
+  | "EMPTY_OUTCOME_EXPRESSION"
+  // Calculation (reference expression) language
+  | "UNKNOWN_FUNCTION"
+  | "FUNCTION_ARGS"
+  | "DIVIDE_BY_ZERO"
+  | "UNKNOWN_UNIT"
+  | "DATE_AMOUNT"
+  | "FORMULA_UNWRAPPED"
+  | "MIXED_FORMULA";
 
 export interface Diagnostic {
   severity: Severity;

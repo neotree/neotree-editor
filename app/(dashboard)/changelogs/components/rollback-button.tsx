@@ -31,7 +31,13 @@ type Props = {
   mode?: "previous" | "restore"
 }
 
-export function RollbackButton({ entityId, entityType, targetVersion, currentVersion, disabled, mode = "previous" }: Props) {
+// Switching an account on or off is undone by reactivating / deactivating the user, never by a rollback.
+export function RollbackButton(props: Props) {
+  if (props.entityType === "user") return null
+  return <RollbackButtonInner {...props} />
+}
+
+function RollbackButtonInner({ entityId, entityType, targetVersion, currentVersion, disabled, mode = "previous" }: Props) {
   const { alert } = useAlertModal()
   const { viewOnly } = useAppContext()
   const router = useRouter()

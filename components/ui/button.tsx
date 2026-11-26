@@ -14,7 +14,7 @@ const buttonVariants = cva(
     text-sm
     font-medium
     transition-colors
-    focus-visible:outline-none
+    focus-visible:outline-hidden
     disabled:pointer-events-none
     disabled:opacity-50
   `,

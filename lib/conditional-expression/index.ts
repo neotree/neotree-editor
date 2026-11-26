@@ -14,6 +14,15 @@ export type {
   ValidationResult,
 } from "./ast";
 export { validateReferenceExpression } from "./reference-expr";
+export {
+  compileCalculation,
+  evaluateCalculation,
+  getCalculationKeys,
+  addToDate,
+  DATE_UNITS,
+  type CompileResult,
+  type DateUnit,
+} from "./calculation";
 export { tidyCondition } from "./device";
 export { mergeConditionKeys } from "./merge-keys";
 export { toConditionKeys } from "./keys";

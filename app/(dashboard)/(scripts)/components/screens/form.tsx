@@ -36,7 +36,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader } from "@/components/loader";
 import { ScreenFormDataType } from "@/contexts/scripts";
-import { screenTypes, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
+import { screenTypes, screenTypePickerOptions, defaultScreenTableConfig, CONDITIONAL_EXP_EXAMPLE } from '@/constants';
 import { cn } from "@/lib/utils";
 import { nuidSearchOptions } from "@/constants/fields";
 import { WHY_DIAGNOSIS_OPTION_DISABLED, WHY_PROBLEMS_OPTION_DISABLED, } from "@/constants/copy";
@@ -49,6 +49,16 @@ import { useScreenForm } from "../../hooks/use-screen-form";
 import { getScreenDataType } from "../../utils";
 import { ImageField } from "../image-field";
 import { Fields } from "./fields";
+import { ScreenTablePreview, ScreenTableSettings } from "./table-config";
+import {
+    TABLE_SCREEN_TYPE,
+    getDisplayedScreenType,
+    isTableScreen as getIsTableScreen,
+    normalizeScreenTableConfig,
+    tableCollectionName,
+    validateScreenTableConfig,
+    validateTableCollectionName,
+} from "@/lib/screen-table-config";
 import { Items } from "./items";
 import { Drugs } from "./drugs";
 import { EdlizSummary } from "./edliz-summary";
@@ -124,6 +134,41 @@ export function ScreenForm(props: Props) {
     const reasons = watch('reasons');
     const repeatable = watch('repeatable');
     const collectionLabel = watch('collectionLabel');
+    const collectionName = watch('collectionName');
+    const tableConfig = watch('tableConfig');
+    // A table is a repeatable form with table settings; it is created and shown as its own type.
+    const isTableScreen = getIsTableScreen({ type, repeatable, tableConfig });
+    const displayedType = getDisplayedScreenType({ type, repeatable, tableConfig });
+    const tableErrors = useMemo(() => {
+        if (!isTableScreen) return [];
+        const otherCollections = screens
+            .filter(s => s.screenId !== formData?.screenId && !!s.repeatable)
+            .map(s => s.collectionName);
+        const configErrors = validateScreenTableConfig(
+            normalizeScreenTableConfig({ type, repeatable, tableConfig }, () => 'new-row'),
+        );
+        return [
+            ...configErrors,
+            // an unnamed table already says so above
+            ...(!`${tableConfig?.title || ''}`.trim() ? [] : validateTableCollectionName(collectionName, otherCollections)),
+        ];
+    }, [isTableScreen, screens, formData?.screenId, type, repeatable, tableConfig, collectionName]);
+
+    /** Switches a form between an ordinary form and a table (the only type change allowed after creation). */
+    const setScreenType = useCallback((value: string) => {
+        if (value === TABLE_SCREEN_TYPE) {
+            const title = `${form.getValues('title') || ''}`;
+            setValue('type', 'form' as typeof type, { shouldDirty: true, });
+            setValue('repeatable', true, { shouldDirty: true, });
+            setValue('tableConfig', { ...defaultScreenTableConfig, title }, { shouldDirty: true, });
+            if (!`${form.getValues('collectionName') || ''}`.trim()) {
+                setValue('collectionName', tableCollectionName(title), { shouldDirty: true, });
+            }
+            return;
+        }
+        setValue('type', value as typeof type, { shouldDirty: true, });
+        setValue('tableConfig', null, { shouldDirty: true, });
+    }, [form, setValue]);
     const key = watch('key');
     const listStyle = form.watch('listStyle');
     const printDisplayColumns = form.watch('printDisplayColumns');
@@ -252,9 +297,11 @@ export function ScreenForm(props: Props) {
                     <div>
                         <RadioGroup
                             disabled={disabled}
-                            defaultValue={type}
+                            defaultValue={displayedType}
                             onValueChange={value => {
-                                setValue('type', value as typeof type, { shouldDirty: true, });
+                                setScreenType(value);
+                                // a table is repeatable; any other new screen starts as not repeatable
+                                if (value !== TABLE_SCREEN_TYPE) setValue('repeatable', null as unknown as boolean, { shouldDirty: true, });
                                 setValue('items', [], { shouldDirty: true, });
                                 if ((value === 'mwi_edliz_summary_table') || (value === 'zw_edliz_summary_table')) {
                                     const items = edlizSummaryData[value] as ScriptItem[];
@@ -263,7 +310,7 @@ export function ScreenForm(props: Props) {
                             }}
                             className="flex flex-col gap-y-4"
                         >
-                            {screenTypes.map(t => {
+                            {screenTypePickerOptions.map(t => {
                                 let disabled = false;
                                 let helperText = '';
 
@@ -490,17 +537,13 @@ export function ScreenForm(props: Props) {
 
                 <div>
                     <Select
-                        value={type || ''}
-                        disabled
+                        value={displayedType}
+                        // The type is fixed once a screen exists, except that a form can become a table and back.
+                        disabled={disabled || !isFormScreen}
                         name="type"
                         onValueChange={v => {
-                            const value = (v || screenTypes[0].value) as typeof type;
-                            setValue('type', value, { shouldDirty: true, });
-                            setValue('items', [], { shouldDirty: true, });
-                            if ((value === 'mwi_edliz_summary_table') || (value === 'zw_edliz_summary_table')) {
-                                setValue('items', [], { shouldDirty: true, });
-                            }
-                            if (value === 'management') setValue('printable', false);
+                            if (!v || v === displayedType) return;
+                            if (isFormScreen && (v === 'form' || v === TABLE_SCREEN_TYPE)) setScreenType(v);
                         }}
                     >
                         <SelectTrigger>
@@ -509,15 +552,33 @@ export function ScreenForm(props: Props) {
                         <SelectContent>
                             <SelectGroup>
                                 <SelectLabel>Screen types</SelectLabel>
-                                {screenTypes.map(s => (
-                                    <SelectItem key={s.value} value={s.value}>
-                                        {s.label}
-                                    </SelectItem>
-                                ))}
+                                {screenTypePickerOptions
+                                    .filter(s => !isFormScreen || s.value === 'form' || s.value === TABLE_SCREEN_TYPE)
+                                    .map(s => (
+                                        <SelectItem key={s.value} value={s.value}>
+                                            {s.label}
+                                        </SelectItem>
+                                    ))}
                             </SelectGroup>
                         </SelectContent>
                     </Select>
+                    {isFormScreen && !disabled && (
+                        <span className="text-xs text-muted-foreground">
+                            {isTableScreen
+                                ? 'A table captures several rows of the same columns. Switch to Form to capture it as an ordinary form.'
+                                : 'Switch to Table to capture several rows of the same fields as a table.'}
+                        </span>
+                    )}
                 </div>
+
+                {isTableScreen && (
+                    <ScreenTableSettings
+                        form={form}
+                        disabled={disabled}
+                        errors={tableErrors}
+                        persistedCollectionName={formData?.collectionName || ''}
+                    />
+                )}
 
                 <Title>Flow control</Title>
 
@@ -1363,7 +1424,7 @@ export function ScreenForm(props: Props) {
                 >Cancel</Button>
 
                 <Button
-                    disabled={disabled || conditionHasErrors || skipToConditionHasErrors || !!reservedKeyCollisions.length}
+                    disabled={disabled || conditionHasErrors || skipToConditionHasErrors || !!reservedKeyCollisions.length || !!tableErrors.length}
                     onClick={() => save()}
                 >
                     Save Draft
@@ -1379,7 +1440,8 @@ export function ScreenForm(props: Props) {
 
             {isFormScreen && (
                 <>
-                    <div className="flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1">
+                    {/* A table is always repeatable, so the switch is only offered on ordinary forms. */}
+                    <div className={cn('flex flex-col gap-y-5 sm:flex-row sm:gap-y-0 sm:gap-x-2 sm:[&>*]:flex-1', isTableScreen && 'hidden')}>
                         <div className="flex items-center justify-start gap-x-2 py-6 px-4">
                             <Switch
                                 id="repeatable"
@@ -1399,9 +1461,21 @@ export function ScreenForm(props: Props) {
                         scriptId={scriptId}
                         unavailableOutcomeKeys={unavailableOutcomeKeys}
                         persistedFields={(formData?.fields || []) as ScriptField[]}
+                        variant={isTableScreen ? 'columns' : 'fields'}
                     />
-                    
-                    {repeatable && (
+
+                    {isTableScreen && (
+                        <>
+                            <Separator className="my-8" />
+
+                            <ScreenTablePreview form={form} />
+
+                            <Separator className="my-8" />
+                        </>
+                    )}
+
+                    {/* The collection of a table is named after the table (see ScreenTableSettings). */}
+                    {repeatable && !isTableScreen && (
                         <>
                             <Separator className="my-8" />
 

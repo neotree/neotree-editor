@@ -138,25 +138,40 @@ export async function _rollbackDataVersion({
 
       await assertRollbackAllowedWithDrafts(tx, userId)
 
-      const currentDataVersion = requestedDataVersion ?? editor?.dataVersion
+      if (!editor) throw new Error("Failed to lock editor info")
+
+      // Data versions that changed content. A version can also record only a user being
+      // deactivated / reactivated: it has nothing to undo and is never a rollback source or target.
+      const contentRows = await tx
+        .selectDistinct({ dataVersion: changeLogs.dataVersion })
+        .from(changeLogs)
+        .where(and(inArray(changeLogs.entityType, RELEASE_ROLLBACK_ENTITY_TYPES), sql`${changeLogs.dataVersion} is not null`))
+      const contentVersions = contentRows.map((r) => Number(r.dataVersion)).sort((a, b) => a - b)
+      const latestContentVersion = [...contentVersions].reverse().find((v) => v <= editor.dataVersion)
+
+      // The release being undone is the latest one that changed content; access-only versions
+      // published after it do not count as "newer releases".
+      if (requestedDataVersion != null && requestedDataVersion !== editor.dataVersion && requestedDataVersion !== latestContentVersion) {
+        throw new Error("Data version drift detected; reload and try again")
+      }
+      const currentDataVersion = latestContentVersion
       if (!currentDataVersion || currentDataVersion < 2) {
         throw new Error("No data version to rollback or already at initial version")
       }
 
-      if (!editor || editor.dataVersion !== currentDataVersion) {
-        throw new Error("Data version drift detected; reload and try again")
-      }
-
-      const restoreSourceDataVersion = requestedTargetDataVersion ?? (currentDataVersion - 1)
+      const restoreSourceDataVersion =
+        requestedTargetDataVersion ?? [...contentVersions].reverse().find((v) => v < currentDataVersion) ?? currentDataVersion - 1
       if (!Number.isInteger(restoreSourceDataVersion) || restoreSourceDataVersion < 1) {
         throw new Error("No previous data version available to restore")
       }
       if (restoreSourceDataVersion >= currentDataVersion) {
         throw new Error("Rollback target must be older than the current published data version")
       }
+      // Depth counts releases that changed content, so user access versions never use up the window.
+      const releasesUndone = contentVersions.filter((v) => v > restoreSourceDataVersion && v <= currentDataVersion).length
       if (!allowDeepRollback && !isReleaseRollbackWithinRecentWindow({
-        currentDataVersion,
-        targetDataVersion: restoreSourceDataVersion,
+        currentDataVersion: releasesUndone,
+        targetDataVersion: 0,
       })) {
         throw new Error(
           `Release rollback is limited to the last ${RELEASE_ROLLBACK_MAX_RECENT_DEPTH} prior versions unless deep rollback override is enabled`,
@@ -178,7 +193,8 @@ export async function _rollbackDataVersion({
         throw new Error(releaseTargetPolicy.reason)
       }
 
-      const targetDataVersion = currentDataVersion + 1
+      // the new release takes the next free number, which may be past an access-only version
+      const targetDataVersion = editor.dataVersion + 1
       restoredVersion = restoreSourceDataVersion
 
       const currentChanges = await tx.query.changeLogs.findMany({
@@ -198,7 +214,7 @@ export async function _rollbackDataVersion({
       })
 
       if (!rollbackCandidates.length) {
-        throw new Error(`No active entities changed after data version v${restoreSourceDataVersion}`)
+        throw new Error(`No content changed after data version v${restoreSourceDataVersion}, so there is nothing to restore. Versions that only changed user access can't be restored; choose an earlier release.`)
       }
       rolledBackEntityCount = rollbackCandidates.length
 

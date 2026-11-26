@@ -17,6 +17,7 @@ import { ScriptsTableSearch } from "../scripts-table-search";
 import { useConditionKeys } from "@/components/conditional-expression";
 import { ScriptIssueBadge, collisionIssues, conditionIssues } from "@/components/script-issues";
 import { getOutcomeProducers, getUnavailableOutcomeKeys } from "@/lib/conditional-expression";
+import { getDisplayedScreenType } from "@/lib/screen-table-config";
 import { findScriptFieldKeyCollisions, type FieldKeyCollision } from "@/lib/field-key-collisions";
 
 type Props = UseScreensTableParams;
@@ -242,7 +243,7 @@ export function ScreensTable(props: Props) {
                     ]}
                     data={screensArr.map(s => [
                         s.position,
-                        s.type,
+                        getDisplayedScreenType(s as Parameters<typeof getDisplayedScreenType>[0]),
                         s.epicId,
                         s.storyId,
                         s.refId,

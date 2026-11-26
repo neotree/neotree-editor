@@ -50,6 +50,12 @@ export function useRoutes() {
       hidden: isDefaultUser,
     },
     {
+      label: "Calculation Templates",
+      href: "/calculation-templates",
+      id: v4(),
+      hidden: isDefaultUser,
+    },
+    {
       label: "Users",
       href: "/users",
       id: v4(),

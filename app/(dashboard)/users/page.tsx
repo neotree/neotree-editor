@@ -1,6 +1,5 @@
 import { 
     getUsers, 
-    deleteUsers, 
     getUser, 
     updateUsers, 
     createUsers,
@@ -60,7 +59,6 @@ export default async function Users({ searchParams }: Props) {
                                 users={users}
                                 roles={roles}
                                 getUsers={getUsers}
-                                deleteUsers={deleteUsers}
                                 getUser={getUser}
                                 updateUsers={updateUsers}
                                 createUsers={createUsers}

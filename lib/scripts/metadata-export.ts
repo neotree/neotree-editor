@@ -26,6 +26,8 @@ export type ScriptScreenMetadataRow = {
     "Disable other options if selected": string;
     "Forbid With": string;
     "Management Metadata": string;
+    'Found in admission searches': string;
+    'Found in twin searches': string;
 };
 
 const cellValue = (value: unknown) => value == null ? "" : `${value}`;
@@ -66,6 +68,8 @@ export function buildScriptScreenMetadataRows(script: ScriptMetadata): ScriptScr
                 "Management Metadata": screen.managementMetadata
                     ? JSON.stringify(screen.managementMetadata)
                     : "",
+                'Found in admission searches': screen.foundInAdmissionSearches ? 'Yes' : 'No',
+                'Found in twin searches': screen.foundInTwinSearches ? 'Yes' : 'No',
             });
         }
 
@@ -109,6 +113,8 @@ export function buildScriptScreenMetadataRows(script: ScriptMetadata): ScriptScr
                     "Management Metadata": screen.type === "management" && screen.managementMetadata
                         ? JSON.stringify(screen.managementMetadata)
                         : "",
+                    'Found in admission searches': field.foundInAdmissionSearches ? 'Yes' : 'No',
+                    'Found in twin searches': field.foundInTwinSearches ? 'Yes' : 'No',
                 });
             });
         });

@@ -10,6 +10,8 @@ import { _getDevice } from "@/databases/queries/devices";
 import { _saveDevices } from "@/databases/mutations/devices";
 import { getScriptsWithItems } from "@/app/actions/scripts";
 import { getHeaders } from "@/lib/header";
+import { _getUserMini } from "@/databases/queries/users";
+import { isUserDeactivated } from "@/lib/user-status";
 
 interface IParams {
     params: Promise<{
@@ -21,7 +23,6 @@ type ReqBody = {
     lastSyncDate?: string | null;
     dataVersion?: number | null;
     forceSync?: boolean;
-    sessionsCount?: number;
     hospitalId?: string;
 };
 
@@ -73,6 +74,12 @@ export async function POST(req: NextRequest, props: IParams) {
                 });
             });
             isLoggedIn = !!authenticated;
+
+            // a token issued before the account was deactivated must stop working immediately
+            if (authenticated?.userId) {
+                const tokenUser = await _getUserMini(authenticated.userId);
+                if (!tokenUser || isUserDeactivated(tokenUser)) isLoggedIn = false;
+            }
         }
 
         const {
@@ -80,7 +87,6 @@ export async function POST(req: NextRequest, props: IParams) {
             dataVersion,
             forceSync,
             hospitalId,
-            sessionsCount,
         }: ReqBody = await req.json();
 
         const deviceRes = await _getDevice({ deviceId, });
