@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
-import { ArrowRight, MoreVertical, Search } from "lucide-react"
+import { ArrowRight, DownloadIcon, MoreVertical, Search } from "lucide-react"
 
 import { Loader } from "@/components/loader"
 import { Button } from "@/components/ui/button"
@@ -43,6 +43,7 @@ import {
   type UseChangelogsTableParams,
   useChangelogsTable,
 } from "../hooks/use-changelogs-table"
+import { DataKeysChangesModal } from "./datakeys-changes-modal"
 
 type Props = UseChangelogsTableParams & {
   isSuperUser: boolean
@@ -331,9 +332,19 @@ export function ChangelogsTable(props: Props) {
     )
   }
 
+  const [selectedEntry, setSelectedEntry] = useState<DataVersionSummary>();
+
   return (
     <>
       {(loading || rollbacking !== null) && <Loader overlay />}
+
+      {!!selectedEntry && (
+        <DataKeysChangesModal 
+          entry={selectedEntry}
+          open
+          onClose={() => setSelectedEntry(undefined)}
+        />
+      )}
 
       <div className="flex flex-col gap-y-4">
         <div className="pt-4 px-4 flex items-center gap-x-4">
@@ -459,6 +470,10 @@ export function ChangelogsTable(props: Props) {
                         <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
                           <DropdownMenuItem onClick={() => handleNavigate(entry.dataVersion)} className="cursor-pointer">
                             View details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setSelectedEntry(entry)}>
+                            <DownloadIcon className="size-4 mr-2" />
+                            Download data keys changes
                           </DropdownMenuItem>
                           {isSuperUser && !viewOnly && !entry.isAccessOnly && (entry.isLatestContentVersion ?? entry.isLatestVersion) && entry.dataVersion > 1 && (
                             <DropdownMenuItem
