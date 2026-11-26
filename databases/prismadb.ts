@@ -27,7 +27,7 @@ function createPrismaClient() {
     });
 
     return new PrismaClient({
-        adapter,
+        adapter: adapter as unknown as never,
         log: dbLogging ? ['query', 'info', 'warn', 'error'] : undefined,
     });
 }
