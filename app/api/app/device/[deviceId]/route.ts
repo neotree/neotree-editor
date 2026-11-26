@@ -21,7 +21,6 @@ type ReqBody = {
     lastSyncDate?: string | null;
     dataVersion?: number | null;
     forceSync?: boolean;
-    sessionsCount?: number;
     hospitalId?: string;
 };
 
@@ -80,7 +79,6 @@ export async function POST(req: NextRequest, props: IParams) {
             dataVersion,
             forceSync,
             hospitalId,
-            sessionsCount,
         }: ReqBody = await req.json();
 
         const deviceRes = await _getDevice({ deviceId, });
