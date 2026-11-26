@@ -138,7 +138,7 @@ export function SessionsTable({ sessions }: Props) {
                             }
                         }
                     ]}
-                    data={sessions.data.map(s => [
+                    data={sessions.data.map((s: any) => [
                         s.uid || '',
                         s.scriptid || '',
                         s.ingested_at ? moment(s.ingested_at).format('LLL') : '',
