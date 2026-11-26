@@ -42,7 +42,7 @@ export const reactSelectStyles: ReactSelectProps['styles'] = {
 
 export const reactSelectClasses: ReactSelectProps['classNames'] = {
 	control: ({ isDisabled }) => cn(
-		'react-slct-ctrl focus:outline-none text-foreground min-h-10',
+		'react-slct-ctrl focus:outline-hidden text-foreground min-h-10',
 		isDisabled && 'opacity-50',
 	),
 	valueContainer: ({ hasValue }) => cn(

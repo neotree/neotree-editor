@@ -1,11 +1,11 @@
 generator client {
     provider            = "prisma-client-js"
-    previewFeatures     = ["fullTextSearch", "fullTextIndex"]
+    previewFeatures     = ["fullTextSearchPostgres"]
 }
 
+// The connection URL lives in prisma.config.ts (CLI) and databases/prismadb.ts (runtime adapter).
 datasource db {
     provider            = "postgresql"
-    url                 = env("SESSIONS_DB_URL")
 }
 
 /// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.

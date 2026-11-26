@@ -10,7 +10,7 @@ import { ScreenType } from '../../queries/scripts/_screens_get';
 import { removeHexCharacters } from '../../utils'
 import { normalizeSelectionRuleItems, validateSelectionRules } from '@/lib/selection-rules';
 import { assertDraftOwner } from "@/lib/server/draft-owner";
-import { normalizeScreenTableConfig, tableCollectionName, validateScreenTable } from '@/lib/screen-table-config';
+import { normalizeScreenTableConfig, tableCollectionName, tableLegacyCollectionLabel, validateScreenTable } from '@/lib/screen-table-config';
 import { queueContentWrite } from "@/lib/server/content-write-lock";
 import { describeError } from '@/lib/server/db-errors';
 
@@ -268,6 +268,10 @@ async function _saveScreensNow({ data, broadcastAction, userId, client, draftOri
                     // the screen already has one (renaming a table must not move its data).
                     ...(!tableConfig || `${item.collectionName || ''}`.trim() ? {} : {
                         collectionName: tableCollectionName(tableConfig.title),
+                    }),
+                    // Older apps show a table as a repeatable form, which needs a collection label field.
+                    ...(!tableConfig || !Array.isArray(item.fields) ? {} : {
+                        collectionLabel: tableLegacyCollectionLabel(item.fields),
                     }),
                 };
 
