@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
         const data = {
             ...res,
-            data: res.data.map(s => ({
+            data: res.data.map((s: any) => ({
                 uid: s.uid,
                 ingested_at: s.ingested_at,
                 scriptid: s.scriptid,
