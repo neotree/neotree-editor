@@ -1,6 +1,7 @@
 import { normaliseScriptIdType } from "@/lib/script-id-type";
 import { configKeys, diagnoses, problems, screens, scripts } from "@/databases/pg/schema";
 import { ScreenReviewField, ScriptField } from "@/types";
+import { tableLegacyCollectionLabel } from "@/lib/screen-table-config";
 
 export function mapNewConfigKeysToOld(s: typeof configKeys.$inferSelect) {
     return {
@@ -191,7 +192,8 @@ export function mapNewScreenToOld(s: typeof screens.$inferSelect) {
                 text1: s.text1,
                 text2: s.text2,
                 repeatable: s.repeatable,
-                collectionLabel: s.collectionLabel,
+                // A table saved before it set one still needs a collection label on older apps.
+                collectionLabel: s.collectionLabel || (s.repeatable && s.tableConfig ? tableLegacyCollectionLabel(s.fields as any) : s.collectionLabel),
                 collectionName: s.collectionName,
                 // Only a repeatable form can be a table; null = ordinary form.
                 tableConfig: s.repeatable ? (s.tableConfig || null) : null,

@@ -19,7 +19,7 @@ import {
   scripts,
 } from "@/databases/pg/schema"
 import socket from "@/lib/socket"
-import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback"
+import { computeRollbackSnapshotHash } from "@/lib/changelog-rollback-hash"
 import { lockChangeLogChain } from "./_rollback-shared"
 
 export type SaveChangeLogData = {

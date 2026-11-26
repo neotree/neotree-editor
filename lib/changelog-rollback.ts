@@ -1,5 +1,3 @@
-import { createHash } from "crypto"
-
 export const DEFAULT_RELEASE_ROLLBACK_CREATED_ENTITY_POLICY = "soft_delete" as const
 export const RELEASE_ROLLBACK_MAX_RECENT_DEPTH = 5 as const
 export const SCRIPT_CHILD_ENTITY_TYPES = ["screen", "diagnosis", "problem"] as const
@@ -279,37 +277,6 @@ export function partitionReleaseRollbackCandidates<T extends RollbackCandidate>(
     scriptChanges,
     standaloneChanges,
   }
-}
-
-function normalizeSnapshotValueForHash(snapshot: any): any {
-  if (snapshot instanceof Date) return snapshot.toISOString()
-
-  if (Array.isArray(snapshot)) {
-    return snapshot.map((value) => {
-      if (value === undefined || typeof value === "function" || typeof value === "symbol") return null
-      return normalizeSnapshotValueForHash(value)
-    })
-  }
-
-  if (snapshot && typeof snapshot === "object") {
-    return Object.keys(snapshot)
-      .sort()
-      .reduce<Record<string, any>>((acc, key) => {
-        const value = snapshot[key]
-        if (value === undefined || typeof value === "function" || typeof value === "symbol") return acc
-        acc[key] = normalizeSnapshotValueForHash(value)
-        return acc
-      }, {})
-  }
-
-  if (typeof snapshot === "number" && !Number.isFinite(snapshot)) return null
-  if (typeof snapshot === "bigint") return snapshot.toString()
-  return snapshot
-}
-
-export function computeRollbackSnapshotHash(snapshot: any) {
-  const normalizedSnapshot = normalizeSnapshotValueForHash(snapshot ?? {})
-  return createHash("sha256").update(JSON.stringify(normalizedSnapshot)).digest("hex")
 }
 
 export function shouldAutoRepairLegacySnapshotHash(change: {
