@@ -83,6 +83,14 @@
       "namedRegex": "^/api/auth/(?<nxtPnextauth>.+?)(?:/)?$"
     },
     {
+      "page": "/api/changelogs/get/[version]",
+      "regex": "^/api/changelogs/get/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPversion": "nxtPversion"
+      },
+      "namedRegex": "^/api/changelogs/get/(?<nxtPversion>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/api/changelogs/history/[entityId]",
       "regex": "^/api/changelogs/history/([^/]+?)(?:/)?$",
       "routeKeys": {
@@ -287,14 +295,6 @@
       "namedRegex": "^/scripts/(?<nxtPscriptId>[^/]+?)/metadata(?:/)?$"
     },
     {
-      "page": "/sessions/[sessionId]",
-      "regex": "^/sessions/([^/]+?)(?:/)?$",
-      "routeKeys": {
-        "nxtPsessionId": "nxtPsessionId"
-      },
-      "namedRegex": "^/sessions/(?<nxtPsessionId>[^/]+?)(?:/)?$"
-    },
-    {
       "page": "/users/edit/[uuid]",
       "regex": "^/users/edit/([^/]+?)(?:/)?$",
       "routeKeys": {
@@ -435,12 +435,6 @@
       "regex": "^/screens(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/screens(?:/)?$"
-    },
-    {
-      "page": "/sessions",
-      "regex": "^/sessions(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/sessions(?:/)?$"
     },
     {
       "page": "/settings",
